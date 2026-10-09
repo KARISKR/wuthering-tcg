@@ -49,12 +49,14 @@ interface GameBoardProps {
   onExitToLobby?: () => void;
   initialMode?: 'AI' | 'SOLO_DUAL';
   customDeck?: CustomDeckConfig | null;
+  opponentDeck?: CustomDeckConfig | null;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({
   onExitToLobby,
   initialMode = 'AI',
   customDeck,
+  opponentDeck,
 }) => {
   const {
     gameState,
@@ -73,7 +75,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleDiscardOverflow,
     handleEndTurn,
     handleForceResolveClash,
-  } = useGame(undefined, undefined, initialMode, customDeck);
+  } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
 
   // 모달 상태
   const [isRulesOpen, setIsRulesOpen] = useState(false);

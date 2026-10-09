@@ -7,14 +7,18 @@ export function App() {
   const [currentView, setCurrentView] = useState<'LOBBY' | 'BATTLE' | 'DECK_BUILDER'>('LOBBY');
   const [battleMode, setBattleMode] = useState<'AI' | 'SOLO_DUAL'>('AI');
   const [customDeck, setCustomDeck] = useState<CustomDeckConfig | null>(null);
+  const [opponentDeck, setOpponentDeck] = useState<CustomDeckConfig | null>(null);
 
-  const handleStartGame = (mode: 'AI' | 'SOLO_DUAL') => {
+  const handleStartGame = (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, oppDeck?: CustomDeckConfig) => {
+    setCustomDeck(myDeck ?? null);
+    setOpponentDeck(oppDeck ?? null);
     setBattleMode(mode);
     setCurrentView('BATTLE');
   };
 
   const handleStartBattleWithCustomDeck = (deck: CustomDeckConfig) => {
     setCustomDeck(deck);
+    setOpponentDeck(null);
     setBattleMode('AI');
     setCurrentView('BATTLE');
   };
@@ -41,6 +45,7 @@ export function App() {
           onExitToLobby={() => setCurrentView('LOBBY')}
           initialMode={battleMode}
           customDeck={customDeck}
+          opponentDeck={opponentDeck}
         />
       )}
     </div>

@@ -7,6 +7,7 @@ import { VideoGuideModal } from './VideoGuideModal';
 import { PatchNotesModal } from './PatchNotesModal';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
+import { DeckSelectModal } from './DeckSelectModal';
 import {
   Swords,
   Layers,
@@ -25,7 +26,7 @@ import {
 } from 'lucide-react';
 
 interface LobbyProps {
-  onStartGame: (mode: 'AI' | 'SOLO_DUAL') => void;
+  onStartGame: (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, opponentDeck?: CustomDeckConfig) => void;
   onOpenDeckBuilder: () => void;
   onStartBattleWithCustomDeck?: (deck: CustomDeckConfig) => void;
 }
@@ -41,6 +42,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isPresetOpen, setIsPresetOpen] = useState(false);
   const [isPatchNotesOpen, setIsPatchNotesOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
+  const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
 
   return (
     <div className="relative min-h-screen w-full bg-[#070a13] text-slate-100 flex flex-col justify-between overflow-x-hidden">
@@ -318,7 +320,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               <button
                 onClick={() => {
                   setShowModeModal(false);
-                  onStartGame('AI');
+                  setDeckSelectMode('AI');
                 }}
                 className="w-full p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-400 transition flex items-center gap-4 text-left group cursor-pointer"
               >
@@ -338,7 +340,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               <button
                 onClick={() => {
                   setShowModeModal(false);
-                  onStartGame('SOLO_DUAL');
+                  setDeckSelectMode('SOLO_DUAL');
                 }}
                 className="w-full p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-indigo-400 transition flex items-center gap-4 text-left group cursor-pointer"
               >
@@ -365,6 +367,18 @@ export const Lobby: React.FC<LobbyProps> = ({
           </div>
         </div>
       )}
+
+      {/* 덱 선택 모달 (AI 봇 대전 / 1인 2역) */}
+      <DeckSelectModal
+        isOpen={deckSelectMode !== null}
+        mode={deckSelectMode ?? 'AI'}
+        onClose={() => setDeckSelectMode(null)}
+        onConfirm={(myDeck, oppDeck) => {
+          const m = deckSelectMode ?? 'AI';
+          setDeckSelectMode(null);
+          onStartGame(m, myDeck, oppDeck);
+        }}
+      />
 
       {/* 공식 룰북 모달 */}
       <OfficialManualModal

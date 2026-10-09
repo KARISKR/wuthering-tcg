@@ -28,10 +28,11 @@ export function useGame(
   p0PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_ROVER',
   p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_CHIXIA',
   initialGameMode: 'AI' | 'SOLO_DUAL' = 'AI',
-  customDeck?: CustomDeckConfig | null
+  customDeck?: CustomDeckConfig | null,
+  p1CustomDeck?: CustomDeckConfig | null
 ) {
   const [gameState, setGameState] = useState<GameState>(() =>
-    createInitialGameState(p0PresetKey, p1PresetKey, initialGameMode, customDeck)
+    createInitialGameState(p0PresetKey, p1PresetKey, initialGameMode, customDeck, p1CustomDeck)
   );
 
   const [isAiThinking, setIsAiThinking] = useState(false);
@@ -39,10 +40,10 @@ export function useGame(
   // 새 게임 시작
   const restartGame = useCallback(
     (newP0Preset = p0PresetKey, newP1Preset = p1PresetKey, newMode = gameState.gameMode) => {
-      setGameState(createInitialGameState(newP0Preset, newP1Preset, newMode, customDeck));
+      setGameState(createInitialGameState(newP0Preset, newP1Preset, newMode, customDeck, p1CustomDeck));
       setIsAiThinking(false);
     },
-    [p0PresetKey, p1PresetKey, gameState.gameMode, customDeck]
+    [p0PresetKey, p1PresetKey, gameState.gameMode, customDeck, p1CustomDeck]
   );
 
   // 게임 모드 변경 (AI 대전 <-> 1인 2역)

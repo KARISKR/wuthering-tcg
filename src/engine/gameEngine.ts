@@ -56,34 +56,24 @@ export function drawSingleCardFromDeck(player: PlayerState): ActionCard | null {
 // 1. 초기 상태 생성
 // ==========================================
 
-export function createInitialGameState(
-  p0PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_ROVER',
-  p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_CHIXIA',
-  gameMode: 'AI' | 'SOLO_DUAL' = 'AI',
-  p0CustomDeck?: CustomDeckConfig | null
-): GameState {
-  const p0Preset = STARTER_PRESETS[p0PresetKey];
-  const p1Preset = STARTER_PRESETS[p1PresetKey];
-
-  let p0Deck = generateStarterActionDeck(p0PresetKey);
-  let p1Deck = generateStarterActionDeck(p1PresetKey);
-
-  let p0PresetObj = p0Preset;
-
-  // 커스텀 덱이 주어진 경우 플레이어 0 세팅 교체
-  if (p0CustomDeck && p0CustomDeck.actionCards.length >= 40) {
-    p0Deck = shuffleArray([...p0CustomDeck.actionCards]);
-    const charNames = [
-      p0CustomDeck.leader.characterName,
-      p0CustomDeck.leftSupport.characterName,
-      p0CustomDeck.rightSupport.characterName,
-    ];
-    const evolutionCards = OFFICIAL_CARDS.filter(
-      (c) =>
-        c.kind === 'CHARACTER' &&
-        (c.level === 1 || c.level === 2) &&
-        charNames.some((n) => c.nameKr.includes(n) || c.characterName?.includes(n))
-    ).map((c) => ({
+// 커스텀 덱(프리셋 포함) 기반으로 한쪽 플레이어의 액션 덱과 캐릭터 덱 구성
+function buildSideFromCustomDeck(custom: CustomDeckConfig): { deck: ActionCard[]; preset: StarterDeckPreset } {
+  const charNames = [custom.leader.characterName, custom.leftSupport.characterName, custom.rightSupport.characterName];
+  // 동일 카드(코드+레벨)의 희귀도 중복 버전은 1장만 남겨 레벨업 카드 풀이 부풀지 않도록 한다
+  const seen = new Set<string>();
+  const evolutionCards = OFFICIAL_CARDS.filter(
+    (c) =>
+      c.kind === 'CHARACTER' &&
+      (c.level === 1 || c.level === 2) &&
+      charNames.some((n) => c.nameKr.includes(n) || c.characterName?.includes(n))
+  )
+    .filter((c) => {
+      const key = `${c.characterName || c.nameKr}-${c.level}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((c) => ({
       id: c.id,
       kind: 'CHARACTER' as const,
       code: c.code,
@@ -97,14 +87,41 @@ export function createInitialGameState(
       clashSkill: c.description,
     }));
 
-    p0PresetObj = {
+  return {
+    deck: shuffleArray([...custom.actionCards]),
+    preset: {
       id: 'STARTER_ROVER',
-      nameKr: p0CustomDeck.name,
-      leader: p0CustomDeck.leader,
-      leftSupport: p0CustomDeck.leftSupport,
-      rightSupport: p0CustomDeck.rightSupport,
+      nameKr: custom.name,
+      leader: custom.leader,
+      leftSupport: custom.leftSupport,
+      rightSupport: custom.rightSupport,
       characterDeck: evolutionCards,
-    };
+    },
+  };
+}
+
+export function createInitialGameState(
+  p0PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_ROVER',
+  p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_CHIXIA',
+  gameMode: 'AI' | 'SOLO_DUAL' = 'AI',
+  p0CustomDeck?: CustomDeckConfig | null,
+  p1CustomDeck?: CustomDeckConfig | null
+): GameState {
+  let p0Deck = generateStarterActionDeck(p0PresetKey);
+  let p1Deck = generateStarterActionDeck(p1PresetKey);
+  let p0PresetObj = STARTER_PRESETS[p0PresetKey];
+  let p1PresetObj = STARTER_PRESETS[p1PresetKey];
+
+  // 커스텀 덱이 주어진 경우 해당 플레이어 세팅 교체 (양쪽 모두 지원)
+  if (p0CustomDeck && p0CustomDeck.actionCards.length >= 40) {
+    const built = buildSideFromCustomDeck(p0CustomDeck);
+    p0Deck = built.deck;
+    p0PresetObj = built.preset;
+  }
+  if (p1CustomDeck && p1CustomDeck.actionCards.length >= 40) {
+    const built = buildSideFromCustomDeck(p1CustomDeck);
+    p1Deck = built.deck;
+    p1PresetObj = built.preset;
   }
 
   // 초기 5장 드로우
@@ -123,7 +140,7 @@ export function createInitialGameState(
   const player1: PlayerState = createPlayerState(
     'p1',
     gameMode === 'AI' ? '상대 (AI 봇)' : '상대 (플레이어 2)',
-    p1Preset,
+    p1PresetObj,
     p1Deck,
     p1Hand,
     gameMode === 'AI'
