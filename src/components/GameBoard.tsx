@@ -7,13 +7,14 @@ import { UpgradeModal } from './UpgradeModal';
 import { MulliganModal } from './MulliganModal';
 import { ClashAnimationOverlay } from './ClashAnimationOverlay';
 import { ComboStrikeOverlay } from './ComboStrikeOverlay';
+import { UpgradeEffectOverlay } from './UpgradeEffectOverlay';
 import { PhaseBannerOverlay } from './PhaseBannerOverlay';
 import { soundEffects } from '../utils/soundEffects';
 import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { GameOverModal } from './GameOverModal';
 import { CardListModal } from './CardListModal';
-import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect } from '../types/tcg';
+import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect } from '../types/tcg';
 import { CustomDeckConfig } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
 import {
@@ -104,12 +105,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 연격 공격 시네마틱 오버레이 상태
   const [activeComboStrike, setActiveComboStrike] = useState<ComboStrikeEffect | null>(null);
 
+  // 캐릭터 레벨업 각성 시네마틱 오버레이 상태
+  const [activeUpgrade, setActiveUpgrade] = useState<UpgradeEffect | null>(null);
+
   // gameState.lastComboStrike 변경 시 시네마틱 오버레이 자동 실행
   useEffect(() => {
     if (gameState.lastComboStrike) {
       setActiveComboStrike(gameState.lastComboStrike);
     }
   }, [gameState.lastComboStrike?.id]);
+
+  // gameState.lastUpgrade 변경 시 레벨업 시네마틱 오버레이 자동 실행
+  useEffect(() => {
+    if (gameState.lastUpgrade) {
+      setActiveUpgrade(gameState.lastUpgrade);
+    }
+  }, [gameState.lastUpgrade?.id]);
 
   // 1인 2역 (SOLO_DUAL) 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
   const [controlledPlayerIndex, setControlledPlayerIndex] = useState<0 | 1>(0);
@@ -1506,6 +1517,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <ComboStrikeOverlay
           strike={activeComboStrike}
           onDismiss={() => setActiveComboStrike(null)}
+        />
+      )}
+
+      {/* 캐릭터 레벨업(Upgrade) 각성 시네마틱 연출 오버레이 */}
+      {activeUpgrade && (
+        <UpgradeEffectOverlay
+          effect={activeUpgrade}
+          onDismiss={() => setActiveUpgrade(null)}
         />
       )}
 

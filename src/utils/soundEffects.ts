@@ -1,7 +1,7 @@
 // Web Audio API 및 커스텀 오디오 파일(MP3/WAV/OGG) 하이브리드 사운드 엔진
 // public/audio/sfx/ 폴더에 커스텀 파일이 있으면 우선 재생하고, 없으면 내장 물리 합성음으로 폴백
 
-export type SfxCategory = 'clash' | 'damage' | 'phase' | 'combo' | 'card' | 'turn';
+export type SfxCategory = 'clash' | 'damage' | 'phase' | 'combo' | 'card' | 'turn' | 'upgrade';
 
 export interface SfxSpec {
   category: SfxCategory;
@@ -66,6 +66,15 @@ export const SFX_SPECIFICATIONS: Record<SfxCategory, SfxSpec> = {
     recommendedDurationSec: 0.6,
     description: '새 턴 시작 및 선후공 턴 교대 차임',
     folderPath: '/audio/sfx/turn/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  upgrade: {
+    category: 'upgrade',
+    nameKr: '캐릭터 레벨업 / 공명 진화',
+    recommendedDuration: '0.6초 ~ 1.5초',
+    recommendedDurationSec: 1.0,
+    description: '공명자 Lv.1 -> Lv.2 진화 시 신성하고 웅장한 승급 팡파르/차임',
+    folderPath: '/audio/sfx/upgrade/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
 };
@@ -427,6 +436,59 @@ class SoundEffectsEngine {
     gain.connect(ctx.destination);
     osc.start(now);
     osc.stop(now + 0.4);
+  }
+
+  // =========================================================================
+  // 7. 캐릭터 레벨업 / 진화 효과음 (LEVEL UP - 권장 0.6~1.5초)
+  // =========================================================================
+  public playUpgrade() {
+    if (this.isMuted) return;
+
+    if (this.playCustomBuffer('upgrade')) return;
+
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+
+    // A. 웅장한 서브 붐 (공명 각성 임팩트)
+    const subOsc = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(90, now);
+    subOsc.frequency.exponentialRampToValueAtTime(35, now + 0.6);
+
+    subGain.gain.setValueAtTime(this.volume * 0.7, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+    subOsc.connect(subGain);
+    subGain.connect(ctx.destination);
+    subOsc.start(now);
+    subOsc.stop(now + 0.6);
+
+    // B. 신성한 상승 아르페지오 화음 (C4 -> E4 -> G4 -> C5 벨 차임)
+    const notes = [261.63, 329.63, 392.0, 523.25];
+    notes.forEach((freq, idx) => {
+      const noteOsc = ctx.createOscillator();
+      const noteGain = ctx.createGain();
+      noteOsc.type = 'triangle';
+      noteOsc.frequency.value = freq;
+
+      const noteStart = now + idx * 0.08;
+      const noteEnd = noteStart + 0.45;
+
+      noteGain.gain.setValueAtTime(0.001, noteStart);
+      noteGain.gain.linearRampToValueAtTime(this.volume * 0.45, noteStart + 0.02);
+      noteGain.gain.exponentialRampToValueAtTime(0.001, noteEnd);
+
+      noteOsc.connect(noteGain);
+      noteGain.connect(ctx.destination);
+      noteOsc.start(noteStart);
+      noteOsc.stop(noteEnd);
+    });
+
+    // C. 공명 광휘 로우패스 후시
+    this.playCinematicWhoosh(0.65, this.volume * 0.4);
   }
 
   // =========================================================================

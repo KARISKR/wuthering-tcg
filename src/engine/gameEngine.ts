@@ -424,6 +424,15 @@ export function upgradeCharacter(
 
   let newState = { ...state };
   newState.players[playerIndex] = player;
+  newState.lastUpgrade = {
+    id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    playerIndex,
+    playerName: player.name,
+    character: { ...upgradeCard },
+    previousLevel: currentSlotCard.level as 0 | 1,
+    newLevel: upgradeCard.level as 1 | 2,
+    slotName: targetSlot,
+  };
   newState = addLog(
     newState,
     `${player.name}이(가) [${currentSlotCard.nameKr}]을(를) [${upgradeCard.nameKr}](으)로 레벨업했습니다! (패 ${discarded.length}장 소비)`,

@@ -45,6 +45,9 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
       case 'turn':
         soundEffects.playTurnStart();
         break;
+      case 'upgrade':
+        soundEffects.playUpgrade();
+        break;
     }
     setTimeout(() => {
       setPlayingCat(null);

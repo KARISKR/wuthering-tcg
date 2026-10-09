@@ -121,6 +121,16 @@ export interface ComboStrikeEffect {
   damage: number;
 }
 
+export interface UpgradeEffect {
+  id: string;
+  playerIndex: 0 | 1;
+  playerName: string;
+  character: CharacterCard;
+  previousLevel: 0 | 1;
+  newLevel: 1 | 2;
+  slotName: 'leader' | 'leftSupport' | 'rightSupport';
+}
+
 export interface GameState {
   turn: number;
   activePlayerIndex: 0 | 1; // 턴 플레이어 (0: 플레이어1, 1: 플레이어2/AI)
@@ -128,6 +138,7 @@ export interface GameState {
   players: [PlayerState, PlayerState];
   clashResult: ClashResult | null;
   lastComboStrike?: ComboStrikeEffect | null;
+  lastUpgrade?: UpgradeEffect | null;
   winner: 0 | 1 | null;
   logs: LogItem[];
   gameMode: 'AI' | 'SOLO_DUAL'; // AI 대전 vs 1인 2역 듀얼

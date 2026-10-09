@@ -27,12 +27,21 @@ export const patchNotes: PatchNote[] = [
     isLatest: true,
     sections: [
       {
+        tag: 'NEW',
+        title: '캐릭터 레벨업(진화) 시네마틱 연출 및 전용 승급 효과음 추가',
+        items: [
+          '전투 중 캐릭터 카드 Lv.1 ➔ Lv.2 레벨업 시 웅장한 공명 각성(Resonance Awakened) 시네마틱 오버레이 자동 발동',
+          '승급 캐릭터 일러스트, 각성 레벨(Lv.2 MAX), 전용 스킬/설명 표시 및 부드러운 화면 진동·황금빛 오라 파티클 연출',
+          '신성한 아르페지오 화음 및 웅장한 서브 붐 전용 효과음 추가 (public/audio/sfx/upgrade/ 커스텀 음원 지원, 권장 0.6~1.5초)',
+        ],
+      },
+      {
         tag: 'AUDIO',
         title: '커스텀 효과음(SFX) 아키텍처 및 카테고리별 규격 체계 구축',
         items: [
-          '사용자 커스텀 효과음 폴더(public/audio/sfx/) 및 카테고리(clash, damage, phase, combo, card, turn) 체계 신설',
+          '사용자 커스텀 효과음 폴더(public/audio/sfx/) 및 7개 카테고리(clash, damage, phase, combo, card, turn, upgrade) 체계 신설',
           '폴더에 mp3/wav/ogg 파일 추가 시 우선 재생, 파일이 없을 경우 내장 물리 합성음으로 100% 자동 폴백(Fallback)',
-          '카테고리별 권장 재생 시간 가이드 정의 (페이즈 전환: 0.5~1.2초, 카드 세트: 0.05~0.2초, 격돌/피격: 0.3~0.8초 등)',
+          '카테고리별 권장 재생 시간 가이드 정의 (페이즈 전환: 0.5~1.2초, 레벨업: 0.6~1.5초, 카드 세트: 0.05~0.2초 등)',
           '로비 상단 [효과음(SFX) 가이드] 팝업 추가: 각 사운드 즉시 테스트 청취 및 파일 경로·제작 꿀팁 열람 가능',
         ],
       },
