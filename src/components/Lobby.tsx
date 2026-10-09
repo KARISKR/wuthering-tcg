@@ -4,6 +4,8 @@ import { OfficialManualModal } from './OfficialManualModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { DeckPresetModal } from './DeckPresetModal';
 import { VideoGuideModal } from './VideoGuideModal';
+import { PatchNotesModal } from './PatchNotesModal';
+import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import {
   Swords,
@@ -19,6 +21,7 @@ import {
   Trophy,
   BookmarkCheck,
   Film,
+  ScrollText,
 } from 'lucide-react';
 
 interface LobbyProps {
@@ -36,6 +39,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isVideoOpen, setIsVideoOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isPresetOpen, setIsPresetOpen] = useState(false);
+  const [isPatchNotesOpen, setIsPatchNotesOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
 
   return (
@@ -281,10 +285,18 @@ export const Lobby: React.FC<LobbyProps> = ({
         <div>
           <span>Wuthering Waves: Battle TCG Simulator · Complete Official Edition</span>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           <span>Official 192 Card Database</span>
           <span>•</span>
-          <span>Rule Engine v2.0</span>
+          <button
+            onClick={() => setIsPatchNotesOpen(true)}
+            className="hover:text-amber-400 text-slate-400 transition cursor-pointer flex items-center gap-1.5 font-mono"
+            title="패치노트 열기"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>Game {CURRENT_GAME_VERSION}</span>
+            <span className="text-[10px] text-amber-500/90 underline font-sans font-bold">(패치노트)</span>
+          </button>
         </div>
       </footer>
 
@@ -388,6 +400,39 @@ export const Lobby: React.FC<LobbyProps> = ({
         onSelectAndEdit={() => {
           onOpenDeckBuilder();
         }}
+      />
+
+      {/* ========================================================= */}
+      {/* 메인화면 우하단 플로팅 패치노트 위젯 & 버전 표시기 */}
+      {/* ========================================================= */}
+      <button
+        onClick={() => setIsPatchNotesOpen(true)}
+        className="fixed bottom-5 right-5 z-40 group flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-slate-900/95 hover:bg-slate-800 border-2 border-amber-500/50 hover:border-amber-400 text-slate-200 shadow-2xl shadow-black/90 hover:shadow-amber-500/25 backdrop-blur-md transition-all duration-300 hover:scale-105 cursor-pointer"
+        title="패치노트 및 업데이트 내역 확인"
+      >
+        <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
+          <ScrollText className="w-3.5 h-3.5" />
+        </div>
+        <div className="flex flex-col text-left">
+          <div className="flex items-center gap-1.5 leading-none">
+            <span className="font-mono font-black text-amber-300 text-xs">
+              {CURRENT_GAME_VERSION}
+            </span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          <span className="text-[10px] font-bold text-slate-300 group-hover:text-white mt-0.5">
+            패치노트
+          </span>
+        </div>
+        <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-red-600 text-white tracking-wider animate-pulse">
+          NEW
+        </span>
+      </button>
+
+      {/* 패치노트 전용 모달 */}
+      <PatchNotesModal
+        isOpen={isPatchNotesOpen}
+        onClose={() => setIsPatchNotesOpen(false)}
       />
     </div>
   );

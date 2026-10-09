@@ -1,0 +1,161 @@
+// 명조: 대결 TCG 시뮬레이터 공식 버전 및 패치노트 데이터 소스
+// 신규 기능 추가 또는 밸런스 조정 시 최상단 배열에 새 버전을 추가하면 전체 시스템에 자동 반영됩니다.
+
+export type PatchTag = 'NEW' | 'IMPROVE' | 'AUDIO' | 'BALANCE' | 'FIX';
+
+export interface PatchSection {
+  tag: PatchTag;
+  title: string;
+  items: string[];
+}
+
+export interface PatchNote {
+  version: string;
+  releaseDate: string;
+  title: string;
+  summary: string;
+  isLatest?: boolean;
+  sections: PatchSection[];
+}
+
+export const patchNotes: PatchNote[] = [
+  {
+    version: 'v1.3.0',
+    releaseDate: '2026-10-10',
+    title: '사운드 타격감 개편 & 대전 템포 여유화 & 패치노트 시스템',
+    summary: '뿅뿅거리던 고주파 전자음을 전면 제거하고 묵직한 둔탁 타격음을 구현했으며, 페이즈 전환 배너와 AI 사고 템포를 여유롭게 조율했습니다.',
+    isLatest: true,
+    sections: [
+      {
+        tag: 'AUDIO',
+        title: '묵직하고 둔탁한 타격 사운드(Visceral Blunt SFX) 전면 재설계',
+        items: [
+          '고주파 신스음(삐/뿅 소리)을 완전히 제거하고 30Hz~350Hz 중심의 물리적 타격음으로 교체',
+          '카드 격돌음(playClash): 105Hz 서브 임팩트 + 바디 넉 + 로우패스 충돌 노이즈 기반 둔탁한 [턱-! / 쿵-!] 충돌음 적용',
+          '생명력 피격음(playDamage): 가슴을 울리는 80Hz 저음 펀치와 육중한 타격 크런치[퍽-!] 적용',
+          '페이즈 전환음(playPhaseChange): 75Hz→30Hz 시네마틱 서브 붐과 로우패스 바람 소리[두우웅- / 쿠웅-] 구현',
+          '연격 참격음(playComboSlash): 날카로운 칼바람 풍절음과 둔탁한 강타음 결합',
+          '카드 세팅음(playCardPlace): 실제 TCG 고무 매트에 두꺼운 카드를 얹는 둔탁한 손맛[착- / 턱-] 반영',
+        ],
+      },
+      {
+        tag: 'IMPROVE',
+        title: '페이즈 전환 템포 및 AI 사고 시간 여유화 ("휙휙" 넘어가는 현상 해결)',
+        items: [
+          '페이즈 전환 안내 배너(PhaseBannerOverlay) 표시 시간을 0.95초에서 1.75초로 대폭 연장 및 부드러운 페이드아웃 적용',
+          '턴 시작 시 플레이어/상대방의 턴과 드로우 상태를 명확히 안내(YOUR TURN / OPPONENT TURN)',
+          'AI 액션 단계 사고 딜레이를 0.7초에서 2.0초로 여유화하여 상대의 레벨업/협주 충전 상황을 차분히 확인 가능',
+          'AI 대결 카드 세트 시간을 0.4초에서 1.8초로 여유화하여 플레이어가 자신의 패를 여유롭게 검토할 수 있도록 개선',
+          'AI 연격 단계 연속 공격 딜레이를 0.7초에서 1.8초로 연장하여 타격감을 온전히 감상 가능',
+        ],
+      },
+      {
+        tag: 'NEW',
+        title: '실시간 패치노트 & 버전 표시 시스템 신설',
+        items: [
+          '로비 메인 화면 우측 하단에 상시 패치노트 위젯 및 버전 표시 배지 탑재',
+          '클릭 시 버전별 전체 업데이트 내역과 상세 변경점을 확인할 수 있는 모달 뷰어 제공',
+        ],
+      },
+      {
+        tag: 'FIX',
+        title: '전투 연출 버그 수정 및 최적화',
+        items: [
+          '대결 결과 오픈 단계(CLASH_REVEAL)에서 체력 감소음이 선행 중복 재생되던 문제를 해결하여, 화면에서 검기가 적중하는 순간에만 정확히 임팩트음이 울리도록 동기화',
+        ],
+      },
+    ],
+  },
+  {
+    version: 'v1.2.0',
+    releaseDate: '2026-10-09',
+    title: '공식 룰 영상 가이드(1080p) 분리 & 페이즈 배너 연출 & Web Audio 엔진',
+    summary: '1080p 튜토리얼 영상을 독립 메뉴로 분리하고, TCG 스타일의 페이즈 슬래시 배너 및 0ms Web Audio 사운드 시스템을 최초 구축했습니다.',
+    sections: [
+      {
+        tag: 'NEW',
+        title: '공식 룰 동영상 가이드 (1080p) 전용 메뉴 신설',
+        items: [
+          '로비 메인 6번째 카드 및 상단 헤더 빠른 실행 버튼에 [🎬 룰 영상 가이드] 배치',
+          '1080p 고화질 뷰어 및 6대 챕터 타임스탬프(필드/턴/액션/상성/연격/승리) 원클릭 이동 지원',
+          '공식 룰북 모달에서 무거운 비디오를 분리해 텍스트와 표를 가볍게 열람하도록 경량화',
+        ],
+      },
+      {
+        tag: 'NEW',
+        title: 'TCG 스타일 페이즈 슬래시 배너 오버레이 도입',
+        items: [
+          'DRAW PHASE, ACTION PHASE, BATTLE PHASE, COMBO STRIKE, END PHASE 시각적 슬래시 연출 배너 추가',
+        ],
+      },
+      {
+        tag: 'AUDIO',
+        title: 'Web Audio API 기반 제로 레이턴시 사운드 합성 엔진 탑재',
+        items: [
+          '외부 음원 파일 다운로드 지연 없이 브라우저 내장 Web Audio API로 0ms 즉시 재생 사운드 구현',
+        ],
+      },
+    ],
+  },
+  {
+    version: 'v1.1.0',
+    releaseDate: '2026-10-07',
+    title: '192종 전체 공식 카드 도감 & 덱 프리셋 & 덱 코드 매니저 완성',
+    summary: '실제 명조 TCG 192종 전체 카드 데이터베이스를 구축하고, 덱 코드 공유 및 커스텀 덱 빌더 기능을 완성했습니다.',
+    sections: [
+      {
+        tag: 'NEW',
+        title: '192종 전체 공식 카드 도감 (Card Catalog)',
+        items: [
+          '캐릭터 카드 및 액션 카드(RED, GREEN, BLUE) 전수 등록 및 고화질 일러스트 탑재',
+          '속성/무기/코스트/희귀도 필터링 및 좌측 마스터 듀얼식 카드 상세 뷰어 구현',
+        ],
+      },
+      {
+        tag: 'NEW',
+        title: '덱 프리셋 및 덱 공유 코드 시스템',
+        items: [
+          '방랑자 스타터 덱 및 치샤 스타터 덱 2종 기본 프리셋 제공',
+          '영문 덱 코드 내보내기/불러오기(Base64 인코딩) 지원으로 손쉬운 덱 공유 가능',
+        ],
+      },
+      {
+        tag: 'IMPROVE',
+        title: '반응형 UI 및 마스터 듀얼식 시각 동기화',
+        items: [
+          '중앙 배틀 필드 스크롤 시 좌측 카드 상세창이 시선에 맞춰 부드럽게 동기화 이동하도록 개선',
+        ],
+      },
+    ],
+  },
+  {
+    version: 'v1.0.0',
+    releaseDate: '2026-10-06',
+    title: '명조: 대결 (Wuthering Waves TCG) 시뮬레이터 정식 오픈',
+    summary: '명조 공식 오프라인 트레이딩 카드 게임의 룰을 브라우저에 100% 자동화로 완벽 이식한 대전 시뮬레이터 최초 릴리즈.',
+    sections: [
+      {
+        tag: 'NEW',
+        title: '100% 공식 룰 기반 배틀 엔진 (Game Engine)',
+        items: [
+          '삼각 상성(RED > GREEN > BLUE > RED) 및 동색 스피드 판정 구현',
+          '3단계 공명자 레벨업(Lv.0 → Lv.1 → Lv.2) 진화 및 리더/서포터 스킬 적용',
+          '협주(Concerto) 에너지 충전 및 리더 교대(체인지) 시스템 구현',
+          '적색(RED) 액션 카드를 통한 연격(Combo Strike) 연속 타격 지원',
+        ],
+      },
+      {
+        tag: 'NEW',
+        title: '스마트 휴리스틱 AI 대전 및 1인 2역 연습 모드',
+        items: [
+          '불법 수 없는 규칙 준수형 스마트 AI 대전 지원 (100전 무오류 완주 검증)',
+          '혼자서 양측을 모두 조종하며 룰을 연습할 수 있는 1인 2역 듀얼 모드 지원',
+        ],
+      },
+    ],
+  },
+];
+
+// 최신 버전 정보 추출 헬퍼 (시스템 전체 단일 출처)
+export const CURRENT_GAME_VERSION = patchNotes[0].version;
+export const LATEST_PATCH_NOTE = patchNotes[0];
