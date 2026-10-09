@@ -20,11 +20,45 @@ export interface PatchNote {
 
 export const patchNotes: PatchNote[] = [
   {
+    version: 'v1.4.0',
+    releaseDate: '2026-10-10',
+    title: '공식 BGM 3종 음원 탑재 & 기본 재생 볼륨 최소화(10%) 세팅',
+    summary: '명조 공식 BGM 3곡(Pull Up A Chair, Better Hand, Tavern Brawl)을 탑재하고, 방해되지 않도록 기본 음량을 은은한 10% 볼륨으로 조율했습니다.',
+    isLatest: true,
+    sections: [
+      {
+        tag: 'AUDIO',
+        title: '명조 공식 배경음악(BGM) 3종 탑재',
+        items: [
+          'Track 1: Pull Up A Chair (Main Title Theme) - 평화로운 주점 메인 테마',
+          'Track 2: Better Hand (Battle Clash Theme) - 긴장감 넘치는 전투 대결 테마',
+          'Track 3: Tavern Brawl (High Tension Theme) - 맹렬한 난투 콤보 테마',
+          '트랙 이전/다음 곡 넘기기 및 플레이리스트 원클릭 선택 메뉴 탑재',
+        ],
+      },
+      {
+        tag: 'IMPROVE',
+        title: '기본 재생 볼륨 최소화(10% 은은한 작은 소리) 최적화',
+        items: [
+          '배틀 타격 효과음과 안내 음성이 묻히지 않도록 기본 BGM 볼륨을 10%(0.10)로 작고 은은하게 사전 세팅',
+          '0%~50% 정밀 볼륨 슬라이더 및 원클릭 음소거 토글 지원',
+        ],
+      },
+      {
+        tag: 'NEW',
+        title: '로비 & 배틀 보드 BGM 플레이어 일체화',
+        items: [
+          '로비 메인 화면과 인게임 대전 화면 양쪽에서 동일한 공식 BGM 플레이어를 자유롭게 청취 가능',
+          '기존 커스텀 로컬 MP3 파일 업로드 재생 기능도 지속 지원',
+        ],
+      },
+    ],
+  },
+  {
     version: 'v1.3.0',
     releaseDate: '2026-10-10',
     title: '사운드 타격감 개편 & 대전 템포 여유화 & 패치노트 시스템',
     summary: '뿅뿅거리던 고주파 전자음을 전면 제거하고 묵직한 둔탁 타격음을 구현했으며, 페이즈 전환 배너와 AI 사고 템포를 여유롭게 조율했습니다.',
-    isLatest: true,
     sections: [
       {
         tag: 'AUDIO',
