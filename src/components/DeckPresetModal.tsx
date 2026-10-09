@@ -10,6 +10,7 @@ import {
   customDeckToPreset,
   getActiveCustomDeck,
   setActiveCustomDeck,
+  restoreDefaultPresets,
 } from '../utils/deckCode';
 import { DEDUPED_LV0_CHARACTERS, ACTION_CARD_TEMPLATES } from '../data/cards';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
@@ -23,6 +24,7 @@ import {
   Bookmark,
   BookmarkCheck,
   Trash2,
+  RotateCcw,
   Swords,
   Edit3,
   Sparkles,
@@ -178,9 +180,13 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
 
   // 프리셋 삭제
   const handleDeletePreset = (id: string, name: string) => {
-    if (window.confirm(`'${name}' 프리셋을 삭제하시겠습니까?`)) {
+    if (window.confirm(`'${name}' 프리셋을 정말 보관함에서 삭제하시겠습니까?`)) {
       deletePreset(id);
-      reloadPresets();
+      const remaining = getStoredPresets();
+      setPresets(remaining);
+      if (selectedPresetId === id) {
+        setSelectedPresetId(remaining.length > 0 ? remaining[0].id : null);
+      }
     }
   };
 
@@ -585,15 +591,14 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                           )}
                         </button>
 
-                        {!preset.isOfficial && (
-                          <button
-                            onClick={() => handleDeletePreset(preset.id, preset.name)}
-                            className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 transition cursor-pointer"
-                            title="프리셋 삭제"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDeletePreset(preset.id, preset.name)}
+                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-600/30 text-slate-400 hover:text-red-300 border border-slate-700 hover:border-red-500/40 transition cursor-pointer flex items-center gap-1"
+                          title={`${preset.name} 프리셋 삭제`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                          <span className="text-[10px] hidden sm:inline text-red-300">삭제</span>
+                        </button>
                       </div>
                     </div>
 
@@ -640,6 +645,24 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 );
               })
             )}
+          </div>
+
+          {/* 하단 프리셋 카운트 및 복원 버튼 */}
+          <div className="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 bg-slate-950 shrink-0">
+            <span className="font-mono text-slate-400">총 {presets.length}개 프리셋</span>
+            <button
+              onClick={() => {
+                if (window.confirm('기본 공식 스타터덱(SD01, SD02)을 초기 상태로 복원하시겠습니까?')) {
+                  restoreDefaultPresets();
+                  reloadPresets();
+                }
+              }}
+              className="text-xs text-amber-400 hover:text-amber-300 font-bold cursor-pointer flex items-center gap-1 transition"
+              title="삭제된 공식 스타터덱을 기본값으로 복원합니다"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              공식 프리셋 복원
+            </button>
           </div>
         </aside>
 
@@ -704,6 +727,20 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                   >
                     <Share2 className="w-4 h-4 text-amber-400" />
                     <span>덱 코드 복사</span>
+                  </button>
+
+                  {/* 프리셋 삭제 버튼 (메인 액션 바에 명확하게 배치!) */}
+                  <button
+                    onClick={() => {
+                      if (currentPreviewPreset) {
+                        handleDeletePreset(currentPreviewPreset.id, currentPreviewPreset.name);
+                      }
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-600/80 text-red-300 hover:text-white text-xs font-bold transition cursor-pointer border border-red-500/40 flex items-center gap-1.5 shadow"
+                    title="이 덱 프리셋을 보관함에서 삭제합니다"
+                  >
+                    <Trash2 className="w-4 h-4 text-red-400" />
+                    <span>프리셋 삭제</span>
                   </button>
 
                   {/* 현재 덱으로 적용 */}

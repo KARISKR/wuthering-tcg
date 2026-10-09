@@ -197,26 +197,36 @@ export function getDefaultPresets(): DeckPreset[] {
 export function getStoredPresets(): DeckPreset[] {
   const defaults = getDefaultPresets();
   const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+  const deletedIds: string[] = JSON.parse(localStorage.getItem('wuthering_deleted_presets') || '[]');
+  const activeDefaults = defaults.filter((d) => !deletedIds.includes(d.id));
+
   if (!raw) {
-    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(defaults));
-    return defaults;
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(activeDefaults));
+    return activeDefaults;
   }
 
   try {
     const parsed: DeckPreset[] = JSON.parse(raw);
-    // 공식 프리셋(SD01, SD02 등)은 항상 최신 공식 데이터로 자동 갱신
-    const customOnly = parsed.filter((p) => !p.isOfficial);
-    const updatedList = [...defaults, ...customOnly];
+    // 삭제된 ID 제외
+    const customOnly = parsed.filter((p) => !p.isOfficial && !deletedIds.includes(p.id));
+    const updatedList = [...activeDefaults, ...customOnly];
     localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(updatedList));
     return updatedList;
   } catch (e) {
     console.error('프리셋 로드 에러:', e);
-    return defaults;
+    return activeDefaults;
   }
 }
 
 // 새 덱 프리셋 저장 또는 업데이트
 export function savePreset(preset: DeckPreset): void {
+  // 만약 삭제 기록에 있던 ID라면 삭제 기록에서 복구
+  const deletedIds: string[] = JSON.parse(localStorage.getItem('wuthering_deleted_presets') || '[]');
+  if (deletedIds.includes(preset.id)) {
+    const updatedDeleted = deletedIds.filter((id) => id !== preset.id);
+    localStorage.setItem('wuthering_deleted_presets', JSON.stringify(updatedDeleted));
+  }
+
   const presets = getStoredPresets();
   const index = presets.findIndex((p) => p.id === preset.id);
   if (index !== -1) {
@@ -227,10 +237,28 @@ export function savePreset(preset: DeckPreset): void {
   localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
 }
 
-// 덱 프리셋 삭제
+// 덱 프리셋 삭제 (공식/커스텀 무관하게 완전 삭제)
 export function deletePreset(id: string): void {
-  const presets = getStoredPresets().filter((p) => p.id !== id);
-  localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
+  const deletedIds: string[] = JSON.parse(localStorage.getItem('wuthering_deleted_presets') || '[]');
+  if (!deletedIds.includes(id)) {
+    deletedIds.push(id);
+    localStorage.setItem('wuthering_deleted_presets', JSON.stringify(deletedIds));
+  }
+  const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
+  if (raw) {
+    try {
+      const parsed: DeckPreset[] = JSON.parse(raw);
+      const filtered = parsed.filter((p) => p.id !== id);
+      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(filtered));
+    } catch {}
+  }
+}
+
+// 기본 공식 스타터덱(SD01, SD02) 초기 상태로 전체 복원
+export function restoreDefaultPresets(): void {
+  localStorage.removeItem('wuthering_deleted_presets');
+  localStorage.removeItem(PRESETS_STORAGE_KEY);
+  getStoredPresets();
 }
 
 // DeckPreset을 플레이 가능한 CustomDeckConfig로 변환
