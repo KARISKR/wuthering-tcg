@@ -22,10 +22,10 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
       soundEffects.playDamage(strike.damage);
     }, 250);
 
-    // 950ms 후 자동 퇴장 (빠른 듀얼 템포 유지)
+    // 1350ms 후 자동 퇴장 (연격 연출을 확실히 체감할 수 있도록 여유 부여)
     const tDismiss = setTimeout(() => {
       onDismiss();
-    }, 950);
+    }, 1350);
 
     return () => {
       clearTimeout(tImpact);

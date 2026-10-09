@@ -169,7 +169,7 @@ export function useGame(
       return;
     }
 
-    // 1) AI 액션 단계
+    // 1) AI 액션 단계 (턴 시작 배너가 충분히 나온 뒤 2.0초 후 수 실행)
     if (isAiTurn && gameState.phase === 'ACTION_PHASE') {
       setIsAiThinking(true);
       const timer = setTimeout(() => {
@@ -180,14 +180,14 @@ export function useGame(
           return prev;
         });
         setIsAiThinking(false);
-      }, 700);
+      }, 2000);
       return () => {
         clearTimeout(timer);
         setIsAiThinking(false);
       };
     }
 
-    // 2) AI 대결 카드 세트 단계 (AI 차례이든 아니든 상대방이 AI이고 세트가 안 되었을 때)
+    // 2) AI 대결 카드 세트 단계 (배틀 페이즈 배너 이후 1.8초 동안 고민 후 세트)
     if (gameState.phase === 'CLASH_SET' && gameState.players[1].isAi && !gameState.players[1].clashCardReady) {
       setIsAiThinking(true);
       const timer = setTimeout(() => {
@@ -203,14 +203,14 @@ export function useGame(
           return prev;
         });
         setIsAiThinking(false);
-      }, 400);
+      }, 1800);
       return () => {
         clearTimeout(timer);
         setIsAiThinking(false);
       };
     }
 
-    // 3) AI 연격 단계
+    // 3) AI 연격 단계 (연격 콤보 연출을 충분히 볼 수 있도록 1.8초 템포)
     if (gameState.phase === 'COMBO_STEP' && gameState.players[1].isAi) {
       if (gameState.players[1].comboCount > 0) {
         setIsAiThinking(true);
@@ -222,7 +222,7 @@ export function useGame(
             return prev;
           });
           setIsAiThinking(false);
-        }, 700);
+        }, 1800);
         return () => {
           clearTimeout(timer);
           setIsAiThinking(false);
@@ -232,7 +232,7 @@ export function useGame(
       }
     }
 
-    // 4) AI 패 초과 단계
+    // 4) AI 패 초과 단계 (1.4초 후 버리기)
     if (gameState.phase === 'DISCARD_OVERFLOW' && isAiTurn) {
       setIsAiThinking(true);
       const timer = setTimeout(() => {
@@ -243,7 +243,7 @@ export function useGame(
           return prev;
         });
         setIsAiThinking(false);
-      }, 600);
+      }, 1400);
       return () => {
         clearTimeout(timer);
         setIsAiThinking(false);
