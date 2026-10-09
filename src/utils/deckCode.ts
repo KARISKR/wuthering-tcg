@@ -160,23 +160,23 @@ export function getDefaultPresets(): DeckPreset[] {
     {
       id: 'preset-official-sd01',
       name: '공식 스타터 SD01 [빛과 그림자의 방랑자]',
-      description: '방랑자(여) · 양양 · 치샤 중심의 안정적인 기류·회절 밸런스 덱',
+      description: '방랑자(여) · 양양 · 치샤 중심의 안정적인 기류·용융 밸런스 공식 스타터 덱 (실물 구성 100% 일치)',
       isOfficial: true,
       createdAt: '2026-03-01',
       leaderCode: 'BP01-018',
-      leftSupportCode: 'BP01-022',
-      rightSupportCode: 'BP01-020',
+      leftSupportCode: 'BP01-024',
+      rightSupportCode: 'BP01-027',
       actionCards: Array.from(sd01Counts.entries()).map(([code, count]) => ({ code, count })),
     },
     {
       id: 'preset-official-sd02',
-      name: '공식 스타터 SD02 [타오르는 기류의 선율]',
-      description: '치샤 · 금희 · 산화 중심의 폭발적인 화염·응결 고속 연격 덱',
+      name: '공식 스타터 SD02 [하늘을 가르는 서리]',
+      description: '방랑자(남) · 산화 · 금희 중심의 강력한 응결·회절 콤보 제어 공식 스타터 덱 (실물 구성 100% 일치)',
       isOfficial: true,
       createdAt: '2026-03-01',
-      leaderCode: 'BP01-020',
-      leftSupportCode: 'BP01-024',
-      rightSupportCode: 'BP01-026',
+      leaderCode: 'BP01-021',
+      leftSupportCode: 'BP01-033',
+      rightSupportCode: 'BP01-030',
       actionCards: Array.from(sd02Counts.entries()).map(([code, count]) => ({ code, count })),
     },
     {
@@ -204,14 +204,11 @@ export function getStoredPresets(): DeckPreset[] {
 
   try {
     const parsed: DeckPreset[] = JSON.parse(raw);
-    // 기본 공식 프리셋이 누락되었으면 병합
-    const merged = [...parsed];
-    defaults.forEach((def) => {
-      if (!merged.some((p) => p.id === def.id)) {
-        merged.unshift(def);
-      }
-    });
-    return merged;
+    // 공식 프리셋(SD01, SD02 등)은 항상 최신 공식 데이터로 자동 갱신
+    const customOnly = parsed.filter((p) => !p.isOfficial);
+    const updatedList = [...defaults, ...customOnly];
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(updatedList));
+    return updatedList;
   } catch (e) {
     console.error('프리셋 로드 에러:', e);
     return defaults;

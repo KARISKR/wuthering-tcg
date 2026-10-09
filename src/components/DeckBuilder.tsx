@@ -20,8 +20,11 @@ import {
   LayoutGrid,
   List,
   BookmarkCheck,
+  Share2,
+  X,
 } from 'lucide-react';
 import { DeckPresetModal } from './DeckPresetModal';
+import { DeckExportModal } from './DeckExportModal';
 import type { CustomDeckConfig } from '../types/tcg';
 export type { CustomDeckConfig };
 
@@ -32,6 +35,7 @@ interface DeckBuilderProps {
 
 export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStartBattleWithDeck }) => {
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Lv.0 출전 캐릭터 목록: 같은 캐릭터 중 가장 높은 성급 1장씩 선별하여 중복 제거
   const lv0Characters = useMemo(() => {
@@ -271,7 +275,40 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   const blueCount = actionDeck.filter((c) => c.color === 'BLUE').length;
   const isDeckValid = actionDeck.length === 40;
 
-  // 덱 그룹핑 (항상 최고 성급 카드로 맵핑 및 정렬)
+  // 40장 개별 카드 목록 (중복 카드를 매수로 묶지 않고 1장씩 각각 표시 - TCG 유저 친화적 정렬)
+  const individualDeck = useMemo(() => {
+    return [...actionDeck].map((c) => {
+      const best = availableActionCards.find((a) => a.code === c.code) || c;
+      return {
+        ...best,
+        id: c.id,
+      };
+    }).sort((a, b) => {
+      if (a.cost !== b.cost) return a.cost - b.cost;
+      const colorOrder = { RED: 0, GREEN: 1, BLUE: 2 };
+      const orderA = colorOrder[a.color] ?? 3;
+      const orderB = colorOrder[b.color] ?? 3;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.code.localeCompare(b.code);
+    });
+  }, [actionDeck, availableActionCards]);
+
+  // 슬롯 인덱스 기준 개별 카드 제거
+  const removeCardAtIndex = (deckIndex: number) => {
+    const target = individualDeck[deckIndex];
+    if (!target) return;
+    const off = target.rawOfficial || OFFICIAL_CARDS.find((c) => c.id === target.id) || getOfficialCardByCode(target.code);
+    if (off) setActiveCard(off);
+
+    const realIndex = actionDeck.findLastIndex((c) => c.id === target.id || c.code === target.code);
+    if (realIndex !== -1) {
+      const copy = [...actionDeck];
+      copy.splice(realIndex, 1);
+      setActionDeck(copy);
+    }
+  };
+
+  // 덱 그룹핑 (통계 및 참조용)
   const groupedDeck = useMemo(() => {
     const map = new Map<string, { card: ActionCard; count: number }>();
     actionDeck.forEach((c) => {
@@ -285,6 +322,16 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     });
     return Array.from(map.values()).sort((a, b) => a.card.code.localeCompare(b.card.code));
   }, [actionDeck, availableActionCards]);
+
+  // 현재 커스텀 덱 객체 (내보내기 및 배틀용)
+  const currentDeckConfig: CustomDeckConfig = useMemo(() => ({
+    id: 'custom-deck',
+    name: deckName,
+    leader,
+    leftSupport,
+    rightSupport,
+    actionCards: actionDeck,
+  }), [deckName, leader, leftSupport, rightSupport, actionDeck]);
 
   const charOptions = ['ALL', '방랑자', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
 
@@ -324,6 +371,14 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           >
             <BookmarkCheck className="w-4 h-4 text-purple-400" />
             <span className="hidden sm:inline">프리셋 & 코드</span>
+          </button>
+          <button
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-sm font-bold transition cursor-pointer shadow"
+            title="덱 내보내기 (카드 이미지 시트 PNG / 텍스트 리스트)"
+          >
+            <Share2 className="w-4 h-4 text-indigo-400" />
+            <span className="hidden sm:inline">덱 내보내기</span>
           </button>
           <button
             onClick={saveDeck}
@@ -796,120 +851,118 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
             </div>
           </div>
 
-          {/* 3. 40장 메인 액션 덱 뷰 (5열 대형 그리드 or 텍스트 리스트) */}
+          {/* 3. 40장 메인 액션 덱 뷰 (개별 40장 슬롯 그리드 or 텍스트 리스트) */}
           <div className="flex-1 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 overflow-y-auto min-h-0">
-            {groupedDeck.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-slate-500 text-sm">
-                우측 카드 풀에서 카드를 클릭하여 40장을 채워주세요.
+            {individualDeck.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-slate-500 text-sm gap-2">
+                <Layers className="w-8 h-8 text-slate-600 mb-1" />
+                <span>우측 카드 라이브러리에서 카드를 클릭하여 40장을 채워주세요.</span>
+                <span className="text-xs text-slate-600">중복 카드는 묶이지 않고 40장의 개별 슬롯으로 각각 표시됩니다.</span>
               </div>
             ) : deckViewMode === 'IMAGE' ? (
-              /* [이미지 뷰] 화면 크기에 따라 5~7열로 유동 확장되는 대형 카드 타일 그리드! */
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3">
-                {groupedDeck.map(({ card, count }) => {
-                  const bestAction = availableActionCards.find((a) => a.code === card.code) || card;
-                  const isSelected = activeCard?.code === bestAction.code;
-                  const officialCard = bestAction.rawOfficial || OFFICIAL_CARDS.find((c) => c.id === bestAction.id) || getOfficialCardByCode(bestAction.code);
+              /* [이미지 뷰] 중복 없이 40장 개별 카드가 각각 표시되는 대형 TCG 슬롯 그리드! */
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8 gap-2.5">
+                {individualDeck.map((card, index) => {
+                  const isSelected = activeCard?.code === card.code;
+                  const officialCard = card.rawOfficial || OFFICIAL_CARDS.find((c) => c.id === card.id) || getOfficialCardByCode(card.code);
 
                   return (
                     <div
-                      key={bestAction.code}
+                      key={`${card.id || card.code}-${index}`}
                       onClick={() => {
                         if (officialCard) setActiveCard(officialCard);
                       }}
                       onContextMenu={(e) => {
                         e.preventDefault();
-                        removeCardFromDeck(bestAction.code);
+                        removeCardAtIndex(index);
                       }}
                       onDoubleClick={(e) => {
                         e.stopPropagation();
-                        removeCardFromDeck(bestAction.code);
+                        removeCardAtIndex(index);
                       }}
                       className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-pointer shadow-md select-none ${
                         isSelected
                           ? 'border-amber-400 ring-4 ring-amber-400 scale-102 shadow-amber-500/50 z-10'
-                          : bestAction.color === 'RED'
+                          : card.color === 'RED'
                           ? 'border-red-500/60 hover:border-red-400'
-                          : bestAction.color === 'GREEN'
+                          : card.color === 'GREEN'
                           ? 'border-emerald-500/60 hover:border-emerald-400'
                           : 'border-cyan-500/60 hover:border-cyan-400'
                       }`}
-                      title={`${bestAction.nameKr} (${count}장) - 클릭: 상세 보기 / 하단 버튼: 수량 조절 / 우클릭: 빠른 제거`}
+                      title={`${card.nameKr} (#${index + 1}) - 클릭: 상세 보기 / X: 제거 / 더블클릭·우클릭: 제거`}
                     >
                       {/* 카드 일러스트 (최고 성급 100% 매칭) */}
                       <img
-                        src={bestAction.artUrl}
-                        alt={bestAction.nameKr}
+                        src={card.artUrl}
+                        alt={card.nameKr}
                         className="w-full h-full object-cover object-top"
                       />
 
-                      {/* 우측 상단 수량 뱃지 */}
-                      <div className="absolute top-1.5 right-1.5 z-10 w-7 h-7 rounded-full bg-slate-950 border-2 border-amber-400 flex items-center justify-center font-black text-xs text-amber-300 shadow-md">
-                        {count}
+                      {/* 좌측 상단 슬롯 번호 및 코스트 뱃지 */}
+                      <div className="absolute top-1.5 left-1.5 z-10 flex items-center gap-1">
+                        <span className="px-1.5 py-0.5 rounded-md bg-slate-950/90 border border-slate-700 font-mono font-black text-[10px] text-amber-300 shadow">
+                          #{index + 1}
+                        </span>
+                        <span className="px-1.5 py-0.5 rounded-md bg-slate-950/90 border border-slate-700 font-mono font-black text-[10px] text-slate-200 shadow">
+                          C.{card.cost}
+                        </span>
                       </div>
 
-                      {/* 좌측 상단 코스트 뱃지 */}
-                      <div className="absolute top-1.5 left-1.5 z-10 px-2 py-0.5 rounded-full bg-slate-950/90 border border-slate-500 flex items-center justify-center font-black text-xs text-slate-100 shadow">
-                        COST {bestAction.cost}
-                      </div>
+                      {/* 우측 상단 빠른 삭제 버튼 (호버 및 클릭) */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeCardAtIndex(index);
+                        }}
+                        className="absolute top-1.5 right-1.5 z-20 w-6 h-6 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center shadow-lg transition-transform hover:scale-110 cursor-pointer active:scale-95 border border-red-300/40"
+                        title="덱에서 이 카드 제거"
+                      >
+                        <X className="w-3.5 h-3.5 stroke-[3]" />
+                      </button>
 
                       {/* 하단 카드명 (가독성 높은 그라데이션) */}
-                      <div className="absolute inset-x-0 bottom-8 bg-gradient-to-t from-slate-950 via-slate-950/85 to-transparent px-1.5 pt-3 pb-0.5 pointer-events-none">
-                        <p className="text-[11px] sm:text-xs font-black text-white truncate text-center drop-shadow-md">
-                          {bestAction.nameKr}
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent px-1.5 pt-3 pb-1 pointer-events-none">
+                        <p className="text-[10px] sm:text-[11px] font-black text-white truncate text-center drop-shadow-md">
+                          {card.nameKr}
                         </p>
                       </div>
+                    </div>
+                  );
+                })}
 
-                      {/* 하단 절반 -, 절반 + 조작 바 (상세보기 클릭 방해 제로 & 원클릭 조작) */}
-                      <div className="absolute inset-x-0 bottom-0 h-8 bg-slate-950/95 border-t border-slate-700/80 flex items-stretch z-10 overflow-hidden divide-x divide-slate-800">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeCardFromDeck(bestAction.code);
-                          }}
-                          disabled={count <= 0}
-                          className="flex-1 flex items-center justify-center gap-1 bg-red-950/50 hover:bg-red-600 disabled:opacity-25 disabled:pointer-events-none text-red-200 hover:text-white transition font-black text-xs cursor-pointer active:scale-95"
-                          title="덱에서 1장 빼기 (-)"
-                        >
-                          <Minus className="w-3.5 h-3.5 stroke-[3]" />
-                          <span className="text-[11px]">빼기</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            addCardToDeck(bestAction);
-                          }}
-                          disabled={count >= 3}
-                          className="flex-1 flex items-center justify-center gap-1 bg-amber-950/50 hover:bg-amber-500 disabled:opacity-25 disabled:pointer-events-none text-amber-200 hover:text-slate-950 transition font-black text-xs cursor-pointer active:scale-95"
-                          title="덱에 1장 추가 (+)"
-                        >
-                          <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                          <span className="text-[11px]">추가</span>
-                        </button>
-                      </div>
+                {/* 40장 미만일 때 빈 슬롯 시각적 가이드 */}
+                {Array.from({ length: Math.max(0, 40 - individualDeck.length) }).map((_, i) => {
+                  const slotNum = individualDeck.length + i + 1;
+                  return (
+                    <div
+                      key={`empty-slot-${slotNum}`}
+                      className="aspect-[5/7] rounded-xl border border-dashed border-slate-800/80 bg-slate-950/30 flex flex-col items-center justify-center text-slate-600 gap-1 select-none transition-colors hover:border-slate-700"
+                    >
+                      <span className="font-mono text-xs font-bold text-slate-500">#{slotNum}</span>
+                      <span className="text-[10px] text-slate-600">빈 슬롯</span>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              /* [텍스트 리스트 뷰] 마스터듀얼식 깔끔한 한 줄 텍스트 행 리스트! */
+              /* [텍스트 리스트 뷰] 마스터듀얼식 40장 개별 한 줄 텍스트 행 리스트! */
               <div className="space-y-1.5">
                 <div className="grid grid-cols-12 gap-2 px-3 py-1.5 text-xs font-bold text-slate-400 border-b border-slate-800">
+                  <div className="col-span-1">#</div>
                   <div className="col-span-2">속성 / 비용</div>
                   <div className="col-span-5">카드명</div>
                   <div className="col-span-3 text-center">전용 / 스탯</div>
-                  <div className="col-span-2 text-right">수량 및 조작</div>
+                  <div className="col-span-1 text-right">제거</div>
                 </div>
 
-                {groupedDeck.map(({ card, count }) => {
-                  const bestAction = availableActionCards.find((a) => a.code === card.code) || card;
-                  const isSelected = activeCard?.code === bestAction.code;
-                  const officialCard = bestAction.rawOfficial || OFFICIAL_CARDS.find((c) => c.id === bestAction.id) || getOfficialCardByCode(bestAction.code);
+                {individualDeck.map((card, index) => {
+                  const isSelected = activeCard?.code === card.code;
+                  const officialCard = card.rawOfficial || OFFICIAL_CARDS.find((c) => c.id === card.id) || getOfficialCardByCode(card.code);
 
                   return (
                     <div
-                      key={bestAction.code}
+                      key={`${card.id || card.code}-${index}`}
                       onClick={() => {
                         if (officialCard) setActiveCard(officialCard);
                       }}
@@ -919,51 +972,59 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                           : 'bg-slate-900/70 hover:bg-slate-800/80 border-slate-800/80 text-slate-200'
                       }`}
                     >
+                      {/* 슬롯 번호 */}
+                      <div className="col-span-1 font-mono font-bold text-xs text-amber-300">
+                        #{index + 1}
+                      </div>
+
                       {/* 속성 & 코스트 */}
                       <div className="col-span-2 flex items-center gap-1.5">
                         <span className={`w-2.5 h-2.5 rounded-full ${
-                          bestAction.color === 'RED' ? 'bg-red-500' : bestAction.color === 'GREEN' ? 'bg-emerald-500' : 'bg-cyan-500'
+                          card.color === 'RED' ? 'bg-red-500' : card.color === 'GREEN' ? 'bg-emerald-500' : 'bg-cyan-500'
                         }`} />
                         <span className="font-mono font-black text-xs text-amber-300">
-                          C.{bestAction.cost}
+                          C.{card.cost}
                         </span>
                       </div>
 
                       {/* 카드명 */}
                       <div className="col-span-5 font-black text-xs sm:text-sm truncate">
-                        {bestAction.nameKr}
+                        {card.nameKr}
                       </div>
 
                       {/* 전용 / 스탯 */}
                       <div className="col-span-3 text-center text-xs text-slate-400 font-semibold truncate">
-                        {bestAction.characterExclusive ? `[${bestAction.characterExclusive}]` : '범용'} · DMG {bestAction.damage}
+                        {card.characterExclusive ? `[${card.characterExclusive}]` : '범용'} · DMG {card.damage}
                       </div>
 
-                      {/* 수량 뱃지 및 +/- 버튼 */}
-                      <div className="col-span-2 flex items-center justify-end gap-1.5">
-                        <span className="w-6 h-6 rounded-lg bg-slate-950 border border-amber-500/50 flex items-center justify-center font-black text-xs text-amber-300">
-                          {count}
-                        </span>
+                      {/* 개별 제거 버튼 */}
+                      <div className="col-span-1 flex items-center justify-end">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            addCardToDeck(bestAction);
-                          }}
-                          className="w-6 h-6 rounded-lg bg-amber-500/20 hover:bg-amber-500 hover:text-slate-950 text-amber-300 flex items-center justify-center text-xs font-black cursor-pointer transition"
-                          title="1장 추가"
-                        >
-                          +
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeCardFromDeck(bestAction.code);
+                            removeCardAtIndex(index);
                           }}
                           className="w-6 h-6 rounded-lg bg-red-500/20 hover:bg-red-500 hover:text-white text-red-300 flex items-center justify-center text-xs font-black cursor-pointer transition"
-                          title="1장 제거"
+                          title="이 카드 제거"
                         >
-                          -
+                          <X className="w-3.5 h-3.5" />
                         </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* 빈 슬롯 가이드 */}
+                {Array.from({ length: Math.max(0, 40 - individualDeck.length) }).map((_, i) => {
+                  const slotNum = individualDeck.length + i + 1;
+                  return (
+                    <div
+                      key={`empty-text-slot-${slotNum}`}
+                      className="grid grid-cols-12 gap-2 items-center px-3 py-1.5 rounded-xl border border-dashed border-slate-800/60 text-slate-600 text-xs font-mono"
+                    >
+                      <div className="col-span-1">#{slotNum}</div>
+                      <div className="col-span-11 text-slate-600 font-medium font-sans">
+                        빈 슬롯 (우측 카드 라이브러리에서 추가)
                       </div>
                     </div>
                   );
@@ -1332,6 +1393,13 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         onSelectAndBattle={(deck) => {
           onStartBattleWithDeck(deck);
         }}
+      />
+
+      {/* 덱 내보내기 모달 (카드 이미지 시트 & 텍스트 리스트) */}
+      <DeckExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        deck={currentDeckConfig}
       />
     </div>
   );

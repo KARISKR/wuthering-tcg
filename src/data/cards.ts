@@ -86,45 +86,70 @@ export function getHighestRarityActionCard(code: string): ActionCard | undefined
   return ACTION_CARD_TEMPLATES.find((c) => c.code === code);
 }
 
-// 40장 액션 덱 생성 헬퍼
+// 공식 스타터 덱 SD01 액션 카드 40장 목록 (사진 실물 제품 매수 100% 일치)
+// 17종: 2장씩 11종 = 22장 + 3장씩 6종 = 18장 -> 총 40장
+export const OFFICIAL_SD01_ACTION_CARDS: { code: string; count: number }[] = [
+  // 2장 투입 (11종)
+  { code: 'SD01-017', count: 2 }, // 소리의 변화·일반 공격 (방랑자(여))
+  { code: 'SD01-018', count: 2 }, // 소리의 변화·회피 (방랑자(여))
+  { code: 'SD01-021', count: 2 }, // 로프 (방랑자(여))
+  { code: 'SD01-022', count: 2 }, // 공명 참격 (방랑자(여))
+  { code: 'SD01-012', count: 2 }, // 날카로운 바람·일반 공격 (양양)
+  { code: 'SD01-013', count: 2 }, // 날카로운 바람·회피 (양양)
+  { code: 'SD01-015', count: 2 }, // 점프 (양양)
+  { code: 'SD01-007', count: 2 }, // 펑펑·일반 공격 (치샤)
+  { code: 'SD01-008', count: 2 }, // 펑펑·회피 반격 (치샤)
+  { code: 'SD01-010', count: 2 }, // 투쟁의 마음 (치샤)
+  { code: 'SD01-009', count: 2 }, // 도약의 불빛 (치샤)
+  // 3장 투입 (6종)
+  { code: 'SD01-019', count: 3 }, // 진동 소리 (방랑자(여))
+  { code: 'SD01-020', count: 3 }, // 스캔 (방랑자(여))
+  { code: 'SD01-014', count: 3 }, // 숨결 (양양)
+  { code: 'SD01-023', count: 3 }, // 울림의 연주 (방랑자(여))
+  { code: 'SD01-016', count: 3 }, // 북풍의 소용돌이 (양양)
+  { code: 'SD01-011', count: 3 }, // 뜨거운 불길 (치샤)
+];
+
+// 공식 스타터 덱 SD02 액션 카드 40장 목록 (사진 실물 제품 매수 100% 일치)
+// 17종: 2장씩 11종 = 22장 + 3장씩 6종 = 18장 -> 총 40장
+export const OFFICIAL_SD02_ACTION_CARDS: { code: string; count: number }[] = [
+  // 2장 투입 (11종)
+  { code: 'SD02-017', count: 2 }, // 소리의 변화·일반 공격 (방랑자(남))
+  { code: 'SD02-018', count: 2 }, // 소리의 변화·회피 (방랑자(남))
+  { code: 'SD02-021', count: 2 }, // 로프 (방랑자(남))
+  { code: 'SD02-022', count: 2 }, // 공명 참격 (방랑자(남))
+  { code: 'SD02-012', count: 2 }, // 차가운 빛·일반 공격 (산화)
+  { code: 'SD02-013', count: 2 }, // 차가운 빛·회피 (산화)
+  { code: 'SD02-015', count: 2 }, // 만년적설 (산화)
+  { code: 'SD02-007', count: 2 }, // 달빛의 서리·일반 공격 (금희)
+  { code: 'SD02-008', count: 2 }, // 달빛의 서리·회피 반격 (금희)
+  { code: 'SD02-010', count: 2 }, // 용을 타고 하늘로 향해 (금희)
+  { code: 'SD02-009', count: 2 }, // 반룡의 빛 (금희)
+  // 3장 투입 (6종)
+  { code: 'SD02-019', count: 3 }, // 진동 소리 (방랑자(남))
+  { code: 'SD02-020', count: 3 }, // 스캔 (방랑자(남))
+  { code: 'SD02-014', count: 3 }, // 차가운 눈꽃 (산화)
+  { code: 'SD02-023', count: 3 }, // 울림의 연주 (방랑자(남))
+  { code: 'SD02-016', count: 3 }, // 죽음의 눈보라 (산화)
+  { code: 'SD02-011', count: 3 }, // 만물의 정화 (금희)
+];
+
+// 40장 액션 덱 생성 헬퍼 (공식 실물 덱 구성 100% 매칭)
 export function generateStarterActionDeck(deckPresetId: 'STARTER_ROVER' | 'STARTER_CHIXIA'): ActionCard[] {
   const deck: ActionCard[] = [];
-  let cardIdCounter = 1;
+  const list = deckPresetId === 'STARTER_ROVER' ? OFFICIAL_SD01_ACTION_CARDS : OFFICIAL_SD02_ACTION_CARDS;
+  let counter = 1;
 
-  // 공식 액션 카드 풀에서 관련 캐릭터 카드 우선 선별
-  const targetCharName = deckPresetId === 'STARTER_ROVER' ? '방랑자' : '치샤';
-
-  const relevantActions = ACTION_CARD_TEMPLATES.filter(
-    (c) => !c.characterExclusive || c.characterExclusive.includes(targetCharName)
-  );
-
-  const fallbackActions = ACTION_CARD_TEMPLATES;
-
-  // 관련 카드 2~3장씩 투입 (총 40장)
-  for (const card of relevantActions) {
-    const copies = card.cost === 0 ? 3 : 2;
-    for (let i = 0; i < copies; i++) {
-      if (deck.length >= 40) break;
-      deck.push({
-        ...card,
-        id: `deck-${deckPresetId}-${card.code}-${cardIdCounter++}`,
-      });
+  for (const item of list) {
+    const template = ACTION_CARD_TEMPLATES.find((c) => c.code === item.code);
+    if (template) {
+      for (let i = 0; i < item.count; i++) {
+        deck.push({
+          ...template,
+          id: `deck-${deckPresetId}-${template.code}-${counter++}`,
+        });
+      }
     }
-    if (deck.length >= 40) break;
-  }
-
-  // 40장이 채워질 때까지 풀에서 추가
-  let fallbackIdx = 0;
-  while (deck.length < 40 && fallbackActions.length > 0) {
-    const card = fallbackActions[fallbackIdx % fallbackActions.length];
-    const currentCount = deck.filter((c) => c.code === card.code).length;
-    if (currentCount < 3) {
-      deck.push({
-        ...card,
-        id: `deck-${deckPresetId}-${card.code}-${cardIdCounter++}`,
-      });
-    }
-    fallbackIdx++;
   }
 
   return shuffleArray(deck);
@@ -156,27 +181,33 @@ const findChar = (name: string, lvl: number): CharacterCard => {
 export const STARTER_PRESETS: Record<'STARTER_ROVER' | 'STARTER_CHIXIA', StarterDeckPreset> = {
   STARTER_ROVER: {
     id: 'STARTER_ROVER',
-    nameKr: '스타터 덱 SD01 [빛과 그림자의 방랑자] (방랑자 / 양양 / 치샤)',
-    leader: findChar('방랑자', 0),
-    leftSupport: findChar('양양', 0),
-    rightSupport: findChar('치샤', 0),
-    characterDeck: ALL_CHARACTERS.filter(
-      (c) =>
-        (c.characterName.includes('방랑자') || c.characterName.includes('양양') || c.characterName.includes('치샤')) &&
-        (c.level === 1 || c.level === 2)
-    ),
+    nameKr: '공식 스타터 덱 SD01 [빛과 그림자의 방랑자] (방랑자(여) / 양양 / 치샤)',
+    leader: ALL_CHARACTERS.find((c) => c.code === 'BP01-018') || findChar('방랑자', 0),
+    leftSupport: ALL_CHARACTERS.find((c) => c.code === 'BP01-024') || findChar('양양', 0),
+    rightSupport: ALL_CHARACTERS.find((c) => c.code === 'BP01-027') || findChar('치샤', 0),
+    characterDeck: [
+      ALL_CHARACTERS.find((c) => c.code === 'SD01-002')!, // 방랑자(여) Lv.1
+      ALL_CHARACTERS.find((c) => c.code === 'SD01-001')!, // 방랑자(여) Lv.2
+      ALL_CHARACTERS.find((c) => c.code === 'SD01-004')!, // 양양 Lv.1
+      ALL_CHARACTERS.find((c) => c.code === 'SD01-003')!, // 양양 Lv.2
+      ALL_CHARACTERS.find((c) => c.code === 'SD01-006')!, // 치샤 Lv.1
+      ALL_CHARACTERS.find((c) => c.code === 'SD01-005')!, // 치샤 Lv.2
+    ].filter(Boolean),
   },
   STARTER_CHIXIA: {
     id: 'STARTER_CHIXIA',
-    nameKr: '스타터 덱 SD02 [타오르는 기류의 선율] (치샤 / 금희 / 산화)',
-    leader: findChar('치샤', 0),
-    leftSupport: findChar('금희', 0),
-    rightSupport: findChar('산화', 0),
-    characterDeck: ALL_CHARACTERS.filter(
-      (c) =>
-        (c.characterName.includes('치샤') || c.characterName.includes('금희') || c.characterName.includes('산화')) &&
-        (c.level === 1 || c.level === 2)
-    ),
+    nameKr: '공식 스타터 덱 SD02 [하늘을 가르는 서리] (방랑자(남) / 산화 / 금희)',
+    leader: ALL_CHARACTERS.find((c) => c.code === 'BP01-021') || findChar('방랑자(남)', 0),
+    leftSupport: ALL_CHARACTERS.find((c) => c.code === 'BP01-033') || findChar('산화', 0),
+    rightSupport: ALL_CHARACTERS.find((c) => c.code === 'BP01-030') || findChar('금희', 0),
+    characterDeck: [
+      ALL_CHARACTERS.find((c) => c.code === 'SD02-002')!, // 방랑자(남) Lv.1
+      ALL_CHARACTERS.find((c) => c.code === 'SD02-001')!, // 방랑자(남) Lv.2
+      ALL_CHARACTERS.find((c) => c.code === 'SD02-004')!, // 산화 Lv.1
+      ALL_CHARACTERS.find((c) => c.code === 'SD02-003')!, // 산화 Lv.2
+      ALL_CHARACTERS.find((c) => c.code === 'SD02-006')!, // 금희 Lv.1
+      ALL_CHARACTERS.find((c) => c.code === 'SD02-005')!, // 금희 Lv.2
+    ].filter(Boolean),
   },
 };
 

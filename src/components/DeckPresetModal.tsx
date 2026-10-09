@@ -13,6 +13,7 @@ import {
 } from '../utils/deckCode';
 import { DEDUPED_LV0_CHARACTERS, ACTION_CARD_TEMPLATES } from '../data/cards';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
+import { DeckExportModal } from './DeckExportModal';
 import {
   X,
   Copy,
@@ -69,6 +70,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
 
   // 클립보드 복사 피드백 상태 (presetId -> copied boolean)
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // 덱 내보내기 모달 상태
+  const [isExportOpen, setIsExportOpen] = useState(false);
 
   // 새 프리셋 이름 입력 모달/다이얼로그 상태
   const [isSavingCurrent, setIsSavingCurrent] = useState(false);
@@ -680,6 +684,16 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
 
                 {/* 우측 주요 액션 버튼군 */}
                 <div className="flex items-center gap-2.5 flex-wrap self-stretch lg:self-auto justify-end">
+                  {/* 덱 내보내기 (이미지 시트 & 텍스트 리스트) */}
+                  <button
+                    onClick={() => setIsExportOpen(true)}
+                    className="px-4 py-2.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 text-xs font-bold transition cursor-pointer border border-purple-500/50 flex items-center gap-1.5 shadow"
+                    title="이 덱을 카드 이미지 시트(PNG) 또는 텍스트 리스트(.txt)로 내보냅니다"
+                  >
+                    <Download className="w-4 h-4 text-purple-400" />
+                    <span>덱 내보내기 (이미지/텍스트)</span>
+                  </button>
+
                   {/* 코드 복사 */}
                   <button
                     onClick={() => {
@@ -1065,6 +1079,15 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* 덱 내보내기 모달 (카드 이미지 시트 & 텍스트 리스트) */}
+      {currentPreviewDeck && (
+        <DeckExportModal
+          isOpen={isExportOpen}
+          onClose={() => setIsExportOpen(false)}
+          deck={currentPreviewDeck}
+        />
       )}
     </div>
   );
