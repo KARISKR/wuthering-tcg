@@ -30,9 +30,10 @@ export const patchNotes: PatchNote[] = [
         tag: 'AUDIO',
         title: '명조 공식 배경음악(BGM) 3종 탑재',
         items: [
-          'Track 1: Pull Up A Chair (Main Title Theme) - 평화로운 주점 메인 테마',
+          'Track 1: Pull Up A Chair (Main Title Theme) - 사이트 접속 시 기본 무한 루프 자동재생',
           'Track 2: Better Hand (Battle Clash Theme) - 긴장감 넘치는 전투 대결 테마',
           'Track 3: Tavern Brawl (High Tension Theme) - 맹렬한 난투 콤보 테마',
+          '접속 시 1번 트랙 무한 반복 자동재생 지원 (브라우저 오디오 정책 완벽 대응 첫 제스처 잠금해제)',
           '트랙 이전/다음 곡 넘기기 및 플레이리스트 원클릭 선택 메뉴 탑재',
         ],
       },
