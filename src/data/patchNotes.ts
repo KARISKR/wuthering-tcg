@@ -27,6 +27,16 @@ export const patchNotes: PatchNote[] = [
     isLatest: true,
     sections: [
       {
+        tag: 'AUDIO',
+        title: '커스텀 효과음(SFX) 아키텍처 및 카테고리별 규격 체계 구축',
+        items: [
+          '사용자 커스텀 효과음 폴더(public/audio/sfx/) 및 카테고리(clash, damage, phase, combo, card, turn) 체계 신설',
+          '폴더에 mp3/wav/ogg 파일 추가 시 우선 재생, 파일이 없을 경우 내장 물리 합성음으로 100% 자동 폴백(Fallback)',
+          '카테고리별 권장 재생 시간 가이드 정의 (페이즈 전환: 0.5~1.2초, 카드 세트: 0.05~0.2초, 격돌/피격: 0.3~0.8초 등)',
+          '로비 상단 [효과음(SFX) 가이드] 팝업 추가: 각 사운드 즉시 테스트 청취 및 파일 경로·제작 꿀팁 열람 가능',
+        ],
+      },
+      {
         tag: 'NEW',
         title: 'AI 봇 대전 및 1인 2역 듀얼 시 양측 덱 선택 모달 추가',
         items: [

@@ -5,6 +5,7 @@ import { CardCatalogModal } from './CardCatalogModal';
 import { DeckPresetModal } from './DeckPresetModal';
 import { VideoGuideModal } from './VideoGuideModal';
 import { PatchNotesModal } from './PatchNotesModal';
+import { SfxGuideModal } from './SfxGuideModal';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import { DeckSelectModal } from './DeckSelectModal';
@@ -23,6 +24,7 @@ import {
   BookmarkCheck,
   Film,
   ScrollText,
+  Volume2,
 } from 'lucide-react';
 
 interface LobbyProps {
@@ -41,6 +43,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isPresetOpen, setIsPresetOpen] = useState(false);
   const [isPatchNotesOpen, setIsPatchNotesOpen] = useState(false);
+  const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
 
@@ -68,6 +71,16 @@ export const Lobby: React.FC<LobbyProps> = ({
 
         {/* 상단 퀵 바로가기 & BGM 플레이어 위젯 */}
         <div className="flex items-center gap-2.5">
+          {/* 커스텀 효과음 가이드 상단 버튼 */}
+          <button
+            onClick={() => setIsSfxGuideOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer shadow"
+            title="효과음 커스텀 폴더 및 규격 안내 열기"
+          >
+            <Volume2 className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">효과음(SFX) 가이드</span>
+          </button>
+
           {/* 동영상 룰 가이드 상단 버튼 */}
           <button
             onClick={() => setIsVideoOpen(true)}
@@ -447,6 +460,12 @@ export const Lobby: React.FC<LobbyProps> = ({
       <PatchNotesModal
         isOpen={isPatchNotesOpen}
         onClose={() => setIsPatchNotesOpen(false)}
+      />
+
+      {/* 커스텀 효과음 가이드 모달 */}
+      <SfxGuideModal
+        isOpen={isSfxGuideOpen}
+        onClose={() => setIsSfxGuideOpen(false)}
       />
     </div>
   );
