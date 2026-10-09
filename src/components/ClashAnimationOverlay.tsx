@@ -4,6 +4,8 @@ import { CardView } from './CardView';
 import { Flame, Wind, Shield, Swords, Sparkles, CheckCircle2, XCircle, Zap, Crown } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
+import { soundEffects } from '../utils/soundEffects';
+
 interface ClashAnimationOverlayProps {
   clashResult: ClashResult;
   players: [PlayerState, PlayerState];
@@ -25,14 +27,20 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
   const isDraw = clashResult.winnerIndex === -1;
 
   useEffect(() => {
-    // 1단계: 700ms 후 격돌 (양 카드 돌진 & 화면 셰이크 & 스파크)
+    // 1단계: 700ms 후 격돌 (양 카드 돌진 & 화면 셰이크 & 스파크 & 효과음)
     const tCollide = setTimeout(() => {
       setStage('COLLIDE');
+      soundEffects.playClash();
     }, 700);
 
-    // 2단계: 1500ms 후 승리자의 참격 및 대미지 슬램
+    // 2단계: 1500ms 후 승리자의 참격 및 대미지 슬램 (피해 효과음)
     const tSlash = setTimeout(() => {
       setStage('SLASH');
+      if (clashResult.damageDealt > 0) {
+        soundEffects.playDamage(clashResult.damageDealt);
+      } else {
+        soundEffects.playClash();
+      }
     }, 1500);
 
     // 3단계: 2300ms 후 승리 배너 & 연격권 해금 & 콘페티

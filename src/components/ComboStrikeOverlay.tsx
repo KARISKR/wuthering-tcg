@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { ComboStrikeEffect } from '../types/tcg';
 import { Flame, Swords, Zap, Sparkles } from 'lucide-react';
 
+import { soundEffects } from '../utils/soundEffects';
+
 interface ComboStrikeOverlayProps {
   strike: ComboStrikeEffect;
   onDismiss: () => void;
@@ -11,9 +13,13 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
   const [activeStage, setActiveStage] = useState<'SLASH' | 'IMPACT'>('SLASH');
 
   useEffect(() => {
-    // 300ms 후 임팩트 폭발
+    // 참격 효과음 재생
+    soundEffects.playComboSlash();
+
+    // 250ms 후 임팩트 폭발
     const tImpact = setTimeout(() => {
       setActiveStage('IMPACT');
+      soundEffects.playDamage(strike.damage);
     }, 250);
 
     // 950ms 후 자동 퇴장 (빠른 듀얼 템포 유지)

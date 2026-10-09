@@ -3,6 +3,7 @@ import { BgmPlayer } from './BgmPlayer';
 import { OfficialManualModal } from './OfficialManualModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { DeckPresetModal } from './DeckPresetModal';
+import { VideoGuideModal } from './VideoGuideModal';
 import type { CustomDeckConfig } from '../types/tcg';
 import {
   Swords,
@@ -17,6 +18,7 @@ import {
   Wind,
   Trophy,
   BookmarkCheck,
+  Film,
 } from 'lucide-react';
 
 interface LobbyProps {
@@ -31,6 +33,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   onStartBattleWithCustomDeck,
 }) => {
   const [isManualOpen, setIsManualOpen] = useState(false);
+  const [isVideoOpen, setIsVideoOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isPresetOpen, setIsPresetOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
@@ -57,8 +60,18 @@ export const Lobby: React.FC<LobbyProps> = ({
           </div>
         </div>
 
-        {/* 상단 덱 프리셋 & BGM 플레이어 위젯 */}
+        {/* 상단 퀵 바로가기 & BGM 플레이어 위젯 */}
         <div className="flex items-center gap-2.5">
+          {/* 동영상 룰 가이드 상단 버튼 */}
+          <button
+            onClick={() => setIsVideoOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer shadow"
+          >
+            <Film className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">룰 영상 가이드 (1080p)</span>
+          </button>
+
+          {/* 덱 프리셋 상단 버튼 */}
           <button
             onClick={() => setIsPresetOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/40 text-xs font-black transition cursor-pointer shadow"
@@ -71,7 +84,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       </header>
 
       {/* 2. 메인 중앙 콘텐츠 */}
-      <main className="relative z-20 flex-1 max-w-5xl w-full mx-auto px-6 py-8 flex flex-col items-center justify-center gap-8">
+      <main className="relative z-20 flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col items-center justify-center gap-8">
         {/* 타이틀 히어로 영역 */}
         <div className="text-center space-y-2 max-w-2xl">
           <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 font-extrabold text-xs tracking-widest uppercase shadow-lg shadow-amber-500/10">
@@ -89,8 +102,8 @@ export const Lobby: React.FC<LobbyProps> = ({
           </p>
         </div>
 
-        {/* 메인 메뉴 카드 5선 그리드 */}
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {/* 메인 메뉴 카드 6선 그리드 (독립 룰 영상 가이드 메뉴 포함!) */}
+        <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
           {/* 메뉴 1: 배틀 시작 */}
           <div
             onClick={() => setShowModeModal(true)}
@@ -128,7 +141,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 덱 빌더
               </h3>
               <p className="text-xs text-slate-400 leading-snug">
-                리더 1명 + 서포터 2명 및 40장의 액션 덱을 취향대로 자유롭게 커스텀 편성합니다.
+                리더 1명 + 서포터 2명 및 40장의 액션 덱을 자유롭게 커스텀 편성합니다.
               </p>
             </div>
             <div className="mt-6 flex items-center text-xs font-bold text-indigo-400 gap-1 group-hover:translate-x-1 transition">
@@ -137,7 +150,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
           </div>
 
-          {/* 메뉴 3: 덱 프리셋 & 코드 (신설!) */}
+          {/* 메뉴 3: 덱 프리셋 & 코드 */}
           <div
             onClick={() => setIsPresetOpen(true)}
             className="group relative rounded-2xl bg-gradient-to-b from-purple-950/40 via-slate-900 to-slate-950 border border-purple-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-purple-500/25 hover:border-purple-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
@@ -174,7 +187,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 카드 도감
               </h3>
               <p className="text-xs text-slate-400 leading-snug">
-                실제 고해상도 공식 123종 캐릭터 및 액션 카드 일러스트와 효과를 열람합니다.
+                실제 고해상도 공식 192종 캐릭터 및 액션 카드 일러스트와 효과를 열람합니다.
               </p>
             </div>
             <div className="mt-6 flex items-center text-xs font-bold text-emerald-400 gap-1 group-hover:translate-x-1 transition">
@@ -205,6 +218,34 @@ export const Lobby: React.FC<LobbyProps> = ({
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>
+
+          {/* 메뉴 6: 공식 룰 동영상 가이드 (신설!) */}
+          <div
+            onClick={() => setIsVideoOpen(true)}
+            className="group relative rounded-2xl bg-gradient-to-b from-red-950/40 via-slate-900 to-slate-950 border border-red-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-red-500/30 hover:border-amber-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/15 rounded-full blur-2xl group-hover:bg-amber-500/25 transition" />
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 text-white flex items-center justify-center mb-4 shadow-lg shadow-red-600/30 font-black">
+                <Film className="w-6 h-6" />
+              </div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <h3 className="font-black text-lg text-white group-hover:text-amber-300 transition">
+                  룰 영상 가이드
+                </h3>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 font-black">
+                  1080p
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 leading-snug">
+                10분 완성 공식 플레이 시연 영상과 챕터별 타임스탬프로 규칙을 한눈에 마스터합니다.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center text-xs font-bold text-amber-400 gap-1 group-hover:translate-x-1 transition">
+              <span>영상 시청하기</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </div>
         </div>
 
         {/* 상성 및 시스템 요약 바 */}
@@ -223,51 +264,61 @@ export const Lobby: React.FC<LobbyProps> = ({
           <div className="hidden md:block w-px h-4 bg-slate-800" />
 
           <div className="text-slate-400">
-            생명력 <strong className="text-amber-400">20 HP</strong> • 선공 1장 / 후공 2장 드로우 • 최대 패 <strong className="text-amber-400">8장</strong>
+            동색 대결 판정: <span className="font-bold text-amber-400">속도(Speed)</span> 대결 (동속일 경우 선공 우선)
+          </div>
+
+          <div className="hidden md:block w-px h-4 bg-slate-800" />
+
+          <div className="flex items-center gap-2 text-slate-400">
+            <Trophy className="w-3.5 h-3.5 text-amber-400" />
+            <span>승리 조건: 상대 생명력(20pt) 0으로 격파</span>
           </div>
         </div>
       </main>
 
-      {/* 3. 하단 푸터 */}
-      <footer className="relative z-20 h-12 border-t border-slate-800/60 bg-slate-950/80 px-6 flex items-center justify-between text-[11px] text-slate-500">
-        <div>Wuthering Waves: Battle TCG Simulator (Web Fan Edition)</div>
-        <div>UCP Official License & Kuro Games © All rights reserved.</div>
+      {/* 푸터 영역 */}
+      <footer className="relative z-20 h-14 border-t border-slate-900 bg-slate-950/50 px-6 flex items-center justify-between text-xs text-slate-500">
+        <div>
+          <span>Wuthering Waves: Battle TCG Simulator · Complete Official Edition</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <span>Official 192 Card Database</span>
+          <span>•</span>
+          <span>Rule Engine v2.0</span>
+        </div>
       </footer>
 
       {/* 대전 모드 선택 모달 */}
       {showModeModal && (
-        <div
-          onClick={() => setShowModeModal(false)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-slate-900 border-2 border-amber-500/60 rounded-3xl max-w-md w-full p-6 shadow-2xl flex flex-col gap-4 text-slate-100"
-          >
-            <div className="text-center">
-              <h3 className="text-xl font-black text-white">대전 모드 선택</h3>
-              <p className="text-xs text-slate-400 mt-1">
-                플레이할 대전 방식을 선택하세요.
-              </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl text-slate-100 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-lg text-white">대전 모드 선택</h3>
+              <button
+                onClick={() => setShowModeModal(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
             </div>
 
-            <div className="space-y-3 my-2">
+            <div className="space-y-3">
               <button
                 onClick={() => {
                   setShowModeModal(false);
                   onStartGame('AI');
                 }}
-                className="w-full p-4 rounded-2xl bg-gradient-to-r from-slate-950 to-slate-900 hover:from-amber-950/40 hover:to-slate-900 border border-slate-700 hover:border-amber-400 transition flex items-center gap-4 text-left cursor-pointer group"
+                className="w-full p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-400 transition flex items-center gap-4 text-left group cursor-pointer"
               >
-                <div className="p-3 rounded-xl bg-cyan-600/20 text-cyan-400 group-hover:bg-amber-500 group-hover:text-slate-950 transition">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition">
                   <Bot className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="font-extrabold text-sm text-white group-hover:text-amber-300">
-                    스마트 AI 봇 대전 (추천)
+                  <div className="font-black text-white group-hover:text-amber-300 transition text-sm">
+                    AI 봇 대전 (싱글 플레이)
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
-                    상성과 패를 계산해 레벨업 및 심리전을 구사하는 AI와 경기합니다.
+                  <div className="text-xs text-slate-400 mt-0.5">
+                    기초 상성과 카운터를 학습한 스마트 AI 봇을 상대로 듀얼을 진행합니다.
                   </div>
                 </div>
               </button>
@@ -277,16 +328,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                   setShowModeModal(false);
                   onStartGame('SOLO_DUAL');
                 }}
-                className="w-full p-4 rounded-2xl bg-gradient-to-r from-slate-950 to-slate-900 hover:from-slate-800 hover:to-slate-900 border border-slate-700 hover:border-slate-500 transition flex items-center gap-4 text-left cursor-pointer group"
+                className="w-full p-4 rounded-2xl bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-indigo-400 transition flex items-center gap-4 text-left group cursor-pointer"
               >
-                <div className="p-3 rounded-xl bg-amber-600/20 text-amber-400 group-hover:bg-amber-400 group-hover:text-slate-950 transition">
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition">
                   <User className="w-6 h-6" />
                 </div>
                 <div>
-                  <div className="font-extrabold text-sm text-white">
-                    1인 2역 연습 듀얼 (솔로)
+                  <div className="font-black text-white group-hover:text-indigo-300 transition text-sm">
+                    1인 2역 연습 듀얼 (셀프 테스트)
                   </div>
-                  <div className="text-[11px] text-slate-400 mt-0.5">
+                  <div className="text-xs text-slate-400 mt-0.5">
                     혼자서 양 플레이어를 모두 조작하여 덱 테스트와 룰을 연습합니다.
                   </div>
                 </div>
@@ -307,6 +358,14 @@ export const Lobby: React.FC<LobbyProps> = ({
       <OfficialManualModal
         isOpen={isManualOpen}
         onClose={() => setIsManualOpen(false)}
+        onOpenVideoGuide={() => setIsVideoOpen(true)}
+      />
+
+      {/* 공식 룰 동영상 가이드 전용 모달 (신설!) */}
+      <VideoGuideModal
+        isOpen={isVideoOpen}
+        onClose={() => setIsVideoOpen(false)}
+        onOpenManual={() => setIsManualOpen(true)}
       />
 
       {/* 카드 도감 모달 */}

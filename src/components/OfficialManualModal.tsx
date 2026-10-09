@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { OFFICIAL_RULES_DATA } from '../data/officialRules';
 import {
   X,
@@ -15,38 +15,24 @@ import {
   Swords,
   Trophy,
   CheckCircle2,
-  Video,
-  Play,
-  RotateCcw,
-  Clock,
   Film,
+  Play,
 } from 'lucide-react';
 
 interface OfficialManualModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenVideoGuide?: () => void;
 }
 
-interface ChapterBookmark {
-  time: number;
-  label: string;
-  desc: string;
-}
-
-const CHAPTER_BOOKMARKS: ChapterBookmark[] = [
-  { time: 0, label: '00:00 인트로 & 게임 개요', desc: '승리 조건(생명력 20pt)과 1:1 대전 기초' },
-  { time: 60, label: '01:00 필드 구성 & 3인 공명자', desc: '중앙 리더와 좌우 후방 서포터, 협주 에리어' },
-  { time: 150, label: '02:30 턴의 흐름 & 액션 3대 행동', desc: '레벨업(진화), 체인지(리더 교대), 차지(협주 충전)' },
-  { time: 285, label: '04:45 배틀 페이즈 & 삼각 상성', desc: 'RED > GREEN > BLUE > RED 및 속도(Speed) 판정' },
-  { time: 435, label: '07:15 연격(Combo Strike) 콤보', desc: '추격 X와 적색 카드 연속 폭딜 시스템' },
-  { time: 540, label: '09:00 승리 판정 & 핵심 실전 팁', desc: '엔드 페이즈 처리 및 손패 8장 관리' },
-];
-
-export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'MANUAL' | 'VIDEO' | 'FAQ' | 'FLOOR'>('MANUAL');
+export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
+  isOpen,
+  onClose,
+  onOpenVideoGuide,
+}) => {
+  const [activeTab, setActiveTab] = useState<'MANUAL' | 'FAQ' | 'FLOOR'>('MANUAL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSectionIdx, setSelectedSectionIdx] = useState<number | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   if (!isOpen) return null;
 
@@ -55,13 +41,6 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen
     const q = searchQuery.toLowerCase();
     return item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q);
   });
-
-  const handleSeekVideo = (seconds: number) => {
-    if (videoRef.current) {
-      videoRef.current.currentTime = seconds;
-      videoRef.current.play().catch(() => {});
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 w-screen h-screen bg-[#05070d] flex flex-col overflow-hidden text-slate-100 select-none animate-in fade-in duration-200">
@@ -79,22 +58,34 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen
                 공식 룰북 & 규정 자료실
               </h2>
               <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2 py-0.5 rounded-full">
-                OFFICIAL RULEBOOK & VIDEO TUTORIAL
+                OFFICIAL RULEBOOK & FAQ VER 1.0
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
-              『명조: 대결』 10분 완성 공식 룰 영상, 한글 매뉴얼북, 대회 플로어 룰, FAQ 원문을 100% 열람합니다.
+              『명조: 대결』 공식 한글 매뉴얼북, 대회 플로어 룰, 1問1答 질의응답 FAQ 원문을 100% 열람합니다.
             </p>
           </div>
         </div>
 
-        {/* 상단 탭 네비게이션 & 닫기 버튼 */}
+        {/* 상단 탭 네비게이션 & 영상 가이드 이동 & 닫기 버튼 */}
         <div className="flex items-center gap-3">
+          {onOpenVideoGuide && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenVideoGuide();
+              }}
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-600/20 hover:bg-red-600/30 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer shadow"
+            >
+              <Film className="w-3.5 h-3.5 text-amber-400" />
+              <span>동영상 룰 가이드 열기 (1080p)</span>
+            </button>
+          )}
+
           <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-            {/* 탭 1: 매뉴얼북 */}
             <button
               onClick={() => setActiveTab('MANUAL')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-black text-xs transition cursor-pointer ${
                 activeTab === 'MANUAL'
                   ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white'
@@ -104,39 +95,21 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen
               <span>공식 매뉴얼북</span>
             </button>
 
-            {/* 탭 2: 동영상 가이드 (신설!) */}
-            <button
-              onClick={() => setActiveTab('VIDEO')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs transition cursor-pointer ${
-                activeTab === 'VIDEO'
-                  ? 'bg-gradient-to-r from-red-500 to-amber-500 text-white shadow-md shadow-red-500/30 animate-pulse'
-                  : 'text-slate-400 hover:text-amber-300'
-              }`}
-            >
-              <Film className="w-3.5 h-3.5 text-amber-400" />
-              <span>동영상 룰 가이드</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 font-black">
-                1080p
-              </span>
-            </button>
-
-            {/* 탭 3: FAQ */}
             <button
               onClick={() => setActiveTab('FAQ')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-black text-xs transition cursor-pointer ${
                 activeTab === 'FAQ'
                   ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <HelpCircle className="w-3.5 h-3.5" />
-              <span>FAQ ({OFFICIAL_RULES_DATA.faq_list.length})</span>
+              <span>공식 FAQ ({OFFICIAL_RULES_DATA.faq_list.length})</span>
             </button>
 
-            {/* 탭 4: 대회 규정 */}
             <button
               onClick={() => setActiveTab('FLOOR')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-black text-xs transition cursor-pointer ${
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-black text-xs transition cursor-pointer ${
                 activeTab === 'FLOOR'
                   ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white'
@@ -163,7 +136,7 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen
       {/* ========================================================= */}
       <div className="flex-1 flex overflow-hidden min-h-0 bg-[#05070d]">
         {/* ======================================================= */}
-        {/* TAB 1: 공식 매뉴얼북 (상단 영상 퀵 배너 + 좌측 목차 + 우측 리더) */}
+        {/* TAB 1: 공식 매뉴얼북 (좌측 목차 및 삼각 상성 요약 + 우측 대형 리더) */}
         {/* ======================================================= */}
         {activeTab === 'MANUAL' && (
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
@@ -243,42 +216,9 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen
               </div>
             </aside>
 
-            {/* 우측 메인 리더: 영상 퀵 배너 + 전체 챕터 대형 카드 뷰 */}
+            {/* 우측 메인 리더: 전체 챕터 대형 카드 뷰 */}
             <main className="flex-1 overflow-y-auto p-6 sm:p-8 lg:p-10 space-y-6 bg-gradient-to-b from-[#080d1a] to-[#04060c] custom-scrollbar">
               <div className="max-w-5xl mx-auto space-y-6">
-                {/* 🎬 룰북 최상단 튜토리얼 영상 바로보기 퀵 배너 */}
-                <div
-                  onClick={() => setActiveTab('VIDEO')}
-                  className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-red-950/40 via-amber-950/20 to-slate-900 border-2 border-amber-500/60 shadow-2xl flex items-center justify-between gap-4 cursor-pointer hover:border-amber-400 hover:scale-[1.01] transition-all duration-200 group"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-red-500 to-amber-500 text-white flex items-center justify-center shadow-lg shadow-red-500/30 shrink-0 group-hover:scale-105 transition-transform">
-                      <Play className="w-7 h-7 fill-white ml-1" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-black text-amber-400 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full">
-                          RECOMMENDED
-                        </span>
-                        <span className="text-xs font-mono font-bold text-slate-400">
-                          총 10분 05초 분량
-                        </span>
-                      </div>
-                      <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-300 transition">
-                        영상으로 10분 만에 마스터하는 『명조: 대결』 공식 룰 가이드
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        복잡한 텍스트 대신 실제 플레이 시연 영상과 챕터별 타임스탬프로 규칙을 빠르게 익혀보세요!
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="hidden sm:flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs shadow-lg shrink-0 group-hover:bg-amber-400 transition">
-                    <span>영상 재생하기</span>
-                    <ChevronRight className="w-4 h-4" />
-                  </div>
-                </div>
-
                 {/* 챕터별 규정 본문 */}
                 {OFFICIAL_RULES_DATA.manual_sections.map((sec, idx) => (
                   <section
@@ -300,7 +240,7 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen
                       {sec.content.map((c, i) => (
                         <li
                           key={i}
-                          className="text-sm text-slate-200 leading-relaxed p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80"
+                          className="text-sm text-slate-200 leading-relaxed p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80"
                         >
                           {c}
                         </li>
@@ -314,105 +254,7 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen
         )}
 
         {/* ======================================================= */}
-        {/* TAB 2: 동영상 룰 가이드 (전체화면 시네마 플레이어 + 챕터 점프바) */}
-        {/* ======================================================= */}
-        {activeTab === 'VIDEO' && (
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-black">
-            {/* 메인 영상 플레이어 영역 */}
-            <div className="flex-1 flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 overflow-y-auto bg-gradient-to-b from-slate-950 via-[#070b16] to-black min-h-0">
-              <div className="w-full max-w-5xl space-y-4">
-                {/* 비디오 비디오 컨테이너 */}
-                <div className="relative aspect-video w-full rounded-3xl overflow-hidden border-2 border-amber-500/70 shadow-2xl bg-black shadow-amber-500/10">
-                  <video
-                    ref={videoRef}
-                    src="/videos/rules_tutorial.mp4"
-                    controls
-                    playsInline
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-
-                {/* 영상 정보 바 */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-black text-amber-400 bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-full">
-                        공식 튜토리얼
-                      </span>
-                      <span className="text-xs font-mono font-bold text-slate-400">
-                        1080p FHD · 한국어 공식 가이드
-                      </span>
-                    </div>
-                    <h3 className="text-base sm:text-lg font-black text-white">
-                      『명조: 대결』 공식 배틀 TCG 룰 설명 & 플레이 시연
-                    </h3>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleSeekVideo(0)}
-                      className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border border-slate-700"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>처음부터 재생</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('MANUAL')}
-                      className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer shadow flex items-center gap-1.5"
-                    >
-                      <BookOpen className="w-3.5 h-3.5" />
-                      <span>텍스트 룰북 보기</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 우측 사이드바: 챕터별 타임스탬프 원클릭 점프 내비게이터 */}
-            <aside className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-slate-800 bg-slate-950/95 p-5 flex flex-col gap-3.5 overflow-y-auto shrink-0 custom-scrollbar">
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="text-xs font-black text-amber-400 tracking-wider uppercase block">
-                    TIMESTAMPS
-                  </span>
-                  <h4 className="text-base font-black text-white flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-amber-400" />
-                    챕터별 바로가기
-                  </h4>
-                </div>
-                <span className="text-[11px] text-slate-500">클릭 시 즉시 이동</span>
-              </div>
-
-              <div className="space-y-2">
-                {CHAPTER_BOOKMARKS.map((bm, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => handleSeekVideo(bm.time)}
-                    className="w-full p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-amber-400/80 transition-all text-left group cursor-pointer shadow"
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-black text-xs text-amber-300 group-hover:text-amber-200 transition">
-                        {bm.label}
-                      </span>
-                      <Play className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400 fill-transparent group-hover:fill-amber-400 transition" />
-                    </div>
-                    <p className="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">
-                      {bm.desc}
-                    </p>
-                  </button>
-                ))}
-              </div>
-
-              {/* 팁 안내 */}
-              <div className="mt-auto p-3.5 rounded-xl bg-slate-900/50 border border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
-                💡 <span className="font-bold text-slate-300">시청 안내:</span> 영상 재생 바의 전체화면 버튼을 누르면 1080p 고화질 전체화면으로 시청할 수 있습니다.
-              </div>
-            </aside>
-          </div>
-        )}
-
-        {/* ======================================================= */}
-        {/* TAB 3: 공식 FAQ 질의응답 (검색창 + 2열 반응형 와이드 카드) */}
+        {/* TAB 2: 공식 FAQ 질의응답 (검색창 + 2열 반응형 와이드 카드) */}
         {/* ======================================================= */}
         {activeTab === 'FAQ' && (
           <div className="flex-1 flex flex-col overflow-hidden min-h-0">
@@ -474,7 +316,7 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({ isOpen
         )}
 
         {/* ======================================================= */}
-        {/* TAB 4: 대회 플로어 룰 (공식 규정 및 토너먼트 지침) */}
+        {/* TAB 3: 대회 플로어 룰 (공식 규정 및 토너먼트 지침) */}
         {/* ======================================================= */}
         {activeTab === 'FLOOR' && (
           <div className="flex-1 overflow-y-auto p-6 sm:p-8 lg:p-10 bg-gradient-to-b from-[#080d1a] to-[#04060c] custom-scrollbar">

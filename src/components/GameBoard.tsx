@@ -7,6 +7,8 @@ import { UpgradeModal } from './UpgradeModal';
 import { MulliganModal } from './MulliganModal';
 import { ClashAnimationOverlay } from './ClashAnimationOverlay';
 import { ComboStrikeOverlay } from './ComboStrikeOverlay';
+import { PhaseBannerOverlay } from './PhaseBannerOverlay';
+import { soundEffects } from '../utils/soundEffects';
 import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { GameOverModal } from './GameOverModal';
@@ -213,6 +215,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const p0 = gameState.players[0];
   const p1 = gameState.players[1];
   const isP0Turn = gameState.activePlayerIndex === 0;
+
+  // 피격/대미지 효과음 자동 감지
+  const prevP0Hp = useRef(p0.hp);
+  const prevP1Hp = useRef(p1.hp);
+
+  useEffect(() => {
+    if (p0.hp < prevP0Hp.current) {
+      soundEffects.playDamage(prevP0Hp.current - p0.hp);
+    }
+    prevP0Hp.current = p0.hp;
+  }, [p0.hp]);
+
+  useEffect(() => {
+    if (p1.hp < prevP1Hp.current) {
+      soundEffects.playDamage(prevP1Hp.current - p1.hp);
+    }
+    prevP1Hp.current = p1.hp;
+  }, [p1.hp]);
 
   // 1인 2역 (SOLO_DUAL) 시 페이즈에 따른 자동 조종 시점 전환 로직
   useEffect(() => {
@@ -1431,6 +1451,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* ========================================================= */}
       {/* 4. 모달 오버레이들 */}
       {/* ========================================================= */}
+
+      {/* 페이즈 전환 연출 애니메이션 배너 (Draw Phase!, Battle Phase! 등) */}
+      <PhaseBannerOverlay
+        phase={gameState.phase}
+        turn={gameState.turn}
+        activePlayerIndex={gameState.activePlayerIndex}
+        isAiTurn={gameState.activePlayerIndex === 1 && gameState.players[1].isAi}
+      />
 
       {/* 멀리건 모달 */}
       {gameState.phase === 'MULLIGAN' && (
