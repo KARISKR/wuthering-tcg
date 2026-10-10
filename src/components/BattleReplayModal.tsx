@@ -1,5 +1,13 @@
-import React, { useState, useMemo } from 'react';
-import { BattleReplayData, getSavedReplays, deleteBattleReplay, clearAllBattleReplays, exportReplayToJson } from '../utils/replayManager';
+import React, { useState, useMemo, useRef } from 'react';
+import {
+  BattleReplayData,
+  getSavedReplays,
+  deleteBattleReplay,
+  clearAllBattleReplays,
+  exportReplayToJson,
+  importReplayFromFile,
+  importReplayFromJson,
+} from '../utils/replayManager';
 import { LogItem } from '../types/tcg';
 import {
   X,
@@ -7,6 +15,7 @@ import {
   Play,
   RotateCcw,
   Download,
+  Upload,
   Trash2,
   Calendar,
   Clock,
@@ -24,6 +33,9 @@ import {
   Sparkles,
   Search,
   Filter,
+  Copy,
+  Check,
+  FileText,
 } from 'lucide-react';
 
 interface BattleReplayModalProps {
@@ -43,6 +55,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
   );
   const [activeTurnFilter, setActiveTurnFilter] = useState<number | 'ALL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
 
@@ -96,6 +111,32 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
     }
   };
 
+  // 외부 파일 업로드 핸들러
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const res = await importReplayFromFile(file);
+    if (res.success && res.replay) {
+      refreshReplays();
+      setSelectedReplayId(res.replay.id);
+      setImportNotice(`"${file.name}" 리플레이를 성공적으로 불러왔습니다!`);
+      setTimeout(() => setImportNotice(null), 3500);
+    } else {
+      alert(`리플레이 파일 불러오기 실패: ${res.error || '유효하지 않은 파일입니다.'}`);
+    }
+
+    if (e.target) e.target.value = '';
+  };
+
+  // 클립보드 복사
+  const handleCopyJson = (replay: BattleReplayData) => {
+    navigator.clipboard.writeText(JSON.stringify(replay, null, 2)).then(() => {
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    });
+  };
+
   const getLogIcon = (type: LogItem['type']) => {
     switch (type) {
       case 'CLASH':
@@ -115,6 +156,15 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-6xl h-[92vh] max-h-[900px] bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100">
         
+        {/* 숨김 파일 업로드 인풋 */}
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+          accept=".json,application/json"
+          className="hidden"
+        />
+
         {/* 상단 헤더 */}
         <header className="px-6 py-4 border-b border-slate-800 bg-slate-950/70 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -127,14 +177,29 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-bold border border-amber-500/30">
                   AUTO-SAVED
                 </span>
+                {importNotice && (
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40 animate-fade-in flex items-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-400" /> {importNotice}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                종료된 대전의 턴별 진행 상황, 카드 격돌 판정, 데미지 내역을 상세 복기합니다.
+                종료된 대전의 턴별 진행 상황, 카드 격돌 판정, 데미지 내역을 상세 복기하고 다른 사람의 파일도 불러옵니다.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
+            {/* 외부 리플레이 파일 가져오기 버튼 */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow"
+              title="다른 사람에게 전달받은 리플레이 JSON 파일 불러오기"
+            >
+              <Upload className="w-3.5 h-3.5 text-indigo-400" />
+              <span>리플레이 파일 불러오기</span>
+            </button>
+
             {replays.length > 0 && (
               <button
                 onClick={handleClearAll}
@@ -289,13 +354,33 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 self-end sm:self-auto">
+                    {/* JSON 클립보드 복사 */}
+                    <button
+                      onClick={() => handleCopyJson(selectedReplay)}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                      title="리플레이 JSON 코드 클립보드 복사"
+                    >
+                      {copySuccess ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span className="text-emerald-400">복사 완료!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-400" />
+                          <span>코드 복사</span>
+                        </>
+                      )}
+                    </button>
+
+                    {/* JSON 파일 다운로드 */}
                     <button
                       onClick={() => exportReplayToJson(selectedReplay)}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow"
                       title="리플레이 파일 다운로드"
                     >
                       <Download className="w-3.5 h-3.5 text-amber-400" />
-                      <span>JSON 저장</span>
+                      <span>파일 내보내기 (.json)</span>
                     </button>
                   </div>
                 </div>
