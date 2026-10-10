@@ -9,6 +9,7 @@ interface HandViewProps {
   hand: ActionCard[];
   concertoCount: number;
   leaderName: string;
+  leaderCard?: import('../types/tcg').CharacterCard;
   phase: GamePhase;
   isTurnPlayer: boolean;
   canChargeConcerto: boolean;
@@ -27,6 +28,7 @@ export const HandView: React.FC<HandViewProps> = ({
   hand,
   concertoCount,
   leaderName,
+  leaderCard,
   phase,
   isTurnPlayer,
   canChargeConcerto,
@@ -83,14 +85,16 @@ export const HandView: React.FC<HandViewProps> = ({
   // 카드별 사용 가능 여부 판별
   const checkCardUsable = (card: ActionCard): { canPlayClash: boolean; canCombo: boolean; reason?: string } => {
     const hasEnoughCost = concertoCount >= card.cost;
-    const meetsLeader = canLeaderUseCard({ characterName: leaderName, nameKr: leaderName } as any, card);
+    const currentLeader = leaderCard || ({ characterName: leaderName, nameKr: leaderName } as any);
+    const meetsLeader = canLeaderUseCard(currentLeader, card);
 
     const canPlayClash = canSetClashCard && hasEnoughCost && meetsLeader;
+    // 공식 룰: 연격 단계에서는 RED 카드 사용 가능 (연격 리더 교체/효과 카드 포함)
     const canCombo = isComboStep && comboCount > 0 && card.color === 'RED' && hasEnoughCost;
 
     let reason = '';
     if (!hasEnoughCost) reason = `비용 부족 (필요 ${card.cost}, 보유 ${concertoCount})`;
-    else if (!meetsLeader) reason = `리더 [${card.characterExclusive}] 전용`;
+    else if (!meetsLeader && canSetClashCard) reason = `리더 [${card.characterExclusive}] 전용`;
 
     return { canPlayClash, canCombo, reason };
   };

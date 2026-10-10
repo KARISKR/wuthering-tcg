@@ -1,4 +1,4 @@
-﻿import { GameState, ActionCard, PlayerState, CharacterCard, CardColor } from '../types/tcg';
+import { GameState, ActionCard, PlayerState, CharacterCard, CardColor } from '../types/tcg';
 import {
   upgradeCharacter,
   switchLeader,
@@ -8,6 +8,7 @@ import {
   finishComboStep,
   discardOverflowCards,
   canLeaderUseCard,
+  findEvolutionCard,
 } from './gameEngine';
 
 // ==========================================================
@@ -225,7 +226,7 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
     for (const k of SLOT_KEYS) {
       const ch = p.slots[k];
       if (!ch || ch.level >= 2) continue;
-      const up = p.characterDeck.find((c) => c.characterName === ch.characterName && c.level === ch.level + 1);
+      const up = findEvolutionCard(p.characterDeck, ch);
       if (!up) continue;
       let req = up.level;
       const hasYang2 = SLOT_KEYS.some((s) => p.slots[s]?.characterName === '양양' && p.slots[s]?.level === 2);
