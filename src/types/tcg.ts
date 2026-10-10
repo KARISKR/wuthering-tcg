@@ -131,6 +131,20 @@ export interface UpgradeEffect {
   slotName: 'leader' | 'leftSupport' | 'rightSupport';
 }
 
+// 효과 발동/패 드로우 등 유저 선택 이벤트 (선택 발동 모달)
+export interface PendingChoice {
+  id: string;
+  playerIndex: 0 | 1;
+  title: string;
+  sourceCardName: string;
+  sourceCardArt?: string;
+  description: string;
+  revealedCards: ActionCard[]; // 공개된 덱 위 카드들
+  minSelect: number; // 예: 0장 선택 가능
+  maxSelect: number; // 예: 최대 2장 선택 가능
+  onResolveType: 'ADD_TO_HAND' | 'SET_CONCERTO';
+}
+
 export interface GameState {
   turn: number;
   activePlayerIndex: 0 | 1; // 턴 플레이어 (0: 플레이어1, 1: 플레이어2/AI)
@@ -139,6 +153,7 @@ export interface GameState {
   clashResult: ClashResult | null;
   lastComboStrike?: ComboStrikeEffect | null;
   lastUpgrade?: UpgradeEffect | null;
+  pendingChoice?: PendingChoice | null;
   winner: 0 | 1 | null;
   logs: LogItem[];
   gameMode: 'AI' | 'SOLO_DUAL'; // AI 대전 vs 1인 2역 듀얼

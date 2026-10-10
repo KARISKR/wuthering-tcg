@@ -14,6 +14,7 @@ import {
   discardOverflowCards,
   executeEndPhase,
   forceResolveClash,
+  resolvePendingChoice,
   CustomDeckConfig,
 } from '../engine/gameEngine';
 import {
@@ -115,9 +116,9 @@ export function useGame(
   }, []);
 
   // 6. 대결 카드 세트
-  const handleSetClashCard = useCallback((playerIndex: 0 | 1, cardId: string | null) => {
+  const handleSetClashCard = useCallback((playerIndex: 0 | 1, cardId: string | null, spentConcertoIds?: string[]) => {
     setGameState((prev) => {
-      const res = setClashCard(prev, playerIndex, cardId);
+      const res = setClashCard(prev, playerIndex, cardId, spentConcertoIds);
       return res.success ? res.newState : prev;
     });
   }, []);
@@ -128,11 +129,16 @@ export function useGame(
   }, []);
 
   // 8. 연격(Combo) 공격
-  const handleComboAttack = useCallback((playerIndex: 0 | 1, cardId: string) => {
+  const handleComboAttack = useCallback((playerIndex: 0 | 1, cardId: string, spentConcertoIds?: string[]) => {
     setGameState((prev) => {
-      const res = executeComboAttack(prev, playerIndex, cardId);
+      const res = executeComboAttack(prev, playerIndex, cardId, spentConcertoIds);
       return res.success ? res.newState : prev;
     });
+  }, []);
+
+  // 8-1. 선택 발동 효과 해결
+  const handleResolvePendingChoice = useCallback((chosenCardIds: string[]) => {
+    setGameState((prev) => resolvePendingChoice(prev, chosenCardIds));
   }, []);
 
   // 9. 연격 종료
@@ -273,6 +279,7 @@ export function useGame(
     handleSetClashCard,
     handleProceedAfterClash,
     handleComboAttack,
+    handleResolvePendingChoice,
     handleFinishCombo,
     handleDiscardOverflow,
     handleEndTurn,

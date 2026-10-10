@@ -14,6 +14,8 @@ import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { GameOverModal } from './GameOverModal';
 import { CardListModal } from './CardListModal';
+import { ConcertoSelectModal } from './ConcertoSelectModal';
+import { EffectChoiceModal } from './EffectChoiceModal';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect } from '../types/tcg';
 import { CustomDeckConfig } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
@@ -72,11 +74,77 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleSetClashCard,
     handleProceedAfterClash,
     handleComboAttack,
+    handleResolvePendingChoice,
     handleFinishCombo,
     handleDiscardOverflow,
     handleEndTurn,
     handleForceResolveClash,
   } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
+
+  // 협주 소모 카드 직접 선택 모달 상태
+  const [concertoModalState, setConcertoModalState] = useState<{
+    isOpen: boolean;
+    targetCard: ActionCard | null;
+    requiredCost: number;
+    actionType: 'CLASH' | 'COMBO';
+    playerIndex: 0 | 1;
+  }>({
+    isOpen: false,
+    targetCard: null,
+    requiredCost: 0,
+    actionType: 'CLASH',
+    playerIndex: 0,
+  });
+
+  // 대결 세트 시 협주 코스트 지불 선택 분기
+  const requestSetClashCard = (playerIndex: 0 | 1, cardId: string | null) => {
+    if (!cardId) {
+      handleSetClashCard(playerIndex, null);
+      return;
+    }
+    const player = gameState.players[playerIndex];
+    const card = player.hand.find((c) => c.id === cardId);
+    if (!card) return;
+
+    if (card.cost > 0) {
+      // 협주 카드 선택 모달 오픈
+      setConcertoModalState({
+        isOpen: true,
+        targetCard: card,
+        requiredCost: card.cost,
+        actionType: 'CLASH',
+        playerIndex,
+      });
+    } else {
+      // 코스트 0이면 바로 세트
+      handleSetClashCard(playerIndex, card.id);
+    }
+  };
+
+  // 연격 공격 시 협주 코스트 지불 선택 분기
+  const requestComboAttack = (playerIndex: 0 | 1, cardId: string) => {
+    const player = gameState.players[playerIndex];
+    const card = player.hand.find((c) => c.id === cardId);
+    if (!card) return;
+
+    // 금희 Lv.1 비용 경감 고려
+    let effectiveCost = card.cost;
+    if (player.slots.leader.characterName === '금희' && player.slots.leader.level >= 1) {
+      effectiveCost = Math.max(0, effectiveCost - 1);
+    }
+
+    if (effectiveCost > 0) {
+      setConcertoModalState({
+        isOpen: true,
+        targetCard: card,
+        requiredCost: effectiveCost,
+        actionType: 'COMBO',
+        playerIndex,
+      });
+    } else {
+      handleComboAttack(playerIndex, card.id);
+    }
+  };
 
   // 모달 상태
   const [isRulesOpen, setIsRulesOpen] = useState(false);
@@ -630,11 +698,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             onScroll={handleArenaScroll}
             className="flex-1 flex flex-col items-center py-2 px-3 overflow-y-auto min-h-0 custom-scrollbar"
           >
-            <div className="w-full max-w-[1040px] flex flex-col items-center gap-3.5 mx-auto py-1">
+            <div className="w-full max-w-[1360px] flex flex-col items-center gap-3.5 mx-auto py-1">
               {/* ------------------------------------------------------- */}
               {/* 1. 상대방 공식 플레이매트 (상단 - 대칭 마주보기 구조) */}
               {/* ------------------------------------------------------- */}
-              <div className="relative rounded-3xl bg-gradient-to-b from-slate-950/95 via-[#0b1020]/90 to-slate-950/90 border-2 border-cyan-500/30 p-3 sm:p-4 shadow-2xl backdrop-blur-md overflow-hidden">
+              <div className="relative w-full rounded-3xl bg-gradient-to-b from-slate-950/95 via-[#0b1020]/90 to-slate-950/90 border-2 border-cyan-500/30 p-3 sm:p-4 shadow-2xl backdrop-blur-md overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(6,182,212,0.08),transparent)] pointer-events-none" />
 
                 {/* 상대방 상태 바 (HP & 스탯 대형화) */}
@@ -663,63 +731,63 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   </div>
                 </div>
 
-                {/* 상대 공식 플레이매트 3열 구조 */}
-                <div className="grid grid-cols-[145px_1fr_145px] sm:grid-cols-[165px_1fr_165px] md:grid-cols-[180px_1fr_180px] lg:grid-cols-[190px_1fr_190px] gap-3 sm:gap-4 items-stretch">
-                  {/* [상대 좌측] 액션 덱 에리어 (상단) + 트래시 에리어 (하단) */}
-                  <div className="flex flex-col gap-2.5">
-                    <div className="h-32 sm:h-36 rounded-2xl border border-slate-800 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">액션 덱</span>
-                      <div className="w-20 h-24 sm:w-22 sm:h-26 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
-                        <Sparkles className="w-5 h-5 text-cyan-400/60" />
+                {/* 상대 공식 플레이매트 3열 구조: 좌우 슬림화 & 중앙 초대형화 */}
+                <div className="grid grid-cols-[115px_1fr_115px] sm:grid-cols-[125px_1fr_125px] md:grid-cols-[135px_1fr_135px] gap-3 sm:gap-4 items-stretch">
+                  {/* [상대 좌측] 액션 덱 에리어 (상단) + 트래시 에리어 (하단 슬림화) */}
+                  <div className="flex flex-col gap-2">
+                    <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
+                      <span className="text-[11px] font-mono text-slate-400 font-black">액션 덱</span>
+                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
+                        <Sparkles className="w-4 h-4 text-cyan-400/60" />
                       </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-slate-200">{p1.actionDeck.length}장</span>
+                      <span className="text-[11px] font-mono font-black text-slate-200">{p1.actionDeck.length}장</span>
                     </div>
 
-                    {/* 상대 트래시 에리어 (대형화 & 클릭 시 모달 목록 표시) */}
+                    {/* 상대 트래시 에리어 (슬림 컴팩트화) */}
                     <div
                       onClick={() => openCardListModal('TRASH', 1)}
                       onMouseEnter={() => p1.dropZone.length > 0 && setPreviewCard(p1.dropZone[p1.dropZone.length - 1])}
-                      className="flex-1 rounded-2xl border border-slate-700 hover:border-amber-400/70 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[140px] relative shadow-lg cursor-pointer transition group"
+                      className="flex-1 rounded-2xl border border-slate-700 hover:border-amber-400/70 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg cursor-pointer transition group"
                       title="상대 트래시 에리어 (클릭 시 전체 카드 목록 보기)"
                     >
-                      <div className="flex items-center justify-between w-full px-1">
-                        <span className="text-[11px] sm:text-xs font-mono text-slate-400 font-black">트래시 에리어</span>
-                        <span className="text-[10px] font-mono font-bold text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">
+                      <div className="flex items-center justify-between w-full px-0.5">
+                        <span className="text-[10px] font-mono text-slate-400 font-black">트래시</span>
+                        <span className="text-[9px] font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
                           {p1.dropZone.length}장
                         </span>
                       </div>
 
                       {p1.dropZone.length > 0 ? (
-                        <div className="relative w-24 h-34 sm:w-28 sm:h-38 rounded-xl overflow-hidden border-2 border-slate-600 shadow-xl my-1 group-hover:scale-105 transition transform">
+                        <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-slate-600 shadow-md my-0.5 group-hover:scale-105 transition transform">
                           {p1.dropZone.length > 1 && (
-                            <div className="absolute -top-1 -right-1 w-full h-full rounded-xl border border-slate-600/50 bg-slate-800 -z-10" />
+                            <div className="absolute -top-1 -right-1 w-full h-full rounded-lg border border-slate-600/50 bg-slate-800 -z-10" />
                           )}
                           <img
                             src={(p1.dropZone[p1.dropZone.length - 1] as any).artUrl}
                             alt="트래시"
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-1 text-[10px] font-black text-amber-300 truncate">
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-0.5 text-[9px] font-black text-amber-300 truncate">
                             {p1.dropZone[p1.dropZone.length - 1].nameKr}
                           </div>
                         </div>
                       ) : (
-                        <div className="w-24 h-34 sm:w-28 sm:h-38 rounded-xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-1">
-                          <Trash2 className="w-6 h-6 mb-1 opacity-40" />
-                          <span className="text-[11px] font-bold">비어있음</span>
+                        <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-0.5">
+                          <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
+                          <span className="text-[10px] font-bold">비어있음</span>
                         </div>
                       )}
 
-                      <span className="text-[10px] text-slate-500 font-semibold group-hover:text-amber-300 transition">
-                        클릭 시 목록 보기
+                      <span className="text-[9px] text-slate-500 font-semibold group-hover:text-amber-300 transition">
+                        목록 보기
                       </span>
                     </div>
                   </div>
 
-                  {/* [상대 중앙] 캐릭터 3인 진형 (상단: 백 / 리더 / 백) + 액션 에리어 (하단) */}
-                  <div className="flex flex-col justify-between gap-3">
+                  {/* [상대 중앙] 캐릭터 3인 진형 (상단: 백 / 리더 / 백) + 액션 에리어 (하단 대형화) */}
+                  <div className="flex flex-col justify-between gap-3 flex-1">
                     {/* 상대 캐릭터 3인 배치 [백] [리더] [백] */}
-                    <div className="grid grid-cols-3 gap-3 sm:gap-4 items-center justify-items-center">
+                    <div className="grid grid-cols-3 gap-3 sm:gap-5 items-center justify-items-center w-full">
                       {/* 상대 백 (서포터 1) */}
                       <div className="flex flex-col items-center">
                         <CharacterSlot
@@ -768,10 +836,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </div>
                     </div>
 
-                    {/* 상대 액션 에리어 (규격 고정으로 배틀 시 넓어짐/요동침 완전 방지) */}
+                    {/* 상대 액션 에리어 (화면에 꽉 차는 대형 규격) */}
                     <div
                       onMouseEnter={() => p1.clashCard && setPreviewCard(p1.clashCard)}
-                      className="h-[230px] w-full rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
+                      className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
                     >
                       <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-cyan-500/70 uppercase tracking-widest z-10">
                         액션 에리어 (상대)
@@ -781,62 +849,62 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           <CardView card={p1.clashCard} size="md" isFacedown={!p1.clashCardReady || gameState.phase === 'CLASH_SET'} />
                         </div>
                       ) : (
-                        <div className="w-36 h-52 rounded-xl border-2 border-dashed border-cyan-500/30 bg-cyan-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
-                          <Swords className="w-6 h-6 text-cyan-500/40" />
+                        <div className="w-40 h-56 rounded-xl border-2 border-dashed border-cyan-500/30 bg-cyan-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
+                          <Swords className="w-7 h-7 text-cyan-500/40" />
                           <span className="text-xs font-bold text-slate-400">대결 대기</span>
                         </div>
                       )}
                     </div>
                   </div>
 
-                  {/* [상대 우측] 협주 에리어 (상단) + 캐릭터 덱 에리어 (하단) */}
-                  <div className="flex flex-col gap-2.5">
-                    {/* 상대 협주 에리어 (대형화 & 클릭 시 충전 카드 목록 표시) */}
+                  {/* [상대 우측] 협주 에리어 (상단) + 캐릭터 덱 에리어 (하단 슬림화) */}
+                  <div className="flex flex-col gap-2">
+                    {/* 상대 협주 에리어 (슬림 컴팩트화) */}
                     <div
                       onClick={() => openCardListModal('CONCERTO', 1)}
                       onMouseEnter={() => p1.concertoZone.length > 0 && setPreviewCard(p1.concertoZone[p1.concertoZone.length - 1])}
-                      className="flex-1 rounded-2xl border border-cyan-500/50 hover:border-cyan-400 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[140px] relative shadow-lg cursor-pointer transition group"
+                      className="flex-1 rounded-2xl border border-cyan-500/50 hover:border-cyan-400 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg cursor-pointer transition group"
                       title="상대 협주 에리어 (클릭 시 충전된 카드 목록 보기)"
                     >
-                      <div className="flex items-center justify-between w-full px-1">
-                        <span className="text-[11px] sm:text-xs font-mono text-cyan-400 font-black">협주 에리어</span>
-                        <span className="text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/50">
+                      <div className="flex items-center justify-between w-full px-0.5">
+                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주</span>
+                        <span className="text-[9px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
                           {p1.concertoZone.length}장
                         </span>
                       </div>
 
                       {p1.concertoZone.length > 0 ? (
-                        <div className="relative w-24 h-34 sm:w-28 sm:h-38 rounded-xl overflow-hidden border-2 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)] my-1 group-hover:scale-105 transition transform">
+                        <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)] my-0.5 group-hover:scale-105 transition transform">
                           <img
                             src={(p1.concertoZone[p1.concertoZone.length - 1] as any).artUrl}
                             alt="협주 에너지"
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1.5">
-                            <span className="text-[11px] font-black text-cyan-200 flex items-center justify-center gap-1 drop-shadow">
-                              <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>에너지 {p1.concertoZone.length}</span>
+                          <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1">
+                            <span className="text-[9px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
+                              <BatteryCharging className="w-3 h-3 text-cyan-400" />
+                              <span>{p1.concertoZone.length}</span>
                             </span>
                           </div>
                         </div>
                       ) : (
-                        <div className="w-24 h-34 sm:w-28 sm:h-38 rounded-xl border-2 border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-1">
-                          <BatteryCharging className="w-6 h-6 mb-1 text-cyan-500/40" />
-                          <span className="text-[11px] font-bold text-slate-500">협주 0</span>
+                        <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
+                          <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
+                          <span className="text-[10px] font-bold text-slate-500">0</span>
                         </div>
                       )}
 
-                      <span className="text-[10px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
-                        클릭 시 목록 보기
+                      <span className="text-[9px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
+                        목록 보기
                       </span>
                     </div>
 
-                    <div className="h-32 sm:h-36 rounded-2xl border border-slate-800 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">캐릭터 덱</span>
-                      <div className="w-18 h-24 sm:w-20 sm:h-26 rounded-xl bg-gradient-to-br from-amber-950/50 to-slate-900 border border-amber-500/30 flex items-center justify-center shadow">
-                        <Crown className="w-5 h-5 text-amber-400/70" />
+                    <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
+                      <span className="text-[11px] font-mono text-slate-400 font-black">캐릭터 덱</span>
+                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/50 to-slate-900 border border-amber-500/30 flex items-center justify-center shadow">
+                        <Crown className="w-4 h-4 text-amber-400/70" />
                       </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-amber-300">{p1.characterDeck.length}장</span>
+                      <span className="text-[11px] font-mono font-black text-amber-300">{p1.characterDeck.length}장</span>
                     </div>
                   </div>
                 </div>
@@ -918,66 +986,66 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   </div>
                 </div>
 
-                {/* 플레이어 공식 플레이매트 3열 구조 */}
-                <div className="grid grid-cols-[145px_1fr_145px] sm:grid-cols-[165px_1fr_165px] md:grid-cols-[180px_1fr_180px] lg:grid-cols-[190px_1fr_190px] gap-3 sm:gap-4 items-stretch">
-                  {/* [내 좌측] 협주 에리어 (상단) + 캐릭터 덱 에리어 (하단) */}
-                  <div className="flex flex-col gap-2.5">
-                    {/* 내 협주 에리어 (대형화 & 클릭 시 충전 카드 목록 표시) */}
+                {/* 플레이어 공식 플레이매트 3열 구조: 좌우 슬림화 & 중앙 초대형화 */}
+                <div className="grid grid-cols-[115px_1fr_115px] sm:grid-cols-[125px_1fr_125px] md:grid-cols-[135px_1fr_135px] gap-3 sm:gap-4 items-stretch">
+                  {/* [내 좌측] 협주 에리어 (상단) + 캐릭터 덱 에리어 (하단 슬림화) */}
+                  <div className="flex flex-col gap-2">
+                    {/* 내 협주 에리어 (슬림 컴팩트화) */}
                     <div
                       onClick={() => openCardListModal('CONCERTO', 0)}
                       onMouseEnter={() => p0.concertoZone.length > 0 && setPreviewCard(p0.concertoZone[p0.concertoZone.length - 1])}
-                      className="flex-1 rounded-2xl border border-cyan-500/50 hover:border-cyan-400 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[140px] relative shadow-lg cursor-pointer transition group"
+                      className="flex-1 rounded-2xl border border-cyan-500/50 hover:border-cyan-400 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg cursor-pointer transition group"
                       title="내 협주 에리어 (클릭 시 충전된 카드 목록 보기)"
                     >
-                      <div className="flex items-center justify-between w-full px-1">
-                        <span className="text-[11px] sm:text-xs font-mono text-cyan-400 font-black">협주 에리어</span>
-                        <span className="text-[10px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/50">
+                      <div className="flex items-center justify-between w-full px-0.5">
+                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주</span>
+                        <span className="text-[9px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
                           {p0.concertoZone.length}장
                         </span>
                       </div>
 
                       {p0.concertoZone.length > 0 ? (
-                        <div className="relative w-24 h-34 sm:w-28 sm:h-38 rounded-xl overflow-hidden border-2 border-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.3)] my-1 group-hover:scale-105 transition transform">
+                        <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)] my-0.5 group-hover:scale-105 transition transform">
                           <img
                             src={(p0.concertoZone[p0.concertoZone.length - 1] as any).artUrl}
                             alt="협주 에너지"
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1.5">
-                            <span className="text-[11px] font-black text-cyan-200 flex items-center justify-center gap-1 drop-shadow">
-                              <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>에너지 {p0.concertoZone.length}</span>
+                          <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1">
+                            <span className="text-[9px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
+                              <BatteryCharging className="w-3 h-3 text-cyan-400" />
+                              <span>{p0.concertoZone.length}</span>
                             </span>
                           </div>
                         </div>
                       ) : (
-                        <div className="w-24 h-34 sm:w-28 sm:h-38 rounded-xl border-2 border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-1">
-                          <BatteryCharging className="w-6 h-6 mb-1 text-cyan-500/40" />
-                          <span className="text-[11px] font-bold text-slate-500">협주 0</span>
+                        <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
+                          <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
+                          <span className="text-[10px] font-bold text-slate-500">0</span>
                         </div>
                       )}
 
-                      <span className="text-[10px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
-                        클릭 시 목록 보기
+                      <span className="text-[9px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
+                        목록 보기
                       </span>
                     </div>
 
                     {/* 캐릭터 덱 에리어 */}
-                    <div className="h-32 sm:h-36 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs sm:text-sm font-mono text-amber-400/80 font-black">캐릭터 덱</span>
-                      <div className="w-18 h-24 sm:w-20 sm:h-26 rounded-xl bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-500/40 flex items-center justify-center shadow">
-                        <Crown className="w-5 h-5 text-amber-400" />
+                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
+                      <span className="text-[11px] font-mono text-amber-400/80 font-black">캐릭터 덱</span>
+                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-500/40 flex items-center justify-center shadow">
+                        <Crown className="w-4 h-4 text-amber-400" />
                       </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-amber-300">{p0.characterDeck.length}장</span>
+                      <span className="text-[11px] font-mono font-black text-amber-300">{p0.characterDeck.length}장</span>
                     </div>
                   </div>
 
-                  {/* [내 중앙] 액션 에리어 (상단) + 캐릭터 3인 진형 [백 / 리더 / 백] (하단) */}
-                  <div className="flex flex-col justify-between gap-3">
-                    {/* 내 액션 에리어 (규격 고정으로 배틀 시 넓어짐/요동침 완전 방지) */}
+                  {/* [내 중앙] 액션 에리어 (상단 대형화) + 캐릭터 3인 진형 [백 / 리더 / 백] (하단) */}
+                  <div className="flex flex-col justify-between gap-3 flex-1">
+                    {/* 내 액션 에리어 (화면에 꽉 차는 대형 규격) */}
                     <div
                       onMouseEnter={() => p0.clashCard && setPreviewCard(p0.clashCard)}
-                      className="h-[230px] w-full rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
+                      className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
                     >
                       <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-amber-500/80 uppercase tracking-widest z-10">
                         액션 에리어 (내 대결 존)
@@ -987,15 +1055,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           <CardView card={p0.clashCard} size="md" />
                         </div>
                       ) : (
-                        <div className="w-36 h-52 rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
-                          <Swords className="w-6 h-6 text-amber-500/40" />
+                        <div className="w-40 h-56 rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
+                          <Swords className="w-7 h-7 text-amber-500/40" />
                           <span className="text-xs font-bold text-slate-400">대결 대기</span>
                         </div>
                       )}
                     </div>
 
                     {/* 캐릭터 3인 진형 [백] [리더 (동심원 레이더)] [백] */}
-                    <div className="grid grid-cols-3 gap-3 sm:gap-4 items-center justify-items-center">
+                    <div className="grid grid-cols-3 gap-3 sm:gap-5 items-center justify-items-center w-full">
                       {/* 백 (서포터 1) */}
                       <div className="flex flex-col items-center">
                         <CharacterSlot
@@ -1045,55 +1113,55 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   </div>
 
-                  {/* [내 우측] 트래시 에리어 (상단) + 액션 덱 에리어 (하단) */}
-                  <div className="flex flex-col gap-2.5">
-                    {/* 내 트래시 에리어 (대형화 & 클릭 시 모달 목록 표시) */}
+                  {/* [내 우측] 트래시 에리어 (상단) + 액션 덱 에리어 (하단 슬림화) */}
+                  <div className="flex flex-col gap-2">
+                    {/* 내 트래시 에리어 (슬림 컴팩트화) */}
                     <div
                       onClick={() => openCardListModal('TRASH', 0)}
                       onMouseEnter={() => p0.dropZone.length > 0 && setPreviewCard(p0.dropZone[p0.dropZone.length - 1])}
-                      className="flex-1 rounded-2xl border border-slate-700 hover:border-amber-400/70 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[140px] relative shadow-lg cursor-pointer transition group"
+                      className="flex-1 rounded-2xl border border-slate-700 hover:border-amber-400/70 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg cursor-pointer transition group"
                       title="내 트래시 에리어 (클릭 시 전체 카드 목록 보기)"
                     >
-                      <div className="flex items-center justify-between w-full px-1">
-                        <span className="text-[11px] sm:text-xs font-mono text-slate-400 font-black">트래시 에리어</span>
-                        <span className="text-[10px] font-mono font-bold text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">
+                      <div className="flex items-center justify-between w-full px-0.5">
+                        <span className="text-[10px] font-mono text-slate-400 font-black">트래시</span>
+                        <span className="text-[9px] font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
                           {p0.dropZone.length}장
                         </span>
                       </div>
 
                       {p0.dropZone.length > 0 ? (
-                        <div className="relative w-24 h-34 sm:w-28 sm:h-38 rounded-xl overflow-hidden border-2 border-slate-600 shadow-xl my-1 group-hover:scale-105 transition transform">
+                        <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-slate-600 shadow-md my-0.5 group-hover:scale-105 transition transform">
                           {p0.dropZone.length > 1 && (
-                            <div className="absolute -top-1 -right-1 w-full h-full rounded-xl border border-slate-600/50 bg-slate-800 -z-10" />
+                            <div className="absolute -top-1 -right-1 w-full h-full rounded-lg border border-slate-600/50 bg-slate-800 -z-10" />
                           )}
                           <img
                             src={(p0.dropZone[p0.dropZone.length - 1] as any).artUrl}
                             alt="트래시"
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-1 text-[10px] font-black text-amber-300 truncate">
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-0.5 text-[9px] font-black text-amber-300 truncate">
                             {p0.dropZone[p0.dropZone.length - 1].nameKr}
                           </div>
                         </div>
                       ) : (
-                        <div className="w-24 h-34 sm:w-28 sm:h-38 rounded-xl border-2 border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-1">
-                          <Trash2 className="w-6 h-6 mb-1 opacity-40" />
-                          <span className="text-[11px] font-bold">비어있음</span>
+                        <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-0.5">
+                          <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
+                          <span className="text-[10px] font-bold">비어있음</span>
                         </div>
                       )}
 
-                      <span className="text-[10px] text-slate-500 font-semibold group-hover:text-amber-300 transition">
-                        클릭 시 목록 보기
+                      <span className="text-[9px] text-slate-500 font-semibold group-hover:text-amber-300 transition">
+                        목록 보기
                       </span>
                     </div>
 
                     {/* 액션 덱 에리어 */}
-                    <div className="h-32 sm:h-36 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">액션 덱</span>
-                      <div className="w-18 h-24 sm:w-20 sm:h-26 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
-                        <Sparkles className="w-5 h-5 text-amber-400/70" />
+                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
+                      <span className="text-[11px] font-mono text-slate-400 font-black">액션 덱</span>
+                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
+                        <Sparkles className="w-4 h-4 text-amber-400/70" />
                       </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-slate-200">{p0.actionDeck.length}장</span>
+                      <span className="text-[11px] font-mono font-black text-slate-200">{p0.actionDeck.length}장</span>
                     </div>
                   </div>
                 </div>
@@ -1116,8 +1184,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               selectedOverflowCardIds={selectedOverflowIds}
               onSelectOverflowCard={toggleOverflowCard}
               onChargeConcerto={(cardId) => handleChargeConcerto(controlledPlayerIndex, cardId)}
-              onSetClashCard={(cardId) => handleSetClashCard(controlledPlayerIndex, cardId)}
-              onComboAttack={(cardId) => handleComboAttack(controlledPlayerIndex, cardId)}
+              onSetClashCard={(cardId) => requestSetClashCard(controlledPlayerIndex, cardId)}
+              onComboAttack={(cardId) => requestComboAttack(controlledPlayerIndex, cardId)}
               onHover={(card) => setPreviewCard(card, true)}
             />
           </div>
@@ -1564,6 +1632,29 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           onExitToLobby={onExitToLobby}
         />
       )}
+
+      {/* 협주 게이지 소모 선택 모달 */}
+      <ConcertoSelectModal
+        isOpen={concertoModalState.isOpen}
+        onClose={() => setConcertoModalState((prev) => ({ ...prev, isOpen: false, targetCard: null }))}
+        concertoCards={gameState.players[concertoModalState.playerIndex].concertoZone}
+        requiredCost={concertoModalState.requiredCost}
+        targetCard={concertoModalState.targetCard}
+        actionType={concertoModalState.actionType}
+        onConfirm={(selectedConcertoIds) => {
+          if (concertoModalState.actionType === 'CLASH' && concertoModalState.targetCard) {
+            handleSetClashCard(concertoModalState.playerIndex, concertoModalState.targetCard.id, selectedConcertoIds);
+          } else if (concertoModalState.actionType === 'COMBO' && concertoModalState.targetCard) {
+            handleComboAttack(concertoModalState.playerIndex, concertoModalState.targetCard.id, selectedConcertoIds);
+          }
+        }}
+      />
+
+      {/* 선택 발동 효과 모달 (방랑자 BP01-018 녹색 배틀 덱 2장 공개 선택, SD01-002 판정 패배 선택 등) */}
+      <EffectChoiceModal
+        choice={gameState.pendingChoice}
+        onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
+      />
     </div>
   );
 };

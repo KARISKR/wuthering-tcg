@@ -539,7 +539,8 @@ export function decideClash(state: GameState, startClash: boolean): GameState {
 export function setClashCard(
   state: GameState,
   playerIndex: 0 | 1,
-  cardId: string | null
+  cardId: string | null,
+  spentConcertoIds?: string[]
 ): { success: boolean; newState: GameState; error?: string } {
   const player = { ...state.players[playerIndex] };
 
@@ -571,6 +572,25 @@ export function setClashCard(
       };
     }
 
+    // 코스트 지불: 전달받은 spentConcertoIds가 있으면 우선 소모, 없으면 앞에서부터 차감
+    if (card.cost > 0) {
+      let spentCards: ActionCard[] = [];
+      if (spentConcertoIds && spentConcertoIds.length === card.cost) {
+        const remaining: ActionCard[] = [];
+        for (const c of player.concertoZone) {
+          if (spentConcertoIds.includes(c.id) && spentCards.length < card.cost) {
+            spentCards.push(c);
+          } else {
+            remaining.push(c);
+          }
+        }
+        player.concertoZone = remaining;
+      } else {
+        spentCards = player.concertoZone.splice(0, card.cost);
+      }
+      player.dropZone.push(...spentCards);
+    }
+
     // 패에서 세트 존으로
     player.hand = player.hand.filter((c) => c.id !== cardId);
     player.clashCard = card;
@@ -584,6 +604,43 @@ export function setClashCard(
       playerIndex === 1 ? player : { ...state.players[1] },
     ] as [PlayerState, PlayerState],
   };
+
+  // 방랑자(여) [BP01-018] 리더 배틀 효과 체크:
+  // "자신이 녹색 카드로 배틀 시, 자신의 덱 위의 카드를 최대 2장 공개하고 패에 추가한다."
+  if (
+    player.clashCard &&
+    player.clashCard.color === 'GREEN' &&
+    (player.slots.leader.code === 'BP01-018' ||
+      (player.slots.leader.characterName === '방랑자' && player.slots.leader.nameKr.includes('방랑자(여)')))
+  ) {
+    const revealed = player.actionDeck.splice(0, Math.min(2, player.actionDeck.length));
+    if (revealed.length > 0) {
+      if (player.isAi) {
+        // AI는 2장 모두 패로 자동 추가
+        player.hand.push(...revealed);
+        newState = addLog(
+          newState,
+          `[방랑자(여) BP01-018 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 카드 ${revealed.length}장을 패에 추가했습니다.`,
+          'ACTION',
+          playerIndex
+        );
+      } else {
+        // 유저는 선택 모달(PendingChoice)을 띄워 0장, 1장, 2장 직접 선택
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: '방랑자(여) 배틀 효과',
+          sourceCardName: '방랑자(여) [BP01-018]',
+          sourceCardArt: player.slots.leader.artUrl,
+          description: '녹색 카드로 배틀하여 덱 위의 카드를 최대 2장까지 패에 추가할 수 있습니다. 패에 넣을 카드를 선택하세요 (0장~2장 선택 가능).',
+          revealedCards: revealed,
+          minSelect: 0,
+          maxSelect: revealed.length,
+          onResolveType: 'ADD_TO_HAND',
+        };
+      }
+    }
+  }
 
   // 양 플레이어 모두 카드를 세트했다면 자동 공개 및 판정!
   if (newState.players[0].clashCardReady && newState.players[1].clashCardReady) {
@@ -605,6 +662,10 @@ export function forceResolveClash(state: GameState): GameState {
   if (!p1.clashCardReady && p1.isAi) {
     const usable = p1.hand.find((c) => p1.concertoZone.length >= c.cost && canLeaderUseCard(p1.slots.leader, c));
     if (usable) {
+      if (usable.cost > 0) {
+        const spent = p1.concertoZone.splice(0, usable.cost);
+        p1.dropZone.push(...spent);
+      }
       p1.hand = p1.hand.filter((c) => c.id !== usable.id);
       p1.clashCard = usable;
     }
@@ -626,16 +687,6 @@ export function resolveClash(state: GameState): GameState {
 
   const c0 = p0.clashCard;
   const c1 = p1.clashCard;
-
-  // 코스트 지불: 사용한 카드의 cost만큼 협주 존에서 드롭 존으로
-  if (c0 && c0.cost > 0) {
-    const spent = p0.concertoZone.splice(0, c0.cost);
-    p0.dropZone.push(...spent);
-  }
-  if (c1 && c1.cost > 0) {
-    const spent = p1.concertoZone.splice(0, c1.cost);
-    p1.dropZone.push(...spent);
-  }
 
   let winnerIndex: 0 | 1 | -1 = -1;
   let reason: ClashResult['reason'] = 'DRAW';
@@ -802,9 +853,9 @@ export function resolveClash(state: GameState): GameState {
     winnerPlayer.comboCount = comboGranted;
   }
 
-  // 패배자 방랑자 Lv.1 효과: 초록 카드가 빨강에 졌어도 1장 드로우
+  // 패배자 방랑자 Lv.1 효과: 초록 카드가 빨강에 졌어도 1장 드로우 (선택 가능)
   if (winnerIndex !== -1) {
-    const loserIndex = winnerIndex === 0 ? 1 : 0;
+    const loserIndex = (winnerIndex === 0 ? 1 : 0) as 0 | 1;
     const loserPlayer = loserIndex === 0 ? p0 : p1;
     const loserCard = loserIndex === 0 ? c0 : c1;
     const winnerCard = winnerIndex === 0 ? c0 : c1;
@@ -815,10 +866,30 @@ export function resolveClash(state: GameState): GameState {
       loserCard?.color === 'GREEN' &&
       winnerCard?.color === 'RED'
     ) {
-      const card = drawSingleCardFromDeck(loserPlayer);
-      if (card) {
-        loserPlayer.hand.push(card);
-        newState = addLog(newState, `[방랑자 Lv.1 효과] ${loserPlayer.name}이(가) 패배 시 1장 드로우했습니다.`, 'ACTION', loserIndex as 0 | 1);
+      const revealed = loserPlayer.actionDeck.splice(0, Math.min(1, loserPlayer.actionDeck.length));
+      if (revealed.length > 0) {
+        if (loserPlayer.isAi) {
+          loserPlayer.hand.push(...revealed);
+          newState = addLog(
+            newState,
+            `[방랑자 Lv.1 효과] ${loserPlayer.name}이(가) 패배 시 덱 위 1장을 패에 추가했습니다.`,
+            'ACTION',
+            loserIndex
+          );
+        } else {
+          newState.pendingChoice = {
+            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            playerIndex: loserIndex,
+            title: '방랑자 Lv.1 판정 효과',
+            sourceCardName: '방랑자 Lv.1 [SD01-002]',
+            sourceCardArt: loserPlayer.slots.leader.artUrl,
+            description: '자신의 녹색 카드가 적색 카드에 패배하여 덱 위의 카드를 패에 추가할 수 있습니다 (0장 또는 1장 선택).',
+            revealedCards: revealed,
+            minSelect: 0,
+            maxSelect: 1,
+            onResolveType: 'ADD_TO_HAND',
+          };
+        }
       }
     }
   }
@@ -895,7 +966,8 @@ export function proceedAfterClashReveal(state: GameState): GameState {
 export function executeComboAttack(
   state: GameState,
   playerIndex: 0 | 1,
-  cardId: string
+  cardId: string,
+  spentConcertoIds?: string[]
 ): { success: boolean; newState: GameState; error?: string } {
   const player = { ...state.players[playerIndex] };
   const opponent = { ...state.players[playerIndex === 0 ? 1 : 0] };
@@ -927,10 +999,23 @@ export function executeComboAttack(
     };
   }
 
-  // 비용 지불
+  // 비용 지불: spentConcertoIds 우선 소모
   if (effectiveCost > 0) {
-    const spent = player.concertoZone.splice(0, effectiveCost);
-    player.dropZone.push(...spent);
+    let spentCards: ActionCard[] = [];
+    if (spentConcertoIds && spentConcertoIds.length === effectiveCost) {
+      const remaining: ActionCard[] = [];
+      for (const c of player.concertoZone) {
+        if (spentConcertoIds.includes(c.id) && spentCards.length < effectiveCost) {
+          spentCards.push(c);
+        } else {
+          remaining.push(c);
+        }
+      }
+      player.concertoZone = remaining;
+    } else {
+      spentCards = player.concertoZone.splice(0, effectiveCost);
+    }
+    player.dropZone.push(...spentCards);
   }
 
   // 패에서 묘지로
@@ -1075,4 +1160,43 @@ function checkGameOver(state: GameState): GameState {
     );
   }
   return state;
+}
+
+// ==========================================
+// 9. 선택 발동 효과 해결 (PendingChoice)
+// ==========================================
+
+export function resolvePendingChoice(
+  state: GameState,
+  chosenCardIds: string[]
+): GameState {
+  if (!state.pendingChoice) return state;
+
+  const { playerIndex, revealedCards, sourceCardName } = state.pendingChoice;
+  const player = { ...state.players[playerIndex] };
+
+  // 선택된 카드는 패로
+  const chosenCards = revealedCards.filter((c) => chosenCardIds.includes(c.id));
+  player.hand = [...player.hand, ...chosenCards];
+
+  // 선택되지 않은 카드는 덱 맨 아래로
+  const unchosenCards = revealedCards.filter((c) => !chosenCardIds.includes(c.id));
+  player.actionDeck = [...player.actionDeck, ...unchosenCards];
+
+  let newState: GameState = {
+    ...state,
+    pendingChoice: null,
+  };
+  newState.players[playerIndex] = player;
+
+  newState = addLog(
+    newState,
+    `${player.name}이(가) [${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 선택하여 패에 추가했습니다.${
+      unchosenCards.length > 0 ? ` (선택하지 않은 ${unchosenCards.length}장은 덱 맨 아래로)` : ''
+    }`,
+    'ACTION',
+    playerIndex
+  );
+
+  return newState;
 }
