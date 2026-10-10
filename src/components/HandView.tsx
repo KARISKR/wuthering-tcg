@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ActionCard, GamePhase } from '../types/tcg';
 import { CardView } from './CardView';
-import { BatteryCharging, Swords, Zap, Trash2, X } from 'lucide-react';
+import { BatteryCharging, Swords, Zap, Trash2, X, Sparkles } from 'lucide-react';
 import { canLeaderUseCard } from '../engine/gameEngine';
+import { soundEffects } from '../utils/soundEffects';
 
 interface HandViewProps {
   hand: ActionCard[];
@@ -41,6 +42,41 @@ export const HandView: React.FC<HandViewProps> = ({
 }) => {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+
+  // 새로 드로우된 카드 추적 및 드로우 애니메이션 활성화 상태
+  const [animatingDrawIds, setAnimatingDrawIds] = useState<Set<string>>(new Set());
+  const prevHandIdsRef = useRef<Set<string>>(new Set(hand.map((c) => c.id)));
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    // 최초 렌더링(초기 세팅) 시에는 기본 표시
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      prevHandIdsRef.current = new Set(hand.map((c) => c.id));
+      return;
+    }
+
+    const currentIds = new Set(hand.map((c) => c.id));
+    const newCards = hand.filter((c) => !prevHandIdsRef.current.has(c.id));
+
+    if (newCards.length > 0) {
+      const newIds = new Set(newCards.map((c) => c.id));
+      setAnimatingDrawIds(newIds);
+
+      // 드로우 효과음 재생
+      soundEffects.playCardPlace();
+
+      // 700ms 후 애니메이션 종료
+      const timer = setTimeout(() => {
+        setAnimatingDrawIds(new Set());
+      }, 700);
+
+      prevHandIdsRef.current = currentIds;
+      return () => clearTimeout(timer);
+    }
+
+    prevHandIdsRef.current = currentIds;
+  }, [hand]);
 
   const selectedCard = hand.find((c) => c.id === selectedCardId);
 
@@ -95,6 +131,10 @@ export const HandView: React.FC<HandViewProps> = ({
             const isSelected = selectedCardId === card.id || selectedOverflowCardIds.includes(card.id);
             const isHighlighted = (canSetClashCard && canPlayClash) || (isComboStep && canCombo);
 
+            const isNewlyDrawn = animatingDrawIds.has(card.id);
+            const drawIndex = Array.from(animatingDrawIds).indexOf(card.id);
+            const drawDelay = drawIndex >= 0 ? `${drawIndex * 110}ms` : '0ms';
+
             const colorBorder =
               card.color === 'RED'
                 ? 'border-red-500/80 hover:border-red-400'
@@ -118,7 +158,10 @@ export const HandView: React.FC<HandViewProps> = ({
                     setSelectedCardId(selectedCardId === card.id ? null : card.id);
                   }
                 }}
+                style={isNewlyDrawn ? { animationDelay: drawDelay } : undefined}
                 className={`relative w-32 sm:w-36 md:w-40 shrink-0 flex flex-col items-center rounded-2xl bg-slate-900 border-2 p-1.5 transition-all duration-200 cursor-pointer select-none group shadow-xl ${
+                  isNewlyDrawn ? 'animate-card-draw z-30' : ''
+                } ${
                   isSelected
                     ? 'border-amber-400 ring-4 ring-amber-400/60 -translate-y-5 shadow-amber-500/30 scale-105 z-20'
                     : isHighlighted
@@ -126,6 +169,13 @@ export const HandView: React.FC<HandViewProps> = ({
                     : `${colorBorder} hover:-translate-y-4 hover:scale-105 hover:z-20`
                 }`}
               >
+                {/* 신규 드로우 시 카드 주변 골드/시안 링 번쩍임 이펙트 */}
+                {isNewlyDrawn && (
+                  <div
+                    className="absolute -inset-2 rounded-3xl border-2 border-amber-400/90 pointer-events-none animate-draw-ring z-40"
+                    style={{ animationDelay: drawDelay }}
+                  />
+                )}
                 {/* 호버 시 손패 바로 위 플로팅 대형 상세 팝업 (시선 이동 없이 즉시 확인) */}
                 {hoveredCardId === card.id && (
                   <div className="absolute bottom-[108%] left-1/2 -translate-x-1/2 z-50 pointer-events-none w-64 sm:w-72 bg-slate-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-2xl shadow-black/90 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-2">

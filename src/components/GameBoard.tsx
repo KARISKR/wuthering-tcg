@@ -82,6 +82,32 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleForceResolveClash,
   } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
 
+  // 덱에서 카드 드로우 시 시각 효과 상태
+  const [p0DeckDrawing, setP0DeckDrawing] = useState(false);
+  const [p1DeckDrawing, setP1DeckDrawing] = useState(false);
+  const prevP0DeckLen = useRef(gameState.players[0].actionDeck.length);
+  const prevP1DeckLen = useRef(gameState.players[1].actionDeck.length);
+
+  useEffect(() => {
+    if (gameState.players[0].actionDeck.length < prevP0DeckLen.current) {
+      setP0DeckDrawing(true);
+      const t = setTimeout(() => setP0DeckDrawing(false), 600);
+      prevP0DeckLen.current = gameState.players[0].actionDeck.length;
+      return () => clearTimeout(t);
+    }
+    prevP0DeckLen.current = gameState.players[0].actionDeck.length;
+  }, [gameState.players[0].actionDeck.length]);
+
+  useEffect(() => {
+    if (gameState.players[1].actionDeck.length < prevP1DeckLen.current) {
+      setP1DeckDrawing(true);
+      const t = setTimeout(() => setP1DeckDrawing(false), 600);
+      prevP1DeckLen.current = gameState.players[1].actionDeck.length;
+      return () => clearTimeout(t);
+    }
+    prevP1DeckLen.current = gameState.players[1].actionDeck.length;
+  }, [gameState.players[1].actionDeck.length]);
+
   // 협주 소모 카드 직접 선택 모달 상태
   const [concertoModalState, setConcertoModalState] = useState<{
     isOpen: boolean;
@@ -736,10 +762,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <div className="grid grid-cols-[115px_1fr_115px] sm:grid-cols-[125px_1fr_125px] md:grid-cols-[135px_1fr_135px] gap-3 sm:gap-4 items-stretch">
                   {/* [상대 좌측] 액션 덱 에리어 (상단) + 트래시 에리어 (하단 슬림화) */}
                   <div className="flex flex-col gap-2">
-                    <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
+                    <div className={`h-24 sm:h-26 rounded-2xl border bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow transition-all duration-300 ${
+                      p1DeckDrawing
+                        ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/40 -translate-y-1'
+                        : 'border-slate-800'
+                    }`}>
                       <span className="text-[11px] font-mono text-slate-400 font-black">액션 덱</span>
-                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
-                        <Sparkles className="w-4 h-4 text-cyan-400/60" />
+                      <div className={`w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow transition-transform ${
+                        p1DeckDrawing ? 'scale-105 border-cyan-400 animate-pulse' : ''
+                      }`}>
+                        <Sparkles className={`w-4 h-4 ${p1DeckDrawing ? 'text-cyan-300 animate-spin' : 'text-cyan-400/60'}`} />
                       </div>
                       <span className="text-[11px] font-mono font-black text-slate-200">{p1.actionDeck.length}장</span>
                     </div>
@@ -1157,10 +1189,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
 
                     {/* 액션 덱 에리어 */}
-                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
+                    <div className={`h-24 sm:h-26 rounded-2xl border bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow transition-all duration-300 ${
+                      p0DeckDrawing
+                        ? 'border-amber-400 ring-2 ring-amber-400/80 shadow-amber-500/40 -translate-y-1'
+                        : 'border-amber-500/30'
+                    }`}>
                       <span className="text-[11px] font-mono text-slate-400 font-black">액션 덱</span>
-                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
-                        <Sparkles className="w-4 h-4 text-amber-400/70" />
+                      <div className={`w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow transition-transform ${
+                        p0DeckDrawing ? 'scale-105 border-amber-400 animate-pulse' : ''
+                      }`}>
+                        <Sparkles className={`w-4 h-4 ${p0DeckDrawing ? 'text-amber-300 animate-spin' : 'text-amber-400/70'}`} />
                       </div>
                       <span className="text-[11px] font-mono font-black text-slate-200">{p0.actionDeck.length}장</span>
                     </div>
