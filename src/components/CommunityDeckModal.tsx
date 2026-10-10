@@ -288,14 +288,14 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-black text-white tracking-wide">
-                  커뮤니티 덱 라운지
+                  공유된 덱 리스트
                 </h2>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold">
-                  전 세계 방랑자 공유 레시피
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                  커뮤니티 실전 공유 레시피
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                다른 플레이어들의 독창적인 덱을 둘러보고, 내 덱을 익명 또는 닉네임으로 자유롭게 공유해보세요!
+                mc.sldark 실전 메타 덱 4종 및 다른 플레이어들의 독창적인 덱을 둘러보고, 원클릭 복사/대전을 즐겨보세요!
               </p>
             </div>
           </div>
@@ -312,7 +312,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                공유된 덱 둘러보기 ({sharedDecks.length})
+                공유된 덱 리스트 ({sharedDecks.length})
               </button>
               <button
                 onClick={() => setActiveTab('SHARE')}

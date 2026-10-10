@@ -290,14 +290,14 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
             </button>
           )}
 
-          {/* 커뮤니티 덱 라운지 열기 버튼 */}
+          {/* 공유된 덱 리스트 열기 버튼 */}
           <button
             onClick={() => setIsCommunityOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-300 border border-indigo-500/40 text-xs font-black transition cursor-pointer shadow-md"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-xs font-black transition cursor-pointer shadow-md"
             title="다른 유저들의 공유 덱 둘러보기 및 내 덱 공유"
           >
             <Share2 className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="hidden sm:inline">커뮤니티 덱 라운지</span>
+            <span>공유된 덱 리스트</span>
           </button>
 
           {/* 덱 코드 가져오기 드로어 토글 */}
@@ -518,6 +518,14 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               }`}
             >
               공식 스타터 ({presets.filter((p) => p.isOfficial).length})
+            </button>
+            <button
+              onClick={() => setIsCommunityOpen(true)}
+              className="py-2 px-2.5 rounded-xl text-xs font-black transition cursor-pointer text-indigo-300 hover:text-white bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-500/40 flex items-center justify-center gap-1 shrink-0 shadow"
+              title="커뮤니티 공유된 덱 리스트 열기"
+            >
+              <Share2 className="w-3.5 h-3.5 text-indigo-400" />
+              <span>공유 덱</span>
             </button>
           </div>
 

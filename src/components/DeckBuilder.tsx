@@ -395,10 +395,10 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           <button
             onClick={() => setIsCommunityModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-sm font-bold transition cursor-pointer shadow"
-            title="다른 유저들의 공유 덱 둘러보기 및 내 덱 공유"
+            title="공유된 덱 리스트 둘러보기 및 내 덱 공유"
           >
             <Share2 className="w-4 h-4 text-indigo-400" />
-            <span className="hidden sm:inline">공유 덱 라운지</span>
+            <span>공유된 덱 리스트</span>
           </button>
           <button
             onClick={() => setIsExportModalOpen(true)}

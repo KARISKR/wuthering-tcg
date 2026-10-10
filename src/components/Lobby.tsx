@@ -74,14 +74,14 @@ export const Lobby: React.FC<LobbyProps> = ({
 
         {/* 상단 퀵 바로가기 & BGM 플레이어 위젯 */}
         <div className="flex items-center gap-2.5">
-          {/* 커뮤니티 덱 라운지 상단 버튼 */}
+          {/* 커뮤니티 공유된 덱 리스트 상단 버튼 */}
           <button
             onClick={() => setIsCommunityDeckOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-black transition cursor-pointer shadow"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-xs font-black transition cursor-pointer shadow-md"
             title="다른 플레이어들의 공유 덱 둘러보기 및 내 덱 공유하기"
           >
             <Share2 className="w-4 h-4 text-indigo-400" />
-            <span className="hidden sm:inline">커뮤니티 덱 라운지</span>
+            <span>공유된 덱 리스트</span>
           </button>
 
           {/* 커스텀 효과음 가이드 상단 버튼 */}
@@ -217,18 +217,18 @@ export const Lobby: React.FC<LobbyProps> = ({
               </div>
               <div className="flex items-center gap-1.5 mb-1">
                 <h3 className="font-black text-lg text-white group-hover:text-indigo-300 transition">
-                  공유 덱 라운지
+                  공유된 덱 리스트
                 </h3>
                 <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-400 text-slate-950 font-black">
-                  NEW
+                  4종 탑재
                 </span>
               </div>
               <p className="text-xs text-slate-400 leading-snug">
-                다른 플레이어들의 추천 덱 열람, 익명 덱 공유, 원클릭 복사 및 즉시 대전을 즐겨보세요.
+                mc.sldark 실전 메타 덱 4종(RIN, 女秧椿 등) 및 플레이어 공유 덱 열람, 원클릭 복사, 즉시 대전 지원
               </p>
             </div>
             <div className="mt-6 flex items-center text-xs font-bold text-indigo-400 gap-1 group-hover:translate-x-1 transition">
-              <span>공유 덱 보기</span>
+              <span>공유된 덱 리스트 보기</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>

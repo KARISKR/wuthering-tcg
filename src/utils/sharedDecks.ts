@@ -8,66 +8,14 @@ import {
   COMMUNITY_DECK_PRESETS,
 } from './deckCode';
 import { ACTION_CARD_TEMPLATES, DEDUPED_LV0_CHARACTERS } from '../data/cards';
+import { INITIAL_COMMUNITY_SHARED_DECKS } from '../data/communityDecks';
 
 const SHARED_DECKS_STORAGE_KEY = 'wuthering_shared_decks';
 const LIKED_DECKS_STORAGE_KEY = 'wuthering_liked_shared_decks';
 
 // 기본 추천 커뮤니티 덱 시드 데이터 생성 (mc.sldark.com 실전 공유 덱 4종)
 function generateInitialSharedDecks(): SharedDeck[] {
-  return [
-    {
-      id: 'shared-deck-sld-rin',
-      deckName: '🔥 RIN (카멜리아 · 앙코 · 양양)',
-      authorName: 'RIN',
-      isAnonymous: false,
-      description:
-        'mc.sldark.com 커뮤니티 공유 덱 [코드: SLD-TLL2EZT6] - 카멜리아 소멸 연격과 앙코 용융 속공, 양양 기류 서포트 콤보 덱',
-      deckCode: 'SLD-TLL2EZT6',
-      deckPreset: COMMUNITY_DECK_PRESETS[0],
-      likes: 0,
-      createdAt: Date.now() - 1000 * 60 * 60 * 12,
-      tags: ['카멜리아', '앙코', '양양', '용융', '소멸', '기류', '속공', 'sldark'],
-    },
-    {
-      id: 'shared-deck-sld-nv-yang-chun',
-      deckName: '🌸 女秧椿 (카멜리아 · 여랑자 · 양양)',
-      authorName: 'sldark 유저',
-      isAnonymous: false,
-      description:
-        'mc.sldark.com 커뮤니티 공유 덱 [코드: SLD-7LKN8P9G] - 방랑자(여)와 양양의 기류 순환으로 카멜리아의 소멸 연격을 몰아치는 연계 덱',
-      deckCode: 'SLD-7LKN8P9G',
-      deckPreset: COMMUNITY_DECK_PRESETS[1],
-      likes: 0,
-      createdAt: Date.now() - 1000 * 60 * 60 * 24,
-      tags: ['카멜리아', '방랑자(여)', '양양', '소멸', '기류', '회절', '콤보', 'sldark'],
-    },
-    {
-      id: 'shared-deck-sld-anke-loop',
-      deckName: '🐑 安克loop (앙코 · 양양 · 산화)',
-      authorName: 'sldark 유저',
-      isAnonymous: false,
-      description:
-        'mc.sldark.com 커뮤니티 공유 덱 [코드: SLD-DVQMKQPG] - 앙코 대폭주 화력과 산화 응결 방어, 양양 서포트로 매 턴 회피 및 연격을 이어가는 루프 덱',
-      deckCode: 'SLD-DVQMKQPG',
-      deckPreset: COMMUNITY_DECK_PRESETS[2],
-      likes: 0,
-      createdAt: Date.now() - 1000 * 60 * 60 * 36,
-      tags: ['앙코', '양양', '산화', '용융', '응결', '기류', '콤보', 'sldark'],
-    },
-    {
-      id: 'shared-deck-sld-an-san-shou',
-      deckName: '🌌 安散守 (파수인 · 앙코 · 양양)',
-      authorName: 'sldark 유저',
-      isAnonymous: false,
-      description:
-        'mc.sldark.com 커뮤니티 공유 덱 [코드: SLD-DV56VXTG] - 파수인의 회절 드로우 및 결말 순환과 앙코 용융 화력을 조합한 안정적인 컨트롤 제어 덱',
-      deckCode: 'SLD-DV56VXTG',
-      deckPreset: COMMUNITY_DECK_PRESETS[3],
-      likes: 0,
-      createdAt: Date.now() - 1000 * 60 * 60 * 48,
-      tags: ['파수인', '앙코', '양양', '회절', '용융', '기류', '컨트롤', 'sldark'],
-    },
-  ];
+  return [...INITIAL_COMMUNITY_SHARED_DECKS];
 }
 
 // 내가 좋아요 누른 덱 ID 목록 가져오기
