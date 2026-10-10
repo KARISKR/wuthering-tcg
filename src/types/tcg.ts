@@ -123,6 +123,10 @@ export interface LogItem {
   text: string;
   type: 'PHASE' | 'ACTION' | 'CLASH' | 'DAMAGE' | 'HEAL' | 'SYSTEM';
   timestamp: number;
+  cardArt?: string; // 카드 일러스트 썸네일
+  cardName?: string; // 카드 이름
+  amount?: number; // 데미지량 또는 회복 수치
+  effectTag?: string; // '연격', '가드', '드로우', '회복', '충전' 등
 }
 
 // 전체 게임 상태

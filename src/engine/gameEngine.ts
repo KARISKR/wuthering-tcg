@@ -265,7 +265,18 @@ function createPlayerState(
 }
 
 // 로그 헬퍼
-function addLog(state: GameState, text: string, type: LogItem['type'], playerIndex?: 0 | 1): GameState {
+function addLog(
+  state: GameState,
+  text: string,
+  type: LogItem['type'],
+  playerIndex?: 0 | 1,
+  meta?: {
+    cardArt?: string;
+    cardName?: string;
+    amount?: number;
+    effectTag?: string;
+  }
+): GameState {
   const newLog: LogItem = {
     id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     turn: state.turn,
@@ -273,6 +284,10 @@ function addLog(state: GameState, text: string, type: LogItem['type'], playerInd
     text,
     type,
     timestamp: Date.now(),
+    cardArt: meta?.cardArt,
+    cardName: meta?.cardName,
+    amount: meta?.amount,
+    effectTag: meta?.effectTag,
   };
   return {
     ...state,
@@ -492,9 +507,14 @@ export function upgradeCharacter(
   };
   newState = addLog(
     newState,
-    `${player.name}이(가) [${currentSlotCard.nameKr}]을(를) [${upgradeCard.nameKr}](으)로 레벨업했습니다! (패 ${discarded.length}장 소비)`,
+    `[캐릭터 레벨업!] ${player.name}이(가) [${currentSlotCard.nameKr}]을(를) [${upgradeCard.nameKr}](Lv.${upgradeCard.level})(으)로 진화시켰습니다! (패 ${discarded.length}장 소비)`,
     'ACTION',
-    playerIndex
+    playerIndex,
+    {
+      cardArt: upgradeCard.artUrl,
+      cardName: upgradeCard.nameKr,
+      effectTag: `Lv.${upgradeCard.level} 진화`,
+    }
   );
 
   return { success: true, newState };
@@ -559,9 +579,14 @@ export function chargeConcerto(
   newState.players[playerIndex] = player;
   newState = addLog(
     newState,
-    `${player.name}이(가) [${chargedCard.nameKr}]을(를) 협주 존에 충전했습니다. (현재 협주: ${player.concertoZone.length})`,
+    `[협주 충전] ${player.name}이(가) [${chargedCard.nameKr}]을(를) 협주 존에 충전했습니다. (현재 협주: ${player.concertoZone.length})`,
     'ACTION',
-    playerIndex
+    playerIndex,
+    {
+      cardArt: chargedCard.artUrl,
+      cardName: chargedCard.nameKr,
+      effectTag: '협주 충전',
+    }
   );
 
   return { success: true, newState };
@@ -905,6 +930,17 @@ export function resolveClash(state: GameState): GameState {
         playerIndex: winnerIndex,
         timestamp: Date.now(),
       });
+      newState = addLog(
+        newState,
+        `[패 드로우 효과] [${winCard.nameKr}]의 효과로 카드 ${drawN}장을 뽑아 패에 보충했습니다.`,
+        'ACTION',
+        winnerIndex,
+        {
+          cardArt: winCard.artUrl,
+          cardName: winCard.nameKr,
+          effectTag: '카드 드로우',
+        }
+      );
     } else if (winCard.effectType === 'HEAL') {
       const healAmount = winCard.code === 'WW-AC-B04' ? 3 : 2;
       winnerPlayer.hp = Math.min(winnerPlayer.maxHp, winnerPlayer.hp + healAmount);
@@ -918,6 +954,18 @@ export function resolveClash(state: GameState): GameState {
         playerIndex: winnerIndex,
         timestamp: Date.now(),
       });
+      newState = addLog(
+        newState,
+        `[생명력 회복 발동!] [${winCard.nameKr}]의 효과로 생명력을 +${healAmount} 회복했습니다! (현재 HP: ${winnerPlayer.hp}/${winnerPlayer.maxHp})`,
+        'HEAL',
+        winnerIndex,
+        {
+          cardArt: winCard.artUrl,
+          cardName: winCard.nameKr,
+          amount: healAmount,
+          effectTag: 'HP 회복',
+        }
+      );
     } else if (winCard.effectType === 'CHARGE') {
       const c1 = drawSingleCardFromDeck(winnerPlayer);
       if (c1) winnerPlayer.concertoZone.push(c1);
@@ -933,6 +981,17 @@ export function resolveClash(state: GameState): GameState {
         playerIndex: winnerIndex,
         timestamp: Date.now(),
       });
+      newState = addLog(
+        newState,
+        `[협주 급속 충전!] [${winCard.nameKr}]의 효과로 협주 에너지 1장을 충전하고 카드 1장을 드로우했습니다.`,
+        'ACTION',
+        winnerIndex,
+        {
+          cardArt: winCard.artUrl,
+          cardName: winCard.nameKr,
+          effectTag: '협주 충전',
+        }
+      );
     }
 
     // 3. 캐릭터 스킬 발동
@@ -949,6 +1008,18 @@ export function resolveClash(state: GameState): GameState {
         playerIndex: winnerIndex,
         timestamp: Date.now(),
       });
+      newState = addLog(
+        newState,
+        `[산화 냉기의 가호] 청색 카드 판정 승리로 HP +2를 회복했습니다! (현재 HP: ${winnerPlayer.hp}/${winnerPlayer.maxHp})`,
+        'HEAL',
+        winnerIndex,
+        {
+          cardArt: winnerPlayer.slots.leader.artUrl,
+          cardName: winnerPlayer.slots.leader.nameKr,
+          amount: 2,
+          effectTag: '리더 회복',
+        }
+      );
     }
     // 양양 Lv.0: 판정 승리 시 협주 1장 충전
     if (winnerPlayer.slots.leader.characterName === '양양') {
@@ -1092,7 +1163,27 @@ export function resolveClash(state: GameState): GameState {
     newState.lastEffectEvent = triggeredEffects[0];
   }
 
-  newState = addLog(newState, `【대결 결과】 ${logText} (피해: ${damageDealt}, 부여된 연격: ${comboGranted})`, 'CLASH');
+  const winCard = winnerIndex === 0 ? c0 : c1;
+  if (winnerIndex !== -1 && winCard) {
+    newState = addLog(
+      newState,
+      `【대결 판정 승리】 ${logText}\n💥 [${winCard.nameKr}] 공격 적중! 상대에게 ${damageDealt} 피해를 입혔습니다!${comboGranted > 0 ? ` (연격 +${comboGranted}회 획득)` : ''}`,
+      'DAMAGE',
+      winnerIndex,
+      {
+        cardArt: winCard.artUrl,
+        cardName: winCard.nameKr,
+        amount: damageDealt,
+        effectTag: '판정 피해',
+      }
+    );
+  } else {
+    newState = addLog(
+      newState,
+      `【대결 결과】 ${logText}`,
+      'CLASH'
+    );
+  }
 
   // 승패 체크
   if (p0.hp <= 0 || p1.hp <= 0) {
@@ -1229,9 +1320,15 @@ export function executeComboAttack(
 
   newState = addLog(
     newState,
-    `[연격 성공!] ${player.name}이(가) [${card.nameKr}](으)로 ${dmg}의 추가 피해를 입혔습니다! (남은 연격: ${player.comboCount})`,
+    `[연격 공격 성공!] ${player.name}이(가) [${card.nameKr}](으)로 ${dmg}의 연격 추가 피해를 입혔습니다! (남은 연격: ${player.comboCount}회)`,
     'DAMAGE',
-    playerIndex
+    playerIndex,
+    {
+      cardArt: card.artUrl,
+      cardName: card.nameKr,
+      amount: dmg,
+      effectTag: '연격 피해',
+    }
   );
 
   // 승패 확인

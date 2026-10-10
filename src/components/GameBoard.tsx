@@ -1474,21 +1474,29 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
             {isLogPanelExpanded ? (
               <>
-                <div className="flex-1 overflow-y-auto space-y-2 p-3 text-xs custom-scrollbar min-h-0">
+                <div className="flex-1 overflow-y-auto space-y-2.5 p-3 text-xs custom-scrollbar min-h-0">
                   {(() => {
                     const chronologicalLogs = [...gameState.logs].reverse();
                     return chronologicalLogs.map((log, idx) => {
                       const isNewTurn = idx === 0 || chronologicalLogs[idx - 1].turn !== log.turn;
-                      const badgeColor =
-                        log.type === 'CLASH'
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                          : log.type === 'DAMAGE'
-                          ? 'bg-red-500/20 text-red-300 border-red-500/40'
-                          : log.type === 'PHASE'
-                          ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
-                          : log.type === 'HEAL'
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                          : 'bg-slate-800 text-slate-300 border-slate-700';
+
+                      // 로그 유형별 테두리 및 배경 글로우
+                      let containerStyle = 'bg-slate-900/90 border-slate-800/90';
+                      let badgeColor = 'bg-slate-800 text-slate-300 border-slate-700';
+
+                      if (log.type === 'DAMAGE') {
+                        containerStyle = 'bg-gradient-to-r from-red-950/40 via-slate-900 to-slate-950 border-red-500/50 shadow-md shadow-red-950/20';
+                        badgeColor = 'bg-red-500/25 text-red-300 border-red-500/60 font-black';
+                      } else if (log.type === 'HEAL') {
+                        containerStyle = 'bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-950 border-emerald-500/50 shadow-md shadow-emerald-950/20';
+                        badgeColor = 'bg-emerald-500/25 text-emerald-300 border-emerald-500/60 font-black';
+                      } else if (log.type === 'CLASH') {
+                        containerStyle = 'bg-gradient-to-r from-amber-950/30 via-slate-900 to-slate-950 border-amber-500/50 shadow-md shadow-amber-950/20';
+                        badgeColor = 'bg-amber-500/25 text-amber-300 border-amber-500/60 font-black';
+                      } else if (log.type === 'PHASE') {
+                        containerStyle = 'bg-gradient-to-r from-indigo-950/30 via-slate-900 to-slate-950 border-indigo-500/40';
+                        badgeColor = 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40 font-bold';
+                      }
 
                       return (
                         <React.Fragment key={log.id}>
@@ -1501,18 +1509,115 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                               <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-amber-500/40" />
                             </div>
                           )}
-                          <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800/90 hover:border-slate-700 transition shadow-sm">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className={`text-[10px] font-mono font-black px-2 py-0.5 rounded border ${badgeColor}`}>
-                                {log.type}
-                              </span>
-                              <span className="text-[10px] font-mono text-slate-500 font-bold">
-                                #{idx + 1}
-                              </span>
+
+                          <div className={`p-2.5 rounded-xl border transition-all duration-200 shadow-sm ${containerStyle}`}>
+                            {/* 로그 상단 뱃지 & 이벤트 태그 */}
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase ${badgeColor}`}>
+                                  {log.type}
+                                </span>
+                                {log.effectTag && (
+                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-500/30">
+                                    {log.effectTag}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* 수치 강조 뱃지 (데미지 또는 회복 수치) */}
+                              <div className="flex items-center gap-1.5">
+                                {log.type === 'DAMAGE' && log.amount !== undefined && (
+                                  <span className="text-xs font-mono font-black px-2 py-0.5 rounded-full bg-red-600/30 text-red-300 border border-red-500/50 shadow animate-pulse">
+                                    💥 -{log.amount} HP
+                                  </span>
+                                )}
+                                {log.type === 'HEAL' && log.amount !== undefined && (
+                                  <span className="text-xs font-mono font-black px-2 py-0.5 rounded-full bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 shadow animate-pulse">
+                                    💚 +{log.amount} HP
+                                  </span>
+                                )}
+                                <span className="text-[10px] font-mono text-slate-500 font-bold">
+                                  #{idx + 1}
+                                </span>
+                              </div>
                             </div>
-                            <p className="text-slate-100 text-xs sm:text-sm leading-relaxed whitespace-pre-line font-medium">
-                              {log.text}
-                            </p>
+
+                            {/* 로그 본문: 카드 일러스트 썸네일 + 텍스트 */}
+                            <div className="flex items-start gap-2.5 mt-1">
+                              {/* 카드 일러스트 썸네일 */}
+                              {log.cardArt && (
+                                <div
+                                  onMouseEnter={() => {
+                                    if (log.cardName) {
+                                      // 호버 시 좌측 패널 미리보기에 실시간 연동
+                                      setPreviewCard({
+                                        id: log.id,
+                                        code: log.cardName,
+                                        nameKr: log.cardName,
+                                        artUrl: log.cardArt,
+                                        description: log.text,
+                                        kind: 'ACTION',
+                                        color: 'RED',
+                                        cost: 0,
+                                        damage: log.amount || 0,
+                                      } as any);
+                                    }
+                                  }}
+                                  className="relative w-11 h-15 shrink-0 rounded-lg overflow-hidden border-2 border-amber-400/70 shadow-md bg-slate-950 cursor-pointer hover:scale-105 hover:border-amber-300 transition duration-150"
+                                  title={`${log.cardName || '카드'} (마우스 오버 시 미리보기)`}
+                                >
+                                  <img
+                                    src={log.cardArt}
+                                    alt={log.cardName || '카드'}
+                                    className="w-full h-full object-cover"
+                                  />
+                                  {log.amount !== undefined && (
+                                    <div className="absolute inset-x-0 bottom-0 bg-black/80 text-[9px] font-mono font-black text-center text-amber-300 py-0.2">
+                                      {log.type === 'DAMAGE' ? `-${log.amount}` : `+${log.amount}`}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* 텍스트 내용 (강조 폰트 색상 적용) */}
+                              <div className="flex-1 min-w-0">
+                                <p className={`text-xs sm:text-[13px] leading-relaxed whitespace-pre-line font-medium ${
+                                  log.type === 'DAMAGE'
+                                    ? 'text-red-100 font-semibold'
+                                    : log.type === 'HEAL'
+                                    ? 'text-emerald-100 font-semibold'
+                                    : log.type === 'CLASH'
+                                    ? 'text-amber-100 font-medium'
+                                    : 'text-slate-200'
+                                }`}>
+                                  {/* 정규식으로 [카드이름], 피해, 회복 등 키워드 시각적 하이라이트 */}
+                                  {log.text.split(/(\[[^\]]+\]|\d+ 피해|\d+의 추가 피해|\+\d+ 회복|\+\d+ HP)/g).map((part, pIdx) => {
+                                    if (part.startsWith('[') && part.endsWith(']')) {
+                                      return (
+                                        <span key={pIdx} className="text-amber-300 font-black bg-amber-500/10 px-1 py-0.2 rounded border border-amber-500/30 inline-block my-0.5">
+                                          {part}
+                                        </span>
+                                      );
+                                    }
+                                    if (part.includes('피해')) {
+                                      return (
+                                        <span key={pIdx} className="text-red-400 font-black drop-shadow">
+                                          {part}
+                                        </span>
+                                      );
+                                    }
+                                    if (part.includes('회복')) {
+                                      return (
+                                        <span key={pIdx} className="text-emerald-300 font-black drop-shadow">
+                                          {part}
+                                        </span>
+                                      );
+                                    }
+                                    return <span key={pIdx}>{part}</span>;
+                                  })}
+                                </p>
+                              </div>
+                            </div>
                           </div>
                         </React.Fragment>
                       );
