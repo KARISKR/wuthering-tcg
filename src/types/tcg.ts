@@ -198,6 +198,7 @@ export interface DeckPreset {
   rightSupportCode: string;
   actionCards: { code: string; count: number }[];
   description?: string;
+  externalCode?: string;
 }
 
 // 커뮤니티 공유 덱 데이터 구조

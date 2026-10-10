@@ -5,16 +5,69 @@ import {
   presetToCustomDeck,
   savePreset,
   getDefaultPresets,
+  COMMUNITY_DECK_PRESETS,
 } from './deckCode';
 import { ACTION_CARD_TEMPLATES, DEDUPED_LV0_CHARACTERS } from '../data/cards';
 
 const SHARED_DECKS_STORAGE_KEY = 'wuthering_shared_decks';
 const LIKED_DECKS_STORAGE_KEY = 'wuthering_liked_shared_decks';
 
-// 기본 추천 커뮤니티 덱 시드 데이터 생성
-// 초기 기본 공유 덱 (임의 생성 덱 없이 빈 목록으로 시작)
+// 기본 추천 커뮤니티 덱 시드 데이터 생성 (mc.sldark.com 실전 공유 덱 4종)
 function generateInitialSharedDecks(): SharedDeck[] {
-  return [];
+  return [
+    {
+      id: 'shared-deck-sld-rin',
+      deckName: '🔥 RIN (카멜리아 · 앙코 · 양양)',
+      authorName: 'RIN',
+      isAnonymous: false,
+      description:
+        'mc.sldark.com 커뮤니티 공유 덱 [코드: SLD-TLL2EZT6] - 카멜리아 소멸 연격과 앙코 용융 속공, 양양 기류 서포트 콤보 덱',
+      deckCode: 'SLD-TLL2EZT6',
+      deckPreset: COMMUNITY_DECK_PRESETS[0],
+      likes: 0,
+      createdAt: Date.now() - 1000 * 60 * 60 * 12,
+      tags: ['카멜리아', '앙코', '양양', '용융', '소멸', '기류', '속공', 'sldark'],
+    },
+    {
+      id: 'shared-deck-sld-nv-yang-chun',
+      deckName: '🌸 女秧椿 (카멜리아 · 여랑자 · 양양)',
+      authorName: 'sldark 유저',
+      isAnonymous: false,
+      description:
+        'mc.sldark.com 커뮤니티 공유 덱 [코드: SLD-7LKN8P9G] - 방랑자(여)와 양양의 기류 순환으로 카멜리아의 소멸 연격을 몰아치는 연계 덱',
+      deckCode: 'SLD-7LKN8P9G',
+      deckPreset: COMMUNITY_DECK_PRESETS[1],
+      likes: 0,
+      createdAt: Date.now() - 1000 * 60 * 60 * 24,
+      tags: ['카멜리아', '방랑자(여)', '양양', '소멸', '기류', '회절', '콤보', 'sldark'],
+    },
+    {
+      id: 'shared-deck-sld-anke-loop',
+      deckName: '🐑 安克loop (앙코 · 양양 · 산화)',
+      authorName: 'sldark 유저',
+      isAnonymous: false,
+      description:
+        'mc.sldark.com 커뮤니티 공유 덱 [코드: SLD-DVQMKQPG] - 앙코 대폭주 화력과 산화 응결 방어, 양양 서포트로 매 턴 회피 및 연격을 이어가는 루프 덱',
+      deckCode: 'SLD-DVQMKQPG',
+      deckPreset: COMMUNITY_DECK_PRESETS[2],
+      likes: 0,
+      createdAt: Date.now() - 1000 * 60 * 60 * 36,
+      tags: ['앙코', '양양', '산화', '용융', '응결', '기류', '콤보', 'sldark'],
+    },
+    {
+      id: 'shared-deck-sld-an-san-shou',
+      deckName: '🌌 安散守 (파수인 · 앙코 · 양양)',
+      authorName: 'sldark 유저',
+      isAnonymous: false,
+      description:
+        'mc.sldark.com 커뮤니티 공유 덱 [코드: SLD-DV56VXTG] - 파수인의 회절 드로우 및 결말 순환과 앙코 용융 화력을 조합한 안정적인 컨트롤 제어 덱',
+      deckCode: 'SLD-DV56VXTG',
+      deckPreset: COMMUNITY_DECK_PRESETS[3],
+      likes: 0,
+      createdAt: Date.now() - 1000 * 60 * 60 * 48,
+      tags: ['파수인', '앙코', '양양', '회절', '용융', '기류', '컨트롤', 'sldark'],
+    },
+  ];
 }
 
 // 내가 좋아요 누른 덱 ID 목록 가져오기
@@ -34,19 +87,19 @@ export function getSharedDecks(): SharedDeck[] {
 
   let decks: SharedDeck[] = [];
   if (!raw) {
-    decks = [];
+    decks = generateInitialSharedDecks();
     localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(decks));
   } else {
     try {
       decks = JSON.parse(raw);
     } catch (e) {
       console.error('공유 덱 파싱 실패:', e);
-      decks = [];
+      decks = generateInitialSharedDecks();
       localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(decks));
     }
   }
 
-  // 임의 생성되었던 가상 덱(shared-deck-1 ~ 5 등) 완벽 제거 및 정화
+  // 임의 생성되었던 구버전 가상 덱(shared-deck-1 ~ 5 등) 완벽 제거 및 정화
   const PURGE_IDS = new Set([
     'shared-deck-1',
     'shared-deck-2',
@@ -58,8 +111,16 @@ export function getSharedDecks(): SharedDeck[] {
     'shared-preset-jinhsi-burst',
   ]);
 
-  const cleanedDecks = decks.filter((d) => !PURGE_IDS.has(d.id));
-  if (cleanedDecks.length !== decks.length) {
+  let cleanedDecks = decks.filter((d) => !PURGE_IDS.has(d.id));
+
+  // 신규 4종 커뮤니티 실전 덱 시드 보장 (기존 유저 생성 덱 유지하며 누락된 시드 덱 자동 보충)
+  const initialDecks = generateInitialSharedDecks();
+  const existingIds = new Set(cleanedDecks.map((d) => d.id));
+  const missingInitials = initialDecks.filter((d) => !existingIds.has(d.id));
+  if (missingInitials.length > 0) {
+    cleanedDecks = [...missingInitials, ...cleanedDecks];
+    localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(cleanedDecks));
+  } else if (cleanedDecks.length !== decks.length) {
     localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(cleanedDecks));
   }
 
