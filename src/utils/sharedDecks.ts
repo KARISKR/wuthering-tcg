@@ -99,7 +99,7 @@ function generateInitialSharedDecks(): SharedDeck[] {
       description: '초반 속도전에서 무조건 우위를 점할 수 있는 레드 카드 위주 구성입니다. 2~3턴 킬 각이 잘 나옵니다!',
       deckCode: encodeDeckCode(presetToCustomDeck(chixiaPreset)),
       deckPreset: chixiaPreset,
-      likes: 128,
+      likes: 0,
       createdAt: Date.now() - 1000 * 60 * 60 * 14, // 14시간 전
       tags: ['속공', '용융', '공격형', '치샤', '추천'],
     },
@@ -111,7 +111,7 @@ function generateInitialSharedDecks(): SharedDeck[] {
       description: '상대가 공격해올 때 BLUE 가드로 데미지를 상쇄하고 지속 반격으로 말려 죽이는 덱입니다. 익명으로 올립니다 ㅎㅎ',
       deckCode: encodeDeckCode(presetToCustomDeck(sanhuaPreset)),
       deckPreset: sanhuaPreset,
-      likes: 95,
+      likes: 0,
       createdAt: Date.now() - 1000 * 60 * 60 * 36, // 36시간 전
       tags: ['컨트롤', '응결', '방어', '산화', '익명'],
     },
@@ -123,7 +123,7 @@ function generateInitialSharedDecks(): SharedDeck[] {
       description: '양양과 산화의 협주 시너지로 3레벨 금희 승천 후 폭발적인 피니시를 노립니다. 토너먼트 3연승 달성 레시피!',
       deckCode: encodeDeckCode(presetToCustomDeck(jinhsiPreset)),
       deckPreset: jinhsiPreset,
-      likes: 210,
+      likes: 0,
       createdAt: Date.now() - 1000 * 60 * 60 * 4, // 4시간 전
       tags: ['콤보', '회절', '금희', '대회입상', '추천'],
     },
@@ -135,7 +135,7 @@ function generateInitialSharedDecks(): SharedDeck[] {
       description: 'SD01 스타터를 기반으로 밸런스를 개선한 덱. 방랑자(여)의 기류 패 보충 능력으로 패 마름 없이 안정적인 운영이 가능합니다.',
       deckCode: encodeDeckCode(presetToCustomDeck(sd01Preset)),
       deckPreset: sd01Preset,
-      likes: 82,
+      likes: 0,
       createdAt: Date.now() - 1000 * 60 * 60 * 48,
       tags: ['입문추천', '기류', '밸런스', '방랑자(여)'],
     },
@@ -147,7 +147,7 @@ function generateInitialSharedDecks(): SharedDeck[] {
       description: 'SD02 기반으로 방어 카드와 회복 카드를 꽉 채운 지구전 덱입니다. 봇 대전 상대로 승률 90% 이상 보장합니다.',
       deckCode: encodeDeckCode(presetToCustomDeck(sd02Preset)),
       deckPreset: sd02Preset,
-      likes: 64,
+      likes: 0,
       createdAt: Date.now() - 1000 * 60 * 60 * 72,
       tags: ['입문추천', '응결', '철벽', '방랑자(남)', '익명'],
     },
@@ -183,11 +183,32 @@ export function getSharedDecks(): SharedDeck[] {
     }
   }
 
-  // likedByMe 플래그 갱신
-  return decks.map((d) => ({
-    ...d,
-    likedByMe: likedIds.has(d.id),
-  }));
+  // likedByMe 플래그 갱신 및 기존에 캐싱된 가짜 추천수(128, 210 등) 실제 추천수로 교정
+  const SEED_DECK_IDS = new Set(['shared-deck-1', 'shared-deck-2', 'shared-deck-3', 'shared-deck-4', 'shared-deck-5']);
+  let needsSync = false;
+
+  const normalized = decks.map((d) => {
+    const isLiked = likedIds.has(d.id);
+    let realLikes = d.likes;
+
+    // 시드 덱에 기존 가짜 추천수가 남아있다면 실제 추천수(0 또는 1)로 강제 정정
+    if (SEED_DECK_IDS.has(d.id) && d.likes > 1) {
+      realLikes = isLiked ? 1 : 0;
+      needsSync = true;
+    }
+
+    return {
+      ...d,
+      likes: realLikes,
+      likedByMe: isLiked,
+    };
+  });
+
+  if (needsSync) {
+    localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(normalized));
+  }
+
+  return normalized;
 }
 
 // 새 덱 공유 등록하기
@@ -234,21 +255,14 @@ export function shareNewDeck(params: ShareDeckParams): SharedDeck {
       name: params.deckName.trim() || targetPreset.name,
       description: params.description.trim() || targetPreset.description,
     },
-    likes: 1, // 본인 등록 시 기본 1 추천
-    likedByMe: true,
+    likes: 0, // 실제 추천수 0부터 시작
+    likedByMe: false,
     createdAt: Date.now(),
     tags: params.tags && params.tags.length > 0 ? params.tags : ['커뮤니티', '유저공유'],
   };
 
   const updated = [newSharedDeck, ...currentDecks];
   localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(updated));
-
-  // 본인 등록 덱 자동 좋아요
-  const likedIds = getLikedDeckIds();
-  if (!likedIds.includes(newSharedDeck.id)) {
-    likedIds.push(newSharedDeck.id);
-    localStorage.setItem(LIKED_DECKS_STORAGE_KEY, JSON.stringify(likedIds));
-  }
 
   return newSharedDeck;
 }
