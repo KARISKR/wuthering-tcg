@@ -324,4 +324,56 @@
   animation: draw-ring-burst 0.65s ease-out forwards;
 }
 
+/* ========================================================= */
+/* 주사위 굴리기 (선공 결정 연출) */
+/* ========================================================= */
+@keyframes dice-roll-shake {
+  0% {
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+  20% {
+    transform: rotate(-18deg) scale(1.12) translateY(-14px);
+  }
+  40% {
+    transform: rotate(22deg) scale(0.95) translateY(8px);
+  }
+  60% {
+    transform: rotate(-12deg) scale(1.08) translateY(-8px);
+  }
+  80% {
+    transform: rotate(14deg) scale(0.98) translateY(4px);
+  }
+  100% {
+    transform: rotate(0deg) scale(1) translateY(0);
+  }
+}
+
+.animate-dice-roll {
+  animation: dice-roll-shake 0.35s infinite ease-in-out;
+  will-change: transform;
+}
+
+@keyframes dice-land-impact {
+  0% {
+    transform: scale(1.35) translateY(-25px);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(0.92) translateY(6px);
+  }
+  75% {
+    transform: scale(1.06) translateY(-2px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-dice-land {
+  animation: dice-land-impact 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform;
+}
+
+
 

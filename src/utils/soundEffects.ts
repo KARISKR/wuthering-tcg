@@ -492,6 +492,78 @@ class SoundEffectsEngine {
   }
 
   // =========================================================================
+  // 주사위 굴리기 & 착지 사운드
+  // =========================================================================
+  public playDiceRoll() {
+    if (this.isMuted) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    // 가벼운 주사위 래틀/달그락 사운드 (빠른 노이즈 탭 3개)
+    const now = ctx.currentTime;
+    for (let i = 0; i < 3; i++) {
+      const delay = i * 0.04 + Math.random() * 0.01;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(600 + Math.random() * 400, now + delay);
+      osc.frequency.exponentialRampToValueAtTime(300, now + delay + 0.03);
+
+      gain.gain.setValueAtTime(this.volume * 0.25, now + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.03);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + delay);
+      osc.stop(now + delay + 0.03);
+    }
+  }
+
+  public playDiceLand(isWin: boolean = false) {
+    if (this.isMuted) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    // 묵직한 착지 소리 (우드/테이블 쿵)
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(240, now);
+    osc.frequency.exponentialRampToValueAtTime(60, now + 0.12);
+
+    gain.gain.setValueAtTime(this.volume * 0.5, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.12);
+
+    this.playDullThudNoise(0.08, this.volume * 0.35, 600);
+
+    // 승리 시 밝은 상승 팡파르 차임
+    if (isWin) {
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const chimeOsc = ctx.createOscillator();
+        const chimeGain = ctx.createGain();
+        chimeOsc.type = 'triangle';
+        chimeOsc.frequency.setValueAtTime(freq, now + 0.08 + idx * 0.06);
+
+        chimeGain.gain.setValueAtTime(this.volume * 0.3, now + 0.08 + idx * 0.06);
+        chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35 + idx * 0.06);
+
+        chimeOsc.connect(chimeGain);
+        chimeGain.connect(ctx.destination);
+        chimeOsc.start(now + 0.08 + idx * 0.06);
+        chimeOsc.stop(now + 0.35 + idx * 0.06);
+      });
+    }
+  }
+
+
+  // =========================================================================
   // 내부 합성 헬퍼: 둔탁한 저역 노이즈 (High-cut Lowpass)
   // =========================================================================
   private playDullThudNoise(duration: number, volume: number, cutoffFreq: number) {

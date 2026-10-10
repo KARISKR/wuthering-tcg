@@ -5,6 +5,7 @@ import { CharacterSlot } from './CharacterSlot';
 import { HandView } from './HandView';
 import { UpgradeModal } from './UpgradeModal';
 import { MulliganModal } from './MulliganModal';
+import { InitiativeDiceModal } from './InitiativeDiceModal';
 import { ClashAnimationOverlay } from './ClashAnimationOverlay';
 import { ComboStrikeOverlay } from './ComboStrikeOverlay';
 import { UpgradeEffectOverlay } from './UpgradeEffectOverlay';
@@ -67,6 +68,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     isAiThinking,
     restartGame,
     setGameMode,
+    handleSetInitiative,
     handleMulligan,
     handleUpgrade,
     handleSwitchLeader,
@@ -81,6 +83,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleEndTurn,
     handleForceResolveClash,
   } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
+
+  // 선공 결정 주사위 연출 상태 (게임 시작 시 MULLIGAN 단계에서 활성화)
+  const [isInitiativeRolling, setIsInitiativeRolling] = useState(true);
+
 
   // 덱에서 카드 드로우 시 시각 효과 상태
   const [p0DeckDrawing, setP0DeckDrawing] = useState(false);
@@ -588,7 +594,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           </button>
 
           <button
-            onClick={() => restartGame()}
+            onClick={() => {
+              setIsInitiativeRolling(true);
+              restartGame();
+            }}
             className="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 transition cursor-pointer"
             title="게임 재시작"
           >
@@ -1691,8 +1700,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         isAiTurn={gameState.activePlayerIndex === 1 && gameState.players[1].isAi}
       />
 
-      {/* 멀리건 모달 */}
-      {gameState.phase === 'MULLIGAN' && (
+      {/* 선공 결정 주사위 모달 (양측 주사위 투척 연출) */}
+      <InitiativeDiceModal
+        isOpen={isInitiativeRolling && gameState.phase === 'MULLIGAN'}
+        player0={gameState.players[0]}
+        player1={gameState.players[1]}
+        onComplete={(winnerIndex, roll0, roll1) => {
+          handleSetInitiative(winnerIndex, roll0, roll1);
+          setIsInitiativeRolling(false);
+        }}
+      />
+
+      {/* 멀리건 모달 (주사위 결정 연출 완료 후 노출) */}
+      {gameState.phase === 'MULLIGAN' && !isInitiativeRolling && (
         <MulliganModal
           hand={p0.hand}
           onConfirm={handleMulligan}
@@ -1772,7 +1792,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           winner={gameState.winner as 0 | 1}
           players={gameState.players}
           turn={gameState.turn}
-          onRestart={() => restartGame()}
+          onRestart={() => {
+            setIsInitiativeRolling(true);
+            restartGame();
+          }}
           onExitToLobby={onExitToLobby}
         />
       )}

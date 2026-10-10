@@ -63,6 +63,29 @@ export function useGame(
     }));
   }, []);
 
+  // 0. 선공 주사위 결정
+  const handleSetInitiative = useCallback(
+    (firstPlayerIndex: 0 | 1, roll0: number, roll1: number) => {
+      setGameState((prev) => {
+        const winnerName = prev.players[firstPlayerIndex].name;
+        const rollLog: import('../types/tcg').LogItem = {
+          id: `log-dice-${Date.now()}`,
+          turn: prev.turn,
+          playerIndex: firstPlayerIndex,
+          type: 'SYSTEM',
+          text: `🎲 [선공 결정 주사위] ${prev.players[0].name}: ${roll0} vs ${prev.players[1].name}: ${roll1} ➔ [${winnerName}] 선공 확정!`,
+          timestamp: Date.now(),
+        };
+        return {
+          ...prev,
+          activePlayerIndex: firstPlayerIndex,
+          logs: [rollLog, ...prev.logs],
+        };
+      });
+    },
+    []
+  );
+
   // 1. 멀리건 확인
   const handleMulligan = useCallback(
     (p0DiscardIds: string[]) => {
@@ -76,6 +99,7 @@ export function useGame(
     },
     []
   );
+
 
   // 2. 캐릭터 레벨업
   const handleUpgrade = useCallback(
@@ -271,6 +295,7 @@ export function useGame(
     isAiThinking,
     restartGame,
     setGameMode,
+    handleSetInitiative,
     handleMulligan,
     handleUpgrade,
     handleSwitchLeader,
