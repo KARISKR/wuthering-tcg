@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ComboStrikeEffect } from '../types/tcg';
 import { Flame, Swords, Zap, Sparkles } from 'lucide-react';
 
-import { soundEffects } from '../utils/soundEffects';
+import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
 
 interface ComboStrikeOverlayProps {
   strike: ComboStrikeEffect;
@@ -13,13 +13,15 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
   const [activeStage, setActiveStage] = useState<'SLASH' | 'IMPACT'>('SLASH');
 
   useEffect(() => {
+    const attackerWeapon = getWeaponByCharacter(strike.attackerName);
+
     // 참격 효과음 재생
     soundEffects.playComboSlash();
 
-    // 250ms 후 임팩트 폭발
+    // 250ms 후 임팩트 폭발 (티어별 데미지 + 공격자 무기 효과음)
     const tImpact = setTimeout(() => {
       setActiveStage('IMPACT');
-      soundEffects.playDamage(strike.damage);
+      soundEffects.playDamage(strike.damage, attackerWeapon);
     }, 250);
 
     // 1350ms 후 자동 퇴장 (연격 연출을 확실히 체감할 수 있도록 여유 부여)

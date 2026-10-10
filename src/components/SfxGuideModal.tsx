@@ -33,6 +33,27 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
       case 'damage':
         soundEffects.playDamage(3);
         break;
+      case 'damage_light':
+        soundEffects.playDamageLight();
+        break;
+      case 'damage_medium':
+        soundEffects.playDamageMedium(4);
+        break;
+      case 'damage_heavy':
+        soundEffects.playDamageHeavy(7);
+        break;
+      case 'weapon_sword':
+        soundEffects.playWeaponSound('직검');
+        break;
+      case 'weapon_broadblade':
+        soundEffects.playWeaponSound('대검');
+        break;
+      case 'weapon_pistol':
+        soundEffects.playWeaponSound('권총');
+        break;
+      case 'weapon_rectifier':
+        soundEffects.playWeaponSound('증폭기');
+        break;
       case 'phase':
         soundEffects.playPhaseChange();
         break;

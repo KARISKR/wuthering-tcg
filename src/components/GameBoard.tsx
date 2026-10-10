@@ -10,7 +10,7 @@ import { ClashAnimationOverlay } from './ClashAnimationOverlay';
 import { ComboStrikeOverlay } from './ComboStrikeOverlay';
 import { UpgradeEffectOverlay } from './UpgradeEffectOverlay';
 import { PhaseBannerOverlay } from './PhaseBannerOverlay';
-import { soundEffects } from '../utils/soundEffects';
+import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
 import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { GameOverModal } from './GameOverModal';
@@ -338,21 +338,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     if (p0.hp < prevP0Hp.current) {
       // 대결 연출 중에는 ClashAnimationOverlay가 참격 타이밍(1.5초)에 직접 효과음을 내므로 중복 방지
       if (gameState.phase !== 'CLASH_REVEAL') {
-        soundEffects.playDamage(prevP0Hp.current - p0.hp);
+        const attackerLeader = p1.slots.leader;
+        const weapon = attackerLeader ? getWeaponByCharacter(attackerLeader.characterName || attackerLeader.nameKr) : undefined;
+        soundEffects.playDamage(prevP0Hp.current - p0.hp, weapon);
       }
     }
     prevP0Hp.current = p0.hp;
-  }, [p0.hp, gameState.phase]);
+  }, [p0.hp, gameState.phase, p1.slots.leader]);
 
   useEffect(() => {
     if (p1.hp < prevP1Hp.current) {
       // 대결 연출 중에는 ClashAnimationOverlay가 참격 타이밍(1.5초)에 직접 효과음을 내므로 중복 방지
       if (gameState.phase !== 'CLASH_REVEAL') {
-        soundEffects.playDamage(prevP1Hp.current - p1.hp);
+        const attackerLeader = p0.slots.leader;
+        const weapon = attackerLeader ? getWeaponByCharacter(attackerLeader.characterName || attackerLeader.nameKr) : undefined;
+        soundEffects.playDamage(prevP1Hp.current - p1.hp, weapon);
       }
     }
     prevP1Hp.current = p1.hp;
-  }, [p1.hp, gameState.phase]);
+  }, [p1.hp, gameState.phase, p0.slots.leader]);
 
   // 1인 2역 (SOLO_DUAL) 시 페이즈에 따른 자동 조종 시점 전환 로직
   useEffect(() => {

@@ -1,7 +1,23 @@
 // Web Audio API 및 커스텀 오디오 파일(MP3/WAV/OGG) 하이브리드 사운드 엔진
 // public/audio/sfx/ 폴더에 커스텀 파일이 있으면 우선 재생하고, 없으면 내장 물리 합성음으로 폴백
 
-export type SfxCategory = 'clash' | 'damage' | 'phase' | 'combo' | 'card' | 'turn' | 'upgrade';
+export type WeaponType = '직검' | '대검' | '권총' | '증폭기';
+
+export type SfxCategory =
+  | 'clash'
+  | 'damage' // legacy fallback
+  | 'damage_light' // 1~2
+  | 'damage_medium' // 3~5
+  | 'damage_heavy' // 6+
+  | 'weapon_sword' // 직검
+  | 'weapon_broadblade' // 대검
+  | 'weapon_pistol' // 권총
+  | 'weapon_rectifier' // 증폭기
+  | 'phase'
+  | 'combo'
+  | 'card'
+  | 'turn'
+  | 'upgrade';
 
 export interface SfxSpec {
   category: SfxCategory;
@@ -25,11 +41,74 @@ export const SFX_SPECIFICATIONS: Record<SfxCategory, SfxSpec> = {
   },
   damage: {
     category: 'damage',
-    nameKr: 'HP 피격 / 대미지',
+    nameKr: 'HP 피격 / 대미지 (기본 통합)',
     recommendedDuration: '0.3초 ~ 0.6초',
     recommendedDurationSec: 0.45,
-    description: '생명력 감소 시 묵직한 타격음 (서브 베이스 펀치)',
+    description: '공통 생명력 감소 시 타격음 (세부 티어 파일이 없을 때 폴백)',
     folderPath: '/audio/sfx/damage/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  damage_light: {
+    category: 'damage_light',
+    nameKr: '대미지 1~2 (경타 / 스침)',
+    recommendedDuration: '0.15초 ~ 0.35초',
+    recommendedDurationSec: 0.25,
+    description: '가벼운 견제타 및 스침 피격음 (경쾌한 스냅/잽 타격)',
+    folderPath: '/audio/sfx/damage_light/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  damage_medium: {
+    category: 'damage_medium',
+    nameKr: '대미지 3~5 (중타 / 크런치)',
+    recommendedDuration: '0.3초 ~ 0.6초',
+    recommendedDurationSec: 0.45,
+    description: '일반 유효타 및 강력한 공격 피격음 (묵직한 크런치 & 서브 베이스 펀치)',
+    folderPath: '/audio/sfx/damage_medium/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  damage_heavy: {
+    category: 'damage_heavy',
+    nameKr: '대미지 6 이상 (치명타 / 필살 슬램)',
+    recommendedDuration: '0.6초 ~ 1.2초',
+    recommendedDurationSec: 0.85,
+    description: '치명적 대량 피해 피격음 (대폭발 서브 베이스 럼블 & 균열 파쇄음)',
+    folderPath: '/audio/sfx/damage_heavy/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  weapon_sword: {
+    category: 'weapon_sword',
+    nameKr: '무기 - 직검 (Sword)',
+    recommendedDuration: '0.2초 ~ 0.45초',
+    recommendedDurationSec: 0.3,
+    description: '직검 베기/참격 (방랑자, 양양, 산화, 카멜리아 - 고주파 메탈 슬래시)',
+    folderPath: '/audio/sfx/weapon_sword/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  weapon_broadblade: {
+    category: 'weapon_broadblade',
+    nameKr: '무기 - 대검 (Broadblade)',
+    recommendedDuration: '0.35초 ~ 0.7초',
+    recommendedDurationSec: 0.5,
+    description: '대검 묵직한 파쇄 (금희 - 둔기급 서브 충격파 및 헤비 스매시)',
+    folderPath: '/audio/sfx/weapon_broadblade/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  weapon_pistol: {
+    category: 'weapon_pistol',
+    nameKr: '무기 - 권총 (Pistols)',
+    recommendedDuration: '0.15초 ~ 0.35초',
+    recommendedDurationSec: 0.25,
+    description: '권총 화약 격발 및 탄환 적중 (치샤 - 고속 피탄 및 스파크 탕-!)',
+    folderPath: '/audio/sfx/weapon_pistol/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  weapon_rectifier: {
+    category: 'weapon_rectifier',
+    nameKr: '무기 - 증폭기 (Rectifier)',
+    recommendedDuration: '0.3초 ~ 0.6초',
+    recommendedDurationSec: 0.45,
+    description: '증폭기 공명 마법 파동 (파수인, 앙코 - 에테르 에너지 공명 및 버스트)',
+    folderPath: '/audio/sfx/weapon_rectifier/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
   phase: {
@@ -78,6 +157,19 @@ export const SFX_SPECIFICATIONS: Record<SfxCategory, SfxSpec> = {
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
 };
+
+/**
+ * 캐릭터 이름을 공식 무기 직군으로 변환하는 매핑 헬퍼
+ */
+export function getWeaponByCharacter(nameOrCharacter?: string): WeaponType {
+  if (!nameOrCharacter) return '직검';
+  const name = nameOrCharacter.trim();
+  if (name.includes('치샤')) return '권총';
+  if (name.includes('금희')) return '대검';
+  if (name.includes('파수인') || name.includes('앙코')) return '증폭기';
+  // 방랑자(여), 방랑자(남), 양양, 산화, 카멜리아 등은 직검
+  return '직검';
+}
 
 class SoundEffectsEngine {
   private ctx: AudioContext | null = null;
@@ -280,37 +372,273 @@ class SoundEffectsEngine {
   }
 
   // =========================================================================
-  // 2. 생명력(HP) 피격 / 피해 효과음 (DAMAGE - 권장 0.3~0.6초)
+  // 2. 생명력(HP) 피격 / 대미지 효과음 (데미지 1~2 / 3~5 / 6+ 및 무기직군 연동)
   // =========================================================================
-  public playDamage(amount: number = 2) {
+  public playDamage(amount: number = 2, weapon?: WeaponType) {
     if (this.isMuted) return;
 
-    const intensity = Math.min(1.4, 0.8 + amount * 0.12);
-    if (this.playCustomBuffer('damage', intensity)) return;
+    // A. 무기 사운드 병렬 레이어 재생
+    if (weapon) {
+      this.playWeaponSound(weapon);
+    }
 
+    // B. 데미지 수치별 카테고리 분기
+    // 1~2: Light, 3~5: Medium, 6+: Heavy
+    let damageCat: SfxCategory = 'damage_medium';
+    if (amount <= 2) {
+      damageCat = 'damage_light';
+    } else if (amount >= 6) {
+      damageCat = 'damage_heavy';
+    }
+
+    // 우선 해당 티어의 커스텀 사운드 시도 -> 없으면 공통 'damage' 커스텀 사운드 시도
+    if (this.playCustomBuffer(damageCat)) return;
+    if (this.playCustomBuffer('damage')) return;
+
+    // 커스텀 사운드가 없을 경우 내장 티어별 물리 합성음 재생
+    if (amount <= 2) {
+      this.playDamageLight();
+    } else if (amount >= 6) {
+      this.playDamageHeavy(amount);
+    } else {
+      this.playDamageMedium(amount);
+    }
+  }
+
+  /**
+   * 티어 1: 데미지 1~2 (경타 / 스침, 가벼운 타격음)
+   */
+  public playDamageLight() {
+    if (this.isMuted) return;
     const ctx = this.getAudioContext();
     if (!ctx) return;
 
     const now = ctx.currentTime;
 
-    // A. 딥 서브 베이스 펀치
+    // 가벼운 피치 다운 팝/스냅 (130Hz -> 65Hz)
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(80, now);
-    osc.frequency.exponentialRampToValueAtTime(26, now + 0.38);
+    osc.frequency.setValueAtTime(130, now);
+    osc.frequency.exponentialRampToValueAtTime(65, now + 0.18);
 
-    gain.gain.setValueAtTime(this.volume * intensity, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+    gain.gain.setValueAtTime(this.volume * 0.6, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
     osc.connect(gain);
     gain.connect(ctx.destination);
     osc.start(now);
-    osc.stop(now + 0.38);
+    osc.stop(now + 0.18);
 
-    // B. 육중한 육체/장갑 타격 둔탁음
-    const cutoff = Math.min(420, 260 + amount * 25);
-    this.playDullThudNoise(0.26, this.volume * 0.85 * intensity, cutoff);
+    // 가벼운 가죽/옷깃 스침 노이즈
+    this.playDullThudNoise(0.12, this.volume * 0.5, 520);
+  }
+
+  /**
+   * 티어 2: 데미지 3~5 (중타 / 크런치 타격음)
+   */
+  public playDamageMedium(amount: number = 3) {
+    if (this.isMuted) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const intensity = Math.min(1.2, 0.85 + (amount - 3) * 0.1);
+
+    // 묵직한 서브 펀치 (85Hz -> 28Hz)
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(85, now);
+    osc.frequency.exponentialRampToValueAtTime(28, now + 0.36);
+
+    gain.gain.setValueAtTime(this.volume * 0.95 * intensity, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.36);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.36);
+
+    // 묵직한 육체/장갑 타격 크런치
+    this.playDullThudNoise(0.24, this.volume * 0.8 * intensity, 340);
+  }
+
+  /**
+   * 티어 3: 데미지 6 이상 (치명타 / 대폭발 서브 베이스 슬램 + 글래스 섀터)
+   */
+  public playDamageHeavy(amount: number = 6) {
+    if (this.isMuted) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const intensity = Math.min(1.5, 1.1 + (amount - 6) * 0.08);
+
+    // 1. 헤비 서브 베이스 럼블 (초저역 지진급 진동 65Hz -> 18Hz)
+    const subOsc = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(65, now);
+    subOsc.frequency.exponentialRampToValueAtTime(18, now + 0.65);
+
+    subGain.gain.setValueAtTime(this.volume * 1.1 * intensity, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+
+    subOsc.connect(subGain);
+    subGain.connect(ctx.destination);
+    subOsc.start(now);
+    subOsc.stop(now + 0.65);
+
+    // 2. 강타 크런치 넉 (삼각파 슬램)
+    const punchOsc = ctx.createOscillator();
+    const punchGain = ctx.createGain();
+    punchOsc.type = 'triangle';
+    punchOsc.frequency.setValueAtTime(150, now);
+    punchOsc.frequency.exponentialRampToValueAtTime(35, now + 0.28);
+
+    punchGain.gain.setValueAtTime(this.volume * 0.95 * intensity, now);
+    punchGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+    punchOsc.connect(punchGain);
+    punchGain.connect(ctx.destination);
+    punchOsc.start(now);
+    punchOsc.stop(now + 0.28);
+
+    // 3. 치명타 폭발 둔탁음 + 파쇄 노이즈
+    this.playDullThudNoise(0.45, this.volume * intensity, 280);
+    this.playCinematicWhoosh(0.5, this.volume * 0.6 * intensity);
+  }
+
+  // =========================================================================
+  // 무기 직군별 타격 효과음 (직검 / 대검 / 권총 / 증폭기)
+  // =========================================================================
+  public playWeaponSound(weapon: WeaponType) {
+    if (this.isMuted) return;
+
+    let cat: SfxCategory = 'weapon_sword';
+    if (weapon === '대검') cat = 'weapon_broadblade';
+    else if (weapon === '권총') cat = 'weapon_pistol';
+    else if (weapon === '증폭기') cat = 'weapon_rectifier';
+
+    // 커스텀 음원이 지정되어 있으면 우선 재생
+    if (this.playCustomBuffer(cat)) return;
+
+    // 없으면 고유 물리 합성음 재생
+    switch (weapon) {
+      case '직검':
+        this.playWeaponSwordSynth();
+        break;
+      case '대검':
+        this.playWeaponBroadbladeSynth();
+        break;
+      case '권총':
+        this.playWeaponPistolSynth();
+        break;
+      case '증폭기':
+        this.playWeaponRectifierSynth();
+        break;
+    }
+  }
+
+  /** 직검 합성음: 날카로운 메탈릭 슬래시 (고주파 챵-!) */
+  private playWeaponSwordSynth() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 메탈릭 쇳소리 배음 오실레이터 2개
+    [1200, 2450].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.4, now + 0.2);
+
+      gain.gain.setValueAtTime(this.volume * 0.25 * (1 - i * 0.3), now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.2);
+    });
+
+    this.playWindSlashNoise(0.18, this.volume * 0.6);
+  }
+
+  /** 대검 합성음: 묵직한 둔기급 파쇄 쿵-! */
+  private playWeaponBroadbladeSynth() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(95, now);
+    osc.frequency.exponentialRampToValueAtTime(25, now + 0.45);
+
+    gain.gain.setValueAtTime(this.volume * 0.85, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.45);
+
+    this.playDullThudNoise(0.35, this.volume * 0.8, 220);
+  }
+
+  /** 권총 합성음: 화약 폭발 및 탄환 격발음 탕/핑-! */
+  private playWeaponPistolSynth() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 화약 폭발 팝 (1800Hz -> 100Hz 초고속 하강)
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1600, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.08);
+
+    gain.gain.setValueAtTime(this.volume * 0.55, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.08);
+
+    // 탄환 풍절 스파크
+    this.playDullThudNoise(0.07, this.volume * 0.7, 900);
+  }
+
+  /** 증폭기 합성음: 에테르 마법 공명 파동 슈웅-파앗! */
+  private playWeaponRectifierSynth() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 공명 아르페지오 버스트
+    [440, 660, 880].forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.03);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + idx * 0.03 + 0.25);
+
+      gain.gain.setValueAtTime(this.volume * 0.35, now + idx * 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.03 + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + idx * 0.03);
+      osc.stop(now + idx * 0.03 + 0.25);
+    });
+
+    this.playCinematicWhoosh(0.3, this.volume * 0.4);
   }
 
   // =========================================================================

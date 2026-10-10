@@ -4,7 +4,7 @@ import { CardView } from './CardView';
 import { Flame, Wind, Shield, Swords, Sparkles, CheckCircle2, XCircle, Zap, Crown, Heart, BatteryCharging, ShieldAlert } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-import { soundEffects } from '../utils/soundEffects';
+import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
 
 interface ClashAnimationOverlayProps {
   clashResult: ClashResult;
@@ -26,6 +26,10 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
   const isP1Winner = clashResult.winnerIndex === 1;
   const isDraw = clashResult.winnerIndex === -1;
 
+  // 승리자 리더의 무기 타입 판별
+  const winnerLeader = clashResult.winnerIndex !== -1 ? players[clashResult.winnerIndex]?.slots.leader : null;
+  const winnerWeapon = winnerLeader ? getWeaponByCharacter(winnerLeader.characterName || winnerLeader.nameKr) : undefined;
+
   useEffect(() => {
     // 1단계: 700ms 후 격돌 (양 카드 돌진 & 화면 셰이크 & 스파크 & 효과음)
     const tCollide = setTimeout(() => {
@@ -33,11 +37,11 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
       soundEffects.playClash();
     }, 700);
 
-    // 2단계: 1500ms 후 승리자의 참격 및 대미지 슬램 (피해 효과음)
+    // 2단계: 1500ms 후 승리자의 참격 및 대미지 슬램 (피해 효과음 + 무기 직군 타격음)
     const tSlash = setTimeout(() => {
       setStage('SLASH');
       if (clashResult.damageDealt > 0) {
-        soundEffects.playDamage(clashResult.damageDealt);
+        soundEffects.playDamage(clashResult.damageDealt, winnerWeapon);
       } else {
         soundEffects.playClash();
       }
