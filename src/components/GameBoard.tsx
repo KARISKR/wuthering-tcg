@@ -956,9 +956,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               </div>
 
               {/* ------------------------------------------------------- */}
-              {/* 3. 플레이어 공식 플레이매트 (하단 - 공식 사진 규격 100% 일치) */}
+              {/* 3. 플레이어 공식 플레이매트 (하단 - 상대와 100% 동일 규격 대칭) */}
               {/* ------------------------------------------------------- */}
-              <div className="relative rounded-3xl bg-gradient-to-t from-slate-950/95 via-[#0b1020]/90 to-slate-950/90 border-2 border-amber-500/40 p-3 sm:p-4 shadow-2xl backdrop-blur-md overflow-hidden">
+              <div className="relative w-full rounded-3xl bg-gradient-to-t from-slate-950/95 via-[#0b1020]/90 to-slate-950/90 border-2 border-amber-500/40 p-3 sm:p-4 shadow-2xl backdrop-blur-md overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_100%,rgba(245,158,11,0.08),transparent)] pointer-events-none" />
 
                 {/* 플레이어 상태 바 (HP & 스탯 대형화) */}
