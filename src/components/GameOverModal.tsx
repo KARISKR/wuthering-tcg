@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { PlayerState } from '../types/tcg';
-import { Trophy, Skull, RotateCcw, Home, Crown, Flame, Sparkles, Swords, Heart, Shield, Star } from 'lucide-react';
+import { Trophy, Skull, RotateCcw, Home, Crown, Flame, Sparkles, Swords, Heart, Shield, Star, History } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface GameOverModalProps {
@@ -9,6 +9,7 @@ interface GameOverModalProps {
   turn?: number;
   onRestart: () => void;
   onExitToLobby?: () => void;
+  onOpenReplay?: () => void;
 }
 
 // 승리 캐릭터별 전용 명대사
@@ -38,6 +39,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   turn = 1,
   onRestart,
   onExitToLobby,
+  onOpenReplay,
 }) => {
   const isPlayerWinner = winner === 0;
   const winnerPlayer = players[winner];
@@ -246,14 +248,24 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
         {/* 4. 액션 버튼들 */}
         <div
-          className={`w-full max-w-lg flex items-center gap-3 transition-all duration-500 ${
+          className={`w-full max-w-lg flex flex-col sm:flex-row items-center gap-2.5 transition-all duration-500 ${
             animationStep >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
         >
+          {onOpenReplay && (
+            <button
+              onClick={onOpenReplay}
+              className="w-full sm:flex-1 py-3 px-3 rounded-2xl bg-indigo-900/60 hover:bg-indigo-800/80 text-indigo-200 border border-indigo-500/50 font-bold text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/50"
+            >
+              <History className="w-4 h-4 text-indigo-400" />
+              <span>대전 복기 (리플레이)</span>
+            </button>
+          )}
+
           {onExitToLobby && (
             <button
               onClick={onExitToLobby}
-              className="flex-1 py-3 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer border border-slate-700 flex items-center justify-center gap-2"
+              className="w-full sm:flex-1 py-3 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer border border-slate-700 flex items-center justify-center gap-2"
             >
               <Home className="w-4 h-4 text-amber-400" />
               <span>대기실로 나가기</span>
@@ -262,10 +274,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
           <button
             onClick={onRestart}
-            className="flex-1 py-3 px-5 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-500/40 transition transform hover:scale-102 flex items-center justify-center gap-2 cursor-pointer animate-pulse"
+            className="w-full sm:flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/40 transition transform hover:scale-102 flex items-center justify-center gap-2 cursor-pointer animate-pulse"
           >
             <RotateCcw className="w-4 h-4 text-slate-950" />
-            <span>새로운 배틀 시작하기</span>
+            <span>새로운 배틀</span>
           </button>
         </div>
       </div>

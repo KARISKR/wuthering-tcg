@@ -7,6 +7,7 @@ import { VideoGuideModal } from './VideoGuideModal';
 import { PatchNotesModal } from './PatchNotesModal';
 import { SfxGuideModal } from './SfxGuideModal';
 import { CommunityDeckModal } from './CommunityDeckModal';
+import { BattleReplayModal } from './BattleReplayModal';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import { DeckSelectModal } from './DeckSelectModal';
@@ -27,6 +28,7 @@ import {
   ScrollText,
   Volume2,
   Share2,
+  History,
 } from 'lucide-react';
 
 interface LobbyProps {
@@ -47,6 +49,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isPatchNotesOpen, setIsPatchNotesOpen] = useState(false);
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
+  const [isReplayOpen, setIsReplayOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
 
@@ -74,6 +77,16 @@ export const Lobby: React.FC<LobbyProps> = ({
 
         {/* 상단 퀵 바로가기 & BGM 플레이어 위젯 */}
         <div className="flex items-center gap-2.5">
+          {/* 대전 리플레이 상단 바로가기 버튼 */}
+          <button
+            onClick={() => setIsReplayOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer shadow-md"
+            title="대전 리플레이 및 복기 내역 열기"
+          >
+            <History className="w-4 h-4 text-amber-400" />
+            <span className="hidden sm:inline">리플레이 & 복기</span>
+          </button>
+
           {/* 커뮤니티 공유된 덱 리스트 상단 버튼 */}
           <button
             onClick={() => setIsCommunityDeckOpen(true)}
@@ -134,12 +147,12 @@ export const Lobby: React.FC<LobbyProps> = ({
           </p>
         </div>
 
-        {/* 메인 메뉴 카드 7선 그리드 (공유 덱 라운지 & 독립 룰 영상 가이드 포함!) */}
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3.5">
-          {/* 메뉴 1: 배틀 시작 */}
+        {/* 메인 메뉴 카드 8선 그리드 (4칸 2줄 깔끔한 대칭 레이아웃) */}
+        <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* [1행 1열] 메뉴 1: 배틀 시작 */}
           <div
             onClick={() => setShowModeModal(true)}
-            className="group relative rounded-2xl bg-gradient-to-b from-amber-950/40 via-slate-900 to-slate-950 border-2 border-amber-500/60 p-5 flex flex-col justify-between shadow-xl shadow-amber-500/10 hover:shadow-amber-500/25 hover:border-amber-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative rounded-2xl bg-gradient-to-b from-amber-950/40 via-slate-900 to-slate-950 border-2 border-amber-500/60 p-5 flex flex-col justify-between shadow-xl shadow-amber-500/10 hover:shadow-amber-500/25 hover:border-amber-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden min-h-[220px]"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition" />
             <div>
@@ -153,16 +166,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                 스마트 AI 봇과의 진검승부 또는 1인 2역 연습 듀얼을 시작합니다.
               </p>
             </div>
-            <div className="mt-6 flex items-center text-xs font-bold text-amber-400 gap-1 group-hover:translate-x-1 transition">
+            <div className="mt-4 flex items-center text-xs font-bold text-amber-400 gap-1 group-hover:translate-x-1 transition">
               <span>대전 입장하기</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>
 
-          {/* 메뉴 2: 덱 빌더 */}
+          {/* [1행 2열] 메뉴 2: 덱 빌더 */}
           <div
             onClick={onOpenDeckBuilder}
-            className="group relative rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 flex flex-col justify-between shadow-xl hover:shadow-indigo-500/20 hover:border-indigo-500/80 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative rounded-2xl bg-gradient-to-b from-indigo-950/40 via-slate-900 to-slate-950 border border-slate-800 p-5 flex flex-col justify-between shadow-xl hover:shadow-indigo-500/20 hover:border-indigo-500/80 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden min-h-[220px]"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition" />
             <div>
@@ -176,16 +189,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                 리더 1명 + 서포터 2명 및 40장의 액션 덱을 자유롭게 커스텀 편성합니다.
               </p>
             </div>
-            <div className="mt-6 flex items-center text-xs font-bold text-indigo-400 gap-1 group-hover:translate-x-1 transition">
+            <div className="mt-4 flex items-center text-xs font-bold text-indigo-400 gap-1 group-hover:translate-x-1 transition">
               <span>덱 구성하기</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>
 
-          {/* 메뉴 3: 덱 프리셋 & 코드 */}
+          {/* [1행 3열] 메뉴 3: 덱 프리셋 & 코드 */}
           <div
             onClick={() => setIsPresetOpen(true)}
-            className="group relative rounded-2xl bg-gradient-to-b from-purple-950/40 via-slate-900 to-slate-950 border border-purple-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-purple-500/25 hover:border-purple-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative rounded-2xl bg-gradient-to-b from-purple-950/40 via-slate-900 to-slate-950 border border-purple-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-purple-500/25 hover:border-purple-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden min-h-[220px]"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition" />
             <div>
@@ -199,16 +212,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                 저장된 레시피를 일괄 불러오고, 덱 코드로 원클릭 공유 및 즉시 가져오기합니다.
               </p>
             </div>
-            <div className="mt-6 flex items-center text-xs font-bold text-purple-400 gap-1 group-hover:translate-x-1 transition">
+            <div className="mt-4 flex items-center text-xs font-bold text-purple-400 gap-1 group-hover:translate-x-1 transition">
               <span>프리셋 보관함</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>
 
-          {/* 메뉴 4: 커뮤니티 공유 덱 라운지 (신설!) */}
+          {/* [1행 4열] 메뉴 4: 커뮤니티 공유 덱 라운지 */}
           <div
             onClick={() => setIsCommunityDeckOpen(true)}
-            className="group relative rounded-2xl bg-gradient-to-b from-indigo-950/40 via-slate-900 to-slate-950 border border-indigo-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-indigo-500/30 hover:border-indigo-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative rounded-2xl bg-gradient-to-b from-indigo-950/40 via-slate-900 to-slate-950 border border-indigo-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-indigo-500/30 hover:border-indigo-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden min-h-[220px]"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/15 rounded-full blur-2xl group-hover:bg-indigo-500/25 transition" />
             <div>
@@ -224,19 +237,47 @@ export const Lobby: React.FC<LobbyProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 leading-snug">
-                mc.sldark 실전 메타 덱 4종(RIN, 女秧椿 등) 및 플레이어 공유 덱 열람, 원클릭 복사, 즉시 대전 지원
+                mc.sldark 실전 메타 덱 4종(RIN, 女秧椿 등) 및 플레이어 공유 덱 열람, 원클릭 복사 지원
               </p>
             </div>
-            <div className="mt-6 flex items-center text-xs font-bold text-indigo-400 gap-1 group-hover:translate-x-1 transition">
-              <span>공유된 덱 리스트 보기</span>
+            <div className="mt-4 flex items-center text-xs font-bold text-indigo-400 gap-1 group-hover:translate-x-1 transition">
+              <span>공유된 덱 보기</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>
 
-          {/* 메뉴 5: 카드 도감 */}
+          {/* [2행 1열] 메뉴 5: 대전 리플레이 & 복기 (신설!) */}
+          <div
+            onClick={() => setIsReplayOpen(true)}
+            className="group relative rounded-2xl bg-gradient-to-b from-amber-950/30 via-slate-900 to-slate-950 border border-amber-500/40 p-5 flex flex-col justify-between shadow-xl hover:shadow-amber-500/30 hover:border-amber-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden min-h-[220px]"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/15 rounded-full blur-2xl group-hover:bg-amber-500/25 transition" />
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 text-slate-950 flex items-center justify-center mb-4 shadow-lg shadow-amber-500/30 font-black">
+                <History className="w-6 h-6" />
+              </div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <h3 className="font-black text-lg text-white group-hover:text-amber-300 transition">
+                  대전 리플레이 & 복기
+                </h3>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-400 text-slate-950 font-black">
+                  NEW
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 leading-snug">
+                최근 완료된 대전의 턴별 진행, 카드 오픈 대결 및 데미지 기록을 턴별로 상세 복기합니다.
+              </p>
+            </div>
+            <div className="mt-4 flex items-center text-xs font-bold text-amber-400 gap-1 group-hover:translate-x-1 transition">
+              <span>리플레이 열기</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* [2행 2열] 메뉴 6: 카드 도감 */}
           <div
             onClick={() => setIsCatalogOpen(true)}
-            className="group relative rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 flex flex-col justify-between shadow-xl hover:shadow-emerald-500/20 hover:border-emerald-500/80 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 flex flex-col justify-between shadow-xl hover:shadow-emerald-500/20 hover:border-emerald-500/80 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden min-h-[220px]"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition" />
             <div>
@@ -250,16 +291,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                 실제 고해상도 공식 192종 캐릭터 및 액션 카드 일러스트와 효과를 열람합니다.
               </p>
             </div>
-            <div className="mt-6 flex items-center text-xs font-bold text-emerald-400 gap-1 group-hover:translate-x-1 transition">
+            <div className="mt-4 flex items-center text-xs font-bold text-emerald-400 gap-1 group-hover:translate-x-1 transition">
               <span>도감 열람하기</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>
 
-          {/* 메뉴 6: 공식 룰북 & FAQ */}
+          {/* [2행 3열] 메뉴 7: 공식 룰북 & FAQ */}
           <div
             onClick={() => setIsManualOpen(true)}
-            className="group relative rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 flex flex-col justify-between shadow-xl hover:shadow-cyan-500/20 hover:border-cyan-500/80 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 flex flex-col justify-between shadow-xl hover:shadow-cyan-500/20 hover:border-cyan-500/80 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden min-h-[220px]"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition" />
             <div>
@@ -273,16 +314,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                 한국어 공식 매뉴얼북, FAQ 질의응답 및 토너먼트 플로어 룰을 상세 확인합니다.
               </p>
             </div>
-            <div className="mt-6 flex items-center text-xs font-bold text-cyan-400 gap-1 group-hover:translate-x-1 transition">
+            <div className="mt-4 flex items-center text-xs font-bold text-cyan-400 gap-1 group-hover:translate-x-1 transition">
               <span>규칙서 보기</span>
               <ChevronRight className="w-4 h-4" />
             </div>
           </div>
 
-          {/* 메뉴 7: 공식 룰 동영상 가이드 (신설!) */}
+          {/* [2행 4열] 메뉴 8: 공식 룰 동영상 가이드 */}
           <div
             onClick={() => setIsVideoOpen(true)}
-            className="group relative rounded-2xl bg-gradient-to-b from-red-950/40 via-slate-900 to-slate-950 border border-red-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-red-500/30 hover:border-amber-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+            className="group relative rounded-2xl bg-gradient-to-b from-red-950/40 via-slate-900 to-slate-950 border border-red-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-red-500/30 hover:border-amber-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden min-h-[220px]"
           >
             <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/15 rounded-full blur-2xl group-hover:bg-amber-500/25 transition" />
             <div>
@@ -301,7 +342,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 10분 완성 공식 플레이 시연 영상과 챕터별 타임스탬프로 규칙을 한눈에 마스터합니다.
               </p>
             </div>
-            <div className="mt-6 flex items-center text-xs font-bold text-amber-400 gap-1 group-hover:translate-x-1 transition">
+            <div className="mt-4 flex items-center text-xs font-bold text-amber-400 gap-1 group-hover:translate-x-1 transition">
               <span>영상 시청하기</span>
               <ChevronRight className="w-4 h-4" />
             </div>
@@ -523,6 +564,12 @@ export const Lobby: React.FC<LobbyProps> = ({
       <SfxGuideModal
         isOpen={isSfxGuideOpen}
         onClose={() => setIsSfxGuideOpen(false)}
+      />
+
+      {/* 대전 리플레이 & 복기 모달 */}
+      <BattleReplayModal
+        isOpen={isReplayOpen}
+        onClose={() => setIsReplayOpen(false)}
       />
     </div>
   );

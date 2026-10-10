@@ -14,6 +14,8 @@ import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
 import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { GameOverModal } from './GameOverModal';
+import { BattleReplayModal } from './BattleReplayModal';
+import { saveBattleReplay } from '../utils/replayManager';
 import { CardListModal } from './CardListModal';
 import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
@@ -182,6 +184,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 모달 상태
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
+  const [isReplayOpen, setIsReplayOpen] = useState(false);
+  const replaySavedRef = useRef<boolean>(false);
+
+  // 게임 종료 시 리플레이 자동 저장
+  useEffect(() => {
+    if (gameState.phase === 'GAME_OVER' && gameState.winner !== null && !replaySavedRef.current) {
+      replaySavedRef.current = true;
+      saveBattleReplay(
+        gameState.winner as 0 | 1,
+        gameState.players,
+        gameState.logs,
+        gameState.turn,
+        gameState.gameMode
+      );
+    } else if (gameState.phase !== 'GAME_OVER') {
+      replaySavedRef.current = false;
+    }
+  }, [gameState.phase, gameState.winner, gameState.players, gameState.logs, gameState.turn, gameState.gameMode]);
 
   // 트래시 및 협주 존 카드 목록 뷰어 모달 상태
   const [cardListModalState, setCardListModalState] = useState<{
@@ -1802,8 +1822,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             restartGame();
           }}
           onExitToLobby={onExitToLobby}
+          onOpenReplay={() => setIsReplayOpen(true)}
         />
       )}
+
+      {/* 대전 복기 리플레이 모달 */}
+      <BattleReplayModal
+        isOpen={isReplayOpen}
+        onClose={() => setIsReplayOpen(false)}
+      />
 
       {/* 협주 게이지 소모 선택 모달 */}
       <ConcertoSelectModal
