@@ -57,8 +57,8 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   const [actionDeck, setActionDeck] = useState<ActionCard[]>([]);
   const [deckName, setDeckName] = useState('나만의 커스텀 덱 1');
 
-  // 라이브러리 탭 (액션 카드 vs 캐릭터 카드)
-  const [poolTab, setPoolTab] = useState<'ACTION' | 'CHARACTER'>('ACTION');
+  // 라이브러리 탭 (액션 카드 vs 에코 카드 vs 캐릭터 카드)
+  const [poolTab, setPoolTab] = useState<'ACTION' | 'ECHO' | 'CHARACTER'>('ACTION');
 
   // 뷰 모드 이원화 (이미지 그리드 vs 텍스트 리스트)
   const [deckViewMode, setDeckViewMode] = useState<'IMAGE' | 'TEXT'>('IMAGE');
@@ -227,15 +227,26 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     alert('덱이 성공적으로 저장되었습니다!');
   };
 
-  // 필터링된 액션 카드 풀
+  // 필터링된 액션 카드 풀 (순수 액션 카드 또는 에코 카드 구분)
   const filteredActionCards = useMemo(() => {
     return availableActionCards.filter((c) => {
+      const isEcho = Boolean(c.rawOfficial?.feature && c.rawOfficial.feature.includes('에코'));
+      if (poolTab === 'ACTION' && isEcho) return false;
+      if (poolTab === 'ECHO' && !isEcho) return false;
+
       if (selectedColor !== 'ALL' && c.color !== selectedColor) return false;
       if (selectedChar !== 'ALL') {
-        const matches =
-          c.characterExclusive?.includes(selectedChar) ||
-          c.nameKr.includes(selectedChar) ||
-          c.rawOfficial.characterName?.includes(selectedChar);
+        let matches = false;
+        if (selectedChar === '방랑자(남)') {
+          matches = c.nameKr.includes('방랑자(남)') || c.characterExclusive === '방랑자(남)';
+        } else if (selectedChar === '방랑자(여)') {
+          matches = c.nameKr.includes('방랑자(여)') || c.characterExclusive === '방랑자(여)';
+        } else {
+          matches =
+            Boolean(c.characterExclusive?.includes(selectedChar)) ||
+            c.nameKr.includes(selectedChar) ||
+            Boolean(c.rawOfficial.characterName?.includes(selectedChar));
+        }
         if (!matches) return false;
       }
       if (searchTerm.trim()) {
@@ -247,15 +258,22 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       }
       return true;
     });
-  }, [availableActionCards, selectedColor, selectedChar, searchTerm]);
+  }, [availableActionCards, poolTab, selectedColor, selectedChar, searchTerm]);
 
   // 필터링된 캐릭터 카드 풀
   const filteredCharacterCards = useMemo(() => {
     return availableCharacterCards.filter((c) => {
       if (selectedChar !== 'ALL') {
-        const matches =
-          c.characterName?.includes(selectedChar) ||
-          c.nameKr.includes(selectedChar);
+        let matches = false;
+        if (selectedChar === '방랑자(남)') {
+          matches = c.nameKr.includes('방랑자(남)');
+        } else if (selectedChar === '방랑자(여)') {
+          matches = c.nameKr.includes('방랑자(여)');
+        } else {
+          matches =
+            Boolean(c.characterName?.includes(selectedChar)) ||
+            c.nameKr.includes(selectedChar);
+        }
         if (!matches) return false;
       }
       if (searchTerm.trim()) {
@@ -333,7 +351,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     actionCards: actionDeck,
   }), [deckName, leader, leftSupport, rightSupport, actionDeck]);
 
-  const charOptions = ['ALL', '방랑자', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
+  const charOptions = ['ALL', '방랑자(남)', '방랑자(여)', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
 
   return (
     <div className="h-screen w-full bg-[#05070d] text-slate-100 flex flex-col overflow-hidden select-none">
@@ -1058,36 +1076,47 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         <div className="w-full lg:w-[360px] xl:w-[400px] 2xl:w-[440px] shrink-0 bg-slate-950 p-4 flex flex-col justify-between overflow-hidden min-h-0">
           {/* 상단 탭 & 뷰 모드 & 검색 & 필터 */}
           <div className="space-y-2 mb-3 shrink-0">
-            {/* 상단 액션 카드 vs 캐릭터 카드 탭 전환 */}
+            {/* 상단 액션 카드 vs 에코 카드 vs 캐릭터 카드 탭 전환 */}
             <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
               <button
                 onClick={() => setPoolTab('ACTION')}
-                className={`flex-1 py-1.5 rounded-lg font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 rounded-lg font-black text-xs transition cursor-pointer flex items-center justify-center gap-1 ${
                   poolTab === 'ACTION'
                     ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
-                액션 카드 ({filteredActionCards.length})
+                <span>액션 ({availableActionCards.filter((c) => !c.rawOfficial?.feature?.includes('에코')).length})</span>
+              </button>
+              <button
+                onClick={() => setPoolTab('ECHO')}
+                className={`flex-1 py-1.5 rounded-lg font-black text-xs transition cursor-pointer flex items-center justify-center gap-1 ${
+                  poolTab === 'ECHO'
+                    ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>에코 ({availableActionCards.filter((c) => c.rawOfficial?.feature?.includes('에코')).length})</span>
               </button>
               <button
                 onClick={() => setPoolTab('CHARACTER')}
-                className={`flex-1 py-1.5 rounded-lg font-black text-xs transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 rounded-lg font-black text-xs transition cursor-pointer flex items-center justify-center gap-1 ${
                   poolTab === 'CHARACTER'
                     ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <Users className="w-3.5 h-3.5" />
-                캐릭터 카드 ({filteredCharacterCards.length})
+                <span>캐릭터 ({filteredCharacterCards.length})</span>
               </button>
             </div>
 
             {/* 라이브러리 안내 & 뷰 모드 토글 */}
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-400">
-                {poolTab === 'ACTION' ? '클릭: 상세 / 하단 +/-: 수량 조절 / 우클릭: 추가·제거' : '클릭: 좌측 상세 및 출전 슬롯'}
+                {poolTab === 'CHARACTER' ? '클릭: 좌측 상세 및 출전 슬롯' : '클릭: 상세 / 하단 +/-: 수량 조절 / 우클릭: 추가·제거'}
               </span>
 
               {/* 라이브러리 뷰 모드 토글 */}
@@ -1125,8 +1154,8 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
               />
             </div>
 
-            {/* 속성 색상 필터 버튼 (액션 카드 탭일 때만 표시) */}
-            {poolTab === 'ACTION' && (
+            {/* 속성 색상 필터 버튼 (액션 카드 또는 에코 탭일 때 표시) */}
+            {poolTab !== 'CHARACTER' && (
               <div className="flex items-center gap-1.5">
                 {(['ALL', 'RED', 'GREEN', 'BLUE'] as const).map((col) => (
                   <button
@@ -1170,9 +1199,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
 
           {/* 카드 풀 브라우저 (이미지 뷰 or 텍스트 리스트 뷰) */}
           <div className="flex-1 overflow-y-auto pr-1 min-h-0">
-            {poolTab === 'ACTION' ? (
+            {poolTab !== 'CHARACTER' ? (
               libraryViewMode === 'IMAGE' ? (
-                /* 액션 카드 [대형 이미지 그리드 뷰] (2~3열로 이미지 대폭 확대!) */
+                /* 액션 / 에코 카드 [대형 이미지 그리드 뷰] (2~3열로 이미지 대폭 확대!) */
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   {filteredActionCards.map((card) => {
                     const countInDeck = actionDeck.filter((c) => c.code === card.code).length;

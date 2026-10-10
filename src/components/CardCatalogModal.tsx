@@ -80,7 +80,7 @@ function getCardVariants(target: OfficialCardData): OfficialCardData[] {
 export type RarityFilterType = 'ALL' | '★★★★★' | '★★★★' | '★★★' | '★★' | '★' | 'PR';
 
 export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onClose }) => {
-  const [tab, setTab] = useState<'ALL' | 'CHARACTER' | 'ACTION'>('ALL');
+  const [tab, setTab] = useState<'ALL' | 'CHARACTER' | 'ACTION' | 'ECHO'>('ALL');
   const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
   const [cardSize, setCardSize] = useState<'LARGE' | 'MEDIUM'>('LARGE');
   const [isCinemaZoomOpen, setIsCinemaZoomOpen] = useState(false);
@@ -91,17 +91,18 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
   const [searchTerm, setSearchTerm] = useState('');
   const [detailCard, setDetailCard] = useState<OfficialCardData | null>(null);
 
-  // 캐릭터 목록 추출
+  // 캐릭터 목록 추출 (방랑자 남/여 완벽 분리 지원)
   const characterFilterOptions = [
     'ALL',
-    '방랑자',
-    '카멜리아',
-    '파수인',
-    '앙코',
-    '금희',
+    '방랑자(남)',
+    '방랑자(여)',
     '양양',
     '치샤',
     '산화',
+    '금희',
+    '카멜리아',
+    '파수인',
+    '앙코',
   ];
 
   // 필터링된 공식 카드 목록
@@ -110,7 +111,8 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
     return OFFICIAL_CARDS.filter((c) => {
       // 1. 탭 필터
       if (tab === 'CHARACTER' && c.kind !== 'CHARACTER') return false;
-      if (tab === 'ACTION' && c.kind !== 'ACTION') return false;
+      if (tab === 'ACTION' && (c.kind !== 'ACTION' || (c.feature && c.feature.includes('에코')))) return false;
+      if (tab === 'ECHO' && (!c.feature || !c.feature.includes('에코'))) return false;
 
       // 2. 성급 필터
       if (selectedRarity !== 'ALL') {
@@ -133,10 +135,17 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
 
       // 5. 캐릭터 필터
       if (selectedChar !== 'ALL') {
-        const matchesChar =
-          c.characterName?.includes(selectedChar) ||
-          c.nameKr.includes(selectedChar) ||
-          c.characterExclusive?.includes(selectedChar);
+        let matchesChar = false;
+        if (selectedChar === '방랑자(남)') {
+          matchesChar = c.nameKr.includes('방랑자(남)') || c.characterExclusive === '방랑자(남)';
+        } else if (selectedChar === '방랑자(여)') {
+          matchesChar = c.nameKr.includes('방랑자(여)') || c.characterExclusive === '방랑자(여)';
+        } else {
+          matchesChar =
+            Boolean(c.characterName?.includes(selectedChar)) ||
+            c.nameKr.includes(selectedChar) ||
+            Boolean(c.characterExclusive?.includes(selectedChar));
+        }
         if (!matchesChar) return false;
       }
 
@@ -329,7 +338,16 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   tab === 'ACTION' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                액션 카드 ({OFFICIAL_CARDS.filter((c) => c.kind === 'ACTION').length})
+                액션 카드 ({OFFICIAL_CARDS.filter((c) => c.kind === 'ACTION' && (!c.feature || !c.feature.includes('에코'))).length})
+              </button>
+              <button
+                onClick={() => setTab('ECHO')}
+                className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1 ${
+                  tab === 'ECHO' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                에코 ({OFFICIAL_CARDS.filter((c) => c.feature && c.feature.includes('에코')).length})
               </button>
             </div>
 
