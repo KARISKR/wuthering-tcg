@@ -100,6 +100,19 @@ export interface ClashResult {
   damageDealt: number;
   comboGranted: number; // 빨강 승리(1) + 추격(X)
   logText: string;
+  triggeredEffects?: TriggeredEffectEvent[]; // 대결 중 발동된 효과 및 사건 목록
+}
+
+// 카드 효과 발동 이벤트 상세
+export interface TriggeredEffectEvent {
+  id: string;
+  sourceCardName: string; // 효과를 일으킨 카드명 (예: "방랑자(여) [BP01-018]", "진동 소리", "산화 Lv.1", "양양")
+  sourceCardArt?: string; // 카드 일러스트 URL
+  effectType: 'BUFF' | 'DRAW' | 'HEAL' | 'CHARGE' | 'COMBO' | 'CANCEL' | 'DAMAGE';
+  title: string;          // 효과 타이틀 (예: "녹색 배틀 개시", "생명력 회복", "협주 급속 충전", "빙결 결계")
+  description: string;    // 어떤 사건이 일어났는지 설명 (예: "덱 위의 카드를 2장 공개하여 패에 추가했습니다.", "HP를 2 회복했습니다.")
+  playerIndex: 0 | 1;
+  timestamp: number;
 }
 
 // 전투 로그 항목
@@ -153,6 +166,7 @@ export interface GameState {
   clashResult: ClashResult | null;
   lastComboStrike?: ComboStrikeEffect | null;
   lastUpgrade?: UpgradeEffect | null;
+  lastEffectEvent?: TriggeredEffectEvent | null; // 최근 발동된 효과 이벤트 (화면 토스트 연출용)
   pendingChoice?: PendingChoice | null;
   winner: 0 | 1 | null;
   logs: LogItem[];

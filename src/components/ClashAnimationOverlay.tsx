@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ClashResult, PlayerState } from '../types/tcg';
 import { CardView } from './CardView';
-import { Flame, Wind, Shield, Swords, Sparkles, CheckCircle2, XCircle, Zap, Crown } from 'lucide-react';
+import { Flame, Wind, Shield, Swords, Sparkles, CheckCircle2, XCircle, Zap, Crown, Heart, BatteryCharging, ShieldAlert } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 import { soundEffects } from '../utils/soundEffects';
@@ -288,6 +288,50 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                   </span>
                 )}
               </div>
+
+              {/* [신규] 발동된 카드 효과 및 발생한 사건 상세 목록 */}
+              {clashResult.triggeredEffects && clashResult.triggeredEffects.length > 0 && (
+                <div className="my-3 pt-3 border-t border-slate-800 text-left">
+                  <div className="text-[11px] font-mono font-black text-amber-400/90 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>발동된 카드 효과 & 발생 사건 ({clashResult.triggeredEffects.length}건)</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5 max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                    {clashResult.triggeredEffects.map((eff) => (
+                      <div
+                        key={eff.id}
+                        className="flex items-center gap-2.5 p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-xs shadow-inner"
+                      >
+                        {eff.sourceCardArt ? (
+                          <img
+                            src={eff.sourceCardArt}
+                            alt={eff.sourceCardName}
+                            className="w-7 h-9 rounded object-cover border border-slate-700 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0">
+                            {eff.effectType === 'HEAL' && <Heart className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400" />}
+                            {eff.effectType === 'CHARGE' && <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />}
+                            {eff.effectType === 'DRAW' && <Sparkles className="w-3.5 h-3.5 text-amber-400" />}
+                            {eff.effectType === 'CANCEL' && <ShieldAlert className="w-3.5 h-3.5 text-blue-400" />}
+                            {eff.effectType === 'COMBO' && <Flame className="w-3.5 h-3.5 text-orange-400" />}
+                            {eff.effectType === 'DAMAGE' && <Swords className="w-3.5 h-3.5 text-rose-400" />}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-300 text-[11px] truncate">{eff.sourceCardName}</span>
+                            <span className="text-[10px] text-amber-300 font-mono font-bold">[{eff.title}]</span>
+                          </div>
+                          <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">
+                            ➔ {eff.description}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* 다음 단계 버튼 (마우스 클릭 또는 Space/Enter 지원) */}
               <button

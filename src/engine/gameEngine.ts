@@ -7,6 +7,7 @@ import {
   ActionCard,
   CharacterCard,
   CardColor,
+  TriggeredEffectEvent,
 } from '../types/tcg';
 import {
   generateStarterActionDeck,
@@ -615,6 +616,18 @@ export function setClashCard(
   ) {
     const revealed = player.actionDeck.splice(0, Math.min(2, player.actionDeck.length));
     if (revealed.length > 0) {
+      const effectEv: TriggeredEffectEvent = {
+        id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        sourceCardName: '방랑자(여) [BP01-018]',
+        sourceCardArt: player.slots.leader.artUrl,
+        effectType: 'DRAW',
+        title: '방랑자(여) [녹색 배틀 효과]',
+        description: '녹색 카드로 배틀에 돌입하여 덱 위의 카드를 패에 추가하는 효과가 발동했습니다!',
+        playerIndex,
+        timestamp: Date.now(),
+      };
+      newState.lastEffectEvent = effectEv;
+
       if (player.isAi) {
         // AI는 2장 모두 패로 자동 추가
         player.hand.push(...revealed);
@@ -780,21 +793,40 @@ export function resolveClash(state: GameState): GameState {
     }
   }
 
+  // 대결 중 발생한 효과 목록 수집
+  const triggeredEffects: TriggeredEffectEvent[] = [];
+
   // 승리 시 효과 처리 및 대미지 적용
   if (winnerIndex !== -1) {
     const winnerPlayer = winnerIndex === 0 ? p0 : p1;
-    const loserPlayer = winnerIndex === 0 ? p1 : p0;
+    const loserIndex = (winnerIndex === 0 ? 1 : 0) as 0 | 1;
+    const loserPlayer = loserIndex === 0 ? p0 : p1;
     const winCard = winnerIndex === 0 ? c0! : c1!;
 
     // 1. 대미지 계산
     let baseDmg = winCard.damage;
+    let extraDmg = 0;
     // 금희 Lv.0 리더: 빨강 승리 피해 +1
     if (winnerPlayer.slots.leader.characterName === '금희' && winCard.color === 'RED') {
-      baseDmg += 1;
+      extraDmg += 1;
     }
     // 금희 Lv.2 패시브: 빨강 피해 +1
     if (winnerPlayer.slots.leader.characterName === '금희' && winnerPlayer.slots.leader.level === 2 && winCard.color === 'RED') {
-      baseDmg += 1;
+      extraDmg += 1;
+    }
+
+    if (extraDmg > 0) {
+      baseDmg += extraDmg;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-jinshi`,
+        sourceCardName: winnerPlayer.slots.leader.nameKr,
+        sourceCardArt: winnerPlayer.slots.leader.artUrl,
+        effectType: 'DAMAGE',
+        title: '금희 [용의 서리 강타]',
+        description: `적색 카드 판정 승리로 공격 피해가 +${extraDmg} 증가했습니다!`,
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
     }
 
     loserPlayer.hp = Math.max(0, loserPlayer.hp - baseDmg);
@@ -807,25 +839,77 @@ export function resolveClash(state: GameState): GameState {
         const card = drawSingleCardFromDeck(winnerPlayer);
         if (card) winnerPlayer.hand.push(card);
       }
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-draw`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'DRAW',
+        title: '카드 드로우 효과',
+        description: `덱에서 카드 ${drawN}장을 뽑아 패에 추가했습니다.`,
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
     } else if (winCard.effectType === 'HEAL') {
       const healAmount = winCard.code === 'WW-AC-B04' ? 3 : 2;
       winnerPlayer.hp = Math.min(winnerPlayer.maxHp, winnerPlayer.hp + healAmount);
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-heal`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'HEAL',
+        title: '생명력 회복 효과',
+        description: `생명력(HP)을 ${healAmount} 회복했습니다.`,
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
     } else if (winCard.effectType === 'CHARGE') {
       const c1 = drawSingleCardFromDeck(winnerPlayer);
       if (c1) winnerPlayer.concertoZone.push(c1);
       const c2 = drawSingleCardFromDeck(winnerPlayer);
       if (c2) winnerPlayer.hand.push(c2);
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-charge`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'CHARGE',
+        title: '협주 급속 충전',
+        description: '협주 에너지를 1장 충전하고 카드 1장을 드로우했습니다.',
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
     }
 
     // 3. 캐릭터 스킬 발동
     // 산화 Lv.1: 파랑 판정 승리 시 HP 2 회복
     if (winnerPlayer.slots.leader.characterName === '산화' && winnerPlayer.slots.leader.level >= 1 && winCard.color === 'BLUE') {
       winnerPlayer.hp = Math.min(winnerPlayer.maxHp, winnerPlayer.hp + 2);
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-sanhua-heal`,
+        sourceCardName: winnerPlayer.slots.leader.nameKr,
+        sourceCardArt: winnerPlayer.slots.leader.artUrl,
+        effectType: 'HEAL',
+        title: '산화 [냉기의 가호]',
+        description: '청색(방어) 카드 판정 승리로 HP 2를 회복했습니다!',
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
     }
     // 양양 Lv.0: 판정 승리 시 협주 1장 충전
     if (winnerPlayer.slots.leader.characterName === '양양') {
       const card = drawSingleCardFromDeck(winnerPlayer);
-      if (card) winnerPlayer.concertoZone.push(card);
+      if (card) {
+        winnerPlayer.concertoZone.push(card);
+        triggeredEffects.push({
+          id: `eff-${Date.now()}-yangyang`,
+          sourceCardName: winnerPlayer.slots.leader.nameKr,
+          sourceCardArt: winnerPlayer.slots.leader.artUrl,
+          effectType: 'CHARGE',
+          title: '양양 [바람의 조율]',
+          description: '판정 승리로 협주 에너지를 1장 추가 충전했습니다!',
+          playerIndex: winnerIndex,
+          timestamp: Date.now(),
+        });
+      }
     }
 
     // 4. 연격권(Combo Count) 계산
@@ -836,10 +920,30 @@ export function resolveClash(state: GameState): GameState {
     // 카드 자체 [추격 X]
     if (winCard.pursuitCount) {
       comboGranted += winCard.pursuitCount;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-pursuit`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'COMBO',
+        title: `카드 특수 효과 [추격 +${winCard.pursuitCount}]`,
+        description: `연격 연속 공격 횟수를 +${winCard.pursuitCount}회 획득했습니다!`,
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
     }
     // 치샤 Lv.1 리더: 판정 승리 시 추격+1
     if (winnerPlayer.slots.leader.characterName === '치샤' && winnerPlayer.slots.leader.level >= 1) {
       comboGranted += 1;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-chixia`,
+        sourceCardName: winnerPlayer.slots.leader.nameKr,
+        sourceCardArt: winnerPlayer.slots.leader.artUrl,
+        effectType: 'COMBO',
+        title: '치샤 [연속 사격의 열기]',
+        description: '판정 승리로 연격(추격) 횟수를 +1 추가 획득했습니다!',
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
     }
 
     // 상대에게 산화 Lv.2가 있다면 상대 연격 단계 완전 봉쇄!
@@ -847,6 +951,16 @@ export function resolveClash(state: GameState): GameState {
       loserPlayer.slots.leader.characterName === '산화' && loserPlayer.slots.leader.level === 2;
     if (opponentHasSanhuaLv2 && comboGranted > 0) {
       comboGranted = 0;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-sanhua-cancel`,
+        sourceCardName: loserPlayer.slots.leader.nameKr,
+        sourceCardArt: loserPlayer.slots.leader.artUrl,
+        effectType: 'CANCEL',
+        title: '산화 Lv.2 [빙결 결계]',
+        description: '상대의 연격(Combo Step)을 완전히 봉쇄하여 무효화했습니다!',
+        playerIndex: loserIndex,
+        timestamp: Date.now(),
+      });
       newState = addLog(newState, `[산화 Lv.2 패시브] 상대의 냉기 결계로 인해 연격(콤보)이 무효화되었습니다!`, 'SYSTEM', winnerIndex);
     }
 
@@ -868,6 +982,16 @@ export function resolveClash(state: GameState): GameState {
     ) {
       const revealed = loserPlayer.actionDeck.splice(0, Math.min(1, loserPlayer.actionDeck.length));
       if (revealed.length > 0) {
+        triggeredEffects.push({
+          id: `eff-${Date.now()}-rover-defeat`,
+          sourceCardName: '방랑자 Lv.1 [SD01-002]',
+          sourceCardArt: loserPlayer.slots.leader.artUrl,
+          effectType: 'DRAW',
+          title: '방랑자 [역경의 재기]',
+          description: '적색 카드에 패배하여 덱 위의 카드를 패에 추가할 수 있는 효과가 발동했습니다!',
+          playerIndex: loserIndex,
+          timestamp: Date.now(),
+        });
         if (loserPlayer.isAi) {
           loserPlayer.hand.push(...revealed);
           newState = addLog(
@@ -903,10 +1027,14 @@ export function resolveClash(state: GameState): GameState {
     damageDealt,
     comboGranted,
     logText,
+    triggeredEffects,
   };
 
   newState.clashResult = clashResult;
   newState.players = [p0, p1];
+  if (triggeredEffects.length > 0) {
+    newState.lastEffectEvent = triggeredEffects[0];
+  }
 
   newState = addLog(newState, `【대결 결과】 ${logText} (피해: ${damageDealt}, 부여된 연격: ${comboGranted})`, 'CLASH');
 
@@ -1188,6 +1316,18 @@ export function resolvePendingChoice(
     pendingChoice: null,
   };
   newState.players[playerIndex] = player;
+
+  if (chosenCards.length > 0) {
+    newState.lastEffectEvent = {
+      id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      sourceCardName,
+      effectType: 'DRAW',
+      title: '카드 패 추가 완료',
+      description: `[${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 패에 추가했습니다!`,
+      playerIndex,
+      timestamp: Date.now(),
+    };
+  }
 
   newState = addLog(
     newState,

@@ -16,6 +16,7 @@ import { GameOverModal } from './GameOverModal';
 import { CardListModal } from './CardListModal';
 import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
+import { EffectNotificationToast } from './EffectNotificationToast';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect } from '../types/tcg';
 import { CustomDeckConfig } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
@@ -1655,6 +1656,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         choice={gameState.pendingChoice}
         onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
       />
+
+      {/* 실시간 카드 효과 발동 알림 토스트 (어떤 카드의 어떤 효과로 무슨 사건이 일어났는지 시각적 표출) */}
+      <EffectNotificationToast event={gameState.lastEffectEvent} />
     </div>
   );
 };
