@@ -63,10 +63,13 @@ export function useGame(
     }));
   }, []);
 
-  // 0. 선공 주사위 결정
+  // 0. 선공 주사위 결정 (MULLIGAN 단계에서만 안전하게 적용)
   const handleSetInitiative = useCallback(
     (firstPlayerIndex: 0 | 1, roll0: number, roll1: number) => {
       setGameState((prev) => {
+        if (prev.phase !== 'MULLIGAN') return prev;
+        if (prev.logs.some((l) => l.id.startsWith('log-dice-'))) return prev;
+
         const winnerName = prev.players[firstPlayerIndex].name;
         const rollLog: import('../types/tcg').LogItem = {
           id: `log-dice-${Date.now()}`,
@@ -258,8 +261,16 @@ export function useGame(
           clearTimeout(timer);
           setIsAiThinking(false);
         };
-      } else if (gameState.players[0].comboCount === 0) {
-        setGameState((prev) => finishComboStep(prev, 1));
+      } else if (gameState.activePlayerIndex === 1 && gameState.players[1].comboCount === 0) {
+        const timer = setTimeout(() => {
+          setGameState((prev) => {
+            if (prev.phase === 'COMBO_STEP' && prev.activePlayerIndex === 1 && prev.players[1].comboCount === 0) {
+              return finishComboStep(prev, 1);
+            }
+            return prev;
+          });
+        }, 1200);
+        return () => clearTimeout(timer);
       }
     }
 

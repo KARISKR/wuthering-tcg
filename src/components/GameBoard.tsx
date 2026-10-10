@@ -89,6 +89,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 선공 결정 주사위 연출 상태 (게임 시작 시 MULLIGAN 단계에서 활성화)
   const [isInitiativeRolling, setIsInitiativeRolling] = useState(true);
 
+  // MULLIGAN 페이즈가 아니게 되면 주사위 롤링 플래그 즉각 해제 (안전 가드)
+  useEffect(() => {
+    if (gameState.phase !== 'MULLIGAN' && isInitiativeRolling) {
+      setIsInitiativeRolling(false);
+    }
+  }, [gameState.phase, isInitiativeRolling]);
+
 
   // 덱에서 카드 드로우 시 시각 효과 상태
   const [p0DeckDrawing, setP0DeckDrawing] = useState(false);
@@ -1731,8 +1738,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         player0={gameState.players[0]}
         player1={gameState.players[1]}
         onComplete={(winnerIndex, roll0, roll1) => {
-          handleSetInitiative(winnerIndex, roll0, roll1);
           setIsInitiativeRolling(false);
+          handleSetInitiative(winnerIndex, roll0, roll1);
         }}
       />
 

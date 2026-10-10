@@ -52,122 +52,133 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
   const [p0Value, setP0Value] = useState<number>(1);
   const [p1Value, setP1Value] = useState<number>(1);
   const [winnerIndex, setWinnerIndex] = useState<0 | 1 | null>(null);
-  const [isTie, setIsTie] = useState(false);
-  const [tieCount, setTieCount] = useState(0);
 
   const rollIntervalRef = useRef<number | null>(null);
   const autoStartTimerRef = useRef<number | null>(null);
+  const completeTimerRef = useRef<number | null>(null);
+  const isRollingRef = useRef<boolean>(false);
+  const hasCompletedRef = useRef<boolean>(false);
+
+  // 모든 타이머/인터벌 즉각 해제 유틸
+  const clearAllTimers = () => {
+    if (rollIntervalRef.current !== null) {
+      clearInterval(rollIntervalRef.current);
+      rollIntervalRef.current = null;
+    }
+    if (autoStartTimerRef.current !== null) {
+      clearTimeout(autoStartTimerRef.current);
+      autoStartTimerRef.current = null;
+    }
+    if (completeTimerRef.current !== null) {
+      clearTimeout(completeTimerRef.current);
+      completeTimerRef.current = null;
+    }
+  };
+
+  // 완료 콜백 (단 1회만 안전하게 실행 보장)
+  const finishAndComplete = (winIdx: 0 | 1, val0: number, val1: number) => {
+    if (hasCompletedRef.current) return;
+    hasCompletedRef.current = true;
+    isRollingRef.current = false;
+    clearAllTimers();
+    onComplete(winIdx, val0, val1);
+  };
 
   // 주사위 굴리기 시작 함수
   const startRoll = () => {
-    if (phase === 'ROLLING') return;
+    if (isRollingRef.current || hasCompletedRef.current) return;
+    isRollingRef.current = true;
+
+    // 자동 시작 타이머가 남아있다면 즉시 취소
+    if (autoStartTimerRef.current !== null) {
+      clearTimeout(autoStartTimerRef.current);
+      autoStartTimerRef.current = null;
+    }
 
     setPhase('ROLLING');
-    setIsTie(false);
 
-    // 굴림 래틀 사운드 1차 재생
+    // 굴림 사운드 1차 재생
     soundEffects.playDiceRoll();
 
-    // 50ms마다 숫자 랜덤 변경 (회전감)
+    // 50ms마다 눈금 갱신
     let ticks = 0;
     const interval = window.setInterval(() => {
       ticks++;
       setP0Value(Math.floor(Math.random() * 6) + 1);
       setP1Value(Math.floor(Math.random() * 6) + 1);
 
-      if (ticks % 6 === 0) {
+      if (ticks % 5 === 0) {
         soundEffects.playDiceRoll();
       }
 
-      // 1.4초 후 결과 판정 (약 24틱)
-      if (ticks >= 24) {
-        if (rollIntervalRef.current) {
-          clearInterval(rollIntervalRef.current);
-          rollIntervalRef.current = null;
-        }
+      // 약 1.2초 후 (22틱) 확정 판정
+      if (ticks >= 22) {
+        clearInterval(interval);
+        rollIntervalRef.current = null;
 
-        // 최종 주사위 결과 결정
+        // 최종 눈금 결정 (무승부 없이 확실하게 결판나도록 보장)
         const finalP0 = Math.floor(Math.random() * 6) + 1;
         let finalP1 = Math.floor(Math.random() * 6) + 1;
-
-        // 첫 굴림에서는 15% 확률로 동점 유도 (흥미 진진 연출), 재굴림 시에는 확실한 승패 유도
-        if (tieCount === 0 && Math.random() < 0.18) {
-          finalP1 = finalP0;
+        while (finalP1 === finalP0) {
+          finalP1 = Math.floor(Math.random() * 6) + 1;
         }
+
+        const winIdx: 0 | 1 = finalP0 > finalP1 ? 0 : 1;
+        const isP0Win = winIdx === 0;
 
         setP0Value(finalP0);
         setP1Value(finalP1);
+        setWinnerIndex(winIdx);
+        setPhase('RESULT');
 
-        if (finalP0 === finalP1) {
-          // 무승부 발생
-          setIsTie(true);
-          setWinnerIndex(null);
-          setPhase('RESULT');
-          soundEffects.playDiceLand(false);
+        soundEffects.playDiceLand(isP0Win);
 
-          // 1.5초 후 자동 재굴림
-          setTimeout(() => {
-            setTieCount((prev) => prev + 1);
-            startRoll();
-          }, 1500);
-        } else {
-          // 승자 결정
-          const winIdx: 0 | 1 = finalP0 > finalP1 ? 0 : 1;
-          setWinnerIndex(winIdx);
-          setPhase('RESULT');
-
-          const isP0Win = winIdx === 0;
-          soundEffects.playDiceLand(isP0Win);
-
-          // 플레이어 승리 시 축하 폭죽 연출
-          if (isP0Win) {
-            confetti({
-              particleCount: 50,
-              spread: 60,
-              origin: { y: 0.65 },
-              colors: ['#38bdf8', '#fbbf24', '#34d399', '#ffffff'],
-            });
-          }
-
-          // 1.8초 후 배틀로 진입
-          setTimeout(() => {
-            onComplete(winIdx, finalP0, finalP1);
-          }, 1900);
+        if (isP0Win) {
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.65 },
+            colors: ['#38bdf8', '#fbbf24', '#34d399', '#ffffff'],
+          });
         }
+
+        // 1.5초 후 배틀/멀리건으로 진입
+        completeTimerRef.current = window.setTimeout(() => {
+          finishAndComplete(winIdx, finalP0, finalP1);
+        }, 1500);
       }
     }, 55);
 
     rollIntervalRef.current = interval;
   };
 
-  // 스킵 (즉시 랜덤 결정)
+  // 스킵 (즉시 결정 후 완료)
   const handleSkip = () => {
-    if (rollIntervalRef.current) {
-      clearInterval(rollIntervalRef.current);
-      rollIntervalRef.current = null;
-    }
+    if (hasCompletedRef.current) return;
+    clearAllTimers();
+
     const finalP0 = Math.floor(Math.random() * 6) + 1;
     let finalP1 = Math.floor(Math.random() * 6) + 1;
     while (finalP1 === finalP0) {
       finalP1 = Math.floor(Math.random() * 6) + 1;
     }
     const winIdx: 0 | 1 = finalP0 > finalP1 ? 0 : 1;
-    onComplete(winIdx, finalP0, finalP1);
+    finishAndComplete(winIdx, finalP0, finalP1);
   };
 
   useEffect(() => {
     if (isOpen) {
+      isRollingRef.current = false;
+      hasCompletedRef.current = false;
       setPhase('READY');
       setWinnerIndex(null);
-      setIsTie(false);
-      setTieCount(0);
       setP0Value(1);
       setP1Value(1);
 
-      // 1.5초 동안 유저가 클릭 안 하면 자동으로 굴림 시작
+      // 1.4초 동안 조작 없으면 자동 굴림
       autoStartTimerRef.current = window.setTimeout(() => {
         startRoll();
-      }, 1500);
+      }, 1400);
 
       // 스페이스바 / 엔터 키 입력 시 즉시 굴림
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -179,10 +190,11 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
       window.addEventListener('keydown', handleKeyDown);
 
       return () => {
-        if (rollIntervalRef.current) clearInterval(rollIntervalRef.current);
-        if (autoStartTimerRef.current) clearTimeout(autoStartTimerRef.current);
+        clearAllTimers();
         window.removeEventListener('keydown', handleKeyDown);
       };
+    } else {
+      clearAllTimers();
     }
   }, [isOpen]);
 
@@ -345,15 +357,8 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
         {/* 하단 상태 피드백 및 액션 버튼 */}
         <div className="mt-8 w-full max-w-md flex flex-col items-center space-y-4">
-          {/* 무승부 안내 배너 */}
-          {isTie && (
-            <div className="w-full py-2.5 px-4 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 text-center text-xs font-black animate-pulse flex items-center justify-center gap-1.5">
-              <span>⚖️ 동점입니다 ({p0Value} 대 {p1Value})! 자동으로 다시 던집니다...</span>
-            </div>
-          )}
-
           {/* 승자 결정 완료 배너 */}
-          {phase === 'RESULT' && !isTie && winnerIndex !== null && (
+          {phase === 'RESULT' && winnerIndex !== null && (
             <div
               className={`w-full py-3 px-5 rounded-2xl text-center font-black animate-in zoom-in-95 duration-200 border shadow-xl flex items-center justify-center gap-2 ${
                 isP0Win
