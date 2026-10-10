@@ -192,6 +192,41 @@ class SoundEffectsEngine {
     } catch {
       // ignore
     }
+
+    // 브라우저 환경에서 첫 사용자 클릭 시 오디오 컨텍스트 활성화 및 전체 커스텀 사운드 사전 로드
+    if (typeof window !== 'undefined') {
+      const unlockAudio = () => {
+        this.getAudioContext();
+        this.preloadAllCustomSounds();
+        window.removeEventListener('pointerdown', unlockAudio);
+        window.removeEventListener('keydown', unlockAudio);
+      };
+      window.addEventListener('pointerdown', unlockAudio, { once: true });
+      window.addEventListener('keydown', unlockAudio, { once: true });
+    }
+  }
+
+  /**
+   * 전체 카테고리의 커스텀 사운드 사전 비동기 로드
+   */
+  public async preloadAllCustomSounds() {
+    const categories: SfxCategory[] = [
+      'clash',
+      'damage',
+      'damage_light',
+      'damage_medium',
+      'damage_heavy',
+      'weapon_sword',
+      'weapon_broadblade',
+      'weapon_pistol',
+      'weapon_rectifier',
+      'phase',
+      'combo',
+      'card',
+      'turn',
+      'upgrade',
+    ];
+    await Promise.allSettled(categories.map((cat) => this.loadCustomServerFile(cat)));
   }
 
   private getAudioContext(): AudioContext | null {
