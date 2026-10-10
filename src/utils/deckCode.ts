@@ -143,19 +143,6 @@ export function getDefaultPresets(): DeckPreset[] {
     sd02Counts.set(c.code, (sd02Counts.get(c.code) || 0) + 1);
   });
 
-  // 추천 덱 (카멜리아 / 파수인 / 앙코)
-  const camellyaActions = ACTION_CARD_TEMPLATES.slice(0, 14);
-  const camellyaCounts = new Map<string, number>();
-  let totalC = 0;
-  for (const card of camellyaActions) {
-    const qty = totalC + 3 <= 40 ? 3 : 40 - totalC;
-    if (qty > 0) {
-      camellyaCounts.set(card.code, qty);
-      totalC += qty;
-    }
-    if (totalC >= 40) break;
-  }
-
   return [
     {
       id: 'preset-official-sd01',
@@ -179,17 +166,6 @@ export function getDefaultPresets(): DeckPreset[] {
       rightSupportCode: 'BP01-030',
       actionCards: Array.from(sd02Counts.entries()).map(([code, count]) => ({ code, count })),
     },
-    {
-      id: 'preset-official-camellya',
-      name: '[추천 덱] 카멜리아 & 파수인 소멸·협주 덱',
-      description: '카멜리아의 고위력 소멸 연격과 파수인의 협주 서포트 특화 덱',
-      isOfficial: true,
-      createdAt: '2026-03-15',
-      leaderCode: 'BP01-028',
-      leftSupportCode: 'BP01-030',
-      rightSupportCode: 'BP01-032',
-      actionCards: Array.from(camellyaCounts.entries()).map(([code, count]) => ({ code, count })),
-    },
   ];
 }
 
@@ -207,8 +183,10 @@ export function getStoredPresets(): DeckPreset[] {
 
   try {
     const parsed: DeckPreset[] = JSON.parse(raw);
-    // 삭제된 ID 제외
-    const customOnly = parsed.filter((p) => !p.isOfficial && !deletedIds.includes(p.id));
+    // 삭제된 ID 및 임의 생성 프리셋 제외
+    const customOnly = parsed.filter(
+      (p) => !p.isOfficial && !deletedIds.includes(p.id) && p.id !== 'preset-official-camellya'
+    );
     const updatedList = [...activeDefaults, ...customOnly];
     localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(updatedList));
     return updatedList;
