@@ -64,13 +64,33 @@ export function decodeDeckCode(codeStr: string): CustomDeckConfig | null {
   try {
     let clean = codeStr.trim();
 
-    // mc.sldark.com 공유 코드 직접 입력 시 바로 매칭
-    const upperClean = clean.toUpperCase();
-    const matchedPreset = COMMUNITY_DECK_PRESETS.find(
-      (p) => p.externalCode === upperClean
-    );
-    if (matchedPreset) {
-      return presetToCustomDeck(matchedPreset);
+    // 1. mc.sldark.com 공유 코드 (SLD-XXXX) 패턴 매칭 (덱 코드: SLD-... 등 접두사/공백 유연 허용)
+    const sldMatch = clean.match(/SLD\s*[-_]?\s*([A-Za-z0-9]{6,12})/i);
+    if (sldMatch) {
+      const sldCode = `SLD-${sldMatch[1].toUpperCase()}`;
+      const matchedPreset = COMMUNITY_DECK_PRESETS.find(
+        (p) => p.externalCode?.toUpperCase() === sldCode
+      );
+      if (matchedPreset) {
+        return presetToCustomDeck(matchedPreset);
+      }
+    }
+
+    // 2. 덱 명칭으로 직접 입력 매칭 (RIN, 女秧椿 등)
+    const trimmedLower = clean.toLowerCase();
+    const matchedByName = COMMUNITY_DECK_PRESETS.find((p) => {
+      const code = (p.externalCode || '').toLowerCase();
+      return (
+        trimmedLower === code ||
+        trimmedLower.includes(code) ||
+        (code === 'sld-tll2ezt6' && (trimmedLower.includes('rin') || trimmedLower.includes('린'))) ||
+        (code === 'sld-7lkn8p9g' && (trimmedLower.includes('여랑자') || trimmedLower.includes('女秧椿'))) ||
+        (code === 'sld-dvqmkqpg' && (trimmedLower.includes('앙코') && trimmedLower.includes('loop') || trimmedLower.includes('安克'))) ||
+        (code === 'sld-dv56vxtg' && (trimmedLower.includes('파수인') || trimmedLower.includes('安散守')))
+      );
+    });
+    if (matchedByName) {
+      return presetToCustomDeck(matchedByName);
     }
     if (clean.startsWith('WWTCG1_')) {
       clean = clean.substring('WWTCG1_'.length);

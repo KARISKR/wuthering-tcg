@@ -169,7 +169,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       setImportError(null);
     } else {
       setParsedPreviewDeck(null);
-      setImportError('올바른 덱 코드 형식이 아닙니다 (WWTCG1_... 또는 JSON).');
+      setImportError('올바른 덱 코드 형식이 아닙니다 (SLD-XXXX, WWTCG1_..., 또는 JSON 형식).');
     }
   }, [inputCode]);
 
@@ -350,7 +350,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 공유받은 덱 코드 붙여넣기 (클립보드 원클릭 가져오기)
               </span>
               <span className="text-[11px] text-slate-400">
-                `WWTCG1_...` 형식의 덱 코드를 입력하면 즉시 40장 구성이 자동 파싱됩니다.
+                SLD-XXXX (mc.sldark 공유 코드) 또는 WWTCG1_... 덱 코드를 입력하면 즉시 자동 파싱됩니다.
               </span>
             </div>
 
@@ -359,7 +359,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 type="text"
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value)}
-                placeholder="공유받은 덱 코드를 여기에 붙여넣으세요 (예: WWTCG1_eyJ2Ijox...)"
+                placeholder="덱 코드를 입력하세요 (예: SLD-TLL2EZT6 또는 WWTCG1_...)"
                 className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-400 placeholder:text-slate-600"
               />
               <button
