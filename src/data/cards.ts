@@ -15,20 +15,28 @@ export function getRarityScore(rarity?: string): number {
 // 공식 데이터베이스에서 캐릭터 카드 추출
 export const ALL_CHARACTERS: CharacterCard[] = OFFICIAL_CARDS.filter(
   (c) => c.kind === 'CHARACTER'
-).map((c) => ({
-  id: c.id,
-  kind: 'CHARACTER',
-  code: c.code,
-  characterName: c.characterName || c.nameKr,
-  nameKr: c.nameKr,
-  level: (c.level ?? 0) as 0 | 1 | 2,
-  element: c.element,
-  artUrl: c.artUrl,
-  description: c.description,
-  leaderSkill: c.description,
-  clashSkill: c.description,
-  rarity: c.rarity,
-}));
+).map((c) => {
+  let characterName = c.characterName || c.nameKr;
+  if (c.nameKr.includes('방랑자(여)')) {
+    characterName = '방랑자(여)';
+  } else if (c.nameKr.includes('방랑자(남)')) {
+    characterName = '방랑자(남)';
+  }
+  return {
+    id: c.id,
+    kind: 'CHARACTER',
+    code: c.code,
+    characterName,
+    nameKr: c.nameKr,
+    level: (c.level ?? 0) as 0 | 1 | 2,
+    element: c.element,
+    artUrl: c.artUrl,
+    description: c.description,
+    leaderSkill: c.description,
+    clashSkill: c.description,
+    rarity: c.rarity,
+  };
+});
 
 // 출전 캐릭터 (Lv.0): 같은 캐릭터 중에서 가장 높은 성급 1장만 추출하여 중복 제거
 export const DEDUPED_LV0_CHARACTERS: CharacterCard[] = (() => {
@@ -168,10 +176,18 @@ export interface StarterDeckPreset {
 // 기본 프리셋 캐릭터 찾기 헬퍼 (항상 최고 성급 우선 매칭)
 const findChar = (name: string, lvl: number): CharacterCard => {
   if (lvl === 0) {
-    const deduped = DEDUPED_LV0_CHARACTERS.find((c) => c.characterName.includes(name) || c.nameKr.includes(name));
+    const deduped = DEDUPED_LV0_CHARACTERS.find((c) =>
+      name === '방랑자(여)' || name === '방랑자(남)'
+        ? c.nameKr.includes(name) || c.characterName === name
+        : c.characterName.includes(name) || c.nameKr.includes(name)
+    );
     if (deduped) return deduped;
   }
-  const matched = ALL_CHARACTERS.filter((c) => (c.characterName.includes(name) || c.nameKr.includes(name)) && c.level === lvl);
+  const matched = ALL_CHARACTERS.filter((c) =>
+    (name === '방랑자(여)' || name === '방랑자(남)'
+      ? c.nameKr.includes(name) || c.characterName === name
+      : c.characterName.includes(name) || c.nameKr.includes(name)) && c.level === lvl
+  );
   if (matched.length > 0) {
     return matched.reduce((best, curr) => (getRarityScore(curr.rarity) > getRarityScore(best.rarity) ? curr : best));
   }
@@ -182,7 +198,7 @@ export const STARTER_PRESETS: Record<'STARTER_ROVER' | 'STARTER_CHIXIA', Starter
   STARTER_ROVER: {
     id: 'STARTER_ROVER',
     nameKr: '공식 스타터 덱 SD01 [빛과 그림자의 방랑자] (방랑자(여) / 양양 / 치샤)',
-    leader: ALL_CHARACTERS.find((c) => c.code === 'BP01-018') || findChar('방랑자', 0),
+    leader: ALL_CHARACTERS.find((c) => c.code === 'BP01-018') || findChar('방랑자(여)', 0),
     leftSupport: ALL_CHARACTERS.find((c) => c.code === 'BP01-024') || findChar('양양', 0),
     rightSupport: ALL_CHARACTERS.find((c) => c.code === 'BP01-027') || findChar('치샤', 0),
     characterDeck: [

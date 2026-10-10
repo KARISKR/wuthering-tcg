@@ -18,7 +18,7 @@ import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
 import { EffectNotificationToast } from './EffectNotificationToast';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect } from '../types/tcg';
-import { CustomDeckConfig } from '../engine/gameEngine';
+import { CustomDeckConfig, isSameCharacter } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
 import {
   Swords,
@@ -373,7 +373,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
     const nextLevel = (currentChar.level + 1) as 1 | 2;
     const available = targetPlayer.characterDeck.filter(
-      (c) => c.characterName === currentChar.characterName && c.level === nextLevel
+      (c) => isSameCharacter(c, currentChar) && c.level === nextLevel
     );
 
     let requiredDiscard = nextLevel;
@@ -406,7 +406,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
     const nextLevel = (currentChar.level + 1) as 1 | 2;
     const hasEvolution = targetPlayer.characterDeck.some(
-      (c) => c.characterName === currentChar.characterName && c.level === nextLevel
+      (c) => isSameCharacter(c, currentChar) && c.level === nextLevel
     );
 
     let requiredDiscard = nextLevel;

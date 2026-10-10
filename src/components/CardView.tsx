@@ -290,6 +290,22 @@ const CharacterCardView: React.FC<{
             }}
           />
 
+          {/* 방랑자(남) vs 방랑자(여) 명확한 시각적 성별 뱃지 오버레이 */}
+          {card.nameKr.includes('방랑자(여)') && (
+            <span className="absolute top-1.5 left-1.5 z-20 bg-gradient-to-r from-rose-600 to-pink-600 text-white font-black px-2 py-0.5 rounded-full text-[10px] shadow-lg border border-pink-300/60 flex items-center gap-0.5 animate-in fade-in">
+              <span>♀</span>
+              <span>방랑자(여)</span>
+              <span className="bg-black/40 px-1 rounded font-mono text-[9px] ml-0.5">Lv.{card.level}</span>
+            </span>
+          )}
+          {card.nameKr.includes('방랑자(남)') && (
+            <span className="absolute top-1.5 left-1.5 z-20 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-black px-2 py-0.5 rounded-full text-[10px] shadow-lg border border-cyan-300/60 flex items-center gap-0.5 animate-in fade-in">
+              <span>♂</span>
+              <span>방랑자(남)</span>
+              <span className="bg-black/40 px-1 rounded font-mono text-[9px] ml-0.5">Lv.{card.level}</span>
+            </span>
+          )}
+
           {badge && (
             <span className="absolute top-1.5 right-1.5 z-20 bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded-full text-[10px] shadow-lg">
               {badge}

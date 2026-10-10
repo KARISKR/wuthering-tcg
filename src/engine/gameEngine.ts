@@ -27,17 +27,44 @@ export interface CustomDeckConfig {
   actionCards: ActionCard[];
 }
 
+// 동일 캐릭터 여부 판별 헬퍼 (방랑자(남)과 방랑자(여)는 절대 서로 다른 캐릭터!)
+export function isSameCharacter(charA: CharacterCard | undefined, charB: CharacterCard | undefined): boolean {
+  if (!charA || !charB) return false;
+
+  const isAFemale = charA.nameKr.includes('방랑자(여)') || charA.characterName.includes('방랑자(여)');
+  const isAMale = charA.nameKr.includes('방랑자(남)') || charA.characterName.includes('방랑자(남)');
+  const isBFemale = charB.nameKr.includes('방랑자(여)') || charB.characterName.includes('방랑자(여)');
+  const isBMale = charB.nameKr.includes('방랑자(남)') || charB.characterName.includes('방랑자(남)');
+
+  if (isAFemale || isBFemale || isAMale || isBMale) {
+    if (isAFemale && isBFemale) return true;
+    if (isAMale && isBMale) return true;
+    return false;
+  }
+
+  return charA.characterName === charB.characterName || charA.nameKr === charB.nameKr;
+}
+
 // 전용 카드 사용 가능 여부 판별 헬퍼 (공식 규칙: '일반'은 누구나 사용 가능, 캐릭터 전용은 해당 캐릭터가 리더일 때 사용 가능)
 export function canLeaderUseCard(leader: CharacterCard | undefined, card: ActionCard): boolean {
   if (!card.characterExclusive || card.characterExclusive === '일반' || card.characterExclusive === '-') {
     return true;
   }
-  if (!leader) return true;
+  if (!leader) return false;
+
+  const exclusive = card.characterExclusive;
   const leaderName = leader.characterName || leader.nameKr || '';
-  if (card.characterExclusive.includes('방랑자') && leaderName.includes('방랑자')) {
-    return true;
+
+  // 방랑자(여) 전용 카드는 방랑자(여)만 사용 가능
+  if (exclusive.includes('방랑자(여)')) {
+    return leaderName.includes('방랑자(여)');
   }
-  return card.characterExclusive.includes(leaderName) || leaderName.includes(card.characterExclusive);
+  // 방랑자(남) 전용 카드는 방랑자(남)만 사용 가능
+  if (exclusive.includes('방랑자(남)')) {
+    return leaderName.includes('방랑자(남)');
+  }
+
+  return exclusive.includes(leaderName) || leaderName.includes(exclusive);
 }
 
 // 덱에서 카드 1장 추출 헬퍼 (덱 소진 시 드롭 존의 액션 카드를 자동으로 리셔플)
@@ -59,34 +86,59 @@ export function drawSingleCardFromDeck(player: PlayerState): ActionCard | null {
 
 // 커스텀 덱(프리셋 포함) 기반으로 한쪽 플레이어의 액션 덱과 캐릭터 덱 구성
 function buildSideFromCustomDeck(custom: CustomDeckConfig): { deck: ActionCard[]; preset: StarterDeckPreset } {
-  const charNames = [custom.leader.characterName, custom.leftSupport.characterName, custom.rightSupport.characterName];
+  const selectedChars = [custom.leader, custom.leftSupport, custom.rightSupport];
   // 동일 카드(코드+레벨)의 희귀도 중복 버전은 1장만 남겨 레벨업 카드 풀이 부풀지 않도록 한다
   const seen = new Set<string>();
   const evolutionCards = OFFICIAL_CARDS.filter(
     (c) =>
       c.kind === 'CHARACTER' &&
       (c.level === 1 || c.level === 2) &&
-      charNames.some((n) => c.nameKr.includes(n) || c.characterName?.includes(n))
+      selectedChars.some((slotChar) => {
+        // 방랑자(남) vs 방랑자(여) 완벽 분리
+        const cIsFemale = c.nameKr.includes('방랑자(여)');
+        const cIsMale = c.nameKr.includes('방랑자(남)');
+        const slotIsFemale = slotChar.nameKr.includes('방랑자(여)') || slotChar.characterName.includes('방랑자(여)');
+        const slotIsMale = slotChar.nameKr.includes('방랑자(남)') || slotChar.characterName.includes('방랑자(남)');
+
+        if (cIsFemale || slotIsFemale || cIsMale || slotIsMale) {
+          if (cIsFemale && slotIsFemale) return true;
+          if (cIsMale && slotIsMale) return true;
+          return false;
+        }
+
+        const slotName = slotChar.characterName || slotChar.nameKr;
+        return c.nameKr.includes(slotName) || c.characterName?.includes(slotName);
+      })
   )
     .filter((c) => {
-      const key = `${c.characterName || c.nameKr}-${c.level}`;
+      let charName = c.characterName || c.nameKr;
+      if (c.nameKr.includes('방랑자(여)')) charName = '방랑자(여)';
+      else if (c.nameKr.includes('방랑자(남)')) charName = '방랑자(남)';
+
+      const key = `${charName}-${c.level}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
-    .map((c) => ({
-      id: c.id,
-      kind: 'CHARACTER' as const,
-      code: c.code,
-      characterName: c.characterName || c.nameKr,
-      nameKr: c.nameKr,
-      level: (c.level ?? 1) as 1 | 2,
-      element: c.element,
-      artUrl: c.artUrl,
-      description: c.description,
-      leaderSkill: c.description,
-      clashSkill: c.description,
-    }));
+    .map((c) => {
+      let charName = c.characterName || c.nameKr;
+      if (c.nameKr.includes('방랑자(여)')) charName = '방랑자(여)';
+      else if (c.nameKr.includes('방랑자(남)')) charName = '방랑자(남)';
+
+      return {
+        id: c.id,
+        kind: 'CHARACTER' as const,
+        code: c.code,
+        characterName: charName,
+        nameKr: c.nameKr,
+        level: (c.level ?? 1) as 1 | 2,
+        element: c.element,
+        artUrl: c.artUrl,
+        description: c.description,
+        leaderSkill: c.description,
+        clashSkill: c.description,
+      };
+    });
 
   return {
     deck: shuffleArray([...custom.actionCards]),
@@ -385,8 +437,12 @@ export function upgradeCharacter(
     return { success: false, newState: state, error: '캐릭터 덱에 해당 카드가 없습니다.' };
   }
 
-  if (upgradeCard.characterName !== currentSlotCard.characterName) {
-    return { success: false, newState: state, error: '동일한 캐릭터만 레벨업할 수 있습니다.' };
+  if (!isSameCharacter(upgradeCard, currentSlotCard)) {
+    return {
+      success: false,
+      newState: state,
+      error: `[${currentSlotCard.nameKr}]은(는) [${upgradeCard.nameKr}](으)로 레벨업할 수 없습니다. (동일 캐릭터만 진화 가능)`,
+    };
   }
 
   if (upgradeCard.level !== currentSlotCard.level + 1) {
