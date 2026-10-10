@@ -15,6 +15,7 @@ import {
 import { DEDUPED_LV0_CHARACTERS, ACTION_CARD_TEMPLATES } from '../data/cards';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 import { DeckExportModal } from './DeckExportModal';
+import { CommunityDeckModal } from './CommunityDeckModal';
 import {
   X,
   Copy,
@@ -75,6 +76,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
 
   // 덱 내보내기 모달 상태
   const [isExportOpen, setIsExportOpen] = useState(false);
+
+  // 커뮤니티 덱 라운지 모달 상태
+  const [isCommunityOpen, setIsCommunityOpen] = useState(false);
 
   // 새 프리셋 이름 입력 모달/다이얼로그 상태
   const [isSavingCurrent, setIsSavingCurrent] = useState(false);
@@ -285,6 +289,16 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               <span>덱 빌더에서 편집</span>
             </button>
           )}
+
+          {/* 커뮤니티 덱 라운지 열기 버튼 */}
+          <button
+            onClick={() => setIsCommunityOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/35 text-indigo-300 border border-indigo-500/40 text-xs font-black transition cursor-pointer shadow-md"
+            title="다른 유저들의 공유 덱 둘러보기 및 내 덱 공유"
+          >
+            <Share2 className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="hidden sm:inline">커뮤니티 덱 라운지</span>
+          </button>
 
           {/* 덱 코드 가져오기 드로어 토글 */}
           <button
@@ -1126,6 +1140,30 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
           deck={currentPreviewDeck}
         />
       )}
+
+      {/* 커뮤니티 덱 라운지 모달 */}
+      <CommunityDeckModal
+        isOpen={isCommunityOpen}
+        onClose={() => {
+          setIsCommunityOpen(false);
+          reloadPresets();
+        }}
+        currentEditingDeck={currentPreviewDeck}
+        onSelectAndBattle={(deck) => {
+          setIsCommunityOpen(false);
+          if (onSelectAndBattle) {
+            onSelectAndBattle(deck);
+            onClose();
+          }
+        }}
+        onSelectAndEdit={(deck) => {
+          setIsCommunityOpen(false);
+          if (onSelectAndEdit) {
+            onSelectAndEdit(deck);
+            onClose();
+          }
+        }}
+      />
     </div>
   );
 };

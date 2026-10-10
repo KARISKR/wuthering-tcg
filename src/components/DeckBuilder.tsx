@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { DeckPresetModal } from './DeckPresetModal';
 import { DeckExportModal } from './DeckExportModal';
+import { CommunityDeckModal } from './CommunityDeckModal';
 import type { CustomDeckConfig } from '../types/tcg';
 export type { CustomDeckConfig };
 
@@ -36,6 +37,7 @@ interface DeckBuilderProps {
 export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStartBattleWithDeck }) => {
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isCommunityModalOpen, setIsCommunityModalOpen] = useState(false);
 
   // Lv.0 출전 캐릭터 목록: 같은 캐릭터 중 가장 높은 성급 1장씩 선별하여 중복 제거
   const lv0Characters = useMemo(() => {
@@ -391,11 +393,19 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
             <span className="hidden sm:inline">프리셋 & 코드</span>
           </button>
           <button
-            onClick={() => setIsExportModalOpen(true)}
+            onClick={() => setIsCommunityModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-sm font-bold transition cursor-pointer shadow"
-            title="덱 내보내기 (카드 이미지 시트 PNG / 텍스트 리스트)"
+            title="다른 유저들의 공유 덱 둘러보기 및 내 덱 공유"
           >
             <Share2 className="w-4 h-4 text-indigo-400" />
+            <span className="hidden sm:inline">공유 덱 라운지</span>
+          </button>
+          <button
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-sm font-bold transition cursor-pointer shadow"
+            title="덱 내보내기 (카드 이미지 시트 PNG / 텍스트 리스트)"
+          >
+            <Share2 className="w-4 h-4 text-slate-400" />
             <span className="hidden sm:inline">덱 내보내기</span>
           </button>
           <button
@@ -1429,6 +1439,27 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         deck={currentDeckConfig}
+      />
+
+      {/* 커뮤니티 덱 라운지 모달 */}
+      <CommunityDeckModal
+        isOpen={isCommunityModalOpen}
+        onClose={() => setIsCommunityModalOpen(false)}
+        currentEditingDeck={currentDeckConfig}
+        onSelectAndBattle={(deck) => {
+          setIsCommunityModalOpen(false);
+          onStartBattleWithDeck(deck);
+        }}
+        onSelectAndEdit={(deck) => {
+          setIsCommunityModalOpen(false);
+          setDeckName(deck.name);
+          setLeader(deck.leader);
+          setLeftSupport(deck.leftSupport);
+          setRightSupport(deck.rightSupport);
+          setActionDeck(deck.actionCards);
+          const off = getOfficialCardByCode(deck.leader.code);
+          if (off) setActiveCard(off);
+        }}
       />
     </div>
   );

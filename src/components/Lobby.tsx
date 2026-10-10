@@ -6,6 +6,7 @@ import { DeckPresetModal } from './DeckPresetModal';
 import { VideoGuideModal } from './VideoGuideModal';
 import { PatchNotesModal } from './PatchNotesModal';
 import { SfxGuideModal } from './SfxGuideModal';
+import { CommunityDeckModal } from './CommunityDeckModal';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import { DeckSelectModal } from './DeckSelectModal';
@@ -25,6 +26,7 @@ import {
   Film,
   ScrollText,
   Volume2,
+  Share2,
 } from 'lucide-react';
 
 interface LobbyProps {
@@ -44,6 +46,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isPresetOpen, setIsPresetOpen] = useState(false);
   const [isPatchNotesOpen, setIsPatchNotesOpen] = useState(false);
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
+  const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
 
@@ -71,6 +74,16 @@ export const Lobby: React.FC<LobbyProps> = ({
 
         {/* 상단 퀵 바로가기 & BGM 플레이어 위젯 */}
         <div className="flex items-center gap-2.5">
+          {/* 커뮤니티 덱 라운지 상단 버튼 */}
+          <button
+            onClick={() => setIsCommunityDeckOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 text-xs font-black transition cursor-pointer shadow"
+            title="다른 플레이어들의 공유 덱 둘러보기 및 내 덱 공유하기"
+          >
+            <Share2 className="w-4 h-4 text-indigo-400" />
+            <span className="hidden sm:inline">커뮤니티 덱 라운지</span>
+          </button>
+
           {/* 커스텀 효과음 가이드 상단 버튼 */}
           <button
             onClick={() => setIsSfxGuideOpen(true)}
@@ -121,8 +134,8 @@ export const Lobby: React.FC<LobbyProps> = ({
           </p>
         </div>
 
-        {/* 메인 메뉴 카드 6선 그리드 (독립 룰 영상 가이드 메뉴 포함!) */}
-        <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+        {/* 메인 메뉴 카드 7선 그리드 (공유 덱 라운지 & 독립 룰 영상 가이드 포함!) */}
+        <div className="w-full grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3.5">
           {/* 메뉴 1: 배틀 시작 */}
           <div
             onClick={() => setShowModeModal(true)}
@@ -192,7 +205,35 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
           </div>
 
-          {/* 메뉴 4: 카드 도감 */}
+          {/* 메뉴 4: 커뮤니티 공유 덱 라운지 (신설!) */}
+          <div
+            onClick={() => setIsCommunityDeckOpen(true)}
+            className="group relative rounded-2xl bg-gradient-to-b from-indigo-950/40 via-slate-900 to-slate-950 border border-indigo-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-indigo-500/30 hover:border-indigo-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/15 rounded-full blur-2xl group-hover:bg-indigo-500/25 transition" />
+            <div>
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-600 text-white flex items-center justify-center mb-4 shadow-lg shadow-indigo-600/30 font-black">
+                <Share2 className="w-6 h-6" />
+              </div>
+              <div className="flex items-center gap-1.5 mb-1">
+                <h3 className="font-black text-lg text-white group-hover:text-indigo-300 transition">
+                  공유 덱 라운지
+                </h3>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-indigo-400 text-slate-950 font-black">
+                  NEW
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 leading-snug">
+                다른 플레이어들의 추천 덱 열람, 익명 덱 공유, 원클릭 복사 및 즉시 대전을 즐겨보세요.
+              </p>
+            </div>
+            <div className="mt-6 flex items-center text-xs font-bold text-indigo-400 gap-1 group-hover:translate-x-1 transition">
+              <span>공유 덱 보기</span>
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* 메뉴 5: 카드 도감 */}
           <div
             onClick={() => setIsCatalogOpen(true)}
             className="group relative rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 flex flex-col justify-between shadow-xl hover:shadow-emerald-500/20 hover:border-emerald-500/80 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
@@ -215,7 +256,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
           </div>
 
-          {/* 메뉴 5: 공식 룰북 & FAQ */}
+          {/* 메뉴 6: 공식 룰북 & FAQ */}
           <div
             onClick={() => setIsManualOpen(true)}
             className="group relative rounded-2xl bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-slate-800 p-5 flex flex-col justify-between shadow-xl hover:shadow-cyan-500/20 hover:border-cyan-500/80 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
@@ -238,7 +279,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
           </div>
 
-          {/* 메뉴 6: 공식 룰 동영상 가이드 (신설!) */}
+          {/* 메뉴 7: 공식 룰 동영상 가이드 (신설!) */}
           <div
             onClick={() => setIsVideoOpen(true)}
             className="group relative rounded-2xl bg-gradient-to-b from-red-950/40 via-slate-900 to-slate-950 border border-red-500/50 p-5 flex flex-col justify-between shadow-xl hover:shadow-red-500/30 hover:border-amber-400 hover:-translate-y-1.5 transition-all duration-300 cursor-pointer overflow-hidden"
@@ -422,6 +463,22 @@ export const Lobby: React.FC<LobbyProps> = ({
             onStartBattleWithCustomDeck(deck);
           } else {
             onStartGame('AI');
+          }
+        }}
+        onSelectAndEdit={() => {
+          onOpenDeckBuilder();
+        }}
+      />
+
+      {/* 커뮤니티 공유 덱 라운지 모달 (신설!) */}
+      <CommunityDeckModal
+        isOpen={isCommunityDeckOpen}
+        onClose={() => setIsCommunityDeckOpen(false)}
+        onSelectAndBattle={(deck) => {
+          if (onStartBattleWithCustomDeck) {
+            onStartBattleWithCustomDeck(deck);
+          } else {
+            onStartGame('AI', deck);
           }
         }}
         onSelectAndEdit={() => {

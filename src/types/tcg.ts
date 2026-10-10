@@ -196,4 +196,20 @@ export interface DeckPreset {
   description?: string;
 }
 
+// 커뮤니티 공유 덱 데이터 구조
+export interface SharedDeck {
+  id: string;
+  deckName: string;
+  authorName: string;
+  isAnonymous: boolean;
+  description: string;
+  deckCode: string;
+  deckPreset: DeckPreset;
+  likes: number;
+  likedByMe?: boolean;
+  createdAt: number; // 타임스탬프
+  tags: string[]; // ['스타터', '속공', '제어', '회절', '용융' 등]
+}
+
+
 
