@@ -25,14 +25,16 @@ const SLOT_KEYS: SlotKey[] = ['leader', 'leftSupport', 'rightSupport'];
 // 튜닝 가능한 SMART AI 파라미터 (자동 시뮬레이션으로 보정됨)
 export const SMART_PARAMS = {
   upgradeMinHandAfter: 7, // 레벨업 후 최소 남겨야 할 패 수
-  costPenalty: 0.9, // 협주(코스트) 1 소모당 가치 손실
+  costPenalty: 0.4, // 협주(코스트) 1 소모당 가치 손실
   lossCost: { RED: 4.5, GREEN: 2.4, BLUE: 1.6 } as Record<CardColor, number>,
   noise: 0.35, // 읽히지 않도록 EV 근접 시 섞는 랜덤 폭
   comboMinDmgPerCost: 1.5, // 연격에서 코스트 대비 최소 효율
-  concertoTarget: 3, // 협주 존 목표 장수
+  concertoTarget: 2, // 협주 존 목표 장수
   mulliganKeepHeavy: 2, // 멀리건 시 보유할 코스트 2+ 카드 수
   mulliganMaxSwap: 3, // 멀리건 교체 최대 장수
   oppModelWeight: 0, // 상대 묘지 색상 분포 반영 강도 (0 = 균등 추정)
+  charBonusScale: 0, // 커뮤니티 덱 캐릭터(카멜리아/앙코/파수인) 리더 가치 반영 배율 (0 = 끔)
+  effectBonusScale: 2, // 카드 고유 효과(레벨업/리더교체/회수/드로우) 가치 반영 배율 (0 = 끔)
 };
 
 export const SMART_ALT_PARAMS: typeof SMART_PARAMS = { ...SMART_PARAMS, lossCost: { ...SMART_PARAMS.lossCost } };
@@ -150,7 +152,7 @@ function clashEV(state: GameState, idx: 0 | 1, c: ActionCard, probs: Record<Card
   const P = paramsFor(level);
   const me = state.players[idx];
   const iAmActive = state.activePlayerIndex === idx;
-  const winValue = cardRawValue(c, me.slots.leader);
+  const winValue = cardRawValue(c, me.slots.leader) + effectBonus(me, c, P.effectBonusScale);
   const mySpeed = effectiveSpeed(me, c);
   let ev = 0;
   (['RED', 'GREEN', 'BLUE'] as CardColor[]).forEach((k) => {
@@ -181,8 +183,28 @@ function chooseDiscards(p: PlayerState, n: number, excludeIds: string[] = []): A
     .slice(0, n);
 }
 
+// 카드 고유 효과 보너스 (배틀 승리 시 발동하는 레벨업/리더교체 효과 등). scale=0 이면 비활성
+const LEVELUP_CARD_TARGET: Record<string, string> = {
+  'BP01-048': '카멜리아', // 피어난 동백꽃: 카멜리아 레벨업
+  'BP01-062': '앙코', // 그늘이의 대폭주: 앙코 Lv.2 + 리더 교체
+  'BP01-056': '파수인', // 혼돈의 이론: 파수인 레벨업
+};
+function effectBonus(p: PlayerState, c: ActionCard, scale: number): number {
+  if (scale <= 0) return 0;
+  let b = 0;
+  const target = LEVELUP_CARD_TARGET[c.code];
+  if (target) {
+    const has = SLOT_KEYS.some((k) => {
+      const ch = p.slots[k];
+      return !!ch && ch.characterName === target && ch.level < 2;
+    });
+    if (has) b += 2.5;
+  }
+  return b * scale;
+}
+
 // 리더 후보 슬롯의 "이번 대결 가치"
-function leaderScore(p: PlayerState, ch: CharacterCard): number {
+function leaderScore(p: PlayerState, ch: CharacterCard, scale = 0): number {
   const playable = p.hand.filter((c) => canPlay(p, c, ch));
   if (playable.length === 0) return -5 + ch.level * 0.2;
   const vals = playable.map((c) => cardRawValue(c, ch) - c.cost * 0.3).sort((a, b) => b - a);
@@ -195,6 +217,19 @@ function leaderScore(p: PlayerState, ch: CharacterCard): number {
   if (name === '산화') s += (lv >= 1 ? 0.7 : 0) + (lv >= 2 ? 1.2 : 0);
   if (name === '양양') s += 0.6 + (lv >= 1 ? 0.6 : 0);
   if (name === '방랑자') s += (lv >= 1 ? 0.3 : 0) + (lv >= 2 ? 0.8 : 0);
+  if (scale > 0) {
+    // 커뮤니티 덱 캐릭터: 엔진에 구현된 리더 효과 기반
+    let extra = 0;
+    if (name === '카멜리아') extra += 0.9; // 판정 승리 시 트래시에서 일반 공격 회수
+    if (name === '앙코') extra += 0.5 + (playable.some((c) => c.code === 'BP01-059') ? 0.8 : 0); // 그늘이와 구름이: 속도 10
+    if (name === '파수인') extra += playable.some((c) => c.color === 'GREEN') ? 1.0 : 0; // 녹색 드로우/회복
+    s += extra * scale;
+    // 레벨업 효과 카드는 해당 캐릭터를 리더로 세울 때 가치가 큼
+    playable.forEach((c) => {
+      if (LEVELUP_CARD_TARGET[c.code] && SLOT_KEYS.some((k) => p.slots[k]?.characterName === LEVELUP_CARD_TARGET[c.code]))
+        s += 0.3 * scale;
+    });
+  }
   return s;
 }
 
@@ -233,7 +268,7 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
       if (hasYang2 && req > 1) req -= 1;
       if (p.hand.length - req < P.upgradeMinHandAfter) continue;
       // 업그레이드 이득: 해당 캐릭터를 리더로 세웠을 때의 점수 상승 + 현재 리더 보너스
-      const gain = leaderScore(p, { ...ch, level: up.level } as CharacterCard) - leaderScore(p, ch) + 1.2;
+      const gain = leaderScore(p, { ...ch, level: up.level } as CharacterCard, P.charBonusScale) - leaderScore(p, ch, P.charBonusScale) + 1.2;
       const isLeader = k === 'leader' ? 0.8 : 0;
       const score = gain + isLeader - req * 0.9;
       if (score > bestScore) {
@@ -257,13 +292,13 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
   // 3. 리더 교대: 이번 손패로 가장 강한 리더 선택 (교대는 무료 / 턴당 1회)
   p = cur.players[idx];
   if (!p.actionFlags.switchedLeader) {
-    const curScore = leaderScore(p, p.slots.leader);
+    const curScore = leaderScore(p, p.slots.leader, P.charBonusScale);
     let bestKey: SlotKey = 'leader';
     let bestScore = curScore;
     (['leftSupport', 'rightSupport'] as const).forEach((k) => {
       const ch = p.slots[k];
       if (!ch) return;
-      const s = leaderScore(p, ch);
+      const s = leaderScore(p, ch, P.charBonusScale);
       if (s > bestScore + 0.25) {
         bestScore = s;
         bestKey = k;
@@ -440,6 +475,7 @@ export function runAiDiscardOverflow(state: GameState, idx: 0 | 1 = 1, level: Ai
   const res = discardOverflowCards(state, idx, discardIds);
   return res.success ? res.newState : state;
 }
+
 
 
 
