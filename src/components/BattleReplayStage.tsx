@@ -959,6 +959,12 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
               concertoCount={p0.concerto}
               leaderName={p0.leader.nameKr}
               leaderCard={p0LeaderChar || undefined}
+              supportCards={[p0LeftChar, p0RightChar].filter(Boolean) as any}
+              playerSlots={
+                p0LeaderChar
+                  ? { leader: p0LeaderChar, leftSupport: p0LeftChar || null, rightSupport: p0RightChar || null }
+                  : undefined
+              }
               phase="ACTION_PHASE"
               isTurnPlayer={isP0Turn}
               canChargeConcerto={false}

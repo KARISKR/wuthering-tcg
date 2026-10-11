@@ -99,36 +99,108 @@ export function playerHasCharacterSkill(
   return false;
 }
 
-// 전용 카드 사용 가능 여부 판별 헬퍼 (공식 규칙: '일반'은 누구나 사용 가능, 캐릭터 전용은 해당 캐릭터가 리더일 때 사용 가능)
-export function canLeaderUseCard(leader: CharacterCard | undefined, card: ActionCard): boolean {
-  if (!card.characterExclusive || card.characterExclusive === '일반' || card.characterExclusive === '-') {
-    return true;
+// 캐릭터 일치 여부 판별 헬퍼 (방랑자(여) vs 방랑자(남) 정확한 분리 검증 포함)
+export function isCharacterMatching(char: CharacterCard | null | undefined, exclusive: string | undefined): boolean {
+  if (!char || !exclusive) return false;
+  const exclusiveClean = exclusive.trim();
+  if (exclusiveClean === '일반' || exclusiveClean === '-') return true;
+
+  const charName = char.characterName || char.nameKr || '';
+
+  if (exclusiveClean.includes('방랑자(여)')) {
+    return charName.includes('방랑자(여)');
   }
-  if (!leader) return false;
+  if (exclusiveClean.includes('방랑자(남)')) {
+    return charName.includes('방랑자(남)');
+  }
+
+  return exclusiveClean.includes(charName) || charName.includes(exclusiveClean);
+}
+
+// 카드가 【리더 스킬】(리더 전용 발동 조건)을 요구하는지 판별
+export function isLeaderSkillCard(card: ActionCard): boolean {
+  const desc = card.description || '';
+  const feat = (card as any).feature || '';
+  return (
+    desc.includes('【리더 스킬】') ||
+    desc.includes('【리더스킬】') ||
+    desc.includes('리더 스킬(자신의 리더가') ||
+    desc.includes('자신의 리더가 이 카드의 전용 캐릭터일 경우에만 사용 가능') ||
+    feat.includes('리더 스킬')
+  );
+}
+
+export interface CharacterSlotsLike {
+  leader: CharacterCard;
+  leftSupport?: CharacterCard | null;
+  rightSupport?: CharacterCard | null;
+}
+
+// 공식 규칙에 따른 액션 카드 사용 가능 여부 판별
+// 1. 일반 공용 카드: 누구나 사용 가능
+// 2. 【리더 스킬】 카드: 해당 캐릭터가 '현재 리더(중앙)' 자리에 있어야만 발동 가능
+// 3. 비(非) 리더 스킬 전용 카드: 해당 캐릭터가 '전장 3인 파티(리더 또는 좌/우 서포터)'에 존재하면 자유롭게 사용 가능!
+export function canPlayerUseActionCard(
+  slots: CharacterSlotsLike,
+  card: ActionCard
+): { canUse: boolean; reason?: string } {
+  if (!card.characterExclusive || card.characterExclusive === '일반' || card.characterExclusive === '-') {
+    return { canUse: true };
+  }
 
   const exclusive = card.characterExclusive;
 
-  // 방랑자(여) vs 방랑자(남) 정확한 분리 검증
-  const isLeaderFemaleRover = Boolean(
-    (leader.nameKr && leader.nameKr.includes('방랑자(여)')) ||
-    (leader.characterName && leader.characterName.includes('방랑자(여)'))
-  );
-  const isLeaderMaleRover = Boolean(
-    (leader.nameKr && leader.nameKr.includes('방랑자(남)')) ||
-    (leader.characterName && leader.characterName.includes('방랑자(남)'))
-  );
-
-  if (exclusive.includes('방랑자(여)')) {
-    return isLeaderFemaleRover;
-  }
-  if (exclusive.includes('방랑자(남)')) {
-    return isLeaderMaleRover;
+  // 1. 【리더 스킬】이 붙어있는 카드: 현재 리더가 해당 캐릭터여야만 발동 가능
+  if (isLeaderSkillCard(card)) {
+    if (isCharacterMatching(slots.leader, exclusive)) {
+      return { canUse: true };
+    }
+    return {
+      canUse: false,
+      reason: `【리더 스킬】은 [${exclusive}] 캐릭터가 현재 리더일 때만 사용할 수 있습니다.`,
+    };
   }
 
-  // 일반 공명자 (카멜리아, 앙코, 파수인, 양양, 산화, 치샤, 금희 등)
-  const leaderName = leader.characterName || leader.nameKr || '';
-  return exclusive.includes(leaderName) || leaderName.includes(exclusive);
+  // 2. 【리더 스킬】이 없는 일반 전용 카드: 전장(리더 또는 서포터)에 해당 캐릭터가 존재하면 발동 가능
+  const inLeader = isCharacterMatching(slots.leader, exclusive);
+  const inLeftSupport = isCharacterMatching(slots.leftSupport, exclusive);
+  const inRightSupport = isCharacterMatching(slots.rightSupport, exclusive);
+
+  if (inLeader || inLeftSupport || inRightSupport) {
+    return { canUse: true };
+  }
+
+  return {
+    canUse: false,
+    reason: `이 카드는 파티(리더 또는 서포터)에 [${exclusive}] 캐릭터가 있어야 사용할 수 있습니다.`,
+  };
 }
+
+// 전용 카드 사용 가능 여부 판별 헬퍼 (하위 호환 지원)
+export function canLeaderUseCard(
+  leaderOrSlots: CharacterCard | CharacterSlotsLike | undefined,
+  card: ActionCard
+): boolean {
+  if (!leaderOrSlots) {
+    return !card.characterExclusive || card.characterExclusive === '일반' || card.characterExclusive === '-';
+  }
+
+  if ('leader' in leaderOrSlots) {
+    return canPlayerUseActionCard(leaderOrSlots, card).canUse;
+  }
+
+  const char = leaderOrSlots as CharacterCard;
+  if (!card.characterExclusive || card.characterExclusive === '일반' || card.characterExclusive === '-') {
+    return true;
+  }
+
+  // 단일 캐릭터만 전달된 경우:
+  if (isLeaderSkillCard(card)) {
+    return isCharacterMatching(char, card.characterExclusive);
+  }
+  return isCharacterMatching(char, card.characterExclusive);
+}
+
 
 // 덱에서 카드 1장 추출 헬퍼 (덱 소진 시 드롭 존의 액션 카드를 자동으로 리셔플)
 export function drawSingleCardFromDeck(player: PlayerState): ActionCard | null {
@@ -974,11 +1046,12 @@ export function setClashCard(
     }
 
     // 전용 카드 조건 검증
-    if (!canLeaderUseCard(player.slots.leader, card)) {
+    const cardUsage = canPlayerUseActionCard(player.slots, card);
+    if (!cardUsage.canUse) {
       return {
         success: false,
         newState: state,
-        error: `이 카드는 리더가 [${card.characterExclusive}]일 때만 사용할 수 있습니다.`,
+        error: cardUsage.reason || `이 카드는 사용할 수 없습니다.`,
       };
     }
 
@@ -1247,7 +1320,7 @@ export function forceResolveClash(state: GameState): GameState {
 
   // AI가 아직 세트하지 않은 경우 AI 최선 카드 세트
   if (!p1.clashCardReady && p1.isAi) {
-    const usable = p1.hand.find((c) => p1.concertoZone.length >= c.cost && canLeaderUseCard(p1.slots.leader, c));
+    const usable = p1.hand.find((c) => p1.concertoZone.length >= c.cost && canPlayerUseActionCard(p1.slots, c).canUse);
     if (usable) {
       if (usable.cost > 0) {
         const spent = p1.concertoZone.splice(0, usable.cost);
@@ -2060,6 +2133,16 @@ export function executeComboAttack(
 
   if (card.color !== 'RED') {
     return { success: false, newState: state, error: '연격 단계에서는 빨간색(RED) 카드만 사용할 수 있습니다.' };
+  }
+
+  // 전용 카드 조건 검증
+  const cardUsage = canPlayerUseActionCard(player.slots, card);
+  if (!cardUsage.canUse) {
+    return {
+      success: false,
+      newState: state,
+      error: cardUsage.reason || '이 카드는 사용할 수 없습니다.',
+    };
   }
 
   // 금희 Lv.1: 연격 단계 빨간 카드 비용 1 감소 (최소 0)

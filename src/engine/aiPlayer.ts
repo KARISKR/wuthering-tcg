@@ -8,6 +8,7 @@ import {
   finishComboStep,
   discardOverflowCards,
   canLeaderUseCard,
+  canPlayerUseActionCard,
   findEvolutionCard,
   slotHasCharacterSkill,
   playerHasCharacterSkill,
@@ -50,7 +51,8 @@ function paramsFor(level: AiLevel) {
 const other = (idx: 0 | 1): 0 | 1 => (idx === 0 ? 1 : 0);
 
 function canPlay(p: PlayerState, c: ActionCard, leader: CharacterCard = p.slots.leader): boolean {
-  return p.concertoZone.length >= c.cost && canLeaderUseCard(leader, c);
+  const slots = { leader, leftSupport: p.slots.leftSupport, rightSupport: p.slots.rightSupport };
+  return p.concertoZone.length >= c.cost && canPlayerUseActionCard(slots, c).canUse;
 }
 
 function comboCostOf(p: PlayerState, c: ActionCard): number {
@@ -105,11 +107,16 @@ function cardRawValue(c: ActionCard, leader: CharacterCard | undefined): number 
 function cardKeepValue(p: PlayerState, c: ActionCard): number {
   // 세 캐릭터 중 하나가 리더가 될 수 있으므로 현재 리더 + 서포터 모두 고려
   let best = 0;
-  let usableByAny = false;
+  let usableByAny = canPlayerUseActionCard(p.slots, c).canUse;
   for (const k of SLOT_KEYS) {
     const ch = p.slots[k];
     if (!ch) continue;
-    if (canLeaderUseCard(ch, c)) {
+    const slotsIfLeader = {
+      leader: ch,
+      leftSupport: k === 'leftSupport' ? p.slots.leader : p.slots.leftSupport,
+      rightSupport: k === 'rightSupport' ? p.slots.leader : p.slots.rightSupport,
+    };
+    if (canPlayerUseActionCard(slotsIfLeader, c).canUse) {
       usableByAny = true;
       const w = k === 'leader' ? 1 : 0.65;
       best = Math.max(best, cardRawValue(c, ch) * w);

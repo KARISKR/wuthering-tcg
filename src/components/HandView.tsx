@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ActionCard, GamePhase } from '../types/tcg';
 import { CardView } from './CardView';
 import { BatteryCharging, Swords, Zap, Trash2, X, Sparkles, Flame } from 'lucide-react';
-import { canLeaderUseCard } from '../engine/gameEngine';
+import { canLeaderUseCard, canPlayerUseActionCard } from '../engine/gameEngine';
 import { soundEffects } from '../utils/soundEffects';
 
 interface HandViewProps {
@@ -10,6 +10,8 @@ interface HandViewProps {
   concertoCount: number;
   leaderName: string;
   leaderCard?: import('../types/tcg').CharacterCard;
+  supportCards?: (import('../types/tcg').CharacterCard | null)[];
+  playerSlots?: import('../types/tcg').CharacterSlots;
   phase: GamePhase;
   isTurnPlayer: boolean;
   canChargeConcerto: boolean;
@@ -29,6 +31,8 @@ export const HandView: React.FC<HandViewProps> = ({
   concertoCount,
   leaderName,
   leaderCard,
+  supportCards,
+  playerSlots,
   phase,
   isTurnPlayer,
   canChargeConcerto,
@@ -82,19 +86,25 @@ export const HandView: React.FC<HandViewProps> = ({
 
   const selectedCard = hand.find((c) => c.id === selectedCardId);
 
-  // 카드별 사용 가능 여부 판별
+  // 카드별 사용 가능 여부 판별 (공식 룰: 일반 카드는 누구나, 비 리더 전용 카드는 서포터로 파티에 있어도 사용 가능, 리더 스킬만 리더 필수)
   const checkCardUsable = (card: ActionCard): { canPlayClash: boolean; canCombo: boolean; reason?: string } => {
     const hasEnoughCost = concertoCount >= card.cost;
     const currentLeader = leaderCard || ({ characterName: leaderName, nameKr: leaderName } as any);
-    const meetsLeader = canLeaderUseCard(currentLeader, card);
+    const slots = playerSlots || {
+      leader: currentLeader,
+      leftSupport: supportCards?.[0],
+      rightSupport: supportCards?.[1],
+    };
+    const cardUsage = canPlayerUseActionCard(slots, card);
+    const meetsRequirements = cardUsage.canUse;
 
-    const canPlayClash = canSetClashCard && hasEnoughCost && meetsLeader;
+    const canPlayClash = canSetClashCard && hasEnoughCost && meetsRequirements;
     // 공식 룰: 연격 단계에서는 RED 카드 사용 가능 (연격 리더 교체/효과 카드 포함)
-    const canCombo = isComboStep && comboCount > 0 && card.color === 'RED' && hasEnoughCost;
+    const canCombo = isComboStep && comboCount > 0 && card.color === 'RED' && hasEnoughCost && meetsRequirements;
 
     let reason = '';
     if (!hasEnoughCost) reason = `비용 부족 (필요 ${card.cost}, 보유 ${concertoCount})`;
-    else if (!meetsLeader && canSetClashCard) reason = `리더 [${card.characterExclusive}] 전용`;
+    else if (!meetsRequirements && canSetClashCard) reason = cardUsage.reason || `[${card.characterExclusive}] 전용`;
 
     return { canPlayClash, canCombo, reason };
   };

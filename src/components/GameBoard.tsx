@@ -1457,6 +1457,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               concertoCount={activeControlledPlayer.concertoZone.length}
               leaderName={activeControlledPlayer.slots.leader.characterName}
               leaderCard={activeControlledPlayer.slots.leader}
+              supportCards={[activeControlledPlayer.slots.leftSupport, activeControlledPlayer.slots.rightSupport]}
+              playerSlots={activeControlledPlayer.slots}
               phase={gameState.phase}
               isTurnPlayer={isCurrentControlledTurn}
               canChargeConcerto={!activeControlledPlayer.actionFlags.chargedConcerto && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
