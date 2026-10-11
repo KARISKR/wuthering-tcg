@@ -240,7 +240,7 @@ export function createInitialGameState(
     {
       id: `log-init-2`,
       turn: 1,
-      text: `양 플레이어가 초기 패 5장을 뽑았습니다. 멀리건(패 교체)을 진행하세요.`,
+      text: `출격할 시작 리더(LEADER) 카드를 선택하세요.`,
       type: 'SYSTEM',
       timestamp: Date.now(),
     },
@@ -249,7 +249,7 @@ export function createInitialGameState(
   return {
     turn: 1,
     activePlayerIndex: 0, // 플레이어 선공
-    phase: 'MULLIGAN',
+    phase: 'LEADER_SELECT',
     players: [player0, player1],
     clashResult: null,
     lastComboStrike: null,
@@ -257,6 +257,56 @@ export function createInitialGameState(
     logs: initialLogs,
     gameMode,
   };
+}
+
+/**
+ * 시작 리더 카드 선택 (배틀 개시 준비 단계)
+ */
+export function selectStartingLeader(
+  state: GameState,
+  p0LeaderIdOrName: string,
+  p1LeaderIdOrName?: string
+): GameState {
+  let newState = { ...state };
+
+  // 1. P0 리더 재배치
+  const p0 = { ...newState.players[0], slots: { ...newState.players[0].slots } };
+  const p0Chars = [p0.slots.leader, p0.slots.leftSupport, p0.slots.rightSupport].filter(Boolean) as CharacterCard[];
+  const p0Chosen = p0Chars.find((c) => c.id === p0LeaderIdOrName || c.characterName === p0LeaderIdOrName || c.nameKr === p0LeaderIdOrName) || p0.slots.leader;
+  const p0Rest = p0Chars.filter((c) => c !== p0Chosen);
+
+  p0.slots.leader = p0Chosen;
+  p0.slots.leftSupport = p0Rest[0] || null;
+  p0.slots.rightSupport = p0Rest[1] || null;
+  newState.players[0] = p0;
+
+  // 2. P1 리더 재배치
+  const p1 = { ...newState.players[1], slots: { ...newState.players[1].slots } };
+  const p1Chars = [p1.slots.leader, p1.slots.leftSupport, p1.slots.rightSupport].filter(Boolean) as CharacterCard[];
+  let p1Chosen = p1.slots.leader;
+  if (p1LeaderIdOrName) {
+    p1Chosen = p1Chars.find((c) => c.id === p1LeaderIdOrName || c.characterName === p1LeaderIdOrName || c.nameKr === p1LeaderIdOrName) || p1.slots.leader;
+  }
+  const p1Rest = p1Chars.filter((c) => c !== p1Chosen);
+  p1.slots.leader = p1Chosen;
+  p1.slots.leftSupport = p1Rest[0] || null;
+  p1.slots.rightSupport = p1Rest[1] || null;
+  newState.players[1] = p1;
+
+  newState = addLog(
+    newState,
+    `👑 [시작 리더 확정] ${p0.name}: [${p0Chosen.nameKr}] ⚔️ ${p1.name}: [${p1Chosen.nameKr}] 출격!`,
+    'ACTION'
+  );
+
+  newState = addLog(
+    newState,
+    `양 플레이어가 초기 패 5장을 확인했습니다. 멀리건(패 교체)을 진행하세요.`,
+    'SYSTEM'
+  );
+
+  newState.phase = 'MULLIGAN';
+  return newState;
 }
 
 function createPlayerState(

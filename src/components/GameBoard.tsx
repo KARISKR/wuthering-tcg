@@ -5,6 +5,7 @@ import { CharacterSlot } from './CharacterSlot';
 import { HandView } from './HandView';
 import { UpgradeModal } from './UpgradeModal';
 import { MulliganModal } from './MulliganModal';
+import { LeaderSelectModal } from './LeaderSelectModal';
 import { InitiativeDiceModal } from './InitiativeDiceModal';
 import { ClashAnimationOverlay } from './ClashAnimationOverlay';
 import { ComboStrikeOverlay } from './ComboStrikeOverlay';
@@ -73,6 +74,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     restartGame,
     setGameMode,
     handleSetInitiative,
+    handleSelectStartingLeader,
     handleMulligan,
     handleUpgrade,
     handleSwitchLeader,
@@ -88,12 +90,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleForceResolveClash,
   } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
 
-  // 선공 결정 주사위 연출 상태 (게임 시작 시 MULLIGAN 단계에서 활성화)
+  // 선공 결정 주사위 연출 상태 (게임 시작 시 LEADER_SELECT 단계에서 활성화)
   const [isInitiativeRolling, setIsInitiativeRolling] = useState(true);
 
-  // MULLIGAN 페이즈가 아니게 되면 주사위 롤링 플래그 즉각 해제 (안전 가드)
+  // 시작 리더 선택 상태 (1인 2역 대전 지원용)
+  const [leaderSelectPlayerIndex, setLeaderSelectPlayerIndex] = useState<0 | 1>(0);
+  const [p0ChosenLeader, setP0ChosenLeader] = useState<string | null>(null);
+
+  // LEADER_SELECT 및 MULLIGAN 페이즈가 아니게 되면 주사위 롤링 플래그 즉각 해제 (안전 가드)
   useEffect(() => {
-    if (gameState.phase !== 'MULLIGAN' && isInitiativeRolling) {
+    if (gameState.phase !== 'LEADER_SELECT' && gameState.phase !== 'MULLIGAN' && isInitiativeRolling) {
       setIsInitiativeRolling(false);
     }
   }, [gameState.phase, isInitiativeRolling]);
@@ -529,6 +535,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <span className="font-mono text-amber-300 font-bold">TURN {gameState.turn}</span>
                 <span>•</span>
                 <span className="font-extrabold text-slate-200">
+                  {gameState.phase === 'LEADER_SELECT' && '시작 리더 선택 (Leader Select)'}
+                  {gameState.phase === 'MULLIGAN' && '패 교체 (Mulligan)'}
                   {gameState.phase === 'ACTION_PHASE' && '행동 단계 (Action)'}
                   {gameState.phase === 'CLASH_SET' && '대결 세트 (Clash Set)'}
                   {gameState.phase === 'CLASH_REVEAL' && '판정 오픈 (Judgment)'}
@@ -1004,6 +1012,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                   <span className="text-xs font-black text-amber-300 tracking-wider">
+                    {gameState.phase === 'LEADER_SELECT' && 'BATTLE ARENA • LEADER SELECTION'}
+                    {gameState.phase === 'MULLIGAN' && 'BATTLE ARENA • MULLIGAN'}
                     {gameState.phase === 'ACTION_PHASE' && 'BATTLE ARENA • MAIN PHASE'}
                     {gameState.phase === 'CLASH_SET' && 'BATTLE ARENA • CLASH SETTING'}
                     {gameState.phase === 'CLASH_REVEAL' && 'BATTLE ARENA • CLASH JUDGMENT'}
@@ -1011,7 +1021,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     {gameState.phase === 'DISCARD_OVERFLOW' && 'BATTLE ARENA • END PHASE'}
                     {gameState.phase === 'START_PHASE' && 'BATTLE ARENA • START'}
                     {gameState.phase === 'DRAW_PHASE' && 'BATTLE ARENA • DRAW'}
-                    {gameState.phase === 'MULLIGAN' && 'BATTLE ARENA • MULLIGAN'}
                     {gameState.phase === 'GAME_OVER' && 'BATTLE ARENA • FINISH'}
                   </span>
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
@@ -1736,7 +1745,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 선공 결정 주사위 모달 (양측 주사위 투척 연출) */}
       <InitiativeDiceModal
-        isOpen={isInitiativeRolling && gameState.phase === 'MULLIGAN'}
+        isOpen={isInitiativeRolling && (gameState.phase === 'LEADER_SELECT' || gameState.phase === 'MULLIGAN')}
         player0={gameState.players[0]}
         player1={gameState.players[1]}
         onComplete={(winnerIndex, roll0, roll1) => {
@@ -1745,7 +1754,28 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }}
       />
 
-      {/* 멀리건 모달 (주사위 결정 연출 완료 후 노출) */}
+      {/* 시작 리더 카드 선택 모달 (주사위 결정 연출 완료 후 노출) */}
+      {gameState.phase === 'LEADER_SELECT' && !isInitiativeRolling && (
+        <LeaderSelectModal
+          isOpen={true}
+          player={gameState.players[leaderSelectPlayerIndex]}
+          isFirstTurnPlayer={gameState.activePlayerIndex === leaderSelectPlayerIndex}
+          titlePrefix={gameState.gameMode === 'SOLO_DUAL' ? (leaderSelectPlayerIndex === 0 ? 'P1 (당신)' : 'P2 (상대)') : undefined}
+          onConfirm={(selectedCharName) => {
+            if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 0) {
+              setP0ChosenLeader(selectedCharName);
+              setLeaderSelectPlayerIndex(1);
+            } else if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 1) {
+              handleSelectStartingLeader(p0ChosenLeader || selectedCharName, selectedCharName);
+              setLeaderSelectPlayerIndex(0);
+            } else {
+              handleSelectStartingLeader(selectedCharName);
+            }
+          }}
+        />
+      )}
+
+      {/* 멀리건 모달 (시작 리더 선택 완료 후 노출) */}
       {gameState.phase === 'MULLIGAN' && !isInitiativeRolling && (
         <MulliganModal
           hand={p0.hand}

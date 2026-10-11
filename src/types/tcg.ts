@@ -78,6 +78,7 @@ export interface PlayerState {
 
 // 게임 페이즈
 export type GamePhase =
+  | 'LEADER_SELECT'    // 시작 리더 캐릭터 선택 페이즈
   | 'MULLIGAN'         // 시작 5장 교체 선택
   | 'START_PHASE'      // 턴 시작 처리
   | 'DRAW_PHASE'       // 2장 드로우 (선공 1턴 1장)

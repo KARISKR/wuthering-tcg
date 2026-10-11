@@ -33,8 +33,8 @@ export const PhaseBannerOverlay: React.FC<PhaseBannerOverlayProps> = ({
   const lastEventKeyRef = useRef<string>('');
 
   useEffect(() => {
-    // 게임 시작 전 멀리건 또는 게임 오버일 땐 배너 생략
-    if (phase === 'MULLIGAN' || phase === 'GAME_OVER') {
+    // 게임 시작 전 리더 선택, 멀리건 또는 게임 오버일 땐 배너 생략
+    if (phase === 'LEADER_SELECT' || phase === 'MULLIGAN' || phase === 'GAME_OVER') {
       setIsVisible(false);
       return;
     }

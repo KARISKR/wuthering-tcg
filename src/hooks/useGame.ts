@@ -3,6 +3,7 @@ import { GameState } from '../types/tcg';
 import {
   createInitialGameState,
   executeMulligan,
+  selectStartingLeader,
   upgradeCharacter,
   switchLeader,
   chargeConcerto,
@@ -63,11 +64,11 @@ export function useGame(
     }));
   }, []);
 
-  // 0. 선공 주사위 결정 (MULLIGAN 단계에서만 안전하게 적용)
+  // 0. 선공 주사위 결정 (LEADER_SELECT 또는 MULLIGAN 단계에서 적용)
   const handleSetInitiative = useCallback(
     (firstPlayerIndex: 0 | 1, roll0: number, roll1: number) => {
       setGameState((prev) => {
-        if (prev.phase !== 'MULLIGAN') return prev;
+        if (prev.phase !== 'LEADER_SELECT' && prev.phase !== 'MULLIGAN') return prev;
         if (prev.logs.some((l) => l.id.startsWith('log-dice-'))) return prev;
 
         const winnerName = prev.players[firstPlayerIndex].name;
@@ -85,6 +86,14 @@ export function useGame(
           logs: [rollLog, ...prev.logs],
         };
       });
+    },
+    []
+  );
+
+  // 0.5. 시작 리더 카드 선택 (LEADER_SELECT)
+  const handleSelectStartingLeader = useCallback(
+    (p0LeaderIdOrName: string, p1LeaderIdOrName?: string) => {
+      setGameState((prev) => selectStartingLeader(prev, p0LeaderIdOrName, p1LeaderIdOrName));
     },
     []
   );
@@ -307,6 +316,7 @@ export function useGame(
     restartGame,
     setGameMode,
     handleSetInitiative,
+    handleSelectStartingLeader,
     handleMulligan,
     handleUpgrade,
     handleSwitchLeader,
