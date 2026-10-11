@@ -349,30 +349,46 @@ const CharacterCardView: React.FC<{
 // 카드 전체 크게 보기 모달
 const CardZoomModal: React.FC<{ card: AnyCard; onClose: () => void }> = ({ card, onClose }) => {
   const artUrl = (card as unknown as { artUrl?: string }).artUrl;
+  const isChar = card.kind === 'CHARACTER';
+
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative bg-slate-900 border-2 border-amber-500/60 rounded-2xl p-4 max-w-sm w-full flex flex-col items-center shadow-2xl"
+        className="relative bg-slate-950 border-2 border-amber-500/70 rounded-3xl p-5 sm:p-6 max-w-md w-full flex flex-col items-center gap-3.5 shadow-2xl shadow-amber-500/20"
       >
         <button
           onClick={onClose}
-          className="absolute top-2 right-2 p-1.5 rounded-lg bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+          className="absolute top-3 right-3 p-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+          title="닫기"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
         {artUrl && (
-          <img
-            src={artUrl}
-            alt={card.nameKr}
-            className="w-full max-h-96 object-contain rounded-lg mb-3 shadow"
-          />
+          <div className="w-full max-h-[62vh] aspect-[5/7] flex items-center justify-center rounded-2xl overflow-hidden bg-black/40 border border-slate-800 shadow-xl">
+            <img
+              src={artUrl}
+              alt={card.nameKr}
+              className="w-full h-full object-contain drop-shadow-xl"
+            />
+          </div>
         )}
-        <h4 className="font-bold text-sm text-white">{card.nameKr}</h4>
-        <p className="text-xs text-slate-300 mt-1 text-center">{card.description}</p>
+        <div className="w-full text-left space-y-2">
+          <div className="flex items-center justify-between">
+            <h4 className="font-black text-lg text-white">{card.nameKr}</h4>
+            <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+              {isChar ? `Lv.${(card as CharacterCard).level}` : card.code}
+            </span>
+          </div>
+          {card.description && (
+            <p className="text-sm text-slate-200 leading-relaxed bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 font-medium whitespace-pre-line">
+              {card.description}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
