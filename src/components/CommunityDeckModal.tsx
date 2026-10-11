@@ -34,6 +34,7 @@ import {
   Info,
   Tag,
   ArrowRight,
+  ArrowLeft,
   Flame,
   Shield,
   Zap,
@@ -277,24 +278,34 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-5xl h-[92vh] max-h-[850px] bg-slate-950 border border-slate-700/80 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-slate-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-slate-950 border-2 border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100">
         {/* 상단 헤더 */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/80">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-800 bg-slate-900/90 shrink-0">
+          <div className="flex items-center gap-3.5">
+            {/* 좌상단 대기실로 나가기 버튼 통일 */}
+            <button
+              onClick={onClose}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
+              title="대기실로 나가기"
+            >
+              <ArrowLeft className="w-4 h-4 text-amber-400" />
+              <span>대기실로 나가기</span>
+            </button>
+            <div className="h-6 w-px bg-slate-800 hidden sm:block" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
               <Share2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-white tracking-wide">
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
                   공유된 덱 리스트
                 </h2>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
                   커뮤니티 실전 공유 레시피
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-slate-400 mt-0.5 hidden sm:block">
                 mc.sldark 실전 메타 덱 4종 및 다른 플레이어들의 독창적인 덱을 둘러보고, 원클릭 복사/대전을 즐겨보세요!
               </p>
             </div>
@@ -305,31 +316,31 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
             <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
               <button
                 onClick={() => setActiveTab('BROWSE')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'BROWSE'
                     ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Layers className="w-3.5 h-3.5" />
-                공유된 덱 리스트 ({sharedDecks.length})
+                <Layers className="w-4 h-4" />
+                <span>공유된 덱 리스트 ({sharedDecks.length})</span>
               </button>
               <button
                 onClick={() => setActiveTab('SHARE')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'SHARE'
                     ? 'bg-indigo-600 text-white shadow-md font-black'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Plus className="w-3.5 h-3.5" />
-                내 덱 공유하기
+                <Plus className="w-4 h-4" />
+                <span>내 덱 공유하기</span>
               </button>
             </div>
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition border border-slate-700/60"
               title="닫기"
             >
               <X className="w-5 h-5" />
@@ -341,26 +352,26 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
         {activeTab === 'BROWSE' && (
           <div className="flex-1 flex flex-col min-h-0">
             {/* 검색 & 필터 바 */}
-            <div className="p-4 border-b border-slate-800/80 bg-slate-900/40 flex flex-wrap items-center justify-between gap-3">
+            <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-900/40 flex flex-wrap items-center justify-between gap-3 shrink-0">
               {/* 검색창 */}
-              <div className="relative flex-1 min-w-[220px]">
+              <div className="relative flex-1 min-w-[240px]">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="덱 이름, 작성자(익명 포함), 태그 검색..."
-                  className="w-full pl-9 pr-4 py-2 bg-slate-950/80 border border-slate-700/70 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-700/70 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
                 />
               </div>
 
               {/* 정렬 셀렉트 */}
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">정렬:</span>
+                <span className="text-xs sm:text-sm text-slate-400 font-bold">정렬:</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-slate-950/80 border border-slate-700/70 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-amber-400"
+                  className="bg-slate-950/80 border border-slate-700/70 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-amber-400 font-medium"
                 >
                   <option value="POPULAR">❤️ 추천 많은 순</option>
                   <option value="LATEST">⏱️ 최신 등록 순</option>
@@ -369,12 +380,12 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
               </div>
 
               {/* 태그 칩 필터 */}
-              <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-thin">
+              <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-1 text-xs sm:text-sm scrollbar-thin">
                 <button
                   onClick={() => setSelectedTag('전체')}
-                  className={`px-2.5 py-1 rounded-lg font-bold shrink-0 transition ${
+                  className={`px-3 py-1.5 rounded-lg font-bold shrink-0 transition cursor-pointer ${
                     selectedTag === '전체'
-                      ? 'bg-amber-400 text-slate-950 font-black'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow'
                       : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
                   }`}
                 >
@@ -436,7 +447,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                                 src={leader.artUrl}
                                 alt={leader.nameKr}
                                 title={`리더: ${leader.nameKr}`}
-                                className="w-12 h-12 rounded-xl object-cover border-2 border-amber-400 shadow-md relative z-20 bg-slate-800"
+                                className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow-md relative z-20 bg-slate-800"
                               />
                             )}
                             {leftSup && (
@@ -444,7 +455,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                                 src={leftSup.artUrl}
                                 alt={leftSup.nameKr}
                                 title={`서포터 1: ${leftSup.nameKr}`}
-                                className="w-11 h-11 rounded-xl object-cover border-2 border-slate-600 shadow-md relative z-10 bg-slate-800"
+                                className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-600 shadow-md relative z-10 bg-slate-800"
                               />
                             )}
                             {rightSup && (
@@ -452,42 +463,42 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                                 src={rightSup.artUrl}
                                 alt={rightSup.nameKr}
                                 title={`서포터 2: ${rightSup.nameKr}`}
-                                className="w-11 h-11 rounded-xl object-cover border-2 border-slate-700 shadow-md relative z-0 bg-slate-800"
+                                className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-700 shadow-md relative z-0 bg-slate-800"
                               />
                             )}
                           </div>
 
                           {/* 덱 기본 정보 */}
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="text-base sm:text-lg font-black text-white">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <h3 className="text-lg sm:text-xl font-black text-white">
                                 {deck.deckName}
                               </h3>
                               {/* 익명 여부 뱃지 */}
                               {deck.isAnonymous ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-500/40 font-bold">
-                                  <UserX className="w-3 h-3 text-purple-400" />
+                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-500/40 font-bold">
+                                  <UserX className="w-3.5 h-3.5 text-purple-400" />
                                   익명 공유
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-500/40 font-bold">
-                                  <UserCheck className="w-3 h-3 text-cyan-400" />
+                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-500/40 font-bold">
+                                  <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
                                   {deck.authorName}
                                 </span>
                               )}
-                              <span className="text-[11px] text-slate-500 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
+                              <span className="text-xs text-slate-500 flex items-center gap-1">
+                                <Clock className="w-3.5 h-3.5" />
                                 {formatTimeAgo(deck.createdAt)}
                               </span>
                             </div>
 
                             {/* 리더 라인업 표기 */}
-                            <p className="text-xs text-amber-300/80 mt-1 font-semibold">
+                            <p className="text-xs sm:text-sm text-amber-300/90 mt-1 font-semibold">
                               리더: {leader?.nameKr || '미상'} · 서포터: {leftSup?.nameKr || '미상'}, {rightSup?.nameKr || '미상'}
                             </p>
 
                             {/* 덱 설명문 */}
-                            <p className="text-xs text-slate-300 mt-1.5 leading-relaxed bg-slate-950/40 px-3 py-2 rounded-xl border border-slate-800/60">
+                            <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed bg-slate-950/60 px-3.5 py-2.5 rounded-xl border border-slate-800/80">
                               💬 {deck.description}
                             </p>
 
@@ -496,7 +507,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                               {deck.tags.map((tag) => (
                                 <span
                                   key={tag}
-                                  className="text-[10px] px-2 py-0.5 rounded-md bg-slate-800/80 text-slate-300 font-mono"
+                                  className="text-xs px-2.5 py-0.5 rounded-md bg-slate-800/80 text-slate-300 font-mono"
                                 >
                                   #{tag}
                                 </span>
@@ -510,7 +521,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                           {/* 좋아요 버튼 */}
                           <button
                             onClick={(e) => handleLike(deck.id, e)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition border shadow ${
+                            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition border shadow cursor-pointer ${
                               deck.likedByMe
                                 ? 'bg-rose-500/20 text-rose-300 border-rose-500/60 shadow-rose-500/20'
                                 : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
@@ -529,9 +540,9 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                           {onSelectAndBattle && (
                             <button
                               onClick={() => handleBattleWithDeck(deck)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-black text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer"
+                              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition cursor-pointer"
                             >
-                              <Swords className="w-3.5 h-3.5" />
+                              <Swords className="w-4 h-4" />
                               <span>이 덱으로 배틀</span>
                             </button>
                           )}
@@ -539,12 +550,12 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                       </div>
 
                       {/* 하단 툴바: 코드 복사, 내 프리셋 저장, 구성 보기 */}
-                      <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
+                      <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5">
                         <div className="flex items-center gap-2">
                           {/* 덱 코드 복사 버튼 */}
                           <button
                             onClick={(e) => handleCopyCode(deck, e)}
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition border ${
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition border cursor-pointer ${
                               isCopied
                                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
                                 : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
@@ -552,12 +563,12 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                           >
                             {isCopied ? (
                               <>
-                                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                                <Check className="w-4 h-4 text-emerald-400" />
                                 <span>덱 코드 복사완료!</span>
                               </>
                             ) : (
                               <>
-                                <Copy className="w-3.5 h-3.5 text-slate-400" />
+                                <Copy className="w-4 h-4 text-slate-400" />
                                 <span>덱 코드 복사</span>
                               </>
                             )}
@@ -566,7 +577,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                           {/* 내 프리셋에 저장 */}
                           <button
                             onClick={(e) => handleImport(deck, e)}
-                            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition border ${
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition border cursor-pointer ${
                               isImported
                                 ? 'bg-purple-500/20 text-purple-300 border-purple-500/50'
                                 : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'

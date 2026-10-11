@@ -41,6 +41,7 @@ import {
   Search,
   Zap,
   Info,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface DeckPresetModalProps {
@@ -252,7 +253,17 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       {/* ========================================================= */}
       <header className="h-16 px-6 border-b border-slate-800 bg-slate-950/95 flex items-center justify-between shrink-0 z-20">
         <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black">
+          {/* 좌상단 대기실로 나가기 버튼 통일 */}
+          <button
+            onClick={onClose}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
+            title="대기실로 나가기"
+          >
+            <ArrowLeft className="w-4 h-4 text-amber-400" />
+            <span>대기실로 나가기</span>
+          </button>
+          <div className="h-6 w-px bg-slate-800 hidden sm:block" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-600 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black shrink-0">
             <BookmarkCheck className="w-5 h-5" />
           </div>
           <div>
@@ -260,11 +271,11 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               <h2 className="text-base sm:text-lg font-black text-white tracking-wide">
                 덱 프리셋 & 코드 보관함
               </h2>
-              <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+              <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full hidden md:inline">
                 FULLSCREEN MASTER DECK ARCHIVE
               </span>
             </div>
-            <p className="text-xs text-slate-400 hidden sm:block">
+            <p className="text-xs text-slate-400 hidden lg:block">
               저장된 레시피를 일괄 불러오고, 덱 코드를 공유하거나 덱 빌더에서 즉시 수정하여 출격할 수 있습니다.
             </p>
           </div>
