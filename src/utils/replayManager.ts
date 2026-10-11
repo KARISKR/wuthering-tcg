@@ -42,22 +42,44 @@ export interface BattleReplayData extends BattleReplaySummary {
   };
 }
 
+import { SAMPLE_BATTLE_REPLAYS } from '../data/sampleReplays';
+
 const STORAGE_KEY = 'wuthering_tcg_replays_v1';
 const MAX_REPLAYS = 20;
 
 /**
  * 저장된 리플레이 전체 목록 조회 (최신순)
+ * 데이터가 없으면 기본 명경기 샘플 리플레이 2종을 자동 시딩합니다.
  */
 export function getSavedReplays(): BattleReplayData[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) {
+      // 초기 기본 샘플 리플레이 자동 시딩
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_BATTLE_REPLAYS));
+      return [...SAMPLE_BATTLE_REPLAYS];
+    }
     const list: BattleReplayData[] = JSON.parse(raw);
-    return Array.isArray(list) ? list.sort((a, b) => b.timestamp - a.timestamp) : [];
+    if (!Array.isArray(list) || list.length === 0) {
+      return [];
+    }
+    return list.sort((a, b) => b.timestamp - a.timestamp);
   } catch (e) {
     console.error('Failed to parse saved replays:', e);
-    return [];
+    return [...SAMPLE_BATTLE_REPLAYS];
   }
+}
+
+/**
+ * 기본 명경기 샘플 리플레이 복원
+ */
+export function restoreSampleReplays(): BattleReplayData[] {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_BATTLE_REPLAYS));
+  } catch (e) {
+    console.error('Failed to restore sample replays:', e);
+  }
+  return [...SAMPLE_BATTLE_REPLAYS];
 }
 
 /**
