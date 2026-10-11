@@ -90,6 +90,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleDiscardOverflow,
     handleEndTurn,
     handleForceResolveClash,
+    clearLastUpgrade,
   } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
 
   // 선공 결정 주사위 연출 상태 (게임 시작 시 LEADER_SELECT 단계에서 활성화)
@@ -254,10 +255,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [gameState.lastComboStrike?.id]);
 
-  // gameState.lastUpgrade 변경 시 레벨업 시네마틱 오버레이 자동 실행 (전투 데미지 결과 후 실행되도록 CLASH_REVEAL 동안은 보류)
+  // gameState.lastUpgrade 변경 시 레벨업 시네마틱 오버레이 1회만 실행 (전투 데미지 결과 후 실행되도록 CLASH_REVEAL 동안은 보류)
+  const seenUpgradeIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (gameState.lastUpgrade && gameState.phase !== 'CLASH_REVEAL') {
-      setActiveUpgrade(gameState.lastUpgrade);
+    if (!gameState.lastUpgrade) {
+      seenUpgradeIdRef.current = null;
+      return;
+    }
+    if (gameState.phase !== 'CLASH_REVEAL') {
+      if (seenUpgradeIdRef.current !== gameState.lastUpgrade.id) {
+        seenUpgradeIdRef.current = gameState.lastUpgrade.id;
+        setActiveUpgrade(gameState.lastUpgrade);
+      }
     }
   }, [gameState.lastUpgrade?.id, gameState.phase]);
 
@@ -444,6 +454,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const targetPlayer = gameState.players[playerIdx];
     const currentChar = targetPlayer.slots[slotName];
     if (!currentChar) return;
+
+    // 이미 이번 턴에 레벨업했거나 액션 단계가 아니면 차단
+    if (targetPlayer.actionFlags.upgraded || gameState.phase !== 'ACTION_PHASE') return;
 
     const nextLevel = (currentChar.level + 1) as 1 | 2;
     const available = targetPlayer.characterDeck.filter(
@@ -1309,7 +1322,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canSwitch={!p0.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isP0Turn}
                           onUpgradeClick={() => openUpgradeModal('leftSupport', 0)}
                           onCardClick={() => {
-                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn) openUpgradeModal('leftSupport', 0);
+                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn && checkCanUpgradeSlot('leftSupport', 0)) {
+                              openUpgradeModal('leftSupport', 0);
+                            } else if (p0.slots.leftSupport) {
+                              setEvolutionModalChar(p0.slots.leftSupport);
+                            }
                           }}
                           onSwitchClick={() => handleSwitchLeader(0, 'leftSupport')}
                           onMouseEnter={() => p0.slots.leftSupport && setPreviewCard(p0.slots.leftSupport)}
@@ -1330,7 +1347,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canSwitch={false}
                           onUpgradeClick={() => openUpgradeModal('leader', 0)}
                           onCardClick={() => {
-                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn) openUpgradeModal('leader', 0);
+                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn && checkCanUpgradeSlot('leader', 0)) {
+                              openUpgradeModal('leader', 0);
+                            } else if (p0.slots.leader) {
+                              setEvolutionModalChar(p0.slots.leader);
+                            }
                           }}
                           onMouseEnter={() => setPreviewCard(p0.slots.leader)}
                           onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
@@ -1350,7 +1371,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canSwitch={!p0.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isP0Turn}
                           onUpgradeClick={() => openUpgradeModal('rightSupport', 0)}
                           onCardClick={() => {
-                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn) openUpgradeModal('rightSupport', 0);
+                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn && checkCanUpgradeSlot('rightSupport', 0)) {
+                              openUpgradeModal('rightSupport', 0);
+                            } else if (p0.slots.rightSupport) {
+                              setEvolutionModalChar(p0.slots.rightSupport);
+                            }
                           }}
                           onSwitchClick={() => handleSwitchLeader(0, 'rightSupport')}
                           onMouseEnter={() => p0.slots.rightSupport && setPreviewCard(p0.slots.rightSupport)}
@@ -2059,7 +2084,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {activeUpgrade && (
         <UpgradeEffectOverlay
           effect={activeUpgrade}
-          onDismiss={() => setActiveUpgrade(null)}
+          onDismiss={() => {
+            setActiveUpgrade(null);
+            clearLastUpgrade();
+          }}
         />
       )}
 

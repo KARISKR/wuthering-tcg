@@ -514,7 +514,12 @@ export function executeMulligan(
 // ==========================================
 
 export function executeStartPhase(state: GameState): GameState {
-  let newState = { ...state, phase: 'START_PHASE' as GamePhase };
+  let newState: GameState = {
+    ...state,
+    phase: 'START_PHASE' as GamePhase,
+    lastUpgrade: null,
+    lastComboStrike: null,
+  };
   const activeIdx = newState.activePlayerIndex;
   const activePlayer = { ...newState.players[activeIdx] };
 
@@ -2404,7 +2409,13 @@ export function discardOverflowCards(
 }
 
 export function executeEndPhase(state: GameState): GameState {
-  let newState = { ...state, phase: 'END_PHASE' as GamePhase };
+  let newState: GameState = {
+    ...state,
+    phase: 'END_PHASE' as GamePhase,
+    lastUpgrade: null,
+    lastComboStrike: null,
+    lastEffectEvent: null,
+  };
 
   // 연격 카운트 및 대결 플래그 초기화
   newState.players[0].comboCount = 0;

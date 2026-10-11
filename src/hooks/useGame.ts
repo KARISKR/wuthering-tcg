@@ -200,6 +200,11 @@ export function useGame(
     setGameState((prev) => forceResolveClash(prev));
   }, []);
 
+  // 레벨업 연출 완료 후 lastUpgrade 초기화
+  const clearLastUpgrade = useCallback(() => {
+    setGameState((prev) => (prev.lastUpgrade ? { ...prev, lastUpgrade: null } : prev));
+  }, []);
+
   // ==========================================
   // AI 봇 비동기 턴 처리 (레이스 컨디션 및 멈춤 방지)
   // ==========================================
@@ -330,5 +335,6 @@ export function useGame(
     handleDiscardOverflow,
     handleEndTurn,
     handleForceResolveClash,
+    clearLastUpgrade,
   };
 }
