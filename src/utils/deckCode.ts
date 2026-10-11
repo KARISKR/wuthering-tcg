@@ -42,7 +42,7 @@ export function encodeDeckCode(deck: CustomDeckConfig): string {
     a[0].localeCompare(b[0])
   );
 
-  const payload = {
+  const payload: any = {
     v: 1,
     name: deck.name.trim() || '공유 덱',
     l: deck.leader.code,
@@ -50,6 +50,14 @@ export function encodeDeckCode(deck: CustomDeckConfig): string {
     s2: deck.rightSupport.code,
     cards: cardsArray,
   };
+
+  if (deck.characterDeck && deck.characterDeck.length > 0) {
+    const charMap = new Map<string, number>();
+    deck.characterDeck.forEach((c) => {
+      charMap.set(c.code, (charMap.get(c.code) || 0) + 1);
+    });
+    payload.chars = Array.from(charMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }
 
   const jsonStr = JSON.stringify(payload);
   const encoded = utf8ToBase64(jsonStr);
@@ -160,12 +168,29 @@ export function decodeDeckCode(codeStr: string): CustomDeckConfig | null {
       }
     });
 
+    const characterDeck: CharacterCard[] = [];
+    if (Array.isArray(data.chars) && data.chars.length > 0) {
+      data.chars.forEach(([code, count]: [string, number]) => {
+        const found = ALL_CHARACTERS.find((c) => c.code === code);
+        if (found) {
+          const qty = Math.min(Math.max(1, Number(count) || 1), 3);
+          for (let i = 0; i < qty; i++) {
+            characterDeck.push({
+              ...found,
+              id: `char-${found.code}-${Date.now()}-${characterDeck.length}`,
+            });
+          }
+        }
+      });
+    }
+
     return {
       id: `custom-deck-${Date.now()}`,
       name: data.name || '불러온 덱',
       leader,
       leftSupport,
       rightSupport,
+      characterDeck: characterDeck.length > 0 ? characterDeck : undefined,
       actionCards,
     };
   } catch (error) {
@@ -329,12 +354,29 @@ export function presetToCustomDeck(preset: DeckPreset): CustomDeckConfig {
     }
   });
 
+  const characterDeck: CharacterCard[] = [];
+  if (preset.characterDeckCards && preset.characterDeckCards.length > 0) {
+    preset.characterDeckCards.forEach(({ code, count }) => {
+      const match = ALL_CHARACTERS.find((c) => c.code === code);
+      if (match) {
+        const qty = Math.min(Math.max(1, count), 3);
+        for (let i = 0; i < qty; i++) {
+          characterDeck.push({
+            ...match,
+            id: `char-${match.code}-${Date.now()}-${characterDeck.length}`,
+          });
+        }
+      }
+    });
+  }
+
   return {
     id: preset.id,
     name: preset.name,
     leader,
     leftSupport,
     rightSupport,
+    characterDeck: characterDeck.length > 0 ? characterDeck : undefined,
     actionCards,
   };
 }
@@ -346,6 +388,13 @@ export function customDeckToPreset(deck: CustomDeckConfig, customName?: string):
     countMap.set(c.code, (countMap.get(c.code) || 0) + 1);
   });
 
+  const charCountMap = new Map<string, number>();
+  if (deck.characterDeck) {
+    deck.characterDeck.forEach((c) => {
+      charCountMap.set(c.code, (charCountMap.get(c.code) || 0) + 1);
+    });
+  }
+
   return {
     id: `preset-custom-${Date.now()}`,
     name: customName || deck.name || '나만의 덱 프리셋',
@@ -354,6 +403,7 @@ export function customDeckToPreset(deck: CustomDeckConfig, customName?: string):
     leaderCode: deck.leader.code,
     leftSupportCode: deck.leftSupport.code,
     rightSupportCode: deck.rightSupport.code,
+    characterDeckCards: Array.from(charCountMap.entries()).map(([code, count]) => ({ code, count })),
     actionCards: Array.from(countMap.entries()).map(([code, count]) => ({ code, count })),
     description: `커스텀 편성 덱 (${deck.leader.nameKr} / ${deck.leftSupport.nameKr} / ${deck.rightSupport.nameKr})`,
   };
@@ -402,6 +452,7 @@ export function getUserDecks(): CustomDeckConfig[] {
             leader,
             leftSupport,
             rightSupport,
+            characterDeck: Array.isArray(d.characterDeck) && d.characterDeck.length > 0 ? d.characterDeck : undefined,
             actionCards: upgradedActions,
           };
         });
@@ -496,6 +547,7 @@ export function getActiveCustomDeck(): CustomDeckConfig {
           leader,
           leftSupport,
           rightSupport,
+          characterDeck: Array.isArray(parsed.characterDeck) && parsed.characterDeck.length > 0 ? parsed.characterDeck : undefined,
           actionCards: upgradedActions,
         };
       }

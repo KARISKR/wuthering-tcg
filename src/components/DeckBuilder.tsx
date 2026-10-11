@@ -61,36 +61,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     return DEDUPED_LV0_CHARACTERS;
   }, []);
 
-  // 캐릭터 편성 (3명) - 기본은 상호 다른 최고 성급 대표 캐릭터 3인
-  const [leader, setLeader] = useState<CharacterCard>(() => {
-    return DEDUPED_LV0_CHARACTERS.find((c) => c.characterName.includes('방랑자') || c.nameKr.includes('방랑자')) || DEDUPED_LV0_CHARACTERS[0];
-  });
-  const [leftSupport, setLeftSupport] = useState<CharacterCard>(() => {
-    return DEDUPED_LV0_CHARACTERS.find((c) => c.characterName.includes('양양') || c.nameKr.includes('양양')) || DEDUPED_LV0_CHARACTERS[1];
-  });
-  const [rightSupport, setRightSupport] = useState<CharacterCard>(() => {
-    return DEDUPED_LV0_CHARACTERS.find((c) => c.characterName.includes('치샤') || c.nameKr.includes('치샤')) || DEDUPED_LV0_CHARACTERS[2];
-  });
-
-  // 40장 액션 덱
-  const [actionDeck, setActionDeck] = useState<ActionCard[]>([]);
-  const [deckName, setDeckName] = useState('나만의 커스텀 덱 1');
-
-  // 라이브러리 탭 (액션 카드 vs 에코 카드 vs 캐릭터 카드)
-  const [poolTab, setPoolTab] = useState<'ACTION' | 'ECHO' | 'CHARACTER'>('ACTION');
-
-  // 뷰 모드 이원화 (이미지 그리드 vs 텍스트 리스트)
-  const [deckViewMode, setDeckViewMode] = useState<'IMAGE' | 'TEXT'>('IMAGE');
-  const [libraryViewMode, setLibraryViewMode] = useState<'IMAGE' | 'TEXT'>('IMAGE');
-
-  // 검색 및 필터
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedColor, setSelectedColor] = useState<'ALL' | 'RED' | 'GREEN' | 'BLUE'>('ALL');
-  const [selectedChar, setSelectedChar] = useState<string>('ALL');
-
-  // 좌측 패널에 표시할 현재 활성/선택된 카드 (초대형 상세 뷰어)
-  const [activeCard, setActiveCard] = useState<OfficialCardData | null>(null);
-
   // 카드 코드로 OfficialCard 찾기 헬퍼 (동일 코드 중 가장 높은 성급 카드 반환)
   const getOfficialCardByCode = (code: string): OfficialCardData | null => {
     const matched = OFFICIAL_CARDS.filter((c) => c.code === code);
@@ -127,7 +97,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     }));
   }, []);
 
-  // 공식 캐릭터 카드 풀: 동일 코드 중 가장 높은 성급 1장씩 선별 (총 45종)
+  // 공식 캐릭터 카드 풀: 동일 코드 중 가장 높은 성급 1장씩 선별 (총 45종 - Lv.0, Lv.1, Lv.2 전체)
   const availableCharacterCards = useMemo(() => {
     const charCards = OFFICIAL_CARDS.filter((c) => c.kind === 'CHARACTER');
     const charMap = new Map<string, OfficialCardData>();
@@ -139,6 +109,118 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     });
     return Array.from(charMap.values());
   }, []);
+
+  // OfficialCardData -> CharacterCard 변환 헬퍼
+  const officialCardToCharacterCard = (c: OfficialCardData): CharacterCard => {
+    let charName = c.characterName || c.nameKr;
+    if (c.nameKr.includes('방랑자(여)')) charName = '방랑자(여)';
+    else if (c.nameKr.includes('방랑자(남)')) charName = '방랑자(남)';
+
+    return {
+      id: `char-${c.code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      kind: 'CHARACTER',
+      code: c.code,
+      characterName: charName,
+      nameKr: c.nameKr,
+      level: (c.level ?? 0) as 0 | 1 | 2,
+      element: c.element || 'SPECTRO',
+      artUrl: c.artUrl,
+      description: c.description,
+      leaderSkill: c.description,
+      clashSkill: c.description,
+      rarity: c.rarity,
+    };
+  };
+
+  // 기본 캐릭터 덱 생성 (선택된 캐릭터들의 Lv.0, Lv.1, Lv.2 카드로 3~15장 구성)
+  const generateDefaultCharacterDeck = (names: string[] = ['방랑자(여)', '양양', '치샤']): CharacterCard[] => {
+    const result: CharacterCard[] = [];
+    names.forEach((name) => {
+      const cards = availableCharacterCards.filter((c) => {
+        const cName = c.characterName || c.nameKr;
+        if (name.includes('방랑자(여)')) return c.nameKr.includes('방랑자(여)');
+        if (name.includes('방랑자(남)')) return c.nameKr.includes('방랑자(남)');
+        return cName.includes(name) || name.includes(cName);
+      });
+      const lv0 = cards.find((c) => c.level === 0);
+      const lv1 = cards.find((c) => c.level === 1);
+      const lv2 = cards.find((c) => c.level === 2);
+      [lv0, lv1, lv2].filter(Boolean).forEach((c) => {
+        result.push(officialCardToCharacterCard(c!));
+      });
+    });
+    return result;
+  };
+
+  // [신규] 3~15장 캐릭터 덱 상태 (Lv.0, Lv.1, Lv.2 자유 편성)
+  const [characterDeck, setCharacterDeck] = useState<CharacterCard[]>(() => {
+    return generateDefaultCharacterDeck(['방랑자(여)', '양양', '치샤']);
+  });
+
+  // 현재 출전 캐릭터 중 리더로 지정된 캐릭터명 (기본: 방랑자(여))
+  const [designatedLeaderName, setDesignatedLeaderName] = useState<string>('방랑자(여)');
+
+  // 캐릭터 덱에 편성된 카드들의 고유 캐릭터 종류 목록 (예: ['방랑자(여)', '양양', '치샤'])
+  const uniqueCharacterNames = useMemo(() => {
+    const set = new Set<string>();
+    characterDeck.forEach((c) => {
+      let name = c.characterName || c.nameKr;
+      if (c.nameKr.includes('방랑자(여)')) name = '방랑자(여)';
+      else if (c.nameKr.includes('방랑자(남)')) name = '방랑자(남)';
+      if (name) set.add(name);
+    });
+    return Array.from(set);
+  }, [characterDeck]);
+
+  // 캐릭터 덱에서 필드에 출전할 3명 (리더 1명 + 서포터 2명) 자동 파생 계산
+  const { leader, leftSupport, rightSupport } = useMemo(() => {
+    const names = [...uniqueCharacterNames];
+    let leaderName = designatedLeaderName;
+    if (!names.includes(leaderName)) {
+      leaderName = names[0] || '방랑자(여)';
+    }
+
+    const otherNames = names.filter((n) => n !== leaderName);
+    const leftName = otherNames[0] || '양양';
+    const rightName = otherNames[1] || '치샤';
+
+    const findLv0 = (name: string, fallbackIdx: number): CharacterCard => {
+      const inDeck = characterDeck.find(
+        (c) => c.level === 0 && (c.nameKr.includes(name) || (c.characterName && c.characterName.includes(name)))
+      );
+      if (inDeck) return inDeck;
+      const anyInDeck = characterDeck.find(
+        (c) => c.nameKr.includes(name) || (c.characterName && c.characterName.includes(name))
+      );
+      if (anyInDeck) return anyInDeck;
+      return lv0Characters.find((c) => c.nameKr.includes(name)) || lv0Characters[fallbackIdx] || lv0Characters[0];
+    };
+
+    return {
+      leader: findLv0(leaderName, 0),
+      leftSupport: findLv0(leftName, 1),
+      rightSupport: findLv0(rightName, 2),
+    };
+  }, [uniqueCharacterNames, designatedLeaderName, characterDeck, lv0Characters]);
+
+  // 40장 액션 덱
+  const [actionDeck, setActionDeck] = useState<ActionCard[]>([]);
+  const [deckName, setDeckName] = useState('나만의 커스텀 덱 1');
+
+  // 라이브러리 탭 (액션 카드 vs 에코 카드 vs 캐릭터 카드)
+  const [poolTab, setPoolTab] = useState<'ACTION' | 'ECHO' | 'CHARACTER'>('ACTION');
+
+  // 뷰 모드 이원화 (이미지 그리드 vs 텍스트 리스트)
+  const [deckViewMode, setDeckViewMode] = useState<'IMAGE' | 'TEXT'>('IMAGE');
+  const [libraryViewMode, setLibraryViewMode] = useState<'IMAGE' | 'TEXT'>('IMAGE');
+
+  // 검색 및 필터
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedColor, setSelectedColor] = useState<'ALL' | 'RED' | 'GREEN' | 'BLUE'>('ALL');
+  const [selectedChar, setSelectedChar] = useState<string>('ALL');
+
+  // 좌측 패널에 표시할 현재 활성/선택된 카드 (초대형 상세 뷰어)
+  const [activeCard, setActiveCard] = useState<OfficialCardData | null>(null);
 
   // 덱 로컬스토리지 로드 (저장된 내 덱 리스트를 불러오고 최고 성급 카드로 자동 동기화)
   useEffect(() => {
@@ -166,19 +248,34 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     });
     setActionDeck(upgradedDeck);
 
-    if (deck.leader) {
-      const bestLeader = lv0Characters.find((c) => c.nameKr === deck.leader.nameKr) || deck.leader;
-      setLeader(bestLeader);
-      const off = getOfficialCardByCode(bestLeader.code);
-      if (off) setActiveCard(off);
-    }
-    if (deck.leftSupport) {
-      const bestLeft = lv0Characters.find((c) => c.nameKr === deck.leftSupport.nameKr) || deck.leftSupport;
-      setLeftSupport(bestLeft);
-    }
-    if (deck.rightSupport) {
-      const bestRight = lv0Characters.find((c) => c.nameKr === deck.rightSupport.nameKr) || deck.rightSupport;
-      setRightSupport(bestRight);
+    // 캐릭터 덱 동기화
+    if (deck.characterDeck && deck.characterDeck.length > 0) {
+      const upgradedCharDeck: CharacterCard[] = deck.characterDeck.map((c) => {
+        const off = availableCharacterCards.find((a) => a.code === c.code);
+        return off
+          ? {
+              ...c,
+              nameKr: off.nameKr,
+              artUrl: off.artUrl,
+              rarity: off.rarity,
+              element: off.element,
+              description: off.description,
+            }
+          : c;
+      });
+      setCharacterDeck(upgradedCharDeck);
+      if (deck.leader) {
+        setDesignatedLeaderName(deck.leader.characterName || deck.leader.nameKr);
+      }
+    } else {
+      const names = [
+        deck.leader?.characterName || '방랑자(여)',
+        deck.leftSupport?.characterName || '양양',
+        deck.rightSupport?.characterName || '치샤',
+      ];
+      const initialChars = generateDefaultCharacterDeck(names);
+      setCharacterDeck(initialChars);
+      if (deck.leader) setDesignatedLeaderName(deck.leader.characterName || deck.leader.nameKr);
     }
   };
 
@@ -196,16 +293,18 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     const newId = `user-deck-${Date.now()}`;
     const newName = `나만의 커스텀 덱 ${userDecks.length + 1}`;
     // 기본 스타터 덱 카드로 40장 구성
-    const initial: ActionCard[] = [];
+    const initialAction: ActionCard[] = [];
     let idx = 0;
-    while (initial.length < 40 && availableActionCards.length > 0) {
+    while (initialAction.length < 40 && availableActionCards.length > 0) {
       const card = availableActionCards[idx % availableActionCards.length];
-      const count = initial.filter((c) => c.code === card.code).length;
+      const count = initialAction.filter((c) => c.code === card.code).length;
       if (count < 3) {
-        initial.push({ ...card, id: `deck-${card.code}-${initial.length}` });
+        initialAction.push({ ...card, id: `deck-${card.code}-${initialAction.length}` });
       }
       idx++;
     }
+
+    const initialChars = generateDefaultCharacterDeck(['방랑자(여)', '양양', '치샤']);
 
     const newDeck: CustomDeckConfig = {
       id: newId,
@@ -213,7 +312,8 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       leader: lv0Characters.find((c) => c.characterName.includes('방랑자')) || lv0Characters[0],
       leftSupport: lv0Characters.find((c) => c.characterName.includes('양양')) || lv0Characters[1],
       rightSupport: lv0Characters.find((c) => c.characterName.includes('치샤')) || lv0Characters[2],
-      actionCards: initial,
+      characterDeck: initialChars,
+      actionCards: initialAction,
     };
 
     const updated = [...userDecks, newDeck];
@@ -241,7 +341,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     setActiveCustomDeck(nextDeck);
   };
 
-  // 기본 스타터 덱 채우기 (항상 최고 성급 액션 카드로 40장 구성)
+  // 기본 스타터 덱 채우기 (항상 최고 성급 액션 카드로 40장 구성 & 기본 9장 캐릭터 덱)
   const fillDefaultStarterDeck = () => {
     const initial: ActionCard[] = [];
     let idx = 0;
@@ -254,10 +354,79 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       idx++;
     }
     setActionDeck(initial);
+
+    const initialChars = generateDefaultCharacterDeck(['방랑자(여)', '양양', '치샤']);
+    setCharacterDeck(initialChars);
+    setDesignatedLeaderName('방랑자(여)');
+
     if (initial.length > 0) {
       const off = getOfficialCardByCode(initial[0].code);
       if (off) setActiveCard(off);
     }
+  };
+
+  const addCharacterToDeck = (card: OfficialCardData | CharacterCard) => {
+    const off: OfficialCardData | null =
+      getOfficialCardByCode(card.code) ||
+      (OFFICIAL_CARDS.find((c) => c.code === card.code) ?? null);
+    if (off) setActiveCard(off);
+
+    if (characterDeck.length >= 15) {
+      alert('캐릭터 덱은 최대 15장까지만 편성할 수 있습니다.');
+      return;
+    }
+
+    const currentCount = characterDeck.filter((c) => c.code === card.code).length;
+    if (currentCount >= 3) {
+      alert('동일한 캐릭터 카드는 덱에 최대 3장까지만 투입할 수 있습니다.');
+      return;
+    }
+
+    let charName = card.characterName || card.nameKr;
+    if (card.nameKr.includes('방랑자(여)')) charName = '방랑자(여)';
+    else if (card.nameKr.includes('방랑자(남)')) charName = '방랑자(남)';
+
+    if (!uniqueCharacterNames.includes(charName) && uniqueCharacterNames.length >= 3) {
+      alert(
+        `캐릭터 덱에는 최대 3종류의 캐릭터만 편성할 수 있습니다.\n현재 편성된 캐릭터: [${uniqueCharacterNames.join(', ')}]\n\n새 캐릭터를 추가하려면 기존 캐릭터 카드를 먼저 모두 제거하세요.`
+      );
+      return;
+    }
+
+    const officialObj = OFFICIAL_CARDS.find((c) => c.code === card.code) || card;
+    const charCard = officialCardToCharacterCard(officialObj as OfficialCardData);
+
+    const nextDeck = [...characterDeck, charCard];
+    setCharacterDeck(nextDeck);
+
+    if (!uniqueCharacterNames.includes(designatedLeaderName)) {
+      setDesignatedLeaderName(charName);
+    }
+  };
+
+  // 캐릭터 카드 덱 제거 (1장)
+  const removeCharacterFromDeck = (code: string) => {
+    const off = getOfficialCardByCode(code);
+    if (off) setActiveCard(off);
+
+    const index = characterDeck.findLastIndex((c) => c.code === code);
+    if (index !== -1) {
+      const copy = [...characterDeck];
+      copy.splice(index, 1);
+      setCharacterDeck(copy);
+    }
+  };
+
+  // 인덱스 기준 캐릭터 카드 제거
+  const removeCharacterAtIndex = (index: number) => {
+    const target = characterDeck[index];
+    if (!target) return;
+    const off = getOfficialCardByCode(target.code);
+    if (off) setActiveCard(off);
+
+    const copy = [...characterDeck];
+    copy.splice(index, 1);
+    setCharacterDeck(copy);
   };
 
   // 카드 추가 (최대 40장, 동명 최대 3장 - 항상 최고 성급 카드로 투입)
@@ -309,58 +478,89 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   const [validationErrors, setValidationErrors] = useState<ValidationErrorItem[]>([]);
   const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
 
-  // 현재 선택된 캐릭터 슬롯 타깃 ('LEADER' | 'LEFT' | 'RIGHT')
-  const [selectedSlot, setSelectedSlot] = useState<'LEADER' | 'LEFT' | 'RIGHT'>('LEADER');
-
-  // 덱 생성 규칙 검사 (규칙 위반 사유 상세 리스트 반환)
+  // 덱 생성 규칙 검사 (공식 룰: 캐릭터 덱 3~15장 & 3종류, 액션 덱 정확히 40장)
   const getDeckValidationErrors = (): ValidationErrorItem[] => {
     const errors: ValidationErrorItem[] = [];
 
-    // 1. 캐릭터 중복 및 필수 편성 검사
-    const charNames = [
-      leader?.characterName || leader?.nameKr,
-      leftSupport?.characterName || leftSupport?.nameKr,
-      rightSupport?.characterName || rightSupport?.nameKr,
-    ].filter(Boolean);
-
-    if (charNames.length < 3) {
+    // 1. 캐릭터 덱 매수 검사 (최소 3장 ~ 최대 15장)
+    if (characterDeck.length < 3 || characterDeck.length > 15) {
+      const isUnder = characterDeck.length < 3;
       errors.push({
-        id: 'chars-incomplete',
+        id: 'char-deck-count',
         category: 'CHARACTERS',
-        categoryLabel: '출전 캐릭터',
-        title: '출전 캐릭터 3인 미편성',
-        badge: '인원 부족',
+        categoryLabel: '캐릭터 덱',
+        title: '캐릭터 덱 매수 규정 미충족 (3~15장)',
+        badge: `${characterDeck.length} / 15장 (${isUnder ? `${3 - characterDeck.length}장 부족` : '15장 초과'})`,
         badgeColor: 'amber',
-        description: '리더 1명과 서포터 2명으로 총 3명의 서로 다른 캐릭터를 모두 편성해야 합니다.',
-        actionHint: '중앙의 빈 슬롯을 클릭한 후 우측에서 캐릭터를 편성해주세요.',
+        description: '공식 룰상 캐릭터 덱은 최소 3장에서 최대 15장 사이로 구성되어야 합니다.',
+        actionHint: isUnder
+          ? '우측 [캐릭터] 탭에서 원하는 캐릭터 카드를 더 담아주세요.'
+          : '캐릭터 덱에서 15장 이하가 되도록 카드를 빼주세요.',
         actionTab: 'CHARACTER',
       });
-    } else {
-      const nameSet = new Set<string>();
-      const dupes: string[] = [];
-      charNames.forEach((n) => {
-        if (nameSet.has(n)) {
-          dupes.push(n);
-        } else {
-          nameSet.add(n);
-        }
+    }
+
+    // 2. 캐릭터 3종류 필수 검사
+    if (uniqueCharacterNames.length !== 3) {
+      errors.push({
+        id: 'char-types-count',
+        category: 'CHARACTERS',
+        categoryLabel: '캐릭터 종류',
+        title: '캐릭터 3종류 편성 미충족',
+        badge: `${uniqueCharacterNames.length} / 3종류`,
+        badgeColor: 'amber',
+        description: `공식 룰상 캐릭터 덱에는 반드시 서로 다른 정확히 3종류의 캐릭터가 포함되어야 합니다. (현재: ${uniqueCharacterNames.join(', ') || '없음'})`,
+        actionHint:
+          uniqueCharacterNames.length < 3
+            ? '다른 캐릭터의 카드를 추가하여 3종류를 맞춰주세요.'
+            : '캐릭터 종류를 3종류 이하로 줄여주세요.',
+        actionTab: 'CHARACTER',
       });
-      if (dupes.length > 0) {
+    }
+
+    // 3. 3종류 각 캐릭터마다 Lv.0 카드가 최소 1장 이상 필수 (시작 필드 배치용)
+    uniqueCharacterNames.forEach((name) => {
+      const hasLv0 = characterDeck.some(
+        (c) => c.level === 0 && (c.nameKr.includes(name) || (c.characterName && c.characterName.includes(name)))
+      );
+      if (!hasLv0) {
         errors.push({
-          id: 'chars-duplicate',
+          id: `char-missing-lv0-${name}`,
           category: 'CHARACTERS',
-          categoryLabel: '출전 캐릭터',
-          title: '동일 캐릭터 중복 편성',
-          badge: `중복: ${dupes.join(', ')}`,
-          badgeColor: 'amber',
-          description: `출전 캐릭터 3인은 서로 다른 캐릭터여야 합니다. 현재 '${dupes.join(', ')}'가 중복 지정되었습니다.`,
-          actionHint: '중복된 슬롯을 클릭한 뒤 우측 캐릭터 탭에서 다른 캐릭터를 선택하세요.',
+          categoryLabel: 'Lv.0 필수',
+          title: `'${name}' Lv.0 카드 누락`,
+          badge: 'Lv.0 필요',
+          badgeColor: 'red',
+          description: `시작 시 필드에 출전하기 위해, '${name}' 캐릭터의 Lv.0 카드가 캐릭터 덱에 최소 1장 이상 포함되어야 합니다.`,
+          actionHint: `우측 [캐릭터] 탭에서 '${name}'의 Lv.0 카드를 덱에 담아주세요.`,
           actionTab: 'CHARACTER',
         });
       }
-    }
+    });
 
-    // 2. 액션 덱 40장 검사
+    // 4. 동일 캐릭터 카드 최대 3장 검사
+    const charCountMap = new Map<string, { name: string; count: number }>();
+    characterDeck.forEach((c) => {
+      const prev = charCountMap.get(c.code) || { name: c.nameKr, count: 0 };
+      charCountMap.set(c.code, { name: c.nameKr, count: prev.count + 1 });
+    });
+    charCountMap.forEach(({ name, count }, code) => {
+      if (count > 3) {
+        errors.push({
+          id: `char-limit-${code}`,
+          category: 'CARD_LIMIT',
+          categoryLabel: '투입 한도',
+          title: `'${name}' 캐릭터 카드 투입 초과`,
+          badge: `${count}장 투입됨 (최대 3장)`,
+          badgeColor: 'red',
+          description: '공식 룰상 동일한 카드는 덱에 최대 3장까지만 넣을 수 있습니다.',
+          actionHint: `캐릭터 덱에서 '${name}' 카드를 3장 이하로 줄여주세요.`,
+          actionTab: 'CHARACTER',
+        });
+      }
+    });
+
+    // 5. 액션 덱 40장 검사
     if (actionDeck.length !== 40) {
       const diff = 40 - actionDeck.length;
       errors.push({
@@ -370,13 +570,16 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         title: '액션 덱 40장 미충족',
         badge: `${actionDeck.length} / 40장 (${diff > 0 ? `${diff}장 부족` : `${-diff}장 초과`})`,
         badgeColor: 'red',
-        description: `공식 룰상 메인 액션 덱은 반드시 정확히 40장으로 구성되어야 합니다.`,
-        actionHint: diff > 0 ? `우측 라이브러리에서 액션 또는 에코 카드를 ${diff}장 더 담아주세요.` : `덱 목록에서 불필요한 카드를 ${-diff}장 빼주세요.`,
+        description: '공식 룰상 메인 액션 덱은 반드시 정확히 40장으로 구성되어야 합니다.',
+        actionHint:
+          diff > 0
+            ? `우측 라이브러리에서 액션 또는 에코 카드를 ${diff}장 더 담아주세요.`
+            : `덱 목록에서 불필요한 카드를 ${-diff}장 빼주세요.`,
         actionTab: 'ACTION',
       });
     }
 
-    // 3. 동일 카드 3장 초과 검사
+    // 6. 동일 액션 카드 3장 초과 검사
     const countMap = new Map<string, { name: string; count: number }>();
     actionDeck.forEach((c) => {
       const prev = countMap.get(c.code) || { name: c.nameKr, count: 0 };
@@ -391,27 +594,18 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           title: `'${name}' 카드 투입 초과`,
           badge: `${count}장 투입됨 (최대 3장)`,
           badgeColor: 'red',
-          description: `공식 룰상 동일한 카드는 덱에 최대 3장까지만 넣을 수 있습니다.`,
+          description: '공식 룰상 동일한 카드는 덱에 최대 3장까지만 넣을 수 있습니다.',
           actionHint: `덱 목록에서 해당 카드를 클릭하거나 우클릭하여 ${count - 3}장 제거해주세요.`,
           actionTab: 'ACTION',
         });
       }
     });
 
-    // 4. 캐릭터 전용 카드 검사
-    const activeCharNames = [
-      leader?.characterName,
-      leader?.nameKr,
-      leftSupport?.characterName,
-      leftSupport?.nameKr,
-      rightSupport?.characterName,
-      rightSupport?.nameKr,
-    ].filter(Boolean);
-
+    // 7. 캐릭터 전용 카드 검사 (현재 캐릭터 덱에 편성된 3종류 캐릭터 대상)
     const invalidExclusives = new Map<string, { cardName: string; exclusiveFor: string }>();
     actionDeck.forEach((c) => {
       if (c.characterExclusive) {
-        const match = activeCharNames.some(
+        const match = uniqueCharacterNames.some(
           (n) => n && (n.includes(c.characterExclusive!) || c.characterExclusive!.includes(n))
         );
         if (!match) {
@@ -427,45 +621,13 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         title: `'${cardName}' 사용 불가`,
         badge: `전용 대상: ${exclusiveFor}`,
         badgeColor: 'purple',
-        description: `현재 출전 멤버(${activeCharNames.slice(0, 3).join(', ')}) 중 '${exclusiveFor}' 캐릭터가 없어 해당 카드를 사용할 수 없습니다.`,
-        actionHint: `덱에서 해당 카드를 제거하거나, '${exclusiveFor}' 캐릭터를 출전 슬롯에 편성하세요.`,
+        description: `현재 캐릭터 덱(${uniqueCharacterNames.join(', ') || '미편성'})에 '${exclusiveFor}' 캐릭터가 없어 해당 카드를 사용할 수 없습니다.`,
+        actionHint: `덱에서 해당 카드를 제거하거나, '${exclusiveFor}' 캐릭터 카드를 캐릭터 덱에 편성하세요.`,
         actionTab: 'ACTION',
       });
     });
 
     return errors;
-  };
-
-  // 캐릭터 카드를 특정 슬롯에 장착하는 헬퍼 함수
-  const assignCharacterToSlot = (
-    charData: OfficialCardData | CharacterCard,
-    slot: 'LEADER' | 'LEFT' | 'RIGHT' = selectedSlot
-  ) => {
-    const targetName = 'characterName' in charData && charData.characterName ? charData.characterName : charData.nameKr;
-    const found =
-      lv0Characters.find(
-        (c) =>
-          c.code === charData.code ||
-          c.characterName === targetName ||
-          c.nameKr.includes(targetName) ||
-          targetName.includes(c.characterName)
-      ) || lv0Characters[0];
-
-    if (!found) return;
-
-    if (slot === 'LEADER') {
-      setLeader(found);
-      setSelectedSlot('LEFT'); // 다음 슬롯으로 자동 포커스 이동 (빠른 연속 편성)
-    } else if (slot === 'LEFT') {
-      setLeftSupport(found);
-      setSelectedSlot('RIGHT');
-    } else if (slot === 'RIGHT') {
-      setRightSupport(found);
-      setSelectedSlot('LEADER');
-    }
-
-    const off = OFFICIAL_CARDS.find((c) => c.id === found.id) || getOfficialCardByCode(found.code);
-    if (off) setActiveCard(off);
   };
 
   // 덱 저장 (규칙 검사 후 통과 시에만 로컬스토리지에 저장)
@@ -483,6 +645,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       leader,
       leftSupport,
       rightSupport,
+      characterDeck,
       actionCards: actionDeck,
     };
     saveUserDeck(currentDeck);
@@ -609,13 +772,14 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
 
   // 현재 커스텀 덱 객체 (내보내기 및 배틀용)
   const currentDeckConfig: CustomDeckConfig = useMemo(() => ({
-    id: 'custom-deck',
+    id: selectedDeckId || 'custom-deck',
     name: deckName,
     leader,
     leftSupport,
     rightSupport,
+    characterDeck,
     actionCards: actionDeck,
-  }), [deckName, leader, leftSupport, rightSupport, actionDeck]);
+  }), [selectedDeckId, deckName, leader, leftSupport, rightSupport, characterDeck, actionDeck]);
 
   const charOptions = ['ALL', '방랑자(남)', '방랑자(여)', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
 
@@ -724,14 +888,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                 setIsValidationModalOpen(true);
                 return;
               }
-              onStartBattleWithDeck({
-                id: selectedDeckId || 'custom-deck',
-                name: deckName,
-                leader,
-                leftSupport,
-                rightSupport,
-                actionCards: actionDeck,
-              });
+              onStartBattleWithDeck(currentDeckConfig);
             }}
             className={`flex items-center gap-2 px-5 py-2 rounded-xl font-black text-sm shadow-xl transition cursor-pointer ${
               isDeckValid
@@ -870,54 +1027,23 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                 </div>
               )}
 
-              {/* 캐릭터 카드인 경우: 원클릭 편성 버튼 (일반 카드 넣듯이!) */}
+              {/* 캐릭터 카드인 경우: 캐릭터 덱 담기/제거 버튼 (일반 카드 넣듯이!) */}
               {activeCard.kind === 'CHARACTER' && (
-                <div className="flex flex-col gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1">
                   <button
-                    onClick={() => assignCharacterToSlot(activeCard, selectedSlot)}
-                    className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+                    onClick={() => addCharacterToDeck(activeCard)}
+                    className="flex-1 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm shadow-lg transition flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>
-                      [{selectedSlot === 'LEADER' ? '리더' : selectedSlot === 'LEFT' ? '서포터 1' : '서포터 2'}]에 즉시 편성
-                    </span>
+                    캐릭터 덱에 담기 (+1)
                   </button>
-
-                  <div className="grid grid-cols-3 gap-1.5">
-                    <button
-                      onClick={() => assignCharacterToSlot(activeCard, 'LEFT')}
-                      className={`py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border ${
-                        selectedSlot === 'LEFT'
-                          ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                      }`}
-                    >
-                      <Shield className="w-3 h-3 text-cyan-400" />
-                      서포터 1
-                    </button>
-                    <button
-                      onClick={() => assignCharacterToSlot(activeCard, 'LEADER')}
-                      className={`py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border ${
-                        selectedSlot === 'LEADER'
-                          ? 'bg-amber-500 text-slate-950 border-amber-400 font-black'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                      }`}
-                    >
-                      <Crown className="w-3 h-3 text-amber-400" />
-                      리더
-                    </button>
-                    <button
-                      onClick={() => assignCharacterToSlot(activeCard, 'RIGHT')}
-                      className={`py-2 px-1 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border ${
-                        selectedSlot === 'RIGHT'
-                          ? 'bg-cyan-500 text-slate-950 border-cyan-400 font-black'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                      }`}
-                    >
-                      <Shield className="w-3 h-3 text-cyan-400" />
-                      서포터 2
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => removeCharacterFromDeck(activeCard.code)}
+                    className="px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Minus className="w-4 h-4" />
+                    제거
+                  </button>
                 </div>
               )}
             </div>
@@ -929,251 +1055,142 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         </div>
 
         {/* ========================================================= */}
-        {/* [패널 2] 중앙: 3인 캐릭터 슬롯 (일러스트 강조) & 40장 액션 덱 (5열 대형 그리드 / 텍스트 리스트 이원화) */}
+        {/* [패널 2] 중앙: 캐릭터 덱 (3~15장 & 출전 3인 태그) & 메인 액션 덱 (40장) */}
         {/* ========================================================= */}
         <div className="flex-1 border-r border-slate-800/80 bg-slate-900/30 p-3.5 sm:p-4 flex flex-col justify-between overflow-hidden min-h-0">
-          {/* 1. 출전 캐릭터 3인 편성 (선택된 슬롯에 우측 카드 클릭으로 쏙 장착!) */}
+          {/* 1. 캐릭터 덱 목록 (3~15장 편성 및 출전 캐릭터 3인 태그) */}
           <div className="bg-slate-950/95 border border-slate-800 rounded-2xl p-3 mb-2.5 shrink-0 shadow-lg">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1.5">
-                <Crown className="w-4 h-4 text-amber-400" />
-                출전 캐릭터 3인 편성 (클릭하여 슬롯 선택 후, 우측 캐릭터 카드를 클릭해 장착)
-              </span>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                  현재 대상: {selectedSlot === 'LEADER' ? '리더' : selectedSlot === 'LEFT' ? '서포터 1' : '서포터 2'}
+            {/* 상단 헤더: 매수 배지 및 출전 3인 태그 */}
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1.5">
+                  <Users className="w-4 h-4 text-amber-400" />
+                  캐릭터 덱 목록 (3~15장)
                 </span>
+                <span
+                  className={`px-2.5 py-0.5 rounded-full font-mono font-black text-xs ${
+                    characterDeck.length >= 3 && characterDeck.length <= 15
+                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                      : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                  }`}
+                >
+                  {characterDeck.length} / 15장
+                </span>
+              </div>
+
+              {/* 현재 세팅된 출전 캐릭터 3인 태그 */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] text-slate-400 font-bold mr-0.5">출전 멤버:</span>
+                {uniqueCharacterNames.map((name) => {
+                  const isLeader = name === designatedLeaderName;
+                  return (
+                    <button
+                      key={name}
+                      onClick={() => setDesignatedLeaderName(name)}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-black transition flex items-center gap-1.5 cursor-pointer shadow ${
+                        isLeader
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 border border-amber-300 ring-2 ring-amber-400/40'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                      }`}
+                      title="클릭하여 리더(LEADER)로 지정"
+                    >
+                      {isLeader ? (
+                        <Crown className="w-3.5 h-3.5 text-slate-950 animate-bounce" />
+                      ) : (
+                        <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                      )}
+                      <span>{name}</span>
+                      {isLeader ? (
+                        <span className="text-[10px] bg-slate-950/20 px-1 rounded font-black">★ 리더</span>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-normal">서포터</span>
+                      )}
+                    </button>
+                  );
+                })}
+                {uniqueCharacterNames.length !== 3 && (
+                  <span className="text-xs font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-lg border border-amber-500/30">
+                    ⚠️ 3종류 필요 ({uniqueCharacterNames.length}/3)
+                  </span>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              {/* 1) 서포터 1 */}
-              <div
-                onClick={() => {
-                  setSelectedSlot('LEFT');
-                  setPoolTab('CHARACTER');
-                  const f = OFFICIAL_CARDS.find((c) => c.id === leftSupport.id) || getOfficialCardByCode(leftSupport.code);
-                  if (f) setActiveCard(f);
-                }}
-                className={`p-3 rounded-2xl bg-slate-900/90 border-2 transition-all cursor-pointer flex flex-col items-center group shadow-md ${
-                  selectedSlot === 'LEFT'
-                    ? 'border-cyan-400 ring-4 ring-cyan-400/40 shadow-cyan-500/20 bg-slate-900'
-                    : activeCard?.code === leftSupport.code
-                    ? 'border-amber-400 ring-2 ring-amber-400/50'
-                    : 'border-slate-800 hover:border-slate-600'
-                }`}
-              >
-                {/* 상단 라벨 & 속성 */}
-                <div className="w-full flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-slate-300 flex items-center gap-1">
-                    <Shield className="w-3.5 h-3.5 text-cyan-400" /> 서포터 1
-                    {selectedSlot === 'LEFT' && (
-                      <span className="text-[10px] text-cyan-300 bg-cyan-950 px-1.5 py-0.2 rounded border border-cyan-500/50 font-bold">
-                        선택됨
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
-                    {leftSupport.element || '속성'}
-                  </span>
-                </div>
+            {/* 캐릭터 덱 15장 슬롯 그리드 */}
+            <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-15 gap-1.5 overflow-x-auto pb-1 max-h-[170px] sm:max-h-[190px] overflow-y-auto pr-1">
+              {characterDeck.map((charCard, idx) => {
+                const isSelected = activeCard?.code === charCard.code;
+                const isLeaderCard = charCard.characterName === designatedLeaderName && charCard.level === 0;
 
-                {/* 대형 카드 일러스트 */}
-                <div className="w-full max-w-[210px] aspect-[5/7] rounded-xl overflow-hidden border border-slate-700 shadow-xl relative group-hover:scale-[1.03] transition-transform duration-200 shrink-0">
-                  <img
-                    src={leftSupport.artUrl}
-                    alt={leftSupport.nameKr}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-700 text-[10px] font-mono font-bold text-amber-300 shadow">
-                    Lv.0
-                  </div>
-                  {selectedSlot === 'LEFT' && (
-                    <div className="absolute inset-0 bg-cyan-500/10 pointer-events-none border-2 border-cyan-400 rounded-xl" />
-                  )}
-                </div>
-
-                {/* 하단 텍스트 & 교체 안내 버튼 */}
-                <div className="w-full mt-2.5 pt-2 border-t border-slate-800 flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-black text-white truncate">
-                      {leftSupport.nameKr}
-                    </span>
-                    <span className="text-[11px] text-slate-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                      {getOfficialCardByCode(leftSupport.code)?.weaponType || '직검'}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedSlot('LEFT');
-                      setPoolTab('CHARACTER');
+                return (
+                  <div
+                    key={`${charCard.id || charCard.code}-${idx}`}
+                    onClick={() => {
+                      const off = getOfficialCardByCode(charCard.code);
+                      if (off) setActiveCard(off);
                     }}
-                    className={`w-full py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow ${
-                      selectedSlot === 'LEFT'
-                        ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                    }`}
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    {selectedSlot === 'LEFT' ? '편성 대기중 (우측 카드 클릭)' : '서포터 1 교체하기'}
-                  </button>
-                </div>
-              </div>
-
-              {/* 2) 중앙 리더 (LEADER - 황금빛 글로우 & 대형 일러스트) */}
-              <div
-                onClick={() => {
-                  setSelectedSlot('LEADER');
-                  setPoolTab('CHARACTER');
-                  const f = OFFICIAL_CARDS.find((c) => c.id === leader.id) || getOfficialCardByCode(leader.code);
-                  if (f) setActiveCard(f);
-                }}
-                className={`p-3 rounded-2xl bg-gradient-to-br from-amber-950/30 via-slate-900 to-slate-950 border-2 transition-all cursor-pointer flex flex-col items-center group shadow-xl ${
-                  selectedSlot === 'LEADER'
-                    ? 'border-amber-400 ring-4 ring-amber-400/50 shadow-amber-500/30'
-                    : activeCard?.code === leader.code
-                    ? 'border-amber-400/80 ring-2 ring-amber-400/40'
-                    : 'border-amber-500/80 hover:border-amber-400 shadow-amber-500/10'
-                }`}
-              >
-                {/* 상단 라벨 & 속성 */}
-                <div className="w-full flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-amber-300 flex items-center gap-1">
-                    <Crown className="w-4 h-4 text-amber-400 animate-bounce" /> 리더 (LEADER)
-                    {selectedSlot === 'LEADER' && (
-                      <span className="text-[10px] text-amber-300 bg-amber-950 px-1.5 py-0.2 rounded border border-amber-500/50 font-bold">
-                        선택됨
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[11px] font-black text-amber-300 bg-amber-400/20 border border-amber-400/50 px-2 py-0.5 rounded-full">
-                    {leader.element || '속성'}
-                  </span>
-                </div>
-
-                {/* 대형 카드 일러스트 */}
-                <div className="w-full max-w-[210px] aspect-[5/7] rounded-xl overflow-hidden border-2 border-amber-400/80 shadow-2xl ring-2 ring-amber-400/30 relative group-hover:scale-[1.03] transition-transform duration-200 shrink-0">
-                  <img
-                    src={leader.artUrl}
-                    alt={leader.nameKr}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md bg-slate-950/95 border border-amber-400 text-[10px] font-mono font-black text-amber-300 shadow">
-                    리더 Lv.0
-                  </div>
-                  {selectedSlot === 'LEADER' && (
-                    <div className="absolute inset-0 bg-amber-500/10 pointer-events-none border-2 border-amber-400 rounded-xl" />
-                  )}
-                </div>
-
-                {/* 하단 텍스트 & 교체 안내 버튼 */}
-                <div className="w-full mt-2.5 pt-2 border-t border-amber-500/30 flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-black text-amber-200 truncate">
-                      {leader.nameKr}
-                    </span>
-                    <span className="text-[11px] text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40">
-                      {getOfficialCardByCode(leader.code)?.weaponType || '직검'}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedSlot('LEADER');
-                      setPoolTab('CHARACTER');
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      removeCharacterAtIndex(idx);
                     }}
-                    className={`w-full py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow ${
-                      selectedSlot === 'LEADER'
-                        ? 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black'
-                        : 'bg-amber-950/60 hover:bg-amber-900 text-amber-200 border border-amber-500/40'
+                    className={`relative group aspect-[5/7] rounded-xl overflow-hidden border transition-all cursor-pointer shadow-md shrink-0 bg-slate-900 ${
+                      isSelected
+                        ? 'border-amber-400 ring-2 ring-amber-400 scale-102 z-10'
+                        : isLeaderCard
+                        ? 'border-amber-400/80 shadow-amber-500/20'
+                        : 'border-slate-700 hover:border-slate-500'
                     }`}
+                    title={`${charCard.nameKr} (Lv.${charCard.level}) - 클릭: 상세 보기 / 우클릭 또는 X: 제거`}
                   >
-                    <Crown className="w-3.5 h-3.5" />
-                    {selectedSlot === 'LEADER' ? '편성 대기중 (우측 카드 클릭)' : '리더 교체하기'}
-                  </button>
-                </div>
-              </div>
+                    <img
+                      src={charCard.artUrl}
+                      alt={charCard.nameKr}
+                      className="w-full h-full object-cover object-top"
+                    />
 
-              {/* 3) 서포터 2 */}
-              <div
-                onClick={() => {
-                  setSelectedSlot('RIGHT');
-                  setPoolTab('CHARACTER');
-                  const f = OFFICIAL_CARDS.find((c) => c.id === rightSupport.id) || getOfficialCardByCode(rightSupport.code);
-                  if (f) setActiveCard(f);
-                }}
-                className={`p-3 rounded-2xl bg-slate-900/90 border-2 transition-all cursor-pointer flex flex-col items-center group shadow-md ${
-                  selectedSlot === 'RIGHT'
-                    ? 'border-cyan-400 ring-4 ring-cyan-400/40 shadow-cyan-500/20 bg-slate-900'
-                    : activeCard?.code === rightSupport.code
-                    ? 'border-amber-400 ring-2 ring-amber-400/50'
-                    : 'border-slate-800 hover:border-slate-600'
-                }`}
-              >
-                {/* 상단 라벨 & 속성 */}
-                <div className="w-full flex items-center justify-between mb-2">
-                  <span className="text-xs font-black text-slate-300 flex items-center gap-1">
-                    <Shield className="w-3.5 h-3.5 text-cyan-400" /> 서포터 2
-                    {selectedSlot === 'RIGHT' && (
-                      <span className="text-[10px] text-cyan-300 bg-cyan-950 px-1.5 py-0.2 rounded border border-cyan-500/50 font-bold">
-                        선택됨
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-300 bg-slate-800 px-2 py-0.5 rounded-full border border-slate-700">
-                    {rightSupport.element || '속성'}
-                  </span>
-                </div>
+                    {/* 레벨 뱃지 */}
+                    <div className="absolute top-1 left-1 px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[9px] shadow">
+                      Lv.{charCard.level}
+                    </div>
 
-                {/* 대형 카드 일러스트 */}
-                <div className="w-full max-w-[210px] aspect-[5/7] rounded-xl overflow-hidden border border-slate-700 shadow-xl relative group-hover:scale-[1.03] transition-transform duration-200 shrink-0">
-                  <img
-                    src={rightSupport.artUrl}
-                    alt={rightSupport.nameKr}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md bg-slate-950/90 border border-slate-700 text-[10px] font-mono font-bold text-amber-300 shadow">
-                    Lv.0
+                    {/* 제거 버튼 */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeCharacterAtIndex(idx);
+                      }}
+                      className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition shadow cursor-pointer text-[10px] font-black z-20"
+                      title="캐릭터 덱에서 1장 제거"
+                    >
+                      ×
+                    </button>
+
+                    {/* 하단 카드명 */}
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-1 pt-3 pointer-events-none">
+                      <p className="text-[10px] font-black text-white truncate text-center">
+                        {charCard.nameKr}
+                      </p>
+                    </div>
                   </div>
-                  {selectedSlot === 'RIGHT' && (
-                    <div className="absolute inset-0 bg-cyan-500/10 pointer-events-none border-2 border-cyan-400 rounded-xl" />
-                  )}
-                </div>
+                );
+              })}
 
-                {/* 하단 텍스트 & 교체 안내 버튼 */}
-                <div className="w-full mt-2.5 pt-2 border-t border-slate-800 flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-black text-white truncate">
-                      {rightSupport.nameKr}
-                    </span>
-                    <span className="text-[11px] text-slate-400 font-bold bg-slate-950 px-2 py-0.5 rounded border border-slate-800">
-                      {getOfficialCardByCode(rightSupport.code)?.weaponType || '직검'}
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedSlot('RIGHT');
-                      setPoolTab('CHARACTER');
-                    }}
-                    className={`w-full py-1.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer shadow ${
-                      selectedSlot === 'RIGHT'
-                        ? 'bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                    }`}
+              {/* 빈 슬롯 (15장까지 표시) */}
+              {Array.from({ length: Math.max(0, 15 - characterDeck.length) }).map((_, i) => {
+                const slotNum = characterDeck.length + i + 1;
+                return (
+                  <div
+                    key={`empty-char-slot-${slotNum}`}
+                    onClick={() => setPoolTab('CHARACTER')}
+                    className="aspect-[5/7] rounded-xl border border-dashed border-slate-800 bg-slate-950/30 flex flex-col items-center justify-center text-slate-600 gap-0.5 select-none transition-colors hover:border-slate-600 cursor-pointer shrink-0"
+                    title="우측 [캐릭터] 탭에서 카드를 클릭하여 추가"
                   >
-                    <Users className="w-3.5 h-3.5" />
-                    {selectedSlot === 'RIGHT' ? '편성 대기중 (우측 카드 클릭)' : '서포터 2 교체하기'}
-                  </button>
-                </div>
-              </div>
+                    <span className="font-mono text-[9px] font-bold text-slate-500">#{slotNum}</span>
+                    <span className="text-[9px] text-slate-600">+추가</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1470,7 +1487,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300">
                 {poolTab === 'CHARACTER'
-                  ? `클릭: [${selectedSlot === 'LEADER' ? '리더' : selectedSlot === 'LEFT' ? '서포터 1' : '서포터 2'}]에 즉시 장착 / 하단 버튼: 지정 편성`
+                  ? '클릭: 상세 / 하단 +/-: 캐릭터 덱 담기·빼기 / 우클릭: 추가·제거'
                   : '클릭: 상세 / 하단 +/-: 수량 조절 / 우클릭: 추가·제거'}
               </span>
 
@@ -1704,121 +1721,155 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                 </div>
               )
             ) : (
-              /* 캐릭터 카드 풀 그리드: 일반 카드처럼 클릭/더블클릭으로 즉시 슬롯에 편성 */
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {filteredCharacterCards.map((charCard) => {
-                  const isSelected = activeCard?.code === charCard.code;
-                  // 현재 출전 슬롯 여부 확인
-                  const isCurrentLeader = leader.code === charCard.code || leader.characterName === charCard.characterName;
-                  const isCurrentLeft = leftSupport.code === charCard.code || leftSupport.characterName === charCard.characterName;
-                  const isCurrentRight = rightSupport.code === charCard.code || rightSupport.characterName === charCard.characterName;
-                  const isEquipped = isCurrentLeader || isCurrentLeft || isCurrentRight;
+              /* 캐릭터 카드 풀 (이미지 뷰 or 텍스트 리스트 뷰) */
+              libraryViewMode === 'IMAGE' ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {filteredCharacterCards.map((charCard) => {
+                    const isSelected = activeCard?.code === charCard.code;
+                    const countInCharDeck = characterDeck.filter((c) => c.code === charCard.code).length;
 
-                  return (
-                    <div
-                      key={charCard.code}
-                      onClick={() => {
-                        setActiveCard(charCard);
-                        // 일반 카드처럼 클릭 시 현재 활성 슬롯에 즉시 장착!
-                        assignCharacterToSlot(charCard, selectedSlot);
-                      }}
-                      onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        assignCharacterToSlot(charCard, selectedSlot);
-                      }}
-                      className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-pointer shadow-md bg-slate-900 select-none ${
-                        isSelected
-                          ? 'border-amber-400 ring-4 ring-amber-400 scale-102 shadow-amber-500/50 z-10'
-                          : isEquipped
-                          ? 'border-amber-500/80 shadow-amber-500/20'
-                          : 'border-slate-800 hover:border-amber-500/60'
-                      }`}
-                      title={`${charCard.nameKr} - 클릭 시 [${selectedSlot === 'LEADER' ? '리더' : selectedSlot === 'LEFT' ? '서포터 1' : '서포터 2'}]에 즉시 편성`}
-                    >
-                      <img
-                        src={charCard.artUrl}
-                        alt={charCard.nameKr}
-                        className="w-full h-full object-cover object-top"
-                      />
+                    return (
+                      <div
+                        key={charCard.code}
+                        onClick={() => {
+                          setActiveCard(charCard);
+                        }}
+                        onDoubleClick={(e) => {
+                          e.stopPropagation();
+                          addCharacterToDeck(charCard);
+                        }}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          if (countInCharDeck > 0) {
+                            removeCharacterFromDeck(charCard.code);
+                          } else {
+                            addCharacterToDeck(charCard);
+                          }
+                        }}
+                        className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-pointer shadow-md bg-slate-900 select-none ${
+                          isSelected
+                            ? 'border-amber-400 ring-4 ring-amber-400 scale-102 shadow-amber-500/50 z-10'
+                            : countInCharDeck > 0
+                            ? 'border-amber-500/80 shadow-amber-500/20'
+                            : 'border-slate-800 hover:border-amber-500/60'
+                        }`}
+                        title={`${charCard.nameKr} (Lv.${charCard.level}) - 클릭: 상세 보기 / 하단 +/-: 수량 조절 / 더블클릭: 1장 추가`}
+                      >
+                        <img
+                          src={charCard.artUrl}
+                          alt={charCard.nameKr}
+                          className="w-full h-full object-cover object-top"
+                        />
 
-                      {/* 레벨 뱃지 */}
-                      <div className="absolute top-1.5 left-1.5 z-10 px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-xs shadow">
-                        Lv.{charCard.level}
-                      </div>
-
-                      {/* 편성 상태 뱃지 (일반 카드의 매수 뱃지와 동일한 직관성) */}
-                      {isEquipped ? (
-                        <div className="absolute top-1.5 right-1.5 z-10 px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black text-[11px] shadow">
-                          {isCurrentLeader ? '★ 리더' : isCurrentLeft ? '서포터1' : '서포터2'}
+                        {/* 레벨 뱃지 */}
+                        <div className="absolute top-1.5 left-1.5 z-10 px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-xs shadow">
+                          Lv.{charCard.level}
                         </div>
-                      ) : (
-                        <div className="absolute top-1.5 right-1.5 z-10 px-2 py-0.5 rounded-full bg-slate-950/90 border border-slate-700 text-amber-400 font-black text-xs shadow">
-                          {charCard.rarity}
+
+                        {/* 캐릭터 덱 투입 수량 배지 */}
+                        {countInCharDeck > 0 ? (
+                          <div className="absolute top-1.5 right-1.5 z-10 px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-xs shadow">
+                            {countInCharDeck}/3
+                          </div>
+                        ) : (
+                          <div className="absolute top-1.5 right-1.5 z-10 px-2 py-0.5 rounded-full bg-slate-950/90 border border-slate-700 text-amber-400 font-black text-xs shadow">
+                            {charCard.rarity}
+                          </div>
+                        )}
+
+                        {/* 하단 캐릭터 정보 */}
+                        <div className="absolute inset-x-0 bottom-8 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-1.5 pt-3 pointer-events-none">
+                          <p className="text-xs font-black text-white truncate text-center drop-shadow">
+                            {charCard.nameKr}
+                          </p>
+                          <p className="text-[10px] font-bold text-amber-400/90 truncate text-center">
+                            {charCard.element} · {charCard.weaponType}
+                          </p>
                         </div>
-                      )}
 
-                      {/* 하단 캐릭터 정보 */}
-                      <div className="absolute inset-x-0 bottom-8 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-1.5 pt-3">
-                        <p className="text-xs font-black text-white truncate text-center drop-shadow">
-                          {charCard.nameKr}
-                        </p>
-                        <p className="text-[10px] font-bold text-amber-400/90 truncate text-center">
-                          {charCard.element} · {charCard.weaponType}
-                        </p>
+                        {/* 하단 절반 -, 절반 + 조작 바 (일반 액션 카드와 동일!) */}
+                        <div className="absolute inset-x-0 bottom-0 h-8 bg-slate-950/95 border-t border-slate-700/80 flex items-stretch z-10 overflow-hidden divide-x divide-slate-800">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeCharacterFromDeck(charCard.code);
+                            }}
+                            disabled={countInCharDeck <= 0}
+                            className="flex-1 flex items-center justify-center gap-1 bg-red-950/50 hover:bg-red-600 disabled:opacity-25 disabled:pointer-events-none text-red-200 hover:text-white transition font-black text-xs cursor-pointer active:scale-95"
+                            title="캐릭터 덱에서 1장 빼기 (-)"
+                          >
+                            <Minus className="w-3.5 h-3.5 stroke-[3]" />
+                            <span className="text-[11px]">빼기</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addCharacterToDeck(charCard);
+                            }}
+                            disabled={countInCharDeck >= 3 || characterDeck.length >= 15}
+                            className="flex-1 flex items-center justify-center gap-1 bg-amber-950/50 hover:bg-amber-500 disabled:opacity-25 disabled:pointer-events-none text-amber-200 hover:text-slate-950 transition font-black text-xs cursor-pointer active:scale-95"
+                            title="캐릭터 덱에 1장 추가 (+)"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                            <span className="text-[11px]">추가</span>
+                          </button>
+                        </div>
                       </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* 캐릭터 카드 [텍스트 리스트 뷰] */
+                <div className="space-y-1.5">
+                  {filteredCharacterCards.map((charCard) => {
+                    const countInCharDeck = characterDeck.filter((c) => c.code === charCard.code).length;
+                    const isSelected = activeCard?.code === charCard.code;
 
-                      {/* 하단 퀵 슬롯 투입 바 (서포터1 / 리더 / 서포터2 원클릭 지정) */}
-                      <div className="absolute inset-x-0 bottom-0 h-8 bg-slate-950/95 border-t border-slate-700/80 flex items-stretch z-10 overflow-hidden divide-x divide-slate-800">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            assignCharacterToSlot(charCard, 'LEFT');
-                          }}
-                          className={`flex-1 flex items-center justify-center text-[10px] font-black transition cursor-pointer ${
-                            isCurrentLeft
-                              ? 'bg-cyan-500 text-slate-950'
-                              : 'bg-slate-900 hover:bg-cyan-600 text-slate-300 hover:text-white'
-                          }`}
-                          title="서포터 1로 편성"
-                        >
-                          서포터1
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            assignCharacterToSlot(charCard, 'LEADER');
-                          }}
-                          className={`flex-1 flex items-center justify-center text-[10px] font-black transition cursor-pointer ${
-                            isCurrentLeader
-                              ? 'bg-amber-500 text-slate-950'
-                              : 'bg-slate-900 hover:bg-amber-600 text-slate-300 hover:text-white'
-                          }`}
-                          title="리더로 편성"
-                        >
-                          리더
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            assignCharacterToSlot(charCard, 'RIGHT');
-                          }}
-                          className={`flex-1 flex items-center justify-center text-[10px] font-black transition cursor-pointer ${
-                            isCurrentRight
-                              ? 'bg-cyan-500 text-slate-950'
-                              : 'bg-slate-900 hover:bg-cyan-600 text-slate-300 hover:text-white'
-                          }`}
-                          title="서포터 2로 편성"
-                        >
-                          서포터2
-                        </button>
+                    return (
+                      <div
+                        key={charCard.code}
+                        onClick={() => setActiveCard(charCard)}
+                        className={`flex items-center justify-between p-2 rounded-xl transition cursor-pointer border ${
+                          isSelected
+                            ? 'bg-amber-500/15 border-amber-400 text-white shadow'
+                            : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[10px]">
+                            Lv.{charCard.level}
+                          </span>
+                          <span className="text-xs font-bold truncate">
+                            {charCard.nameKr}
+                          </span>
+                          <span className="text-[10px] text-slate-400">
+                            ({charCard.element})
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[11px] font-mono font-bold text-slate-400">
+                            {countInCharDeck}/3
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addCharacterToDeck(charCard);
+                            }}
+                            disabled={countInCharDeck >= 3 || characterDeck.length >= 15}
+                            className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-yellow-400 disabled:opacity-30 text-slate-950 font-black text-xs cursor-pointer shadow transition"
+                            title="캐릭터 덱에 1장 추가"
+                          >
+                            + 담기
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )
             )}
           </div>
         </div>
@@ -1828,14 +1879,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       <DeckPresetModal
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
-        currentEditingDeck={{
-          id: selectedDeckId || 'custom-deck',
-          name: deckName,
-          leader,
-          leftSupport,
-          rightSupport,
-          actionCards: actionDeck,
-        }}
+        currentEditingDeck={currentDeckConfig}
         onApplyActiveDeck={(deck) => {
           saveUserDeck(deck);
           const list = getUserDecks();
@@ -1873,13 +1917,11 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         }}
         onSelectAndEdit={(deck) => {
           setIsCommunityModalOpen(false);
-          setDeckName(deck.name);
-          setLeader(deck.leader);
-          setLeftSupport(deck.leftSupport);
-          setRightSupport(deck.rightSupport);
-          setActionDeck(deck.actionCards);
-          const off = getOfficialCardByCode(deck.leader.code);
-          if (off) setActiveCard(off);
+          saveUserDeck(deck);
+          const list = getUserDecks();
+          setUserDecks(list);
+          setSelectedDeckId(deck.id);
+          applyDeckToEditor(deck);
         }}
       />
 
@@ -1970,9 +2012,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                       <button
                         onClick={() => {
                           setPoolTab(err.actionTab!);
-                          if (err.category === 'CHARACTERS') {
-                            setSelectedSlot('LEADER');
-                          }
                           setIsValidationModalOpen(false);
                         }}
                         className="shrink-0 flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-500 hover:bg-yellow-400 text-slate-950 font-black text-xs shadow transition cursor-pointer"
@@ -1996,7 +2035,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                   const first = validationErrors[0];
                   if (first?.actionTab) {
                     setPoolTab(first.actionTab);
-                    if (first.category === 'CHARACTERS') setSelectedSlot('LEADER');
                   }
                   setIsValidationModalOpen(false);
                 }}

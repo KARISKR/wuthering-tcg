@@ -8,6 +8,7 @@ import {
   CharacterCard,
   CardColor,
   TriggeredEffectEvent,
+  CustomDeckConfig,
 } from '../types/tcg';
 import {
   generateStarterActionDeck,
@@ -18,14 +19,7 @@ import {
 } from '../data/cards';
 import { OFFICIAL_CARDS } from '../data/officialCards';
 
-export interface CustomDeckConfig {
-  id: string;
-  name: string;
-  leader: CharacterCard;
-  leftSupport: CharacterCard;
-  rightSupport: CharacterCard;
-  actionCards: ActionCard[];
-}
+export type { CustomDeckConfig };
 
 // 동일 캐릭터 여부 판별 헬퍼 (방랑자(남)과 방랑자(여)는 절대 서로 다른 캐릭터!)
 export function isSameCharacter(charA: CharacterCard | undefined, charB: CharacterCard | undefined): boolean {
@@ -268,15 +262,74 @@ export function findLv2Card(characterDeck: CharacterCard[], slotChar: CharacterC
 
 // 커스텀 덱(프리셋 포함) 기반으로 한쪽 플레이어의 액션 덱과 캐릭터 덱 구성
 function buildSideFromCustomDeck(custom: CustomDeckConfig): { deck: ActionCard[]; preset: StarterDeckPreset } {
+  // 사용자가 캐릭터 덱(3~15장)을 직접 편성한 경우
+  if (custom.characterDeck && custom.characterDeck.length >= 3) {
+    const charDeckList = [...custom.characterDeck];
+
+    // 필드 출전용 Lv.0 카드 3장 확보
+    let leaderChar = custom.leader;
+    let leftChar = custom.leftSupport;
+    let rightChar = custom.rightSupport;
+
+    // 만약 leader/left/right가 유효하지 않은 경우, characterDeck 내의 Lv.0 카드로 자동 배정
+    const lv0Cards = charDeckList.filter((c) => c.level === 0);
+    const uniqueLv0Map = new Map<string, CharacterCard>();
+    lv0Cards.forEach((c) => {
+      const name = c.characterName || c.nameKr;
+      if (!uniqueLv0Map.has(name)) uniqueLv0Map.set(name, c);
+    });
+    const uniqueLv0List = Array.from(uniqueLv0Map.values());
+
+    if (!leaderChar || !charDeckList.some((c) => c.code === leaderChar.code)) {
+      leaderChar = uniqueLv0List[0] || charDeckList[0];
+    }
+    if (!leftChar || leftChar.characterName === leaderChar.characterName) {
+      leftChar = uniqueLv0List.find((c) => c.characterName !== leaderChar.characterName) || uniqueLv0List[1] || charDeckList[1];
+    }
+    if (!rightChar || rightChar.characterName === leaderChar.characterName || rightChar.characterName === leftChar.characterName) {
+      rightChar = uniqueLv0List.find((c) => c.characterName !== leaderChar.characterName && c.characterName !== leftChar.characterName) || uniqueLv0List[2] || charDeckList[2];
+    }
+
+    // 필드에 배치된 시작 3장을 제외한 나머지 카드들이 게임 중 레벨업(진화)용 캐릭터 덱이 됨
+    // (동일 카드가 여러 장 있으면 1장만 필드로 나가고 나머지는 캐릭터 덱에 남음)
+    const deployedIds = new Set<string>();
+    const deployedCodes = [leaderChar.code, leftChar.code, rightChar.code];
+    
+    // 필드에 나간 카드 1장씩 제외
+    const remainingDeck: CharacterCard[] = [];
+    const usedCounts = new Map<string, number>();
+    deployedCodes.forEach((cd) => usedCounts.set(cd, (usedCounts.get(cd) || 0) + 1));
+
+    charDeckList.forEach((c) => {
+      const needToDeduct = usedCounts.get(c.code) || 0;
+      if (needToDeduct > 0 && c.level === 0) {
+        usedCounts.set(c.code, needToDeduct - 1);
+      } else {
+        remainingDeck.push(c);
+      }
+    });
+
+    return {
+      deck: shuffleArray([...custom.actionCards]),
+      preset: {
+        id: 'STARTER_CUSTOM',
+        nameKr: custom.name,
+        leader: leaderChar,
+        leftSupport: leftChar,
+        rightSupport: rightChar,
+        characterDeck: remainingDeck,
+      },
+    };
+  }
+
+  // 기존 하위 호환 로직 (characterDeck 필드가 없는 구버전 덱)
   const selectedChars = [custom.leader, custom.leftSupport, custom.rightSupport];
-  // 동일 카드(코드+레벨)의 희귀도 중복 버전은 1장만 남겨 레벨업 카드 풀이 부풀지 않도록 한다
   const seen = new Set<string>();
   const evolutionCards = OFFICIAL_CARDS.filter(
     (c) =>
       c.kind === 'CHARACTER' &&
       (c.level === 1 || c.level === 2) &&
       selectedChars.some((slotChar) => {
-        // 방랑자(남) vs 방랑자(여) 완벽 분리
         const cIsFemale = c.nameKr.includes('방랑자(여)');
         const cIsMale = c.nameKr.includes('방랑자(남)');
         const slotIsFemale = slotChar.nameKr.includes('방랑자(여)') || slotChar.characterName.includes('방랑자(여)');

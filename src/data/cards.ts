@@ -165,7 +165,7 @@ export function generateStarterActionDeck(deckPresetId: 'STARTER_ROVER' | 'START
 
 // 덱/캐릭터 프리셋 정의
 export interface StarterDeckPreset {
-  id: 'STARTER_ROVER' | 'STARTER_CHIXIA';
+  id: 'STARTER_ROVER' | 'STARTER_CHIXIA' | string;
   nameKr: string;
   leader: CharacterCard;
   leftSupport: CharacterCard;

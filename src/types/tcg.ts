@@ -191,6 +191,7 @@ export interface CustomDeckConfig {
   leader: CharacterCard;
   leftSupport: CharacterCard;
   rightSupport: CharacterCard;
+  characterDeck?: CharacterCard[]; // 공식 룰 캐릭터 덱 3~15장 (Lv.0, Lv.1, Lv.2 자유 편성)
   actionCards: ActionCard[];
 }
 
@@ -203,6 +204,7 @@ export interface DeckPreset {
   leaderCode: string;
   leftSupportCode: string;
   rightSupportCode: string;
+  characterDeckCards?: { code: string; count: number }[]; // 캐릭터 덱 카드 목록
   actionCards: { code: string; count: number }[];
   description?: string;
   externalCode?: string;
