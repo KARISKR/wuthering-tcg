@@ -68,6 +68,37 @@ import { COMMUNITY_DECK_PRESETS } from '../data/communityDecks';
 import { SLDARK_DECK_PRESETS } from '../data/sldarkDecks';
 export { COMMUNITY_DECK_PRESETS };
 
+// 3인의 캐릭터를 바탕으로 기본 Lv.0, Lv.1, Lv.2 캐릭터 덱(9장) 자동 구성 헬퍼
+export function generateCharacterDeckFor3(
+  leader: CharacterCard,
+  leftSupport: CharacterCard,
+  rightSupport: CharacterCard
+): CharacterCard[] {
+  const chars = [leader, leftSupport, rightSupport];
+  const result: CharacterCard[] = [];
+
+  chars.forEach((c) => {
+    const charName = c.characterName || c.nameKr;
+    for (let lvl = 0; lvl <= 2; lvl++) {
+      let match = ALL_CHARACTERS.find((ac) => {
+        const acName = ac.characterName || ac.nameKr;
+        if (charName.includes('방랑자(여)')) return ac.nameKr.includes('방랑자(여)') && ac.level === lvl;
+        if (charName.includes('방랑자(남)')) return ac.nameKr.includes('방랑자(남)') && ac.level === lvl;
+        return (acName.includes(charName) || charName.includes(acName)) && ac.level === lvl;
+      });
+      if (!match && lvl === 0) match = c;
+      if (match) {
+        result.push({
+          ...match,
+          id: `char-${match.code}-${Date.now()}-${result.length}`,
+        });
+      }
+    }
+  });
+
+  return result;
+}
+
 // 덱 코드를 파싱하여 CustomDeckConfig로 복원
 export function decodeDeckCode(codeStr: string): CustomDeckConfig | null {
   try {
@@ -182,6 +213,8 @@ export function decodeDeckCode(codeStr: string): CustomDeckConfig | null {
           }
         }
       });
+    } else {
+      characterDeck.push(...generateCharacterDeckFor3(leader, leftSupport, rightSupport));
     }
 
     return {
@@ -368,6 +401,8 @@ export function presetToCustomDeck(preset: DeckPreset): CustomDeckConfig {
         }
       }
     });
+  } else {
+    characterDeck.push(...generateCharacterDeckFor3(leader, leftSupport, rightSupport));
   }
 
   return {
@@ -596,13 +631,20 @@ export function sldarkRawToCustomDeck(
   const characters = raw.deck?.characters || [];
   const actions = raw.deck?.actions || {};
 
-  // 1. 캐릭터 식별 (15장 카드 중 유니크 캐릭터 3명 선별)
-  const charCards = characters
-    .map((c) => OFFICIAL_CARDS.find((o) => o.code === c && o.kind === 'CHARACTER'))
-    .filter(Boolean) as OfficialCardData[];
+  // 1. 캐릭터 식별 및 캐릭터 덱 복원
+  const characterDeck: CharacterCard[] = [];
+  characters.forEach((cCode) => {
+    const found = ALL_CHARACTERS.find((o) => o.code === cCode);
+    if (found) {
+      characterDeck.push({
+        ...found,
+        id: `char-${found.code}-${Date.now()}-${characterDeck.length}`,
+      });
+    }
+  });
 
   const uniqueCharNames: string[] = [];
-  charCards.forEach((c) => {
+  characterDeck.forEach((c) => {
     if (!uniqueCharNames.includes(c.characterName)) {
       uniqueCharNames.push(c.characterName);
     }
@@ -621,6 +663,12 @@ export function sldarkRawToCustomDeck(
   const leader = resolveLv0(uniqueCharNames[0], 0);
   const leftSupport = resolveLv0(uniqueCharNames[1], 1);
   const rightSupport = resolveLv0(uniqueCharNames[2], 2);
+
+  // 캐릭터 덱이 3장 미만이거나 비어있으면 3인의 Lv0, Lv1, Lv2(9장)로 자동 보강
+  const finalCharDeck =
+    characterDeck.length >= 3
+      ? characterDeck
+      : generateCharacterDeckFor3(leader, leftSupport, rightSupport);
 
   // 2. 액션 카드 복원
   const actionCards: ActionCard[] = [];
@@ -645,6 +693,7 @@ export function sldarkRawToCustomDeck(
     leader,
     leftSupport,
     rightSupport,
+    characterDeck: finalCharDeck,
     actionCards,
   };
 }
