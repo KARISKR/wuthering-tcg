@@ -441,7 +441,12 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
   const ai = currentState.players[idx];
   const opp = currentState.players[other(idx)];
 
-  const redCards = ai.hand.filter((c) => c.color === 'RED' && ai.concertoZone.length >= comboCostOf(ai, c));
+  const redCards = ai.hand.filter(
+    (c) =>
+      c.color === 'RED' &&
+      ai.concertoZone.length >= comboCostOf(ai, c) &&
+      canPlayerUseActionCard(ai.slots, c).canUse
+  );
   if (redCards.length === 0) return finishComboStep(currentState, idx);
 
   let chosen: ActionCard;

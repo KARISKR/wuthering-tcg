@@ -16,6 +16,7 @@ import {
   executeEndPhase,
   forceResolveClash,
   resolvePendingChoice,
+  canPlayerExecuteCombo,
   CustomDeckConfig,
 } from '../engine/gameEngine';
 import {
@@ -269,14 +270,17 @@ export function useGame(
 
     // 3) AI 연격 단계 (연격 콤보 연출을 충분히 볼 수 있도록 1.8초 템포)
     if (gameState.phase === 'COMBO_STEP' && gameState.players[1].isAi) {
-      const canAiCombo = gameState.players[1].comboUnlimited || gameState.players[1].comboCount > 0;
-      if (canAiCombo) {
+      const p1CanCombo = canPlayerExecuteCombo(gameState.players[1]);
+      if (p1CanCombo) {
         setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
-            const stillCan = prev.players[1].comboUnlimited || prev.players[1].comboCount > 0;
-            if (prev.phase === 'COMBO_STEP' && stillCan) {
-              return runAiComboStep(prev);
+            if (prev.phase === 'COMBO_STEP') {
+              if (canPlayerExecuteCombo(prev.players[1])) {
+                return runAiComboStep(prev, 1);
+              } else {
+                return finishComboStep(prev, 1);
+              }
             }
             return prev;
           });
@@ -287,6 +291,8 @@ export function useGame(
           setIsAiThinking(false);
         };
       } else {
+        // AI가 실제로 낼 수 있는 연격 카드가 없거나 비용이 부족하면 즉시 턴 종료 진행
+        setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
             if (prev.phase === 'COMBO_STEP') {
@@ -294,8 +300,12 @@ export function useGame(
             }
             return prev;
           });
-        }, 1200);
-        return () => clearTimeout(timer);
+          setIsAiThinking(false);
+        }, 800);
+        return () => {
+          clearTimeout(timer);
+          setIsAiThinking(false);
+        };
       }
     }
 
@@ -324,6 +334,12 @@ export function useGame(
     gameState.players[1].isAi,
     gameState.players[1].comboCount,
     gameState.players[0].comboCount,
+    gameState.players[1].comboUnlimited,
+    gameState.players[0].comboUnlimited,
+    gameState.players[1].hand.length,
+    gameState.players[0].hand.length,
+    gameState.players[1].actionArea?.length,
+    gameState.lastComboStrike?.id,
   ]);
 
   return {

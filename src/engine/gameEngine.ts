@@ -2188,6 +2188,20 @@ export function resolveClash(state: GameState): GameState {
   return newState;
 }
 
+// 특정 플레이어가 실제로 연격(COMBO_STEP) 공격을 실행할 수 있는지 검사 (공식 룰 604.1.3)
+export function canPlayerExecuteCombo(player: PlayerState): boolean {
+  if (!player.comboUnlimited && player.comboCount <= 0) return false;
+  return player.hand.some((c) => {
+    if (c.color !== 'RED') return false;
+    const effectiveCost = getAllCardsInSlot(player.slots.leader).some(
+      (ch) => ch.characterName === '금희' && ch.level >= 1
+    )
+      ? Math.max(0, c.cost - 1)
+      : c.cost;
+    return player.concertoZone.length >= effectiveCost && canPlayerUseActionCard(player.slots, c).canUse;
+  });
+}
+
 // 대결 공개 후 연격 단계 또는 턴 종료 단계로 이동
 export function proceedAfterClashReveal(state: GameState): GameState {
   let newState: GameState = { ...state, lastComboStrike: null };
@@ -2216,9 +2230,9 @@ export function proceedAfterClashReveal(state: GameState): GameState {
     newState.deferredEffectEvent = null;
   }
 
-  // 연격권이 남아있거나 무제한이고, 패에 빨간색 카드가 있는 플레이어가 있는지 확인
-  const p0HasCombo = (p0.comboUnlimited || p0.comboCount > 0) && p0.hand.some((c) => c.color === 'RED');
-  const p1HasCombo = (p1.comboUnlimited || p1.comboCount > 0) && p1.hand.some((c) => c.color === 'RED');
+  // 연격권이 남아있거나 무제한이고, 실제로 비용과 조건을 충족하여 낼 수 있는 적색 카드가 있는 플레이어가 있는지 확인
+  const p0HasCombo = canPlayerExecuteCombo(p0);
+  const p1HasCombo = canPlayerExecuteCombo(p1);
 
   if (p0HasCombo || p1HasCombo) {
     newState.phase = 'COMBO_STEP';
@@ -2234,7 +2248,12 @@ export function proceedAfterClashReveal(state: GameState): GameState {
       comboPlayerIdx as 0 | 1
     );
   } else {
-    // 연격 없음 -> 패 초과 체크 및 턴 종료
+    // 낼 수 있는 연격 카드 없음 -> 연격 플래그 리셋 후 패 초과 체크 및 턴 종료
+    p0.comboCount = 0;
+    p0.comboUnlimited = false;
+    p1.comboCount = 0;
+    p1.comboUnlimited = false;
+    newState.players = [p0, p1];
     return checkHandOverflowOrEndTurn(newState);
   }
 
