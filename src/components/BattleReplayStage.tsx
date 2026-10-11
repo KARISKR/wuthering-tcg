@@ -271,26 +271,26 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
               鳴
             </div>
             <div>
-              <h1 className="text-sm font-black tracking-wider text-white flex items-center gap-1.5">
-                명조: 대결 <span className="text-[10px] text-amber-400 font-mono font-bold tracking-widest">MASTER DUEL REPLAY</span>
+              <h1 className="text-base sm:text-lg font-black tracking-wider text-white flex items-center gap-2">
+                명조: 대결 <span className="text-xs text-amber-400 font-mono font-bold tracking-widest">MASTER DUEL REPLAY</span>
               </h1>
-              <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-300 font-medium">
                 <span className="font-mono text-amber-300 font-bold">TURN {activeSnapshot.turn} / {replay.totalTurns}</span>
                 <span>•</span>
-                <span className="font-extrabold text-slate-200">{activeSnapshot.phaseText}</span>
+                <span className="font-extrabold text-slate-100">{activeSnapshot.phaseText}</span>
               </div>
             </div>
           </div>
         </div>
 
         {/* 중앙: 대전 리플레이 통합 컨트롤러 바 */}
-        <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-700/80 px-3.5 py-1.5 rounded-full shadow-2xl backdrop-blur-sm">
+        <div className="flex items-center gap-2.5 bg-slate-900/90 border border-slate-700/80 px-4 py-2 rounded-full shadow-2xl backdrop-blur-sm">
           <button
             onClick={() => {
               setIsPlaying(false);
               setCurrentStep(0);
             }}
-            className="p-1.5 text-slate-400 hover:text-white transition rounded hover:bg-slate-800"
+            className="p-1.5 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800"
             title="처음으로"
           >
             <SkipBack className="w-4 h-4" />
@@ -301,7 +301,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
               setIsPlaying(false);
               setCurrentStep((prev) => Math.max(0, prev - 1));
             }}
-            className="p-1.5 text-slate-300 hover:text-white transition rounded hover:bg-slate-800"
+            className="p-1.5 text-slate-300 hover:text-white transition rounded-lg hover:bg-slate-800"
             title="이전 수 (← 방향키)"
           >
             <RotateCcw className="w-4 h-4" />
@@ -309,17 +309,17 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
 
           <button
             onClick={() => setIsPlaying((prev) => !prev)}
-            className="px-3.5 py-1 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition shadow-lg shadow-amber-500/20"
+            className="px-4 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center gap-2 transition shadow-lg shadow-amber-500/20"
             title="재생 / 일시정지 (스페이스바)"
           >
             {isPlaying ? (
               <>
-                <Pause className="w-3.5 h-3.5 fill-current" />
+                <Pause className="w-4 h-4 fill-current" />
                 <span>일시정지</span>
               </>
             ) : (
               <>
-                <Play className="w-3.5 h-3.5 fill-current" />
+                <Play className="w-4 h-4 fill-current" />
                 <span>자동재생</span>
               </>
             )}
@@ -330,7 +330,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
               setIsPlaying(false);
               setCurrentStep((prev) => Math.min(timeline.length - 1, prev + 1));
             }}
-            className="p-1.5 text-slate-300 hover:text-white transition rounded hover:bg-slate-800"
+            className="p-1.5 text-slate-300 hover:text-white transition rounded-lg hover:bg-slate-800"
             title="다음 수 (→ 방향키)"
           >
             <ChevronRight className="w-4 h-4" />
@@ -341,7 +341,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
               setIsPlaying(false);
               setCurrentStep(timeline.length - 1);
             }}
-            className="p-1.5 text-slate-400 hover:text-white transition rounded hover:bg-slate-800"
+            className="p-1.5 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800"
             title="마지막 수로"
           >
             <SkipForward className="w-4 h-4" />
@@ -354,17 +354,17 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
             onClick={() => {
               setPlaybackSpeed((prev) => (prev === 0.8 ? 1.2 : prev === 1.2 ? 2.0 : 0.8));
             }}
-            className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-black text-amber-300 border border-amber-500/30 transition flex items-center gap-1"
+            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-black text-amber-300 border border-amber-500/30 transition flex items-center gap-1 shadow-sm"
             title="재생 속도 변경"
           >
-            <FastForward className="w-3 h-3 text-amber-400" />
+            <FastForward className="w-3.5 h-3.5 text-amber-400" />
             <span>{playbackSpeed}x</span>
           </button>
 
           {/* 사운드 토글 */}
           <button
             onClick={() => setSoundEnabled((prev) => !prev)}
-            className={`p-1.5 rounded transition ${
+            className={`p-1.5 rounded-lg transition ${
               soundEnabled ? 'text-amber-400 hover:text-amber-300' : 'text-slate-500 hover:text-slate-400'
             }`}
             title={soundEnabled ? '효과음 끄기' : '효과음 켜기'}
@@ -378,7 +378,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
           <div className="hidden lg:block mr-2">
             <BgmPlayer />
           </div>
-          <span className="text-xs font-mono font-bold text-slate-300 bg-slate-900 px-2.5 py-1 rounded-xl border border-slate-700">
+          <span className="text-sm font-mono font-bold text-slate-200 bg-slate-900 px-3 py-1 rounded-xl border border-slate-700 shadow">
             {currentStep + 1} <span className="text-slate-500">/</span> {timeline.length}
           </span>
         </div>
@@ -584,18 +584,18 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(6,182,212,0.08),transparent)] pointer-events-none" />
 
                 {/* 상대방 상태 바 (HP & 스탯 대형화) */}
-                <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 font-black text-base sm:text-lg text-cyan-300">
-                      {replay.gameMode === 'AI' ? <Bot className="w-5 h-5 text-cyan-400" /> : <User className="w-5 h-5 text-cyan-400" />}
+                <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-800/80">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-2 font-black text-lg sm:text-xl text-cyan-300">
+                      {replay.gameMode === 'AI' ? <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" /> : <User className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" />}
                       <span>{p1.name}</span>
                     </div>
 
                     {/* HP 바 */}
-                    <div className="flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border border-slate-800 shadow-inner">
+                    <div className="flex items-center gap-2.5 bg-slate-950 px-4 py-2 rounded-full border border-slate-800 shadow-inner">
                       <Heart className="w-5 h-5 text-red-400 fill-red-400" />
-                      <span className="font-black text-base sm:text-lg text-red-400 font-mono tracking-wider">{p1.hp} / 10</span>
-                      <div className="w-28 sm:w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden ml-1 border border-slate-700/50">
+                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p1.hp} / 10</span>
+                      <div className="w-28 sm:w-40 bg-slate-800 h-3 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
                           className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
                           style={{ width: `${Math.max(0, (p1.hp / 10) * 100)}%` }}
@@ -604,17 +604,17 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-300 font-bold">
-                    <span>패 <strong className="text-white text-sm sm:text-base font-black">{p1.handCount}장</strong></span>
+                  <div className="flex items-center gap-3.5 text-sm sm:text-base text-slate-200 font-bold">
+                    <span>패 <strong className="text-white text-base sm:text-lg font-black">{p1.handCount}장</strong></span>
                     {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
-                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
-                      <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                      <span className="text-[11px] text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
+                    <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-full border border-cyan-500/40 shadow-inner">
+                      <BatteryCharging className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs sm:text-sm text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
                       <div className="flex items-center gap-0.5">
                         {Array.from({ length: 10 }).map((_, i) => (
                           <div
                             key={i}
-                            className={`w-1 sm:w-1.5 h-2.5 rounded-xs transition-all ${
+                            className={`w-1.5 sm:w-2 h-3 rounded-xs transition-all ${
                               i < p1.concerto
                                 ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
                                 : 'bg-slate-800'
@@ -622,29 +622,29 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                           />
                         ))}
                       </div>
-                      <strong className="text-xs font-black text-cyan-300 font-mono ml-0.5">
+                      <strong className="text-sm font-black text-cyan-300 font-mono ml-0.5">
                         {p1.concerto} / 10
                       </strong>
                     </div>
                   </div>
                 </div>
 
-                {/* 상대 공식 플레이매트 3열 구조 */}
-                <div className="grid grid-cols-[115px_1fr_115px] sm:grid-cols-[125px_1fr_125px] md:grid-cols-[135px_1fr_135px] gap-3 sm:gap-4 items-stretch">
+                {/* 상대 공식 플레이매트 3열 구조 (넓은 컬럼 너비로 오버플로우 방지) */}
+                <div className="grid grid-cols-[130px_1fr_130px] sm:grid-cols-[145px_1fr_145px] md:grid-cols-[155px_1fr_155px] gap-3 sm:gap-4 items-stretch">
                   {/* [상대 좌측] 액션 덱 + 트래시 */}
-                  <div className="flex flex-col gap-2">
-                    <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-[11px] font-mono text-slate-400 font-black">액션 덱</span>
+                  <div className="flex flex-col gap-2.5">
+                    <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
+                      <span className="text-xs font-mono text-slate-300 font-black">액션 덱</span>
                       <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
                         <Sparkles className="w-4 h-4 text-cyan-400/60" />
                       </div>
-                      <span className="text-[11px] font-mono font-black text-slate-200">{p1.deckCount}장</span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-slate-100">{p1.deckCount}장</span>
                     </div>
 
-                    <div className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg">
-                      <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-slate-400 font-black">트래시</span>
-                        <span className="text-[9px] font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
+                    <div className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[115px] relative shadow-lg">
+                      <div className="flex items-center justify-between w-full px-1">
+                        <span className="text-xs font-mono text-slate-300 font-black">트래시</span>
+                        <span className="text-xs font-mono font-bold text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">
                           {p1.dropCount}장
                         </span>
                       </div>
@@ -786,18 +786,18 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_100%,rgba(245,158,11,0.08),transparent)] pointer-events-none" />
 
                 {/* 플레이어 상태 바 (HP & 스탯) */}
-                <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-800/80">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 font-black text-base sm:text-lg text-amber-300">
-                      <User className="w-5 h-5 text-amber-400" />
+                <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-800/80">
+                  <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-2 font-black text-lg sm:text-xl text-amber-300">
+                      <User className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
                       <span>{p0.name}</span>
                     </div>
 
                     {/* HP 바 */}
-                    <div className="flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border border-slate-800 shadow-inner">
+                    <div className="flex items-center gap-2.5 bg-slate-950 px-4 py-2 rounded-full border border-slate-800 shadow-inner">
                       <Heart className="w-5 h-5 text-red-400 fill-red-400" />
-                      <span className="font-black text-base sm:text-lg text-red-400 font-mono tracking-wider">{p0.hp} / 10</span>
-                      <div className="w-28 sm:w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden ml-1 border border-slate-700/50">
+                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p0.hp} / 10</span>
+                      <div className="w-28 sm:w-40 bg-slate-800 h-3 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
                           className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
                           style={{ width: `${Math.max(0, (p0.hp / 10) * 100)}%` }}
@@ -806,17 +806,17 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-300 font-bold">
-                    <span>패 <strong className="text-white text-sm sm:text-base font-black">{p0.handCount}장</strong></span>
+                  <div className="flex items-center gap-3.5 text-sm sm:text-base text-slate-200 font-bold">
+                    <span>패 <strong className="text-white text-base sm:text-lg font-black">{p0.handCount}장</strong></span>
                     {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
-                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
-                      <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                      <span className="text-[11px] text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
+                    <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-full border border-cyan-500/40 shadow-inner">
+                      <BatteryCharging className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs sm:text-sm text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
                       <div className="flex items-center gap-0.5">
                         {Array.from({ length: 10 }).map((_, i) => (
                           <div
                             key={i}
-                            className={`w-1 sm:w-1.5 h-2.5 rounded-xs transition-all ${
+                            className={`w-1.5 sm:w-2 h-3 rounded-xs transition-all ${
                               i < p0.concerto
                                 ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
                                 : 'bg-slate-800'
@@ -824,7 +824,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                           />
                         ))}
                       </div>
-                      <strong className="text-xs font-black text-cyan-300 font-mono ml-0.5">
+                      <strong className="text-sm font-black text-cyan-300 font-mono ml-0.5">
                         {p0.concerto} / 10
                       </strong>
                     </div>
@@ -832,29 +832,29 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                 </div>
 
                 {/* 플레이어 공식 플레이매트 3열 구조 */}
-                <div className="grid grid-cols-[115px_1fr_115px] sm:grid-cols-[125px_1fr_125px] md:grid-cols-[135px_1fr_135px] gap-3 sm:gap-4 items-stretch">
+                <div className="grid grid-cols-[130px_1fr_130px] sm:grid-cols-[145px_1fr_145px] md:grid-cols-[155px_1fr_155px] gap-3 sm:gap-4 items-stretch">
                   {/* [내 좌측] 협주 에리어 + 캐릭터 덱 */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex-1 rounded-2xl border border-cyan-500/50 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg">
-                      <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주 게이지</span>
-                        <span className="text-[9px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex-1 rounded-2xl border border-cyan-500/50 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[115px] relative shadow-lg">
+                      <div className="flex items-center justify-between w-full px-1">
+                        <span className="text-xs font-mono text-cyan-300 font-black">협주 게이지</span>
+                        <span className="text-xs font-mono font-black text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/50">
                           {p0.concerto} / 10
                         </span>
                       </div>
-                      <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
-                        <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
-                        <span className="text-[10px] font-bold text-slate-500">{p0.concerto}</span>
+                      <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-500 my-0.5">
+                        <BatteryCharging className="w-5 h-5 mb-0.5 text-cyan-400" />
+                        <span className="text-xs font-bold text-slate-400">{p0.concerto}</span>
                       </div>
-                      <span className="text-[9px] text-cyan-400/80 font-semibold">협주 게이지</span>
+                      <span className="text-xs text-cyan-400/90 font-bold">협주 게이지</span>
                     </div>
 
-                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-[11px] font-mono text-amber-400/80 font-black">캐릭터 덱</span>
+                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
+                      <span className="text-xs font-mono text-amber-300 font-black">캐릭터 덱</span>
                       <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-500/40 flex items-center justify-center shadow">
-                        <Crown className="w-4 h-4 text-amber-400" />
+                        <Crown className="w-5 h-5 text-amber-400" />
                       </div>
-                      <span className="text-[11px] font-mono font-black text-amber-300">3장</span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-amber-300">3장</span>
                     </div>
                   </div>
 
@@ -924,27 +924,27 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                   </div>
 
                   {/* [내 우측] 트래시 + 액션 덱 */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg">
-                      <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-slate-400 font-black">트래시</span>
-                        <span className="text-[9px] font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
+                  <div className="flex flex-col gap-2.5">
+                    <div className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[115px] relative shadow-lg">
+                      <div className="flex items-center justify-between w-full px-1">
+                        <span className="text-xs font-mono text-slate-300 font-black">트래시</span>
+                        <span className="text-xs font-mono font-bold text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">
                           {p0.dropCount}장
                         </span>
                       </div>
-                      <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-0.5">
+                      <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-500 my-0.5">
                         <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
-                        <span className="text-[10px] font-bold">비어있음</span>
+                        <span className="text-xs font-bold">비어있음</span>
                       </div>
-                      <span className="text-[9px] text-slate-500 font-semibold">묘지</span>
+                      <span className="text-xs text-slate-400 font-semibold">묘지</span>
                     </div>
 
-                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-[11px] font-mono text-slate-400 font-black">액션 덱</span>
+                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
+                      <span className="text-xs font-mono text-slate-300 font-black">액션 덱</span>
                       <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
                         <Sparkles className="w-4 h-4 text-amber-400/70" />
                       </div>
-                      <span className="text-[11px] font-mono font-black text-slate-200">{p0.deckCount}장</span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-slate-100">{p0.deckCount}장</span>
                     </div>
                   </div>
                 </div>
@@ -978,51 +978,51 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
         {/* ======================================================= */}
         {/* [우측 패널] 실제 배틀과 100% 동일 규격 콘솔 & 배틀 로그 */}
         {/* ======================================================= */}
-        <div className="w-80 lg:w-84 xl:w-92 h-full max-h-full min-h-0 shrink-0 bg-slate-950 border-l border-slate-800 flex flex-col justify-between overflow-hidden select-text z-20">
+        <div className="w-80 lg:w-88 xl:w-96 h-full max-h-full min-h-0 shrink-0 bg-slate-950 border-l border-slate-800 flex flex-col justify-between overflow-hidden select-text z-20">
           {/* 상단: 리플레이 마스터 콘솔 */}
-          <div className="p-3.5 sm:p-4 border-b border-slate-800 bg-gradient-to-b from-slate-900/90 to-slate-950/95 shrink-0 flex flex-col gap-3">
+          <div className="p-4 border-b border-slate-800 bg-gradient-to-b from-slate-900/90 to-slate-950/95 shrink-0 flex flex-col gap-3.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shadow">
-                  <Swords className="w-4 h-4 text-amber-400" />
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shadow">
+                  <Swords className="w-4.5 h-4.5 text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="font-black text-sm text-white tracking-wide">
+                  <h3 className="font-black text-sm sm:text-base text-white tracking-wide">
                     리플레이 관전 콘솔
                   </h3>
-                  <span className="text-[10px] text-amber-400/80 font-mono font-bold">
+                  <span className="text-xs text-amber-400/80 font-mono font-bold">
                     REPLAY STAGE CONTROLLER
                   </span>
                 </div>
               </div>
-              <span className="text-xs font-mono font-black text-amber-300 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-xl shadow">
+              <span className="text-xs sm:text-sm font-mono font-black text-amber-300 bg-slate-900 border border-slate-700 px-3 py-1 rounded-xl shadow">
                 TURN {activeSnapshot.turn}
               </span>
             </div>
 
             {/* 현재 턴 플레이어 상태 */}
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-inner">
-              <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${isP0Turn ? 'bg-amber-400 animate-ping' : 'bg-cyan-400 animate-ping'}`} />
-                <span className="text-xs font-black text-slate-100">
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-inner">
+              <div className="flex items-center gap-2.5">
+                <span className={`w-3 h-3 rounded-full ${isP0Turn ? 'bg-amber-400 animate-ping' : 'bg-cyan-400 animate-ping'}`} />
+                <span className="text-sm font-black text-slate-100">
                   {isP0Turn ? `${p0.name}의 턴` : `${p1.name}의 턴`}
                 </span>
               </div>
-              <span className="text-[11px] font-bold text-amber-400 font-mono">
+              <span className="text-xs font-bold text-amber-400 font-mono">
                 스텝 #{currentStep + 1}
               </span>
             </div>
 
             {/* 빠른 조작 버튼 */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
               <button
                 onClick={() => {
                   setIsPlaying(false);
                   setCurrentStep((prev) => Math.max(0, prev - 1));
                 }}
-                className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer shadow"
               >
-                <RotateCcw className="w-3.5 h-3.5 text-amber-400" />
+                <RotateCcw className="w-4 h-4 text-amber-400" />
                 <span>이전 수 (←)</span>
               </button>
 
@@ -1031,27 +1031,27 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                   setIsPlaying(false);
                   setCurrentStep((prev) => Math.min(timeline.length - 1, prev + 1));
                 }}
-                className="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-700 transition cursor-pointer"
+                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer shadow"
               >
                 <span>다음 수 (→)</span>
-                <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
+                <ChevronRight className="w-4 h-4 text-amber-400" />
               </button>
             </div>
           </div>
 
           {/* 하단: 실시간 배틀 로그 (클릭하여 시점 이동) */}
-          <div className="flex-1 flex flex-col min-h-0 bg-slate-950/60 p-3">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs">
-              <span className="font-extrabold text-amber-400 flex items-center gap-1">
-                <History className="w-3.5 h-3.5" />
+          <div className="flex-1 flex flex-col min-h-0 bg-slate-950/60 p-3.5">
+            <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800 text-sm">
+              <span className="font-black text-amber-400 flex items-center gap-1.5">
+                <History className="w-4 h-4" />
                 실시간 전투 로그
               </span>
-              <span className="text-[10px] text-slate-500">클릭하여 해당 수로 이동</span>
+              <span className="text-xs text-slate-500 font-medium">클릭하여 해당 수로 이동</span>
             </div>
 
             <div
               ref={logContainerRef}
-              className="flex-1 overflow-y-auto space-y-2 pr-1 select-none custom-scrollbar"
+              className="flex-1 overflow-y-auto space-y-2.5 pr-1 select-none custom-scrollbar"
             >
               {timeline.map((step, idx) => {
                 const isActive = idx === currentStep;
@@ -1063,17 +1063,17 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                       setIsPlaying(false);
                       setCurrentStep(idx);
                     }}
-                    className={`p-2.5 rounded-xl text-xs transition-all cursor-pointer border ${
+                    className={`p-3 rounded-2xl text-xs sm:text-sm transition-all cursor-pointer border ${
                       isActive
-                        ? 'bg-amber-500/20 border-amber-400 text-white font-bold shadow-lg shadow-amber-500/10 ring-1 ring-amber-400/40'
-                        : 'bg-slate-900/60 border-slate-800/80 text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+                        ? 'bg-amber-500/20 border-amber-400 text-white font-bold shadow-lg shadow-amber-500/15 ring-1 ring-amber-400/50'
+                        : 'bg-slate-900/60 border-slate-800/80 text-slate-300 hover:bg-slate-800/60 hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
-                      <span className="font-mono font-bold text-amber-400/80">#{idx + 1}</span>
-                      <span>턴 {step.turn}</span>
+                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                      <span className="font-mono font-bold text-amber-400">#{idx + 1}</span>
+                      <span className="font-mono">턴 {step.turn}</span>
                     </div>
-                    <p className="line-clamp-2 leading-relaxed">{step.logText}</p>
+                    <p className="line-clamp-2 leading-relaxed font-medium">{step.logText}</p>
                   </div>
                 );
               })}

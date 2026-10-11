@@ -764,14 +764,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           <button
                             type="button"
                             onClick={() => setEvolutionModalChar(previewCard)}
-                            className="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-400/40 transition flex items-center gap-1 cursor-pointer shadow-sm"
+                            className="text-xs bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-400/40 transition flex items-center gap-1 cursor-pointer shadow-sm"
                             title="진화 계보 및 상속 스킬 전체 팝업 보기"
                           >
-                            <ExternalLink className="w-2.5 h-2.5" />
+                            <ExternalLink className="w-3 h-3" />
                             <span>계보 전체보기</span>
                           </button>
                         )}
-                        <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                        <span className="text-xs text-amber-400/90 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
                           {previewCard.underlyingCards && previewCard.underlyingCards.length > 0
                             ? `스택: 총 ${previewCard.underlyingCards.length + 1}장`
                             : `Lv.${previewCard.level} 단일`}
@@ -782,8 +782,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     {/* 하위 카드 스택이 있는 경우 */}
                     {previewCard.underlyingCards && previewCard.underlyingCards.length > 0 ? (
                       <div className="space-y-2">
-                        <div className="text-[11px] text-amber-200/90 bg-amber-950/40 border border-amber-500/20 p-2 rounded-lg leading-relaxed flex items-start gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="text-xs sm:text-sm text-amber-200/90 bg-amber-950/40 border border-amber-500/20 p-2.5 rounded-lg leading-relaxed flex items-start gap-1.5">
+                          <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                           <span>
                             공식 룰: 레벨업한 캐릭터는 하위에 겹쳐진 <strong>이전 레벨의 모든 스킬 효과를 영구 상속하여 함께 보유</strong>합니다.
                           </span>
@@ -798,22 +798,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             title="클릭하여 이 카드의 대형 일러스트와 원문 스탯 보기"
                           >
                             <div className="flex items-center justify-between mb-1">
-                              <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-black text-[10px] border border-amber-400/30 flex items-center gap-1">
-                                <Crown className="w-2.5 h-2.5" />
+                              <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-black text-xs border border-amber-400/30 flex items-center gap-1">
+                                <Crown className="w-3 h-3" />
                                 <span>Lv.{underCard.level} 상속 효과</span>
                               </span>
-                              <span className="text-[10px] text-slate-400 font-mono group-hover:text-amber-300">
+                              <span className="text-xs text-slate-400 font-mono group-hover:text-amber-300">
                                 {underCard.nameKr}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-medium pl-1">
+                            <p className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line font-medium pl-1">
                               {underCard.description}
                             </p>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                      <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
                         캐릭터가 레벨업되면 기존 카드가 하위 스택으로 누적되며, 이전 레벨의 모든 스킬 효과가 이곳에 표시되고 함께 발동됩니다.
                       </p>
                     )}
@@ -821,13 +821,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 )}
               </>
             ) : (
-              <div className="my-auto text-center text-slate-500 text-sm py-12">
+              <div className="my-auto text-center text-slate-500 text-sm sm:text-base py-12">
                 필드나 손패의 카드에 마우스를 올리면<br />상세 정보와 대형 일러스트가 여기에 표시됩니다.
               </div>
             )}
           </div>
 
-          <div className="mt-auto text-[11px] text-slate-500 text-center pt-2 border-t border-slate-800/80 font-medium shrink-0">
+          <div className="mt-auto text-xs text-slate-500 text-center pt-2 border-t border-slate-800/80 font-medium shrink-0">
             마우스 스크롤 & 손패 호버 실시간 연동
           </div>
         </div>
@@ -852,14 +852,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 {/* 상대방 상태 바 (HP & 스탯 대형화) */}
                 <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-800/80">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 font-black text-base sm:text-lg text-cyan-300">
+                    <div className="flex items-center gap-2 font-black text-lg sm:text-xl text-cyan-300">
                       {gameState.gameMode === 'AI' ? <Bot className="w-5 h-5 text-cyan-400" /> : <User className="w-5 h-5 text-cyan-400" />}
                       <span>{p1.name}</span>
                     </div>
                     {/* HP 바 */}
                     <div className="flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border border-slate-800 shadow-inner">
                       <Heart className="w-5 h-5 text-red-400 fill-red-400" />
-                      <span className="font-black text-base sm:text-lg text-red-400 font-mono tracking-wider">{p1.hp} / 20</span>
+                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p1.hp} / 20</span>
                       <div className="w-28 sm:w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
                           className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
@@ -869,12 +869,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 sm:gap-3 text-xs sm:text-sm text-slate-300 font-bold">
+                  <div className="flex items-center gap-2.5 sm:gap-3 text-sm sm:text-base text-slate-300 font-bold">
                     {/* 추격(연격) 게이지 & 카운트 */}
                     {p1.comboCount > 0 && (
                       <div className="flex items-center gap-1.5 bg-gradient-to-r from-red-950/90 to-orange-950/90 px-3 py-1 rounded-full border border-red-500/80 shadow-lg shadow-red-500/30 animate-pulse">
                         <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
-                        <span className="text-xs font-black text-orange-300">추격 게이지</span>
+                        <span className="text-xs sm:text-sm font-black text-orange-300">추격 게이지</span>
                         <div className="flex items-center gap-0.5 ml-0.5">
                           {Array.from({ length: Math.min(p1.comboCount, 8) }).map((_, i) => (
                             <span
@@ -883,23 +883,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             />
                           ))}
                         </div>
-                        <strong className="text-xs font-black text-white font-mono bg-red-600 px-2 py-0.5 rounded-full shadow ml-0.5">
+                        <strong className="text-sm font-black text-white font-mono bg-red-600 px-2 py-0.5 rounded-full shadow ml-0.5">
                           {p1.comboCount}회
                         </strong>
                       </div>
                     )}
 
-                    <span>패 <strong className="text-white text-sm sm:text-base font-black">{p1.hand.length}장</strong></span>
+                    <span>패 <strong className="text-white text-base sm:text-lg font-black">{p1.hand.length}장</strong></span>
 
                     {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
                     <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
-                      <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                      <span className="text-[11px] text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
+                      <BatteryCharging className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs sm:text-sm text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
                       <div className="flex items-center gap-0.5">
                         {Array.from({ length: 10 }).map((_, i) => (
                           <div
                             key={i}
-                            className={`w-1 sm:w-1.5 h-2.5 rounded-xs transition-all ${
+                            className={`w-1 sm:w-1.5 h-3 rounded-xs transition-all ${
                               i < p1.concertoZone.length
                                 ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
                                 : 'bg-slate-800'
@@ -907,7 +907,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           />
                         ))}
                       </div>
-                      <strong className="text-xs font-black text-cyan-300 font-mono ml-0.5">
+                      <strong className="text-xs sm:text-sm font-black text-cyan-300 font-mono ml-0.5">
                         {p1.concertoZone.length} / 10
                       </strong>
                     </div>
@@ -915,7 +915,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 </div>
 
                 {/* 상대 공식 플레이매트 3열 구조: 좌우 슬림화 & 중앙 초대형화 */}
-                <div className="grid grid-cols-[115px_1fr_115px] sm:grid-cols-[125px_1fr_125px] md:grid-cols-[135px_1fr_135px] gap-3 sm:gap-4 items-stretch">
+                <div className="grid grid-cols-[130px_1fr_130px] sm:grid-cols-[145px_1fr_145px] md:grid-cols-[155px_1fr_155px] gap-3 sm:gap-4 items-stretch">
                   {/* [상대 좌측] 액션 덱 에리어 (상단) + 트래시 에리어 (하단 슬림화) */}
                   <div className="flex flex-col gap-2">
                     <div className={`h-24 sm:h-26 rounded-2xl border bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow transition-all duration-300 ${
@@ -923,13 +923,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/40 -translate-y-1'
                         : 'border-slate-800'
                     }`}>
-                      <span className="text-[11px] font-mono text-slate-400 font-black">액션 덱</span>
+                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">액션 덱</span>
                       <div className={`w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow transition-transform ${
                         p1DeckDrawing ? 'scale-105 border-cyan-400 animate-pulse' : ''
                       }`}>
                         <Sparkles className={`w-4 h-4 ${p1DeckDrawing ? 'text-cyan-300 animate-spin' : 'text-cyan-400/60'}`} />
                       </div>
-                      <span className="text-[11px] font-mono font-black text-slate-200">{p1.actionDeck.length}장</span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-slate-200">{p1.actionDeck.length}장</span>
                     </div>
 
                     {/* 상대 트래시 에리어 (슬림 컴팩트화) */}
@@ -940,8 +940,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       title="상대 트래시 에리어 (클릭 시 전체 카드 목록 보기)"
                     >
                       <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-slate-400 font-black">트래시</span>
-                        <span className="text-[9px] font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
+                        <span className="text-xs font-mono text-slate-400 font-black">트래시</span>
+                        <span className="text-[11px] sm:text-xs font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
                           {p1.dropZone.length}장
                         </span>
                       </div>
@@ -956,18 +956,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             alt="트래시"
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-0.5 text-[9px] font-black text-amber-300 truncate">
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-0.5 text-[10px] sm:text-[11px] font-black text-amber-300 truncate">
                             {p1.dropZone[p1.dropZone.length - 1].nameKr}
                           </div>
                         </div>
                       ) : (
                         <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-0.5">
                           <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
-                          <span className="text-[10px] font-bold">비어있음</span>
+                          <span className="text-xs font-bold">비어있음</span>
                         </div>
                       )}
 
-                      <span className="text-[9px] text-slate-500 font-semibold group-hover:text-amber-300 transition">
+                      <span className="text-[11px] text-slate-400 font-semibold group-hover:text-amber-300 transition">
                         목록 보기
                       </span>
                     </div>
@@ -1062,8 +1062,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       title="상대 협주 에리어 (클릭 시 충전된 카드 목록 보기)"
                     >
                       <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주 게이지</span>
-                        <span className="text-[9px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
+                        <span className="text-xs font-mono text-cyan-400 font-black">협주 게이지</span>
+                        <span className="text-[11px] sm:text-xs font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
                           {p1.concertoZone.length} / 10
                         </span>
                       </div>
@@ -1076,8 +1076,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1">
-                            <span className="text-[9px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
-                              <BatteryCharging className="w-3 h-3 text-cyan-400" />
+                            <span className="text-[10px] sm:text-[11px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
+                              <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
                               <span>{p1.concertoZone.length}</span>
                             </span>
                           </div>
@@ -1085,21 +1085,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       ) : (
                         <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
                           <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
-                          <span className="text-[10px] font-bold text-slate-500">0</span>
+                          <span className="text-xs font-bold text-slate-500">0</span>
                         </div>
                       )}
 
-                      <span className="text-[9px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
+                      <span className="text-[11px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
                         목록 보기
                       </span>
                     </div>
 
                     <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-[11px] font-mono text-slate-400 font-black">캐릭터 덱</span>
+                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">캐릭터 덱</span>
                       <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/50 to-slate-900 border border-amber-500/30 flex items-center justify-center shadow">
                         <Crown className="w-4 h-4 text-amber-400/70" />
                       </div>
-                      <span className="text-[11px] font-mono font-black text-amber-300">{p1.characterDeck.length}장</span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-amber-300">{p1.characterDeck.length}장</span>
                     </div>
                   </div>
                 </div>
@@ -1110,7 +1110,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {/* ------------------------------------------------------- */}
               <div className="h-11 sm:h-12 w-full rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900/90 to-slate-950 border border-amber-500/30 shadow-lg flex items-center justify-between px-3 sm:px-4 shrink-0 overflow-hidden">
                 {/* 좌측: 상성 가이드 */}
-                <div className="flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-xl bg-slate-950/90 border border-slate-800/80 shadow-inner shrink-0">
+                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black px-2.5 py-1 rounded-xl bg-slate-950/90 border border-slate-800/80 shadow-inner shrink-0">
                   <span className="text-red-400">RED</span>
                   <span className="text-slate-600">&gt;</span>
                   <span className="text-emerald-400">GREEN</span>
@@ -1122,8 +1122,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
                 {/* 중앙: 전장 상태 인디케이터 */}
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                  <span className="text-xs font-black text-amber-300 tracking-wider">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
+                  <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wider">
                     {gameState.phase === 'LEADER_SELECT' && 'BATTLE ARENA • LEADER SELECTION'}
                     {gameState.phase === 'MULLIGAN' && 'BATTLE ARENA • MULLIGAN'}
                     {gameState.phase === 'ACTION_PHASE' && 'BATTLE ARENA • MAIN PHASE'}
@@ -1135,17 +1135,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     {gameState.phase === 'DRAW_PHASE' && 'BATTLE ARENA • DRAW'}
                     {gameState.phase === 'GAME_OVER' && 'BATTLE ARENA • FINISH'}
                   </span>
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                 </div>
 
                 {/* 우측: 로고 및 조작 안내 */}
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono tracking-widest text-slate-500 font-bold hidden sm:inline">
+                  <span className="text-xs font-mono tracking-widest text-slate-500 font-bold hidden sm:inline">
                     KURO GAMES
                   </span>
-                  <span className="text-[10px] text-amber-400 font-bold bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
+                  <span className="text-xs text-amber-400 font-bold bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
                     <span>우측 콘솔 조작</span>
-                    <ChevronRight className="w-3 h-3 text-amber-400" />
+                    <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
                   </span>
                 </div>
               </div>
@@ -1159,14 +1159,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 {/* 플레이어 상태 바 (HP & 스탯 대형화) */}
                 <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-800/80">
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 font-black text-base sm:text-lg text-amber-300">
+                    <div className="flex items-center gap-2 font-black text-lg sm:text-xl text-amber-300">
                       <User className="w-5 h-5 text-amber-400" />
                       <span>{p0.name}</span>
                     </div>
                     {/* HP 바 */}
                     <div className="flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border border-slate-800 shadow-inner">
                       <Heart className="w-5 h-5 text-red-400 fill-red-400" />
-                      <span className="font-black text-base sm:text-lg text-red-400 font-mono tracking-wider">{p0.hp} / 20</span>
+                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p0.hp} / 20</span>
                       <div className="w-28 sm:w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
                           className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
@@ -1176,12 +1176,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2.5 sm:gap-3 text-xs sm:text-sm text-slate-300 font-bold">
+                  <div className="flex items-center gap-2.5 sm:gap-3 text-sm sm:text-base text-slate-300 font-bold">
                     {/* 추격(연격) 게이지 & 카운트 */}
                     {p0.comboCount > 0 && (
                       <div className="flex items-center gap-1.5 bg-gradient-to-r from-red-950/90 to-orange-950/90 px-3 py-1 rounded-full border border-red-500/80 shadow-lg shadow-red-500/30 animate-pulse">
                         <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
-                        <span className="text-xs font-black text-orange-300">추격 게이지</span>
+                        <span className="text-xs sm:text-sm font-black text-orange-300">추격 게이지</span>
                         <div className="flex items-center gap-0.5 ml-0.5">
                           {Array.from({ length: Math.min(p0.comboCount, 8) }).map((_, i) => (
                             <span
@@ -1190,23 +1190,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             />
                           ))}
                         </div>
-                        <strong className="text-xs font-black text-white font-mono bg-red-600 px-2 py-0.5 rounded-full shadow ml-0.5">
+                        <strong className="text-sm font-black text-white font-mono bg-red-600 px-2 py-0.5 rounded-full shadow ml-0.5">
                           {p0.comboCount}회
                         </strong>
                       </div>
                     )}
 
-                    <span>패 <strong className="text-white text-sm sm:text-base font-black">{p0.hand.length}장</strong></span>
+                    <span>패 <strong className="text-white text-base sm:text-lg font-black">{p0.hand.length}장</strong></span>
 
                     {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
                     <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
-                      <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                      <span className="text-[11px] text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
+                      <BatteryCharging className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs sm:text-sm text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
                       <div className="flex items-center gap-0.5">
                         {Array.from({ length: 10 }).map((_, i) => (
                           <div
                             key={i}
-                            className={`w-1 sm:w-1.5 h-2.5 rounded-xs transition-all ${
+                            className={`w-1 sm:w-1.5 h-3 rounded-xs transition-all ${
                               i < p0.concertoZone.length
                                 ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
                                 : 'bg-slate-800'
@@ -1214,7 +1214,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           />
                         ))}
                       </div>
-                      <strong className="text-xs font-black text-cyan-300 font-mono ml-0.5">
+                      <strong className="text-xs sm:text-sm font-black text-cyan-300 font-mono ml-0.5">
                         {p0.concertoZone.length} / 10
                       </strong>
                     </div>
@@ -1222,7 +1222,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 </div>
 
                 {/* 플레이어 공식 플레이매트 3열 구조: 좌우 슬림화 & 중앙 초대형화 */}
-                <div className="grid grid-cols-[115px_1fr_115px] sm:grid-cols-[125px_1fr_125px] md:grid-cols-[135px_1fr_135px] gap-3 sm:gap-4 items-stretch">
+                <div className="grid grid-cols-[130px_1fr_130px] sm:grid-cols-[145px_1fr_145px] md:grid-cols-[155px_1fr_155px] gap-3 sm:gap-4 items-stretch">
                   {/* [내 좌측] 협주 에리어 (상단) + 캐릭터 덱 에리어 (하단 슬림화) */}
                   <div className="flex flex-col gap-2">
                     {/* 내 협주 에리어 (슬림 컴팩트화) */}
@@ -1233,8 +1233,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       title="내 협주 에리어 (클릭 시 충전된 카드 목록 보기)"
                     >
                       <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주 게이지</span>
-                        <span className="text-[9px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
+                        <span className="text-xs font-mono text-cyan-400 font-black">협주 게이지</span>
+                        <span className="text-[11px] sm:text-xs font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
                           {p0.concertoZone.length} / 10
                         </span>
                       </div>
@@ -1247,8 +1247,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1">
-                            <span className="text-[9px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
-                              <BatteryCharging className="w-3 h-3 text-cyan-400" />
+                            <span className="text-[10px] sm:text-[11px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
+                              <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
                               <span>{p0.concertoZone.length}</span>
                             </span>
                           </div>
@@ -1256,22 +1256,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       ) : (
                         <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
                           <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
-                          <span className="text-[10px] font-bold text-slate-500">0</span>
+                          <span className="text-xs font-bold text-slate-500">0</span>
                         </div>
                       )}
 
-                      <span className="text-[9px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
+                      <span className="text-[11px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
                         목록 보기
                       </span>
                     </div>
 
                     {/* 캐릭터 덱 에리어 */}
                     <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-[11px] font-mono text-amber-400/80 font-black">캐릭터 덱</span>
+                      <span className="text-xs sm:text-sm font-mono text-amber-400/80 font-black">캐릭터 덱</span>
                       <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-500/40 flex items-center justify-center shadow">
                         <Crown className="w-4 h-4 text-amber-400" />
                       </div>
-                      <span className="text-[11px] font-mono font-black text-amber-300">{p0.characterDeck.length}장</span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-amber-300">{p0.characterDeck.length}장</span>
                     </div>
                   </div>
 
@@ -1373,8 +1373,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       title="내 트래시 에리어 (클릭 시 전체 카드 목록 보기)"
                     >
                       <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-slate-400 font-black">트래시</span>
-                        <span className="text-[9px] font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
+                        <span className="text-xs font-mono text-slate-400 font-black">트래시</span>
+                        <span className="text-[11px] sm:text-xs font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
                           {p0.dropZone.length}장
                         </span>
                       </div>
@@ -1389,18 +1389,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             alt="트래시"
                             className="w-full h-full object-cover"
                           />
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-0.5 text-[9px] font-black text-amber-300 truncate">
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-0.5 text-[10px] sm:text-[11px] font-black text-amber-300 truncate">
                             {p0.dropZone[p0.dropZone.length - 1].nameKr}
                           </div>
                         </div>
                       ) : (
                         <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-0.5">
                           <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
-                          <span className="text-[10px] font-bold">비어있음</span>
+                          <span className="text-xs font-bold">비어있음</span>
                         </div>
                       )}
 
-                      <span className="text-[9px] text-slate-500 font-semibold group-hover:text-amber-300 transition">
+                      <span className="text-[11px] text-slate-400 font-semibold group-hover:text-amber-300 transition">
                         목록 보기
                       </span>
                     </div>
@@ -1411,13 +1411,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         ? 'border-amber-400 ring-2 ring-amber-400/80 shadow-amber-500/40 -translate-y-1'
                         : 'border-amber-500/30'
                     }`}>
-                      <span className="text-[11px] font-mono text-slate-400 font-black">액션 덱</span>
+                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">액션 덱</span>
                       <div className={`w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow transition-transform ${
                         p0DeckDrawing ? 'scale-105 border-amber-400 animate-pulse' : ''
                       }`}>
                         <Sparkles className={`w-4 h-4 ${p0DeckDrawing ? 'text-amber-300 animate-spin' : 'text-amber-400/70'}`} />
                       </div>
-                      <span className="text-[11px] font-mono font-black text-slate-200">{p0.actionDeck.length}장</span>
+                      <span className="text-xs sm:text-sm font-mono font-black text-slate-200">{p0.actionDeck.length}장</span>
                     </div>
                   </div>
                 </div>
@@ -1463,15 +1463,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <Swords className="w-4 h-4 text-amber-400" />
                 </div>
                 <div>
-                  <h3 className="font-black text-sm text-white tracking-wide">
+                  <h3 className="font-black text-base text-white tracking-wide">
                     페이즈 & 액션 콘솔
                   </h3>
-                  <span className="text-[10px] text-amber-400/80 font-mono font-bold">
+                  <span className="text-xs text-amber-400/80 font-mono font-bold">
                     MASTER DUEL CONTROLLER
                   </span>
                 </div>
               </div>
-              <span className="text-xs font-mono font-black text-amber-300 bg-slate-900 border border-slate-700 px-2.5 py-1 rounded-xl shadow">
+              <span className="text-sm font-mono font-black text-amber-300 bg-slate-900 border border-slate-700 px-3 py-1 rounded-xl shadow">
                 TURN {gameState.turn}
               </span>
             </div>
@@ -1480,27 +1480,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 shadow-inner">
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full ${isP0Turn ? 'bg-amber-400 animate-ping' : 'bg-cyan-400 animate-ping'}`} />
-                <span className="text-xs font-black text-slate-100">
+                <span className="text-sm font-black text-slate-100">
                   {isP0Turn ? `${p0.name}의 턴` : `${p1.name}의 턴`}
                 </span>
               </div>
               {gameState.gameMode === 'SOLO_DUAL' ? (
                 <button
                   onClick={() => setControlledPlayerIndex(controlledPlayerIndex === 0 ? 1 : 0)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-[11px] font-bold text-amber-300 border border-amber-500/40 transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-xs sm:text-sm font-bold text-amber-300 border border-amber-500/40 transition cursor-pointer"
                 >
-                  <ArrowLeftRight className="w-3 h-3" />
+                  <ArrowLeftRight className="w-3.5 h-3.5" />
                   <span>P{controlledPlayerIndex + 1} 조종 중</span>
                 </button>
               ) : (
-                <span className={`text-[11px] font-bold ${isCurrentControlledTurn ? 'text-amber-400 font-black' : 'text-slate-400'}`}>
+                <span className={`text-xs sm:text-sm font-bold ${isCurrentControlledTurn ? 'text-amber-400 font-black' : 'text-slate-400'}`}>
                   {isCurrentControlledTurn ? '당신의 차례' : '상대 진행 중'}
                 </span>
               )}
             </div>
 
             {/* 마스터 듀얼식 페이즈 인디케이터 (DP -> MAIN -> BATTLE -> END) */}
-            <div className="grid grid-cols-4 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 text-center font-mono text-[11px] font-black shadow-inner">
+            <div className="grid grid-cols-4 gap-1 p-1 bg-slate-950 rounded-xl border border-slate-800 text-center font-mono text-xs sm:text-sm font-black shadow-inner">
               <div
                 className={`py-1 rounded-lg transition-all ${
                   gameState.phase === 'DRAW_PHASE' || gameState.phase === 'START_PHASE' || gameState.phase === 'MULLIGAN'
@@ -1540,7 +1540,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             </div>
 
             {/* 페이즈 설명 안내 */}
-            <div className="text-[11px] text-slate-300 font-semibold px-1">
+            <div className="text-xs sm:text-sm text-slate-300 font-semibold px-1">
               {gameState.phase === 'ACTION_PHASE' && '메인 페이즈: 카드 레벨업, 협주 충전 후 대결을 선언하세요.'}
               {gameState.phase === 'CLASH_SET' && '대결 세트: 손패의 액션 카드를 대결 존에 세트하세요.'}
               {gameState.phase === 'CLASH_REVEAL' && '판정 오픈: 양측 카드가 공개되고 상성이 판정됩니다.'}
@@ -1783,12 +1783,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           {/* ======================================================= */}
           <div className="flex-1 flex flex-col min-h-0 bg-slate-950/80 overflow-hidden">
             <div className="p-3 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-950">
-              <div className="flex items-center gap-2 font-black text-xs sm:text-sm text-white">
+              <div className="flex items-center gap-2 font-black text-sm sm:text-base text-white">
                 <ScrollText className="w-4 h-4 text-emerald-400" />
                 <span>배틀 로그 (DUEL LOG)</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-mono font-bold text-slate-300 bg-slate-900 px-2 py-0.5 rounded-full border border-slate-800">
+                <span className="text-xs sm:text-sm font-mono font-bold text-slate-300 bg-slate-900 px-2.5 py-0.5 rounded-full border border-slate-800">
                   {gameState.logs.length}건
                 </span>
                 <button
@@ -1796,14 +1796,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   className="text-slate-400 hover:text-white p-1 rounded transition cursor-pointer"
                   title={isLogPanelExpanded ? '로그 접기' : '로그 펼치기'}
                 >
-                  {isLogPanelExpanded ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                  {isLogPanelExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
               </div>
             </div>
 
             {isLogPanelExpanded ? (
               <>
-                <div className="flex-1 overflow-y-auto space-y-2.5 p-3 text-xs custom-scrollbar min-h-0">
+                <div className="flex-1 overflow-y-auto space-y-2.5 p-3 text-sm custom-scrollbar min-h-0">
                   {(() => {
                     const chronologicalLogs = [...gameState.logs].reverse();
                     return chronologicalLogs.map((log, idx) => {
@@ -1832,22 +1832,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           {isNewTurn && (
                             <div className="flex items-center gap-2 py-1.5 my-1 sticky top-0 bg-slate-950/95 backdrop-blur z-10">
                               <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-amber-500/40" />
-                              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 font-mono text-[11px] font-black tracking-wider shadow">
+                              <span className="px-3 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/40 text-amber-300 font-mono text-xs sm:text-sm font-black tracking-wider shadow">
                                 ⚔️ TURN {log.turn}
                               </span>
                               <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-amber-500/40" />
                             </div>
                           )}
 
-                          <div className={`p-2.5 rounded-xl border transition-all duration-200 shadow-sm ${containerStyle}`}>
+                          <div className={`p-3 rounded-xl border transition-all duration-200 shadow-sm ${containerStyle}`}>
                             {/* 로그 상단 뱃지 & 이벤트 태그 */}
                             <div className="flex items-center justify-between mb-1.5">
                               <div className="flex items-center gap-1.5">
-                                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border uppercase ${badgeColor}`}>
+                                <span className={`text-xs font-mono px-2 py-0.5 rounded border uppercase ${badgeColor}`}>
                                   {log.type}
                                 </span>
                                 {log.effectTag && (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-500/30">
+                                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 border border-amber-500/30">
                                     {log.effectTag}
                                   </span>
                                 )}
@@ -1856,16 +1856,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                               {/* 수치 강조 뱃지 (데미지 또는 회복 수치) */}
                               <div className="flex items-center gap-1.5">
                                 {log.type === 'DAMAGE' && log.amount !== undefined && (
-                                  <span className="text-xs font-mono font-black px-2 py-0.5 rounded-full bg-red-600/30 text-red-300 border border-red-500/50 shadow animate-pulse">
+                                  <span className="text-sm font-mono font-black px-2.5 py-0.5 rounded-full bg-red-600/30 text-red-300 border border-red-500/50 shadow animate-pulse">
                                     💥 -{log.amount} HP
                                   </span>
                                 )}
                                 {log.type === 'HEAL' && log.amount !== undefined && (
-                                  <span className="text-xs font-mono font-black px-2 py-0.5 rounded-full bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 shadow animate-pulse">
+                                  <span className="text-sm font-mono font-black px-2.5 py-0.5 rounded-full bg-emerald-600/30 text-emerald-300 border border-emerald-500/50 shadow animate-pulse">
                                     💚 +{log.amount} HP
                                   </span>
                                 )}
-                                <span className="text-[10px] font-mono text-slate-500 font-bold">
+                                <span className="text-xs font-mono text-slate-500 font-bold">
                                   #{idx + 1}
                                 </span>
                               </div>
@@ -1892,7 +1892,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                                       } as any);
                                     }
                                   }}
-                                  className="relative w-11 h-15 shrink-0 rounded-lg overflow-hidden border-2 border-amber-400/70 shadow-md bg-slate-950 cursor-pointer hover:scale-105 hover:border-amber-300 transition duration-150"
+                                  className="relative w-12 h-16 shrink-0 rounded-lg overflow-hidden border-2 border-amber-400/70 shadow-md bg-slate-950 cursor-pointer hover:scale-105 hover:border-amber-300 transition duration-150"
                                   title={`${log.cardName || '카드'} (마우스 오버 시 미리보기)`}
                                 >
                                   <img
@@ -1901,7 +1901,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                                     className="w-full h-full object-cover"
                                   />
                                   {log.amount !== undefined && (
-                                    <div className="absolute inset-x-0 bottom-0 bg-black/80 text-[9px] font-mono font-black text-center text-amber-300 py-0.2">
+                                    <div className="absolute inset-x-0 bottom-0 bg-black/80 text-[11px] font-mono font-black text-center text-amber-300 py-0.2">
                                       {log.type === 'DAMAGE' ? `-${log.amount}` : `+${log.amount}`}
                                     </div>
                                   )}
@@ -1910,7 +1910,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
                               {/* 텍스트 내용 (강조 폰트 색상 적용) */}
                               <div className="flex-1 min-w-0">
-                                <p className={`text-xs sm:text-[13px] leading-relaxed whitespace-pre-line font-medium ${
+                                <p className={`text-sm sm:text-base leading-relaxed whitespace-pre-line font-medium ${
                                   log.type === 'DAMAGE'
                                     ? 'text-red-100 font-semibold'
                                     : log.type === 'HEAL'
@@ -1954,14 +1954,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   })()}
                   <div ref={logEndRef} />
                 </div>
-                <div className="text-[11px] text-slate-500 text-center py-2 border-t border-slate-800 shrink-0 font-medium bg-slate-950">
+                <div className="text-xs text-slate-500 text-center py-2 border-t border-slate-800 shrink-0 font-medium bg-slate-950">
                   최신 로그 자동 스크롤 연동
                 </div>
               </>
             ) : (
               <div
                 onClick={() => setIsLogPanelExpanded(true)}
-                className="p-3 text-center text-xs text-slate-400 hover:text-amber-300 transition cursor-pointer flex items-center justify-center gap-1.5 bg-slate-950"
+                className="p-3 text-center text-sm text-slate-400 hover:text-amber-300 transition cursor-pointer flex items-center justify-center gap-1.5 bg-slate-950"
               >
                 <span>로그가 접혀있습니다 (클릭하여 펼치기)</span>
               </div>
