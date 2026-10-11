@@ -23,6 +23,7 @@ interface HandViewProps {
   onSetClashCard: (cardId: string) => void;
   onComboAttack: (cardId: string) => void;
   comboCount?: number;
+  comboUnlimited?: boolean;
   onHover?: (card: ActionCard | null) => void;
 }
 
@@ -44,6 +45,7 @@ export const HandView: React.FC<HandViewProps> = ({
   onSetClashCard,
   onComboAttack,
   comboCount = 0,
+  comboUnlimited = false,
   onHover,
 }) => {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
@@ -88,7 +90,6 @@ export const HandView: React.FC<HandViewProps> = ({
 
   // 카드별 사용 가능 여부 판별 (공식 룰: 일반 카드는 누구나, 비 리더 전용 카드는 서포터로 파티에 있어도 사용 가능, 리더 스킬만 리더 필수)
   const checkCardUsable = (card: ActionCard): { canPlayClash: boolean; canCombo: boolean; reason?: string } => {
-    const hasEnoughCost = concertoCount >= card.cost;
     const currentLeader = leaderCard || ({ characterName: leaderName, nameKr: leaderName } as any);
     const slots = playerSlots || {
       leader: currentLeader,
@@ -98,12 +99,19 @@ export const HandView: React.FC<HandViewProps> = ({
     const cardUsage = canPlayerUseActionCard(slots, card);
     const meetsRequirements = cardUsage.canUse;
 
-    const canPlayClash = canSetClashCard && hasEnoughCost && meetsRequirements;
+    // 금희 Lv.1: 연격 단계 적색 카드 비용 1 경감
+    const effectiveCost =
+      isComboStep && (currentLeader?.characterName === '금희' || currentLeader?.nameKr?.includes('금희')) && currentLeader?.level >= 1
+        ? Math.max(0, card.cost - 1)
+        : card.cost;
+    const hasEnoughCost = concertoCount >= effectiveCost;
+
+    const canPlayClash = canSetClashCard && concertoCount >= card.cost && meetsRequirements;
     // 공식 룰: 연격 단계에서는 RED 카드 사용 가능 (연격 리더 교체/효과 카드 포함)
-    const canCombo = isComboStep && comboCount > 0 && card.color === 'RED' && hasEnoughCost && meetsRequirements;
+    const canCombo = isComboStep && (comboUnlimited || comboCount > 0) && card.color === 'RED' && hasEnoughCost && meetsRequirements;
 
     let reason = '';
-    if (!hasEnoughCost) reason = `비용 부족 (필요 ${card.cost}, 보유 ${concertoCount})`;
+    if (!hasEnoughCost) reason = `비용 부족 (필요 ${effectiveCost}, 보유 ${concertoCount})`;
     else if (!meetsRequirements && canSetClashCard) reason = cardUsage.reason || `[${card.characterExclusive}] 전용`;
 
     return { canPlayClash, canCombo, reason };
@@ -134,17 +142,21 @@ export const HandView: React.FC<HandViewProps> = ({
           {isComboStep && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/90 border border-red-500 shadow-lg shadow-red-500/30 animate-pulse">
               <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
-              <span className="text-xs font-black text-orange-300">추격 게이지</span>
-              <div className="flex items-center gap-0.5">
-                {Array.from({ length: Math.min(comboCount, 8) }).map((_, i) => (
-                  <span
-                    key={i}
-                    className="w-1.5 h-3 bg-gradient-to-t from-red-600 to-amber-400 rounded-xs shadow-[0_0_5px_rgba(249,115,22,0.8)] inline-block"
-                  />
-                ))}
-              </div>
+              <span className="text-xs font-black text-orange-300">
+                {comboUnlimited ? '무제한 연격 진행 중' : '추격 게이지'}
+              </span>
+              {!comboUnlimited && (
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: Math.min(comboCount, 8) }).map((_, i) => (
+                    <span
+                      key={i}
+                      className="w-1.5 h-3 bg-gradient-to-t from-red-600 to-amber-400 rounded-xs shadow-[0_0_5px_rgba(249,115,22,0.8)] inline-block"
+                    />
+                  ))}
+                </div>
+              )}
               <strong className="text-xs font-black text-amber-200 font-mono bg-red-900/90 px-2 py-0.5 rounded-full border border-red-500/40">
-                남은 추격: {comboCount}회
+                {comboUnlimited ? '연속 공격: 무제한 (∞)' : `남은 추격: ${comboCount}회`}
               </strong>
             </div>
           )}

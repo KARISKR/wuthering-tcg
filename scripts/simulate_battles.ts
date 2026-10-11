@@ -163,11 +163,11 @@ function simulateMatch(
     if (state.phase === 'COMBO_STEP') {
       const p0 = state.players[0];
       const p1 = state.players[1];
-      const comboIdx: 0 | 1 = p0.comboCount > 0 ? 0 : 1;
+      const comboIdx: 0 | 1 = (p0.comboUnlimited || p0.comboCount > 0) ? 0 : 1;
       const cp = state.players[comboIdx];
 
       const redCard = cp.hand.find((c) => c.color === 'RED' && cp.concertoZone.length >= c.cost);
-      if (redCard && cp.comboCount > 0) {
+      if (redCard && (cp.comboUnlimited || cp.comboCount > 0)) {
         const res = executeComboAttack(state, comboIdx, redCard.id);
         if (res.success) {
           state = res.newState;

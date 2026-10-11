@@ -85,7 +85,7 @@ function playMatch(d0: CustomDeckConfig, d1: CustomDeckConfig, lv0: AiLevel, lv1
         state = proceedAfterClashReveal(state);
         break;
       case 'COMBO_STEP': {
-        const idx: 0 | 1 = state.players[0].comboCount > 0 ? 0 : 1;
+        const idx: 0 | 1 = (state.players[0].comboUnlimited || state.players[0].comboCount > 0) ? 0 : 1;
         state = runAiComboStep(state, idx, levels[idx]);
         break;
       }

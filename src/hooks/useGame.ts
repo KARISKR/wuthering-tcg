@@ -269,11 +269,13 @@ export function useGame(
 
     // 3) AI 연격 단계 (연격 콤보 연출을 충분히 볼 수 있도록 1.8초 템포)
     if (gameState.phase === 'COMBO_STEP' && gameState.players[1].isAi) {
-      if (gameState.players[1].comboCount > 0) {
+      const canAiCombo = gameState.players[1].comboUnlimited || gameState.players[1].comboCount > 0;
+      if (canAiCombo) {
         setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
-            if (prev.phase === 'COMBO_STEP' && prev.players[1].comboCount > 0) {
+            const stillCan = prev.players[1].comboUnlimited || prev.players[1].comboCount > 0;
+            if (prev.phase === 'COMBO_STEP' && stillCan) {
               return runAiComboStep(prev);
             }
             return prev;
@@ -284,10 +286,10 @@ export function useGame(
           clearTimeout(timer);
           setIsAiThinking(false);
         };
-      } else if (gameState.activePlayerIndex === 1 && gameState.players[1].comboCount === 0) {
+      } else {
         const timer = setTimeout(() => {
           setGameState((prev) => {
-            if (prev.phase === 'COMBO_STEP' && prev.activePlayerIndex === 1 && prev.players[1].comboCount === 0) {
+            if (prev.phase === 'COMBO_STEP') {
               return finishComboStep(prev, 1);
             }
             return prev;

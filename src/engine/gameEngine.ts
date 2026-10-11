@@ -46,8 +46,50 @@ export function isSameCharacter(charA: CharacterCard | undefined, charB: Charact
 }
 
 /**
+ * 캐릭터 슬롯에 중첩되어 있는 모든 카드 반환
+ * (공식 룰 504.4.1: 캐릭터 카드 아래에 겹쳐 놓은 카드의 스킬은 계속 유효)
+ */
+export function getAllCardsInSlot(slot: CharacterCard | null | undefined): CharacterCard[] {
+  if (!slot) return [];
+  return [...(slot.underlyingCards || []), slot];
+}
+
+export interface ActiveCharacterCardInfo {
+  card: CharacterCard;
+  isLeader: boolean;
+  slotKey: 'leader' | 'leftSupport' | 'rightSupport';
+}
+
+/**
+ * 플레이어 필드에 활성화되어 있는 모든 캐릭터 카드와 포지션 정보 반환
+ */
+export function getActiveCharacterCards(player: PlayerState): ActiveCharacterCardInfo[] {
+  const result: ActiveCharacterCardInfo[] = [];
+  const slots: ('leader' | 'leftSupport' | 'rightSupport')[] = ['leader', 'leftSupport', 'rightSupport'];
+  for (const slotKey of slots) {
+    const slot = player.slots[slotKey];
+    if (!slot) continue;
+    const isLeader = slotKey === 'leader';
+    const cards = getAllCardsInSlot(slot);
+    for (const card of cards) {
+      result.push({ card, isLeader, slotKey });
+    }
+  }
+  return result;
+}
+
+/**
+ * 특정 조건의 캐릭터 카드 스킬이 현재 활성 상태인지 검사
+ */
+export function hasActiveCharacterSkill(
+  player: PlayerState,
+  predicate: (info: ActiveCharacterCardInfo) => boolean
+): boolean {
+  return getActiveCharacterCards(player).some(predicate);
+}
+
+/**
  * 캐릭터 슬롯이 특정 캐릭터의 특정 레벨 이상 스킬을 보유(상속)하고 있는지 검사
- * (현재 레벨업된 최상위 카드뿐만 아니라 하위에 겹쳐진 이전 레벨 카드까지 모두 탐색)
  */
 export function slotHasCharacterSkill(
   slot: CharacterCard | null | undefined,
@@ -55,29 +97,13 @@ export function slotHasCharacterSkill(
   minLevel?: number
 ): boolean {
   if (!slot) return false;
-
-  // 1. 현재 최상위 카드 검사
-  const matchTop = slot.characterName === characterName || slot.nameKr.includes(characterName);
-  if (matchTop) {
-    if (minLevel === undefined || slot.level >= minLevel) {
-      return true;
-    }
-  }
-
-  // 2. 하위에 겹쳐진 이전 레벨 카드들(underlyingCards) 검사
-  if (slot.underlyingCards && slot.underlyingCards.length > 0) {
-    return slot.underlyingCards.some((under) => {
-      const matchUnder = under.characterName === characterName || under.nameKr.includes(characterName);
-      if (matchUnder) {
-        if (minLevel === undefined || under.level >= minLevel) {
-          return true;
-        }
-      }
-      return false;
-    });
-  }
-
-  return false;
+  const cards = getAllCardsInSlot(slot);
+  return cards.some((c) => {
+    const match = c.characterName === characterName || c.nameKr.includes(characterName);
+    if (!match) return false;
+    if (minLevel === undefined) return true;
+    return c.level >= minLevel;
+  });
 }
 
 /**
@@ -500,6 +526,8 @@ function createPlayerState(
       chargedConcerto: false,
     },
     comboCount: 0,
+    comboUnlimited: false,
+    actionArea: [],
     isAi,
   };
 }
@@ -1088,120 +1116,179 @@ export function setClashCard(
     ] as [PlayerState, PlayerState],
   };
 
-  // 1. 방랑자(여) [BP01-018] 리더 배틀 효과: 녹색 카드로 배틀 시 덱 위 2장 공개 후 패로
-  if (
-    player.clashCard &&
-    player.clashCard.color === 'GREEN' &&
-    (player.slots.leader.code === 'BP01-018' ||
-      (player.slots.leader.characterName === '방랑자' && player.slots.leader.nameKr.includes('방랑자(여)')))
-  ) {
-    const revealed = player.actionDeck.splice(0, Math.min(2, player.actionDeck.length));
-    if (revealed.length > 0) {
-      const effectEv: TriggeredEffectEvent = {
-        id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-        sourceCardName: '방랑자(여) [BP01-018]',
-        sourceCardArt: player.slots.leader.artUrl,
-        effectType: 'DRAW',
-        title: '방랑자(여) [녹색 배틀 효과]',
-        description: '녹색 카드로 배틀에 돌입하여 덱 위의 카드를 패에 추가하는 효과가 발동했습니다!',
-        playerIndex,
-        timestamp: Date.now(),
-      };
-      newState.deferredEffectEvent = effectEv;
+  // ==========================================
+  // 배틀 스텝 (Battle Step 604.1.1) 캐릭터 스킬 처리
+  // (공식 룰 504.4.1: 하위에 겹쳐 놓은 카드의 스킬은 계속 유효)
+  // ==========================================
+  const leaderCards = getAllCardsInSlot(player.slots.leader);
 
-      if (player.isAi) {
-        player.hand.push(...revealed);
+  // 1. 적색 배틀 시 스킬
+  if (player.clashCard && player.clashCard.color === 'RED') {
+    const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
+
+    // 1-A. 치샤 Lv.0 [BP01-027]: 적색 카드로 배틀 시 상대에게 1pt 피해
+    const hasChixia0 = leaderCards.some(
+      (c) => c.code === 'BP01-027' || (c.level === 0 && (c.characterName === '치샤' || c.nameKr.includes('치샤')))
+    );
+    if (hasChixia0) {
+      newState.players[oppIdx].hp = Math.max(0, newState.players[oppIdx].hp - 1);
+      newState = addLog(
+        newState,
+        `[치샤 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
+        'DAMAGE',
+        playerIndex,
+        { amount: 1, effectTag: '배틀 피해' }
+      );
+    }
+
+    // 1-B. 금희 Lv.0 [BP01-030]: 적색 카드로 배틀 시 상대에게 1pt 피해
+    const hasJinhsi0 = leaderCards.some(
+      (c) => c.code === 'BP01-030' || (c.level === 0 && (c.characterName === '금희' || c.nameKr.includes('금희')))
+    );
+    if (hasJinhsi0) {
+      newState.players[oppIdx].hp = Math.max(0, newState.players[oppIdx].hp - 1);
+      newState = addLog(
+        newState,
+        `[금희 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
+        'DAMAGE',
+        playerIndex,
+        { amount: 1, effectTag: '배틀 피해' }
+      );
+    }
+
+    // 1-C. 상대 양양 Lv.2 [SD01-003]: 상대가 적색 카드로 배틀 시 1 COST 지불 가능. 미지불 시 3pt 피해
+    const oppLeaderCards = getAllCardsInSlot(newState.players[oppIdx].slots.leader);
+    const oppHasYangyangLv2 = oppLeaderCards.some(
+      (c) => c.code === 'SD01-003' || (c.characterName === '양양' && c.level === 2)
+    );
+    if (oppHasYangyangLv2) {
+      if (player.concertoZone.length >= 1) {
+        const [spent] = player.concertoZone.splice(0, 1);
+        player.dropZone.push(spent);
         newState = addLog(
           newState,
-          `[방랑자(여) BP01-018 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 카드 ${revealed.length}장을 패에 추가했습니다.`,
+          `[상대 양양 Lv.2 배틀 효과] 상대 적색 배틀 견제로 1 COST를 지불했습니다.`,
           'ACTION',
           playerIndex
         );
       } else {
-        newState.deferredChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          playerIndex,
-          title: '방랑자(여) 배틀 효과',
-          sourceCardName: '방랑자(여) [BP01-018]',
-          sourceCardArt: player.slots.leader.artUrl,
-          description: '녹색 카드로 배틀하여 덱 위의 카드를 최대 2장까지 패에 추가할 수 있습니다. 패에 넣을 카드를 선택하세요 (0장~2장 선택 가능).',
-          revealedCards: revealed,
-          minSelect: 0,
-          maxSelect: revealed.length,
-          onResolveType: 'ADD_TO_HAND',
-        };
+        player.hp = Math.max(0, player.hp - 3);
+        newState = addLog(
+          newState,
+          `[상대 양양 Lv.2 배틀 효과] 1 COST를 지불할 수 없어 3pt 데미지를 받았습니다!`,
+          'DAMAGE',
+          oppIdx,
+          { amount: 3, effectTag: '배틀 피해' }
+        );
       }
     }
   }
 
-  // 2. 파수인 [BP01-010] 리더 배틀 효과: 녹색 카드로 배틀 시 덱 위 1장 공개 후 패에 추가 가능 (선택 효과)
-  if (
-    player.clashCard &&
-    player.clashCard.color === 'GREEN' &&
-    (player.slots.leader.code === 'BP01-010' || player.slots.leader.characterName === '파수인')
-  ) {
-    const card = drawSingleCardFromDeck(player);
-    if (card) {
-      if (player.isAi) {
-        player.hand.push(card);
-        newState = addLog(
-          newState,
-          `[파수인 BP01-010 리더 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱에서 1장을 드로우했습니다.`,
-          'ACTION',
-          playerIndex,
-          { cardArt: player.slots.leader.artUrl, cardName: player.slots.leader.nameKr, effectTag: '배틀 드로우' }
-        );
-      } else {
-        newState.deferredChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          playerIndex,
-          title: '파수인 배틀 효과 (패 추가 선택)',
-          sourceCardName: '파수인 [BP01-010]',
-          sourceCardArt: player.slots.leader.artUrl,
-          description: '녹색 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 공개하고 패에 추가하시겠습니까? (선택하지 않을 경우 덱 맨 위에 유지됩니다)',
-          revealedCards: [card],
-          minSelect: 0,
-          maxSelect: 1,
-          onResolveType: 'ADD_TO_HAND',
-        };
+  // 2. 녹색 배틀 시 스킬
+  if (player.clashCard && player.clashCard.color === 'GREEN') {
+    // 2-A. 방랑자(여) [BP01-018] / 방랑자(남) [BP01-021] Lv.0 배틀 효과: 덱 위 최대 2장 공개 후 패로
+    const hasRover0 = leaderCards.some(
+      (c) =>
+        c.code === 'BP01-018' ||
+        c.code === 'BP01-021' ||
+        (c.level === 0 && (c.characterName?.includes('방랑자') || c.nameKr?.includes('방랑자')))
+    );
+    if (hasRover0) {
+      const revealed = player.actionDeck.splice(0, Math.min(2, player.actionDeck.length));
+      if (revealed.length > 0) {
+        if (player.isAi) {
+          player.hand.push(...revealed);
+          newState = addLog(
+            newState,
+            `[방랑자 Lv.0 배틀 효과] 녹색 카드 배틀 효과로 덱 위의 카드 ${revealed.length}장을 패에 추가했습니다.`,
+            'ACTION',
+            playerIndex
+          );
+        } else {
+          newState.deferredChoice = {
+            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            playerIndex,
+            title: '방랑자 배틀 효과',
+            sourceCardName: '방랑자 Lv.0',
+            sourceCardArt: player.slots.leader.artUrl,
+            description: '녹색 카드로 배틀하여 덱 위의 카드를 최대 2장까지 패에 추가할 수 있습니다 (0장~2장 선택).',
+            revealedCards: revealed,
+            minSelect: 0,
+            maxSelect: revealed.length,
+            onResolveType: 'ADD_TO_HAND',
+          };
+        }
+      }
+    }
+
+    // 2-B. 파수인 Lv.0 [BP01-010]: 녹색 카드로 배틀 시 덱 위 1장 공개 후 패 추가 가능
+    const hasShorekeeper0 = leaderCards.some(
+      (c) => c.code === 'BP01-010' || (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))
+    );
+    if (hasShorekeeper0) {
+      const card = drawSingleCardFromDeck(player);
+      if (card) {
+        if (player.isAi) {
+          player.hand.push(card);
+          newState = addLog(
+            newState,
+            `[파수인 Lv.0 배틀 효과] 녹색 카드 배틀 효과로 덱에서 1장을 패에 추가했습니다.`,
+            'ACTION',
+            playerIndex
+          );
+        } else {
+          newState.deferredChoice = {
+            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            playerIndex,
+            title: '파수인 배틀 효과 (패 추가 선택)',
+            sourceCardName: '파수인 [BP01-010]',
+            sourceCardArt: player.slots.leader.artUrl,
+            description: '녹색 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 패에 추가하시겠습니까?',
+            revealedCards: [card],
+            minSelect: 0,
+            maxSelect: 1,
+            onResolveType: 'ADD_TO_HAND',
+          };
+        }
       }
     }
   }
 
-  // 3. 양양 [BP01-024] / 산화 [BP01-033] 리더 배틀 효과: 청색(방어) 카드로 배틀 시 덱 위 1장 협주 에리어에 배치 가능 (선택 효과)
-  if (
-    player.clashCard &&
-    player.clashCard.color === 'BLUE' &&
-    (player.slots.leader.code === 'BP01-024' ||
-      player.slots.leader.code === 'BP01-033' ||
-      player.slots.leader.characterName === '양양' ||
-      player.slots.leader.characterName === '산화')
-  ) {
-    const card = drawSingleCardFromDeck(player);
-    if (card) {
-      if (player.isAi) {
-        player.concertoZone.push(card);
-        newState = addLog(
-          newState,
-          `[${player.slots.leader.nameKr} 리더 효과] ${player.name}이(가) 청색 카드 배틀 효과로 덱 위 1장을 협주 에리어에 충전했습니다!`,
-          'ACTION',
-          playerIndex,
-          { cardArt: player.slots.leader.artUrl, cardName: player.slots.leader.nameKr, effectTag: '협주 충전' }
-        );
-      } else {
-        const leaderName = player.slots.leader.nameKr;
-        newState.deferredChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          playerIndex,
-          title: `${leaderName} 배틀 효과 (협주 배치 선택)`,
-          sourceCardName: `${leaderName} [배틀 효과]`,
-          sourceCardArt: player.slots.leader.artUrl,
-          description: '청색(방어) 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 협주 에리어에 배치하시겠습니까? (선택하지 않을 경우 덱 맨 위에 유지됩니다)',
-          revealedCards: [card],
-          minSelect: 0,
-          maxSelect: 1,
-          onResolveType: 'SET_CONCERTO',
-        };
+  // 3. 청색 배틀 시 스킬
+  if (player.clashCard && player.clashCard.color === 'BLUE') {
+    // 3-A. 양양 [BP01-024] / 산화 [BP01-033] Lv.0 배틀 효과: 청색 카드로 배틀 시 덱 위 1장 협주 에리어에 배치 가능
+    const hasYangyang0 = leaderCards.some(
+      (c) => c.code === 'BP01-024' || (c.level === 0 && (c.characterName === '양양' || c.nameKr.includes('양양')))
+    );
+    const hasSanhua0 = leaderCards.some(
+      (c) => c.code === 'BP01-033' || (c.level === 0 && (c.characterName === '산화' || c.nameKr.includes('산화')))
+    );
+    if (hasYangyang0 || hasSanhua0) {
+      const card = drawSingleCardFromDeck(player);
+      if (card) {
+        if (player.isAi) {
+          player.concertoZone.push(card);
+          newState = addLog(
+            newState,
+            `[${hasYangyang0 ? '양양' : '산화'} Lv.0 배틀 효과] 청색 카드 배틀 효과로 덱 위 1장을 협주 에리어에 충전했습니다!`,
+            'ACTION',
+            playerIndex
+          );
+        } else {
+          const charName = hasYangyang0 ? '양양' : '산화';
+          newState.deferredChoice = {
+            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            playerIndex,
+            title: `${charName} 배틀 효과 (협주 배치 선택)`,
+            sourceCardName: `${charName} Lv.0 [배틀 효과]`,
+            sourceCardArt: player.slots.leader.artUrl,
+            description: '청색 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 협주 에리어에 배치하시겠습니까?',
+            revealedCards: [card],
+            minSelect: 0,
+            maxSelect: 1,
+            onResolveType: 'SET_CONCERTO',
+          };
+        }
       }
     }
   }
@@ -1405,21 +1492,23 @@ export function resolveClash(state: GameState): GameState {
         reason = 'DRAW';
         logText = `양측 모두 [BLUE] 방어 카드를 내어 무승부(대미지 없음)가 되었습니다.`;
       } else {
-        // RED vs RED 또는 GREEN vs GREEN: 속도(Speed) 비교!
-        // 속도 보정 계산 (치샤 Lv.0, 금희 Lv.2 등)
+        // RED vs RED 또는 GREEN vs GREEN: 속도(Speed) 비교
         let speed0 = c0.speed ?? 0;
         let speed1 = c1.speed ?? 0;
 
-        // P0 버프
-        if (p0.slots.leader.characterName === '치샤' && color0 === 'RED') speed0 += 1;
-        if (p0.slots.leader.characterName === '금희' && p0.slots.leader.level === 2 && color0 === 'RED') speed0 += 1;
         // BP01-059 그늘이와 구름이 출격: 앙코 리더 시 스피드 10으로 변함
-        if (c0.code === 'BP01-059' && p0.slots.leader.characterName === '앙코') speed0 = Math.max(speed0, 10);
-
-        // P1 버프
-        if (p1.slots.leader.characterName === '치샤' && color1 === 'RED') speed1 += 1;
-        if (p1.slots.leader.characterName === '금희' && p1.slots.leader.level === 2 && color1 === 'RED') speed1 += 1;
-        if (c1.code === 'BP01-059' && p1.slots.leader.characterName === '앙코') speed1 = Math.max(speed1, 10);
+        if (
+          c0.code === 'BP01-059' &&
+          getAllCardsInSlot(p0.slots.leader).some((c) => c.characterName === '앙코' || c.nameKr.includes('앙코'))
+        ) {
+          speed0 = 10;
+        }
+        if (
+          c1.code === 'BP01-059' &&
+          getAllCardsInSlot(p1.slots.leader).some((c) => c.characterName === '앙코' || c.nameKr.includes('앙코'))
+        ) {
+          speed1 = 10;
+        }
 
         if (speed0 > speed1) {
           winnerIndex = 0;
@@ -1442,6 +1531,10 @@ export function resolveClash(state: GameState): GameState {
     }
   }
 
+  // 액션 에리어에 사용한 카드 배치 (공식 룰 604.1.2.1, 505)
+  if (c0) p0.actionArea = [...(p0.actionArea || []), c0];
+  if (c1) p1.actionArea = [...(p1.actionArea || []), c1];
+
   // 대결 중 발생한 효과 목록 수집
   const triggeredEffects: TriggeredEffectEvent[] = [];
 
@@ -1453,24 +1546,61 @@ export function resolveClash(state: GameState): GameState {
     const winCard = winnerIndex === 0 ? c0! : c1!;
     const loserCard = loserIndex === 0 ? c0 : c1;
 
+    const winnerLeaderCards = getAllCardsInSlot(winnerPlayer.slots.leader);
+    const loserLeaderCards = getAllCardsInSlot(loserPlayer.slots.leader);
+
     // 1. 대미지 계산
     let baseDmg = winCard.damage;
     let extraDmg = 0;
-    // 금희 Lv.0 리더: 빨강 승리 피해 +1
-    if (slotHasCharacterSkill(winnerPlayer.slots.leader, '금희', 0) && winCard.color === 'RED') {
+
+    // 금희 Lv.1 [BP01-029] 리더 판정: 적색 승리 시 상대에게 데미지 2pt
+    if (winnerLeaderCards.some((c) => c.code === 'BP01-029') && winCard.color === 'RED') {
+      extraDmg += 2;
+    }
+
+    // 치샤 Lv.2 [SD01-005]: 자신의 【리더 스킬】을 가진 【치샤】의 카드 데미지 +3 (필드 어디든 유효)
+    const hasChixiaSd01005 = hasActiveCharacterSkill(winnerPlayer, (info) =>
+      getAllCardsInSlot(info.card).some((c) => c.code === 'SD01-005')
+    );
+    if (hasChixiaSd01005 && winCard.characterExclusive?.includes('치샤') && isLeaderSkillCard(winCard)) {
+      extraDmg += 3;
+    }
+
+    // 앙코 Lv.0 [BP01-015] 리더: 매 턴 처음 사용한 앙코 기본 공격 데미지 +2
+    const hasAnke0 = winnerLeaderCards.some((c) => c.code === 'BP01-015');
+    if (
+      hasAnke0 &&
+      winCard.characterExclusive?.includes('앙코') &&
+      (winCard.nameKr.includes('기본 공격') || winCard.nameKr.includes('일반 공격'))
+    ) {
+      extraDmg += 2;
+    }
+
+    // 앙코 Lv.2 [BP01-011]: 자신의 【앙코】 적색 카드 데미지 +1 (필드 어디든 유효)
+    const hasAnkeBp01011 = hasActiveCharacterSkill(winnerPlayer, (info) =>
+      getAllCardsInSlot(info.card).some((c) => c.code === 'BP01-011')
+    );
+    if (hasAnkeBp01011 && winCard.characterExclusive?.includes('앙코') && winCard.color === 'RED') {
       extraDmg += 1;
     }
-    // 금희 Lv.2 패시브: 빨강 피해 +1
-    if (slotHasCharacterSkill(winnerPlayer.slots.leader, '금희', 2) && winCard.color === 'RED') {
+
+    // 카멜리아 Lv.2 [BP01-001] 리더: 자신의 【카멜리아】 적색 카드 데미지 +1
+    if (
+      winnerLeaderCards.some((c) => c.code === 'BP01-001') &&
+      winCard.characterExclusive?.includes('카멜리아') &&
+      winCard.color === 'RED'
+    ) {
       extraDmg += 1;
     }
+
     // 파수인 BP01-055 근원의 추구·강공격: 생명력이 상대보다 많을 경우 데미지 +1
     if (winCard.code === 'BP01-055' && winnerPlayer.hp > loserPlayer.hp) {
       extraDmg += 1;
     }
-    // 금희 BP01-074 승천하는 용: 액션 에리어에 있는 카드 1장당 데미지 +1
+
+    // 금희 BP01-074 승천하는 용: 액션 에리어 카드 1장당 데미지 +1
     if (winCard.code === 'BP01-074') {
-      extraDmg += 1;
+      extraDmg += winnerPlayer.actionArea?.length || 1;
     }
 
     if (extraDmg > 0) {
@@ -1485,6 +1615,16 @@ export function resolveClash(state: GameState): GameState {
         playerIndex: winnerIndex,
         timestamp: Date.now(),
       });
+    }
+
+    // 피격자 데미지 보정
+    // 카멜리아 Lv.2 [BP01-001] 리더: 자신이 받는 데미지 +1
+    if (loserLeaderCards.some((c) => c.code === 'BP01-001')) {
+      baseDmg += 1;
+    }
+    // 카멜리아 Lv.2 [BP01-002] 리더: 매 턴 처음 받는 데미지 -1
+    if (loserLeaderCards.some((c) => c.code === 'BP01-002')) {
+      baseDmg = Math.max(0, baseDmg - 1);
     }
 
     loserPlayer.hp = Math.max(0, loserPlayer.hp - baseDmg);
@@ -1519,8 +1659,44 @@ export function resolveClash(state: GameState): GameState {
     }
 
     // 2. 카드/리더 승리 특수 효과 발동
-    // A. BP01-005 카멜리아 리더 승리: 트래시에서 일반 공격 1장 패에 추가 가능 (선택 효과)
-    if (winnerPlayer.slots.leader.characterName === '카멜리아') {
+    // 금희 Lv.2 [BP01-028] 리더 판정: 자신의 턴에 승리했을 경우 덱 위 5장 확인, 모든 금희 카드 패 추가
+    if (winnerIndex === activeIdx && winnerLeaderCards.some((c) => c.code === 'BP01-028')) {
+      const top5 = winnerPlayer.actionDeck.splice(0, Math.min(5, winnerPlayer.actionDeck.length));
+      const jinhsiCards = top5.filter((c) => c.characterExclusive?.includes('금희') || c.nameKr.includes('금희'));
+      const others = top5.filter((c) => !jinhsiCards.includes(c));
+      winnerPlayer.hand.push(...jinhsiCards);
+      winnerPlayer.dropZone.push(...others);
+      newState = addLog(
+        newState,
+        `[금희 Lv.2 판정 효과] 덱 위 5장을 확인하여 금희 카드 ${jinhsiCards.length}장을 패에 추가했습니다!`,
+        'ACTION',
+        winnerIndex
+      );
+    }
+
+    // 방랑자(여) Lv.2 [BP01-016] 리더 판정: 녹색 카드가 청색 카드에 승리 시 패 8장까지 드로우
+    if (
+      winnerLeaderCards.some((c) => c.code === 'BP01-016') &&
+      winCard.color === 'GREEN' &&
+      loserCard?.color === 'BLUE'
+    ) {
+      const needed = Math.max(0, 8 - winnerPlayer.hand.length);
+      if (needed > 0) {
+        for (let i = 0; i < needed; i++) {
+          const d = drawSingleCardFromDeck(winnerPlayer);
+          if (d) winnerPlayer.hand.push(d);
+        }
+        newState = addLog(
+          newState,
+          `[방랑자(여) Lv.2 판정 효과] 녹색 카드로 청색 카드에 승리하여 패가 8장이 될 때까지 드로우했습니다!`,
+          'ACTION',
+          winnerIndex
+        );
+      }
+    }
+
+    // BP01-005 카멜리아 리더 승리: 트래시에서 일반 공격 1장 패에 추가 가능
+    if (winnerLeaderCards.some((c) => c.code === 'BP01-005' || (c.level === 0 && (c.characterName === '카멜리아' || c.nameKr.includes('카멜리아'))))) {
       const normalAttacks = winnerPlayer.dropZone.filter((c) => c.kind === 'ACTION' && (c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격'))) as ActionCard[];
       if (normalAttacks.length > 0) {
         if (winnerPlayer.isAi) {
@@ -1541,7 +1717,7 @@ export function resolveClash(state: GameState): GameState {
             title: '카멜리아 판정 효과 (트래시 회수)',
             sourceCardName: '카멜리아 [BP01-005]',
             sourceCardArt: winnerPlayer.slots.leader.artUrl,
-            description: '판정 승리 효과로 트래시 에리어의 일반 공격 카드 1장을 패에 추가할 수 있습니다. 회수할 카드를 선택하세요 (선택하지 않고 패스 가능).',
+            description: '판정 승리 효과로 트래시 에리어의 일반 공격 카드 1장을 패에 추가할 수 있습니다.',
             revealedCards: normalAttacks,
             minSelect: 0,
             maxSelect: 1,
@@ -1551,9 +1727,20 @@ export function resolveClash(state: GameState): GameState {
       }
     }
 
-    // B. BP01-010 파수인 리더 승리: 녹색 카드로 승리 시 HP 1pt 회복
-    if (winnerPlayer.slots.leader.characterName === '파수인' && winCard.color === 'GREEN') {
+    // BP01-010 파수인 리더 승리: 녹색 카드로 승리 시 HP 1pt 회복
+    if (
+      winnerLeaderCards.some((c) => c.code === 'BP01-010' || (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))) &&
+      winCard.color === 'GREEN'
+    ) {
       winnerPlayer.hp = Math.min(winnerPlayer.maxHp, winnerPlayer.hp + 1);
+      // 파수인 Lv.2 [BP01-006]: HP 회복 시 1장 드로우 (1턴 2회)
+      const hasShorekeeperLv2 = hasActiveCharacterSkill(winnerPlayer, (info) =>
+        getAllCardsInSlot(info.card).some((c) => c.code === 'BP01-006' || (c.characterName === '파수인' && c.level === 2))
+      );
+      if (hasShorekeeperLv2) {
+        const d = drawSingleCardFromDeck(winnerPlayer);
+        if (d) winnerPlayer.hand.push(d);
+      }
       newState = addLog(
         newState,
         `[파수인 BP01-010 리더 효과] 녹색 카드 판정 승리로 HP +1을 회복했습니다! (현재 HP: ${winnerPlayer.hp}/${winnerPlayer.maxHp})`,
@@ -1563,7 +1750,7 @@ export function resolveClash(state: GameState): GameState {
       );
     }
 
-    // C. 혼돈의 이론 [BP01-056] 승리 효과: 파수인 레벨업!
+    // 혼돈의 이론 [BP01-056] 승리 효과: 파수인 레벨업!
     if (winCard.code === 'BP01-056') {
       const shSlotKey = (['leader', 'leftSupport', 'rightSupport'] as const).find(
         (k) => winnerPlayer.slots[k]?.characterName === '파수인'
@@ -1598,7 +1785,7 @@ export function resolveClash(state: GameState): GameState {
       }
     }
 
-    // D. 매서운 가시 [BP01-076] 승리 효과: 산화 레벨업!
+    // 매서운 가시 [BP01-076] 승리 효과: 산화 레벨업!
     if (winCard.code === 'BP01-076' && winnerPlayer.slots.leader.characterName === '산화') {
       const nextSanhua = findEvolutionCard(winnerPlayer.characterDeck, winnerPlayer.slots.leader);
       if (nextSanhua) {
@@ -1628,7 +1815,7 @@ export function resolveClash(state: GameState): GameState {
       }
     }
 
-    // E. 바람의 영역 [BP01-070] 승리 효과: 트래시에서 청색(방어) 카드 1장 패로 회수
+    // 바람의 영역 [BP01-070] 승리 효과: 트래시에서 청색(방어) 카드 1장 패로 회수
     if (winCard.code === 'BP01-070') {
       const blueIdx = winnerPlayer.dropZone.findIndex((c) => c.kind === 'ACTION' && (c as ActionCard).color === 'BLUE');
       if (blueIdx !== -1) {
@@ -1644,7 +1831,7 @@ export function resolveClash(state: GameState): GameState {
       }
     }
 
-    // F. 만년적설 [SD02-015] 승리 효과: 덱 위 2장 협주 에리어에 배치
+    // 만년적설 [SD02-015] 승리 효과: 덱 위 2장 협주 에리어에 배치
     if (winCard.code === 'SD02-015') {
       for (let i = 0; i < 2; i++) {
         const c = drawSingleCardFromDeck(winnerPlayer);
@@ -1795,57 +1982,27 @@ export function resolveClash(state: GameState): GameState {
       );
     }
 
-    // 3. 캐릭터 스킬 발동
-    // 산화 Lv.1: 파랑 판정 승리 시 HP 2 회복
-    if (winnerPlayer.slots.leader.characterName === '산화' && winnerPlayer.slots.leader.level >= 1 && winCard.color === 'BLUE') {
-      winnerPlayer.hp = Math.min(winnerPlayer.maxHp, winnerPlayer.hp + 2);
+    // 4. 연격권(Combo Count) 및 무제한 여부 계산 (공식 룰 604.1.2.7)
+    // 604.1.2.7: 배틀에서 적색 카드로 승리한 경우, 이번 턴에서 콤보 횟수 제한이 없음!
+    if (winCard.color === 'RED') {
+      comboGranted = 99;
+      winnerPlayer.comboUnlimited = true;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-sanhua-heal`,
-        sourceCardName: winnerPlayer.slots.leader.nameKr,
-        sourceCardArt: winnerPlayer.slots.leader.artUrl,
-        effectType: 'HEAL',
-        title: '산화 [냉기의 가호]',
-        description: '청색(방어) 카드 판정 승리로 HP 2를 회복했습니다!',
+        id: `eff-${Date.now()}-red-combo`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'COMBO',
+        title: '적색 승리 [연격 무제한]',
+        description: '적색 카드로 승리하여 이번 턴 연속 연격 공격이 무제한으로 가능합니다!',
         playerIndex: winnerIndex,
         timestamp: Date.now(),
       });
-      newState = addLog(
-        newState,
-        `[산화 냉기의 가호] 청색 카드 판정 승리로 HP +2를 회복했습니다! (현재 HP: ${winnerPlayer.hp}/${winnerPlayer.maxHp})`,
-        'HEAL',
-        winnerIndex,
-        {
-          cardArt: winnerPlayer.slots.leader.artUrl,
-          cardName: winnerPlayer.slots.leader.nameKr,
-          amount: 2,
-          effectTag: '리더 회복',
-        }
-      );
-    }
-    // 양양 Lv.0: 판정 승리 시 협주 1장 충전
-    if (winnerPlayer.slots.leader.characterName === '양양') {
-      const card = drawSingleCardFromDeck(winnerPlayer);
-      if (card) {
-        winnerPlayer.concertoZone.push(card);
-        triggeredEffects.push({
-          id: `eff-${Date.now()}-yangyang`,
-          sourceCardName: winnerPlayer.slots.leader.nameKr,
-          sourceCardArt: winnerPlayer.slots.leader.artUrl,
-          effectType: 'CHARGE',
-          title: '양양 [바람의 조율]',
-          description: '판정 승리로 협주 에너지를 1장 추가 충전했습니다!',
-          playerIndex: winnerIndex,
-          timestamp: Date.now(),
-        });
-      }
+    } else {
+      comboGranted = 0;
+      winnerPlayer.comboUnlimited = false;
     }
 
-    // 4. 연격권(Combo Count) 계산
-    // RED 승리 시 기본 1회 연격권
-    if (winCard.color === 'RED') {
-      comboGranted += 1;
-    }
-    // 카드 자체 [추격 X] 및 공식 카드 추격 효과
+    // 카드 자체 [추격 X] 및 캐릭터 추격 효과 가산
     let officialPursuit = winCard.pursuitCount ?? 0;
     if (winCard.code === 'SD02-010') officialPursuit += 8; // 금희 용을 타고 하늘로 향해 [추격 8]
     if (winCard.code === 'BP01-057') officialPursuit += 8; // 결말의 순환 [추격 8]
@@ -1856,17 +2013,19 @@ export function resolveClash(state: GameState): GameState {
     if (winCard.code === 'SD02-013') officialPursuit += 2; // 차가운 빛·회피 [추격 2]
     if (winCard.code === 'SD02-021') officialPursuit += 2; // 로프 [추격 2]
 
-    // 방랑자(남) Lv.2 리더 패시브 (BP01-019): 자신이 녹색 카드로 승리했을 경우 【추격 3】
-    if (slotHasCharacterSkill(winnerPlayer.slots.leader, '방랑자(남)', 2) && winCard.color === 'GREEN') {
+    // 방랑자(남) Lv.2 [BP01-019] 리더 판정: 자신이 녹색 카드로 승리했을 경우 【추격 3】
+    if (winnerLeaderCards.some((c) => c.code === 'BP01-019') && winCard.color === 'GREEN') {
       officialPursuit += 3;
     }
-    // 산화 Lv.2 리더 패시브 (BP01-031): 자신이 청색 카드로 승리했을 경우 【추격 3】
-    if (slotHasCharacterSkill(winnerPlayer.slots.leader, '산화', 2) && winCard.color === 'BLUE') {
+    // 산화 Lv.2 [BP01-031] 리더 판정: 자신이 청색 카드로 승리했을 경우 【추격 3】 및 리더 교체 가능
+    if (winnerLeaderCards.some((c) => c.code === 'BP01-031') && winCard.color === 'BLUE') {
       officialPursuit += 3;
     }
 
     if (officialPursuit > 0) {
-      comboGranted += officialPursuit;
+      if (!winnerPlayer.comboUnlimited) {
+        comboGranted += officialPursuit;
+      }
       triggeredEffects.push({
         id: `eff-${Date.now()}-pursuit`,
         sourceCardName: winCard.nameKr,
@@ -1878,50 +2037,26 @@ export function resolveClash(state: GameState): GameState {
         timestamp: Date.now(),
       });
     }
-    // 치샤 Lv.1 리더: 판정 승리 시 추격+1
-    if (winnerPlayer.slots.leader.characterName === '치샤' && winnerPlayer.slots.leader.level >= 1) {
-      comboGranted += 1;
-      triggeredEffects.push({
-        id: `eff-${Date.now()}-chixia`,
-        sourceCardName: winnerPlayer.slots.leader.nameKr,
-        sourceCardArt: winnerPlayer.slots.leader.artUrl,
-        effectType: 'COMBO',
-        title: '치샤 [연속 사격의 열기]',
-        description: '판정 승리로 연격(추격) 횟수를 +1 추가 획득했습니다!',
-        playerIndex: winnerIndex,
-        timestamp: Date.now(),
-      });
-    }
 
-    // BP01-074 승천하는 용 / BP01-061 그늘이와 구름이: 이번 턴에 자신은 콤보 발동 불가
+    // 콤보 금지/봉쇄 스킬 체크
+    // BP01-074 승천하는 용 / BP01-061 그늘이와 구름이: 이번 턴에 자신은 콤보를 발동할 수 없다.
     if (winCard.code === 'BP01-074' || winCard.code === 'BP01-061') {
       comboGranted = 0;
+      winnerPlayer.comboUnlimited = false;
       newState = addLog(newState, `[${winCard.nameKr} 제약] 이번 턴에 콤보를 발동할 수 없습니다.`, 'SYSTEM', winnerIndex);
     }
 
     // BP01-058 해금: 상대 패배 시 우세 상태이고 파수인 리더인 경우 상대 콤보 봉쇄
-    if (loserCard?.code === 'BP01-058' && slotHasCharacterSkill(loserPlayer.slots.leader, '파수인')) {
+    if (
+      loserCard?.code === 'BP01-058' &&
+      loserLeaderCards.some((c) => c.characterName?.includes('파수인') || c.nameKr?.includes('파수인'))
+    ) {
       comboGranted = 0;
+      winnerPlayer.comboUnlimited = false;
       newState = addLog(newState, `[해금 BP01-058 우세 효과] 상대 파수인의 효과로 연격이 봉쇄되었습니다!`, 'SYSTEM', winnerIndex);
     }
 
-    // 상대에게 산화 Lv.2가 있다면 상대 연격 단계 완전 봉쇄!
-    const opponentHasSanhuaLv2 =
-      loserPlayer.slots.leader.characterName === '산화' && loserPlayer.slots.leader.level === 2;
-    if (opponentHasSanhuaLv2 && comboGranted > 0) {
-      comboGranted = 0;
-      triggeredEffects.push({
-        id: `eff-${Date.now()}-sanhua-cancel`,
-        sourceCardName: loserPlayer.slots.leader.nameKr,
-        sourceCardArt: loserPlayer.slots.leader.artUrl,
-        effectType: 'CANCEL',
-        title: '산화 Lv.2 [빙결 결계]',
-        description: '상대의 연격(Combo Step)을 완전히 봉쇄하여 무효화했습니다!',
-        playerIndex: loserIndex,
-        timestamp: Date.now(),
-      });
-      newState = addLog(newState, `[산화 Lv.2 패시브] 상대의 냉기 결계로 인해 연격(콤보)이 무효화되었습니다!`, 'SYSTEM', winnerIndex);
-    }
+    winnerPlayer.comboCount = comboGranted;
 
     winnerPlayer.comboCount = comboGranted;
   }
@@ -2059,17 +2194,11 @@ export function proceedAfterClashReveal(state: GameState): GameState {
   const p0 = { ...newState.players[0] };
   const p1 = { ...newState.players[1] };
 
-  // 사용한 대결 카드들은 묘지로
-  if (p0.clashCard) {
-    p0.dropZone.push(p0.clashCard);
-    p0.clashCard = null;
-    p0.clashCardReady = false;
-  }
-  if (p1.clashCard) {
-    p1.dropZone.push(p1.clashCard);
-    p1.clashCard = null;
-    p1.clashCardReady = false;
-  }
+  // 대결 카드 슬롯 정리 (단, 사용한 카드는 액션 에리어에 이미 보존되어 있음)
+  p0.clashCard = null;
+  p0.clashCardReady = false;
+  p1.clashCard = null;
+  p1.clashCardReady = false;
 
   newState.players = [p0, p1];
 
@@ -2087,16 +2216,20 @@ export function proceedAfterClashReveal(state: GameState): GameState {
     newState.deferredEffectEvent = null;
   }
 
-  // 연격권이 남아있고 패에 빨간색 카드가 있는 플레이어가 있는지 확인
-  const p0HasCombo = p0.comboCount > 0 && p0.hand.some((c) => c.color === 'RED');
-  const p1HasCombo = p1.comboCount > 0 && p1.hand.some((c) => c.color === 'RED');
+  // 연격권이 남아있거나 무제한이고, 패에 빨간색 카드가 있는 플레이어가 있는지 확인
+  const p0HasCombo = (p0.comboUnlimited || p0.comboCount > 0) && p0.hand.some((c) => c.color === 'RED');
+  const p1HasCombo = (p1.comboUnlimited || p1.comboCount > 0) && p1.hand.some((c) => c.color === 'RED');
 
   if (p0HasCombo || p1HasCombo) {
     newState.phase = 'COMBO_STEP';
     const comboPlayerIdx = p0HasCombo ? 0 : 1;
     newState = addLog(
       newState,
-      `${newState.players[comboPlayerIdx].name}의 [연격 단계(Combo Step)]! 남은 연격 횟수: ${newState.players[comboPlayerIdx].comboCount}`,
+      `${newState.players[comboPlayerIdx].name}의 [연격 단계(Combo Step)]! ${
+        newState.players[comboPlayerIdx].comboUnlimited
+          ? '적색 승리: 연속 연격 무제한 가능'
+          : `남은 연격 횟수: ${newState.players[comboPlayerIdx].comboCount}회`
+      }`,
       'ACTION',
       comboPlayerIdx as 0 | 1
     );
@@ -2109,7 +2242,7 @@ export function proceedAfterClashReveal(state: GameState): GameState {
 }
 
 // ==========================================
-// 7. 연격 단계 (COMBO_STEP)
+// 7. 연격 단계 (COMBO_STEP - 공식 룰 604.1.3)
 // ==========================================
 
 export function executeComboAttack(
@@ -2122,7 +2255,7 @@ export function executeComboAttack(
   const player = { ...state.players[playerIndex] };
   const opponent = { ...state.players[playerIndex === 0 ? 1 : 0] };
 
-  if (player.comboCount <= 0) {
+  if (!player.comboUnlimited && player.comboCount <= 0) {
     return { success: false, newState: state, error: '남은 연격 횟수가 없습니다.' };
   }
 
@@ -2145,9 +2278,9 @@ export function executeComboAttack(
     };
   }
 
-  // 금희 Lv.1: 연격 단계 빨간 카드 비용 1 감소 (최소 0)
+  // 금희 Lv.1: 연격 단계 적색 카드 비용 1 감소 (최소 0)
   let effectiveCost = card.cost;
-  if (player.slots.leader.characterName === '금희' && player.slots.leader.level >= 1) {
+  if (getAllCardsInSlot(player.slots.leader).some((c) => c.characterName === '금희' && c.level >= 1)) {
     effectiveCost = Math.max(0, effectiveCost - 1);
   }
 
@@ -2178,15 +2311,57 @@ export function executeComboAttack(
     player.dropZone.push(...spentCards);
   }
 
-  // 패에서 묘지로
+  // 패에서 액션 에리어로 배치 (공식 룰 604.1.3.2)
   player.hand = player.hand.filter((c) => c.id !== cardId);
-  player.dropZone.push(card);
-  player.comboCount -= 1;
+  player.actionArea = [...(player.actionArea || []), card];
+
+  // 콤보 횟수 차감: 무제한이 아닐 때만 1회 차감
+  if (!player.comboUnlimited) {
+    player.comboCount -= 1;
+  }
 
   let newState = { ...state };
 
   // 연격 카드 특수 효과 & 리더 교체 발동
-  // 1. 팔천의 춘추 [BP01-046]: 리더를 카멜리아로 교체하고, 카멜리아 레벨업!
+  // 1. 도약의 불빛 [SD01-009]: 치샤로 교체 & 데미지 +2
+  if (card.code === 'SD01-009') {
+    const chixiaSlot = (['leftSupport', 'rightSupport'] as const).find(
+      (k) => player.slots[k]?.characterName === '치샤'
+    );
+    if (chixiaSlot && player.slots[chixiaSlot]) {
+      const prevLeader = player.slots.leader;
+      player.slots.leader = player.slots[chixiaSlot]!;
+      player.slots[chixiaSlot] = prevLeader;
+      newState = addLog(
+        newState,
+        `[도약의 불빛 SD01-009 연격 효과] 리더를 [치샤]로 교체했습니다!`,
+        'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체' }
+      );
+    }
+  }
+
+  // 2. 반룡의 빛 [SD02-009]: 금희로 교체 & 데미지 +2
+  if (card.code === 'SD02-009') {
+    const jinhsiSlot = (['leftSupport', 'rightSupport'] as const).find(
+      (k) => player.slots[k]?.characterName === '금희'
+    );
+    if (jinhsiSlot && player.slots[jinhsiSlot]) {
+      const prevLeader = player.slots.leader;
+      player.slots.leader = player.slots[jinhsiSlot]!;
+      player.slots[jinhsiSlot] = prevLeader;
+      newState = addLog(
+        newState,
+        `[반룡의 빛 SD02-009 연격 효과] 리더를 [금희]로 교체했습니다!`,
+        'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체' }
+      );
+    }
+  }
+
+  // 3. 팔천의 춘추 [BP01-046]: 리더를 카멜리아로 교체하고, 카멜리아 레벨업!
   if (card.code === 'BP01-046') {
     const camSlot = (['leftSupport', 'rightSupport'] as const).find(
       (k) => player.slots[k]?.characterName === '카멜리아'
@@ -2196,14 +2371,14 @@ export function executeComboAttack(
       player.slots.leader = player.slots[camSlot]!;
       player.slots[camSlot] = prevLeader;
     }
-    // 카멜리아 레벨업
     const targetKey = player.slots.leader.characterName === '카멜리아' ? 'leader' : (camSlot || 'leader');
     const curCam = player.slots[targetKey];
     if (curCam && curCam.characterName === '카멜리아') {
       const nextCam = findEvolutionCard(player.characterDeck, curCam);
       if (nextCam) {
         player.characterDeck = player.characterDeck.filter((c) => c.id !== nextCam.id);
-        player.slots[targetKey] = { ...nextCam };
+        const prevUnder = curCam.underlyingCards || [];
+        player.slots[targetKey] = { ...nextCam, underlyingCards: [...prevUnder, curCam] };
         newState.lastUpgrade = {
           id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
@@ -2224,7 +2399,7 @@ export function executeComboAttack(
     );
   }
 
-  // 2. 계발 [BP01-054]: 리더를 파수인으로 교체하고 생명력 1pt 회복
+  // 4. 계발 [BP01-054]: 리더를 파수인으로 교체하고 생명력 1pt 회복
   if (card.code === 'BP01-054') {
     const shSlot = (['leftSupport', 'rightSupport'] as const).find(
       (k) => player.slots[k]?.characterName === '파수인'
@@ -2244,7 +2419,7 @@ export function executeComboAttack(
     );
   }
 
-  // 3. 양들의 도움 [BP01-063]: 리더를 앙코로 교체하고 트래시에서 앙코 적색 카드 1장 패에 추가
+  // 5. 양들의 도움 [BP01-063]: 리더를 앙코로 교체하고 트래시에서 앙코 적색 카드 1장 패에 추가
   if (card.code === 'BP01-063') {
     const ankeSlot = (['leftSupport', 'rightSupport'] as const).find(
       (k) => player.slots[k]?.characterName === '앙코'
@@ -2270,7 +2445,7 @@ export function executeComboAttack(
     );
   }
 
-  // 4. 숨결 [SD01-014]: 리더를 양양으로 교체하고 덱 위 1장 협주 에리어에 배치
+  // 6. 숨결 [SD01-014]: 리더를 양양으로 교체하고 덱 위 1장 협주 에리어에 배치
   if (card.code === 'SD01-014') {
     const yangSlot = (['leftSupport', 'rightSupport'] as const).find(
       (k) => player.slots[k]?.characterName === '양양'
@@ -2291,7 +2466,7 @@ export function executeComboAttack(
     );
   }
 
-  // 5. 차가운 눈꽃 [SD02-014]: 리더를 산화로 교체하고 덱 위 1장 협주 에리어에 배치
+  // 7. 차가운 눈꽃 [SD02-014]: 리더를 산화로 교체하고 덱 위 1장 협주 에리어에 배치
   if (card.code === 'SD02-014') {
     const sanSlot = (['leftSupport', 'rightSupport'] as const).find(
       (k) => player.slots[k]?.characterName === '산화'
@@ -2312,7 +2487,7 @@ export function executeComboAttack(
     );
   }
 
-  // 6. 진동 소리 [SD01-019 / SD02-019]: 리더를 방랑자로 교체하고 카드 1장 드로우
+  // 8. 진동 소리 [SD01-019 / SD02-019]: 리더를 방랑자로 교체하고 카드 1장 드로우
   if (card.code === 'SD01-019' || card.code === 'SD02-019') {
     const isFemale = card.code === 'SD01-019';
     const roverSlot = (['leftSupport', 'rightSupport'] as const).find((k) => {
@@ -2338,7 +2513,7 @@ export function executeComboAttack(
     );
   }
 
-  // 7. 복성재우 [BP01-071]: 덱 위 1장 협주 에리어에 배치
+  // 9. 복성재우 [BP01-071]: 덱 위 1장 협주 에리어에 배치
   if (card.code === 'BP01-071') {
     const charged = drawSingleCardFromDeck(player);
     if (charged) player.concertoZone.push(charged);
@@ -2353,35 +2528,28 @@ export function executeComboAttack(
 
   // 대미지 계산
   let dmg = card.damage;
+
   // 도약의 불빛 [SD01-009] / 반룡의 빛 [SD02-009]: 리더 교체 시 데미지 +2
   if (card.code === 'SD01-009' || card.code === 'SD02-009') {
     dmg += 2;
   }
-  // 치샤 Lv.2: 연격 단계 대미지 추가 +1
-  if (slotHasCharacterSkill(player.slots.leader, '치샤', 2)) {
-    dmg += 1;
-  }
-  // 금희 Lv.2 리더: 자신의 적색 카드 연격(콤보) 데미지 +1
-  if (slotHasCharacterSkill(player.slots.leader, '금희', 2) && card.color === 'RED') {
-    dmg += 1;
-  }
-  // 카멜리아 Lv.2 리더: 카멜리아 적색 카드 데미지 +1
-  if (slotHasCharacterSkill(player.slots.leader, '카멜리아', 2) && card.characterExclusive === '카멜리아') {
-    dmg += 1;
-  }
-  // 앙코 Lv.2 리더: 앙코 적색 카드 데미지 +1
-  if (slotHasCharacterSkill(player.slots.leader, '앙코', 2) && card.characterExclusive === '앙코') {
-    dmg += 1;
-  }
-  // SD02-011 만물의 정화: 연격 시 데미지 +3 (충분한 연격 액션 전개 시)
-  if (card.code === 'SD02-011') {
+
+  // SD02-011 만물의 정화: 액션 에리어에 카드가 3장 이상 있을 경우 데미지 +3
+  if (card.code === 'SD02-011' && (player.actionArea?.length || 0) >= 3) {
     dmg += 3;
   }
-  // BP01-050 넝쿨의 춤: 일반 공격 연계 시 데미지 +1
+
+  // BP01-050 넝쿨의 춤: 액션 에리어에 일반 공격 카드가 2장 이상 있을 경우 데미지 +1
   if (card.code === 'BP01-050') {
-    dmg += 1;
+    const normalAttackCount = (player.actionArea || []).filter(
+      (c) => c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격')
+    ).length;
+    if (normalAttackCount >= 2) {
+      dmg += 1;
+    }
   }
-  // BP01-065 / BP01-067 소리의 변화·강공격: 패 1장 버릴 수 있다. 패를 버렸을 경우, 데미지 +1 (선택 효과)
+
+  // BP01-065 / BP01-067 소리의 변화·강공격: 패 1장 버리고 데미지 +1
   if (card.code === 'BP01-065' || card.code === 'BP01-067') {
     if (player.isAi && player.hand.length > 0) {
       const discarded = player.hand.pop();
@@ -2401,6 +2569,40 @@ export function executeComboAttack(
     }
   }
 
+  const leaderCards = getAllCardsInSlot(player.slots.leader);
+  const oppLeaderCards = getAllCardsInSlot(opponent.slots.leader);
+
+  // 금희 Lv.2 [SD02-005] 리더: 적색 카드가 『【콤보】이 카드의 데미지 +1.』 획득
+  if (leaderCards.some((c) => c.code === 'SD02-005') && card.color === 'RED') {
+    dmg += 1;
+  }
+
+  // 치샤 Lv.2 [SD01-005]: 자신의 【리더 스킬】을 가진 【치샤】의 카드 데미지 +3 (필드 어디든 유효)
+  const hasChixiaSd01005 = hasActiveCharacterSkill(player, (info) =>
+    getAllCardsInSlot(info.card).some((c) => c.code === 'SD01-005')
+  );
+  if (hasChixiaSd01005 && card.characterExclusive?.includes('치샤') && isLeaderSkillCard(card)) {
+    dmg += 3;
+  }
+
+  // 앙코 Lv.2 [BP01-011]: 자신의 【앙코】 적색 카드 데미지 +1 (필드 어디든 유효)
+  const hasAnkeBp01011 = hasActiveCharacterSkill(player, (info) =>
+    getAllCardsInSlot(info.card).some((c) => c.code === 'BP01-011')
+  );
+  if (hasAnkeBp01011 && card.characterExclusive?.includes('앙코') && card.color === 'RED') {
+    dmg += 1;
+  }
+
+  // 카멜리아 Lv.2 [BP01-001] 리더: 자신의 【카멜리아】 적색 카드 데미지 +1
+  if (leaderCards.some((c) => c.code === 'BP01-001') && card.characterExclusive?.includes('카멜리아') && card.color === 'RED') {
+    dmg += 1;
+  }
+
+  // 피격자 데미지 보정 (상대 리더가 카멜리아 Lv.2 [BP01-001]인 경우 피격 데미지 +1)
+  if (oppLeaderCards.some((c) => c.code === 'BP01-001')) {
+    dmg += 1;
+  }
+
   opponent.hp = Math.max(0, opponent.hp - dmg);
 
   newState.players[playerIndex] = player;
@@ -2415,7 +2617,9 @@ export function executeComboAttack(
 
   newState = addLog(
     newState,
-    `[연격 공격 성공!] ${player.name}이(가) [${card.nameKr}](으)로 ${dmg}의 연격 추가 피해를 입혔습니다! (남은 연격: ${player.comboCount}회)`,
+    `[연격 공격 성공!] ${player.name}이(가) [${card.nameKr}](으)로 ${dmg}의 연격 피해를 입혔습니다!${
+      player.comboUnlimited ? ' (무제한 연격 진행 중)' : ` (남은 연격: ${player.comboCount}회)`
+    }`,
     'DAMAGE',
     playerIndex,
     {
@@ -2431,8 +2635,19 @@ export function executeComboAttack(
     return { success: true, newState: checkGameOver(newState) };
   }
 
-  // 연격 소진 시 자동 종료
-  if (player.comboCount <= 0 || !player.hand.some((c) => c.color === 'RED')) {
+  // 남은 콤보 가능 여부 확인
+  // 연격 가능 횟수가 남아있거나(무제한 포함), 패에 비용을 지불하고 낼 수 있는 적색 카드가 남아있다면 연격 단계 유지!
+  const canStillCombo =
+    (player.comboUnlimited || player.comboCount > 0) &&
+    player.hand.some((c) => {
+      if (c.color !== 'RED') return false;
+      const cCost = getAllCardsInSlot(player.slots.leader).some((ch) => ch.characterName === '금희' && ch.level >= 1)
+        ? Math.max(0, c.cost - 1)
+        : c.cost;
+      return player.concertoZone.length >= cCost && canPlayerUseActionCard(player.slots, c).canUse;
+    });
+
+  if (!canStillCombo) {
     newState = checkHandOverflowOrEndTurn(newState);
   }
 
@@ -2441,13 +2656,41 @@ export function executeComboAttack(
 
 export function finishComboStep(state: GameState, playerIndex: 0 | 1): GameState {
   let newState: GameState = { ...state, lastComboStrike: null };
-  newState.players[playerIndex].comboCount = 0;
-  newState = addLog(newState, `${newState.players[playerIndex].name}이(가) 연격 단계를 마쳤습니다.`, 'ACTION', playerIndex);
+  const p = { ...newState.players[playerIndex] };
+  const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
+  const opp = { ...newState.players[oppIdx] };
+
+  // 치샤 Lv.2 [BP01-025] 리더 배틀 종료 효과: 액션 에리어에 기본 공격 2장 이상 시 상대에게 3pt 피해
+  const hasChixiaBp01025 = getAllCardsInSlot(p.slots.leader).some((c) => c.code === 'BP01-025');
+  const normalAttacksInAction = (p.actionArea || []).filter(
+    (c) => c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격')
+  ).length;
+  if (hasChixiaBp01025 && normalAttacksInAction >= 2) {
+    opp.hp = Math.max(0, opp.hp - 3);
+    newState.players[oppIdx] = opp;
+    newState = addLog(
+      newState,
+      `[치샤 Lv.2 BP01-025 배틀 종료 효과] 액션 에리어에 기본 공격 카드가 ${normalAttacksInAction}장 있어 상대에게 3pt 추가 피해를 입혔습니다!`,
+      'DAMAGE',
+      playerIndex,
+      { amount: 3, effectTag: '배틀 종료 피해' }
+    );
+  }
+
+  p.comboCount = 0;
+  p.comboUnlimited = false;
+  newState.players[playerIndex] = p;
+  newState = addLog(newState, `${p.name}이(가) 연격 단계를 마쳤습니다.`, 'ACTION', playerIndex);
+
+  if (opp.hp <= 0) {
+    return checkGameOver(newState);
+  }
+
   return checkHandOverflowOrEndTurn(newState);
 }
 
 // ==========================================
-// 8. 패 상한 및 턴 종료 (END_PHASE)
+// 8. 패 상한 및 턴 종료 (END_PHASE - 공식 룰 605.1)
 // ==========================================
 
 function checkHandOverflowOrEndTurn(state: GameState): GameState {
@@ -2500,11 +2743,66 @@ export function executeEndPhase(state: GameState): GameState {
     lastEffectEvent: null,
   };
 
+  const p0 = { ...newState.players[0] };
+  const p1 = { ...newState.players[1] };
+
+  // 605.1.1 턴 종료 스킬 발동 (중첩 스킬 지원)
+  for (let i = 0; i < 2; i++) {
+    const pl = i === 0 ? p0 : p1;
+    const opp = i === 0 ? p1 : p0;
+    const lCards = getAllCardsInSlot(pl.slots.leader);
+
+    // 방랑자(남) Lv.2 [SD02-001] 리더: 각 턴 종료 시 카드 1장 드로우
+    if (lCards.some((c) => c.code === 'SD02-001')) {
+      const drawn = drawSingleCardFromDeck(pl);
+      if (drawn) {
+        pl.hand.push(drawn);
+        newState = addLog(newState, `[방랑자(남) Lv.2 턴 종료 효과] 덱에서 카드 1장을 드로우했습니다.`, 'ACTION', i as 0 | 1);
+      }
+    }
+
+    // 산화 Lv.2 [SD02-003] 리더: 각 턴 종료 시 덱 위 1장 협주 에리어에 배치
+    if (lCards.some((c) => c.code === 'SD02-003')) {
+      const charged = drawSingleCardFromDeck(pl);
+      if (charged) {
+        pl.concertoZone.push(charged);
+        newState = addLog(newState, `[산화 Lv.2 턴 종료 효과] 협주 에너지 1장을 충전했습니다.`, 'ACTION', i as 0 | 1);
+      }
+    }
+
+    // 앙코 Lv.2 [BP01-012] 리더: 이번 턴에 상대가 데미지를 받은 경우 트래시에서 앙코 카드 1장 패 추가
+    if (lCards.some((c) => c.code === 'BP01-012')) {
+      const ankeCard = pl.dropZone.find(
+        (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
+      ) as ActionCard | undefined;
+      if (ankeCard) {
+        pl.dropZone = pl.dropZone.filter((c) => c.id !== ankeCard.id);
+        pl.hand.push(ankeCard);
+        newState = addLog(newState, `[앙코 Lv.2 턴 종료 효과] 트래시에서 [${ankeCard.nameKr}]을(를) 패에 추가했습니다.`, 'ACTION', i as 0 | 1);
+      }
+    }
+  }
+
+  // 605.1.3 각 플레이어는 액션 에리어에 있는 모든 카드를 트래시 에리어로 이동
+  if (p0.actionArea && p0.actionArea.length > 0) {
+    p0.dropZone.push(...p0.actionArea);
+    p0.actionArea = [];
+  }
+  if (p1.actionArea && p1.actionArea.length > 0) {
+    p1.dropZone.push(...p1.actionArea);
+    p1.actionArea = [];
+  }
+
   // 연격 카운트 및 대결 플래그 초기화
-  newState.players[0].comboCount = 0;
-  newState.players[1].comboCount = 0;
-  newState.players[0].clashCardReady = false;
-  newState.players[1].clashCardReady = false;
+  p0.comboCount = 0;
+  p0.comboUnlimited = false;
+  p0.clashCardReady = false;
+
+  p1.comboCount = 0;
+  p1.comboUnlimited = false;
+  p1.clashCardReady = false;
+
+  newState.players = [p0, p1];
 
   // 턴 전환
   const nextPlayerIdx = newState.activePlayerIndex === 0 ? 1 : 0;

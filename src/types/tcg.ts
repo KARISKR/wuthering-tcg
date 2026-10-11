@@ -72,8 +72,10 @@ export interface PlayerState {
     switchedLeader: boolean;
     chargedConcerto: boolean;
   };
-  // 연격 횟수
+  // 연격 횟수 및 무제한 여부
   comboCount: number;
+  comboUnlimited?: boolean; // 적색 승리로 인한 이번 턴 무제한 콤보 여부 (공식 룰 604.1.2.7)
+  actionArea?: ActionCard[]; // 이번 턴 액션 에리어에 사용/배치된 카드 목록 (공식 룰 604.1.3.2)
   isAi: boolean;
 }
 

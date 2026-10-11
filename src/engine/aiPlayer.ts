@@ -432,7 +432,10 @@ export function selectAiClashCard(state: GameState, idx: 0 | 1 = 1, level: AiLev
 // ----------------------------------------------------------
 export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel = DEFAULT_AI_LEVEL): GameState {
   const currentState = { ...state };
-  if (currentState.phase !== 'COMBO_STEP' || currentState.players[idx].comboCount <= 0) {
+  if (
+    currentState.phase !== 'COMBO_STEP' ||
+    (!currentState.players[idx].comboUnlimited && currentState.players[idx].comboCount <= 0)
+  ) {
     return finishComboStep(currentState, idx);
   }
   const ai = currentState.players[idx];

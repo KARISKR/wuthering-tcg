@@ -1463,8 +1463,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               isTurnPlayer={isCurrentControlledTurn}
               canChargeConcerto={!activeControlledPlayer.actionFlags.chargedConcerto && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
               canSetClashCard={gameState.phase === 'CLASH_SET' && !activeControlledPlayer.clashCardReady}
-              isComboStep={gameState.phase === 'COMBO_STEP' && activeControlledPlayer.comboCount > 0}
+              isComboStep={gameState.phase === 'COMBO_STEP' && (Boolean(activeControlledPlayer.comboUnlimited) || activeControlledPlayer.comboCount > 0)}
               comboCount={activeControlledPlayer.comboCount}
+              comboUnlimited={activeControlledPlayer.comboUnlimited}
               selectedOverflowCardIds={selectedOverflowIds}
               onSelectOverflowCard={toggleOverflowCard}
               onChargeConcerto={(cardId) => handleChargeConcerto(controlledPlayerIndex, cardId)}
@@ -1571,7 +1572,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {gameState.phase === 'ACTION_PHASE' && '메인 페이즈: 카드 레벨업, 협주 충전 후 대결을 선언하세요.'}
               {gameState.phase === 'CLASH_SET' && '대결 세트: 손패의 액션 카드를 대결 존에 세트하세요.'}
               {gameState.phase === 'CLASH_REVEAL' && '판정 오픈: 양측 카드가 공개되고 상성이 판정됩니다.'}
-              {gameState.phase === 'COMBO_STEP' && `연격 단계: 추가 공격 가능 (${activeControlledPlayer.comboCount}회)`}
+              {gameState.phase === 'COMBO_STEP' &&
+                (activeControlledPlayer.comboUnlimited
+                  ? '연격 단계: 적색 연속 공격 무제한 가능'
+                  : `연격 단계: 추가 공격 가능 (${activeControlledPlayer.comboCount}회)`)}
               {gameState.phase === 'DISCARD_OVERFLOW' && `패 정리 단계: 8장을 초과한 패를 선택하여 버리세요.`}
               {gameState.phase === 'START_PHASE' && '턴 시작 페이즈'}
               {gameState.phase === 'DRAW_PHASE' && '드로우 페이즈'}
@@ -1751,23 +1755,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               )}
 
               {/* 3. 연격 단계 (COMBO_STEP) 액션 버튼 */}
-              {gameState.phase === 'COMBO_STEP' && activeControlledPlayer.comboCount > 0 && (
+              {gameState.phase === 'COMBO_STEP' &&
+                (Boolean(activeControlledPlayer.comboUnlimited) || activeControlledPlayer.comboCount > 0) && (
                 <div className="flex flex-col gap-2">
                   <div className="p-3 rounded-2xl bg-gradient-to-r from-red-950/95 via-orange-950/90 to-red-950/95 border-2 border-red-500 text-red-200 font-black text-xs flex items-center justify-between shadow-xl shadow-red-500/30 animate-pulse">
                     <div className="flex items-center gap-2.5">
                       <Flame className="w-5 h-5 text-orange-400 fill-orange-400 animate-bounce" />
                       <div>
                         <div className="text-xs font-black text-white flex items-center gap-1.5">
-                          <span>추격 게이지 가동 중!</span>
+                          <span>{activeControlledPlayer.comboUnlimited ? '무제한 연격 진행 중!' : '추격 게이지 가동 중!'}</span>
                           <span className="text-[10px] bg-red-800 text-red-100 px-1.5 py-0.2 rounded font-mono">연격 연속 공격</span>
                         </div>
                         <div className="text-[10px] text-orange-300 mt-0.5">손패의 [RED] 카드로 연속 공격 가능</div>
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
-                      <span className="text-[10px] text-orange-400 font-bold">남은 추격 카운트</span>
+                      <span className="text-[10px] text-orange-400 font-bold">
+                        {activeControlledPlayer.comboUnlimited ? '연격 모드' : '남은 추격 카운트'}
+                      </span>
                       <span className="font-mono text-base font-black text-amber-300 bg-red-900/90 px-3 py-0.5 rounded-lg border border-red-500/60 shadow-inner">
-                        {activeControlledPlayer.comboCount}회
+                        {activeControlledPlayer.comboUnlimited ? '무제한 (∞)' : `${activeControlledPlayer.comboCount}회`}
                       </span>
                     </div>
                   </div>
@@ -1775,7 +1782,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     onClick={() => handleFinishCombo(controlledPlayerIndex)}
                     className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition cursor-pointer border border-slate-700"
                   >
-                    연격 종료 (공격 중단)
+                    연격 종료 (턴 종료)
                   </button>
                 </div>
               )}

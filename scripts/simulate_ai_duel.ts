@@ -1,4 +1,4 @@
-﻿/**
+/**
  * AI 대전 시뮬레이터: 공식 스타터덱 1번(SD01 = STARTER_ROVER) vs 2번(SD02 = STARTER_CHIXIA)
  *
  * 사용법: npx tsx scripts/simulate_ai_duel.ts [games=100] [levelA=SMART] [levelB=BASIC]
@@ -78,7 +78,7 @@ function playMatch(p0Preset: Preset, p1Preset: Preset, lv0: AiLevel, lv1: AiLeve
         state = proceedAfterClashReveal(state);
         break;
       case 'COMBO_STEP': {
-        const idx: 0 | 1 = state.players[0].comboCount > 0 ? 0 : 1;
+        const idx: 0 | 1 = (state.players[0].comboUnlimited || state.players[0].comboCount > 0) ? 0 : 1;
         state = runAiComboStep(state, idx, levels[idx]);
         break;
       }
