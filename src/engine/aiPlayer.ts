@@ -9,6 +9,8 @@ import {
   discardOverflowCards,
   canLeaderUseCard,
   findEvolutionCard,
+  slotHasCharacterSkill,
+  playerHasCharacterSkill,
 } from './gameEngine';
 
 // ==========================================================
@@ -52,7 +54,7 @@ function canPlay(p: PlayerState, c: ActionCard, leader: CharacterCard = p.slots.
 }
 
 function comboCostOf(p: PlayerState, c: ActionCard): number {
-  if (p.slots.leader.characterName === '금희' && p.slots.leader.level >= 1) return Math.max(0, c.cost - 1);
+  if (slotHasCharacterSkill(p.slots.leader, '금희', 1)) return Math.max(0, c.cost - 1);
   return c.cost;
 }
 
@@ -83,14 +85,18 @@ export function decideAiMulligan(aiPlayer: PlayerState, level: AiLevel = DEFAULT
 // ----------------------------------------------------------
 function cardRawValue(c: ActionCard, leader: CharacterCard | undefined): number {
   let dmg = c.damage;
-  if (leader?.characterName === '금희' && c.color === 'RED') dmg += 1 + (leader.level === 2 ? 1 : 0);
+  if (slotHasCharacterSkill(leader, '금희', 0) && c.color === 'RED') dmg += 1;
+  if (slotHasCharacterSkill(leader, '금희', 2) && c.color === 'RED') dmg += 1;
   let v = dmg;
   let combo = (c.color === 'RED' ? 1 : 0) + (c.pursuitCount ?? 0);
-  if (leader?.characterName === '치샤' && leader.level >= 1) combo += 1;
-  v += Math.min(combo, 4) * 1.1;
-  if (c.effectType === 'DRAW') v += 1.5;
-  if (c.effectType === 'HEAL') v += 1.5;
-  if (c.effectType === 'CHARGE') v += 2;
+  if (slotHasCharacterSkill(leader, '치샤', 1)) combo += 1;
+  if (c.code === 'SD02-010') { combo += 8; v += 4.5; } // 용을 타고 하늘로 향해 (추격 8 + 3드로우)
+  if (c.code === 'BP01-057') { combo += 8; v += 3.5; } // 결말의 순환 (추격 8 + 1힐)
+  if (c.code === 'SD01-023') { v += 4.0; } // 울림의 연주 (5pt 힐)
+  v += Math.min(combo, 8) * 1.1;
+  if (c.effectType === 'DRAW' || c.code === 'BP01-058') v += 2.0;
+  if (c.effectType === 'HEAL') v += 2.0;
+  if (c.effectType === 'CHARGE') v += 2.0;
   if (c.color === 'BLUE') v += 1.0; // 상대 연격 봉쇄 가치
   return v;
 }
@@ -136,8 +142,9 @@ const BEATS: Record<CardColor, CardColor> = { RED: 'GREEN', GREEN: 'BLUE', BLUE:
 
 function effectiveSpeed(p: PlayerState, c: ActionCard): number {
   let s = c.speed ?? 0;
-  if (p.slots.leader.characterName === '치샤' && c.color === 'RED') s += 1;
-  if (p.slots.leader.characterName === '금희' && p.slots.leader.level === 2 && c.color === 'RED') s += 1;
+  if (slotHasCharacterSkill(p.slots.leader, '치샤', 0) && c.color === 'RED') s += 1;
+  if (slotHasCharacterSkill(p.slots.leader, '금희', 2) && c.color === 'RED') s += 1;
+  if (c.code === 'BP01-059' && slotHasCharacterSkill(p.slots.leader, '앙코')) s = 10;
   return s;
 }
 
@@ -264,7 +271,7 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
       const up = findEvolutionCard(p.characterDeck, ch);
       if (!up) continue;
       let req = up.level;
-      const hasYang2 = SLOT_KEYS.some((s) => p.slots[s]?.characterName === '양양' && p.slots[s]?.level === 2);
+      const hasYang2 = playerHasCharacterSkill(p, '양양', 2);
       if (hasYang2 && req > 1) req -= 1;
       if (p.hand.length - req < P.upgradeMinHandAfter) continue;
       // 업그레이드 이득: 해당 캐릭터를 리더로 세웠을 때의 점수 상승 + 현재 리더 보너스
@@ -279,7 +286,7 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
     }
     if (bestSlot && bestUpgrade && bestScore > 0) {
       let req = bestUpgrade.level;
-      const hasYang2 = SLOT_KEYS.some((s) => p.slots[s]?.characterName === '양양' && p.slots[s]?.level === 2);
+      const hasYang2 = playerHasCharacterSkill(p, '양양', 2);
       if (hasYang2 && req > 1) req -= 1;
       const discards = chooseDiscards(p, req).map((c) => c.id);
       const res = upgradeCharacter(cur, idx, bestSlot, bestUpgrade.id, discards);
@@ -432,8 +439,20 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
     redCards.sort((a, b) => b.damage - a.damage);
     chosen = redCards[0];
   } else {
-    const bonus = ai.slots.leader.characterName === '치샤' && ai.slots.leader.level === 2 ? 1 : 0;
-    const dmgOf = (c: ActionCard) => c.damage + bonus;
+    const isChixiaLv2 = slotHasCharacterSkill(ai.slots.leader, '치샤', 2);
+    const isJinhsiLv2 = slotHasCharacterSkill(ai.slots.leader, '금희', 2);
+    const isCamellyaLv2 = slotHasCharacterSkill(ai.slots.leader, '카멜리아', 2);
+    const isAnkeLv2 = slotHasCharacterSkill(ai.slots.leader, '앙코', 2);
+    const dmgOf = (c: ActionCard) => {
+      let d = c.damage;
+      if (isChixiaLv2) d += 1;
+      if (isJinhsiLv2 && c.color === 'RED') d += 1;
+      if (isCamellyaLv2 && c.characterExclusive === '카멜리아') d += 1;
+      if (isAnkeLv2 && c.characterExclusive === '앙코') d += 1;
+      if (c.code === 'SD02-011') d += 3;
+      if (c.code === 'BP01-050') d += 1;
+      return d;
+    };
     // 치명타 가능하면 최우선
     const lethal = redCards.filter((c) => dmgOf(c) >= opp.hp).sort((a, b) => comboCostOf(ai, a) - comboCostOf(ai, b));
     if (lethal.length > 0) {
