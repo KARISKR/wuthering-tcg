@@ -22,6 +22,9 @@ import {
   BookmarkCheck,
   Share2,
   X,
+  AlertTriangle,
+  AlertCircle,
+  ArrowRight,
 } from 'lucide-react';
 import { DeckPresetModal } from './DeckPresetModal';
 import { DeckExportModal } from './DeckExportModal';
@@ -289,14 +292,31 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     }
   };
 
+  // 덱 검증 오류 항목 인터페이스
+  interface ValidationErrorItem {
+    id: string;
+    category: 'CARD_COUNT' | 'CHARACTERS' | 'CARD_LIMIT' | 'EXCLUSIVE';
+    categoryLabel: string;
+    title: string;
+    badge: string;
+    badgeColor: 'red' | 'amber' | 'purple';
+    description: string;
+    actionHint: string;
+    actionTab?: 'ACTION' | 'CHARACTER';
+  }
+
+  // 덱 규칙 위반 모달 상태
+  const [validationErrors, setValidationErrors] = useState<ValidationErrorItem[]>([]);
+  const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
+
   // 현재 선택된 캐릭터 슬롯 타깃 ('LEADER' | 'LEFT' | 'RIGHT')
   const [selectedSlot, setSelectedSlot] = useState<'LEADER' | 'LEFT' | 'RIGHT'>('LEADER');
 
   // 덱 생성 규칙 검사 (규칙 위반 사유 상세 리스트 반환)
-  const getDeckValidationErrors = (): string[] => {
-    const errors: string[] = [];
+  const getDeckValidationErrors = (): ValidationErrorItem[] => {
+    const errors: ValidationErrorItem[] = [];
 
-    // 1. 캐릭터 중복 검사
+    // 1. 캐릭터 중복 및 필수 편성 검사
     const charNames = [
       leader?.characterName || leader?.nameKr,
       leftSupport?.characterName || leftSupport?.nameKr,
@@ -304,7 +324,17 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     ].filter(Boolean);
 
     if (charNames.length < 3) {
-      errors.push('출전 캐릭터 3인(리더 1명, 서포터 2명)이 모두 편성되어야 합니다.');
+      errors.push({
+        id: 'chars-incomplete',
+        category: 'CHARACTERS',
+        categoryLabel: '출전 캐릭터',
+        title: '출전 캐릭터 3인 미편성',
+        badge: '인원 부족',
+        badgeColor: 'amber',
+        description: '리더 1명과 서포터 2명으로 총 3명의 서로 다른 캐릭터를 모두 편성해야 합니다.',
+        actionHint: '중앙의 빈 슬롯을 클릭한 후 우측에서 캐릭터를 편성해주세요.',
+        actionTab: 'CHARACTER',
+      });
     } else {
       const nameSet = new Set<string>();
       const dupes: string[] = [];
@@ -316,13 +346,34 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         }
       });
       if (dupes.length > 0) {
-        errors.push(`출전 캐릭터에 동일한 캐릭터가 중복 편성되었습니다. (${dupes.join(', ')})`);
+        errors.push({
+          id: 'chars-duplicate',
+          category: 'CHARACTERS',
+          categoryLabel: '출전 캐릭터',
+          title: '동일 캐릭터 중복 편성',
+          badge: `중복: ${dupes.join(', ')}`,
+          badgeColor: 'amber',
+          description: `출전 캐릭터 3인은 서로 다른 캐릭터여야 합니다. 현재 '${dupes.join(', ')}'가 중복 지정되었습니다.`,
+          actionHint: '중복된 슬롯을 클릭한 뒤 우측 캐릭터 탭에서 다른 캐릭터를 선택하세요.',
+          actionTab: 'CHARACTER',
+        });
       }
     }
 
-    // 2. 덱 40장 검사
+    // 2. 액션 덱 40장 검사
     if (actionDeck.length !== 40) {
-      errors.push(`액션 카드는 정확히 40장이어야 합니다. (현재: ${actionDeck.length}/40장)`);
+      const diff = 40 - actionDeck.length;
+      errors.push({
+        id: 'deck-count',
+        category: 'CARD_COUNT',
+        categoryLabel: '덱 장수',
+        title: '액션 덱 40장 미충족',
+        badge: `${actionDeck.length} / 40장 (${diff > 0 ? `${diff}장 부족` : `${-diff}장 초과`})`,
+        badgeColor: 'red',
+        description: `공식 룰상 메인 액션 덱은 반드시 정확히 40장으로 구성되어야 합니다.`,
+        actionHint: diff > 0 ? `우측 라이브러리에서 액션 또는 에코 카드를 ${diff}장 더 담아주세요.` : `덱 목록에서 불필요한 카드를 ${-diff}장 빼주세요.`,
+        actionTab: 'ACTION',
+      });
     }
 
     // 3. 동일 카드 3장 초과 검사
@@ -331,9 +382,19 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       const prev = countMap.get(c.code) || { name: c.nameKr, count: 0 };
       countMap.set(c.code, { name: c.nameKr, count: prev.count + 1 });
     });
-    countMap.forEach(({ name, count }) => {
+    countMap.forEach(({ name, count }, code) => {
       if (count > 3) {
-        errors.push(`'${name}' 카드가 최대 투입 매수(3장)를 초과했습니다. (현재: ${count}장)`);
+        errors.push({
+          id: `card-limit-${code}`,
+          category: 'CARD_LIMIT',
+          categoryLabel: '투입 한도',
+          title: `'${name}' 카드 투입 초과`,
+          badge: `${count}장 투입됨 (최대 3장)`,
+          badgeColor: 'red',
+          description: `공식 룰상 동일한 카드는 덱에 최대 3장까지만 넣을 수 있습니다.`,
+          actionHint: `덱 목록에서 해당 카드를 클릭하거나 우클릭하여 ${count - 3}장 제거해주세요.`,
+          actionTab: 'ACTION',
+        });
       }
     });
 
@@ -347,20 +408,30 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       rightSupport?.nameKr,
     ].filter(Boolean);
 
-    const invalidExclusives = new Set<string>();
+    const invalidExclusives = new Map<string, { cardName: string; exclusiveFor: string }>();
     actionDeck.forEach((c) => {
       if (c.characterExclusive) {
         const match = activeCharNames.some(
           (n) => n && (n.includes(c.characterExclusive!) || c.characterExclusive!.includes(n))
         );
         if (!match) {
-          invalidExclusives.add(`'${c.nameKr}' (전용: ${c.characterExclusive})`);
+          invalidExclusives.set(c.code, { cardName: c.nameKr, exclusiveFor: c.characterExclusive });
         }
       }
     });
-    if (invalidExclusives.size > 0) {
-      errors.push(`현재 출전 캐릭터가 사용할 수 없는 전용 카드가 포함되어 있습니다: ${Array.from(invalidExclusives).join(', ')}`);
-    }
+    invalidExclusives.forEach(({ cardName, exclusiveFor }, code) => {
+      errors.push({
+        id: `exclusive-${code}`,
+        category: 'EXCLUSIVE',
+        categoryLabel: '전용 카드',
+        title: `'${cardName}' 사용 불가`,
+        badge: `전용 대상: ${exclusiveFor}`,
+        badgeColor: 'purple',
+        description: `현재 출전 멤버(${activeCharNames.slice(0, 3).join(', ')}) 중 '${exclusiveFor}' 캐릭터가 없어 해당 카드를 사용할 수 없습니다.`,
+        actionHint: `덱에서 해당 카드를 제거하거나, '${exclusiveFor}' 캐릭터를 출전 슬롯에 편성하세요.`,
+        actionTab: 'ACTION',
+      });
+    });
 
     return errors;
   };
@@ -401,10 +472,8 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   const saveDeck = () => {
     const errors = getDeckValidationErrors();
     if (errors.length > 0) {
-      alert(
-        `[덱 생성 규칙 위반]\n다음 사유로 인해 덱을 저장할 수 없습니다:\n\n` +
-          errors.map((e, idx) => `${idx + 1}. ${e}`).join('\n')
-      );
+      setValidationErrors(errors);
+      setIsValidationModalOpen(true);
       return;
     }
 
@@ -651,10 +720,8 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
             onClick={() => {
               const errors = getDeckValidationErrors();
               if (errors.length > 0) {
-                alert(
-                  `[덱 출격 불가 - 규칙 위반]\n다음 사유를 해결한 후 출격할 수 있습니다:\n\n` +
-                    errors.map((e, idx) => `${idx + 1}. ${e}`).join('\n')
-                );
+                setValidationErrors(errors);
+                setIsValidationModalOpen(true);
                 return;
               }
               onStartBattleWithDeck({
@@ -1815,6 +1882,133 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           if (off) setActiveCard(off);
         }}
       />
+
+      {/* 덱 생성 규칙 미충족 안내 모달 (직관적 카드형 경고 모달) */}
+      {isValidationModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-xl bg-slate-900 border-2 border-amber-500/80 rounded-2xl shadow-2xl shadow-amber-500/10 overflow-hidden flex flex-col max-h-[85vh]">
+            {/* 모달 헤더 */}
+            <div className="bg-gradient-to-r from-amber-950/80 via-slate-900 to-red-950/80 px-6 py-4 border-b border-amber-500/30 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <AlertTriangle className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white flex items-center gap-2">
+                    덱 생성 규칙 확인 필요
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 font-mono">
+                      {validationErrors.length}건 미충족
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-400 font-medium">
+                    공식 룰 규정에 따라 아래 항목을 조정한 후 저장 및 출격할 수 있습니다.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsValidationModalOpen(false)}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 위반 사항 리스트 본문 */}
+            <div className="p-5 overflow-y-auto space-y-3 flex-1">
+              {validationErrors.map((err, idx) => (
+                <div
+                  key={err.id || idx}
+                  className={`p-4 rounded-xl border transition-all ${
+                    err.badgeColor === 'red'
+                      ? 'bg-red-950/20 border-red-500/40 hover:border-red-500/60'
+                      : err.badgeColor === 'purple'
+                      ? 'bg-purple-950/20 border-purple-500/40 hover:border-purple-500/60'
+                      : 'bg-amber-950/20 border-amber-500/40 hover:border-amber-500/60'
+                  }`}
+                >
+                  {/* 상단 분류 뱃지 & 제목 & 상태 뱃지 */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span
+                        className={`text-[10px] font-black px-2 py-0.5 rounded-md shrink-0 ${
+                          err.badgeColor === 'red'
+                            ? 'bg-red-500/30 text-red-300 border border-red-500/50'
+                            : err.badgeColor === 'purple'
+                            ? 'bg-purple-500/30 text-purple-300 border border-purple-500/50'
+                            : 'bg-amber-500/30 text-amber-300 border border-amber-500/50'
+                        }`}
+                      >
+                        {err.categoryLabel}
+                      </span>
+                      <h4 className="text-sm font-black text-white truncate">{err.title}</h4>
+                    </div>
+                    <span
+                      className={`text-xs font-mono font-black px-2.5 py-0.5 rounded-full shrink-0 ${
+                        err.badgeColor === 'red'
+                          ? 'bg-red-500 text-slate-950'
+                          : err.badgeColor === 'purple'
+                          ? 'bg-purple-400 text-slate-950'
+                          : 'bg-amber-400 text-slate-950'
+                      }`}
+                    >
+                      {err.badge}
+                    </span>
+                  </div>
+
+                  {/* 사유 설명 */}
+                  <p className="text-xs text-slate-300 leading-relaxed font-medium mb-3">
+                    {err.description}
+                  </p>
+
+                  {/* 해결 팁 박스 및 원클릭 바로가기 버튼 */}
+                  <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950/70 border border-slate-800 text-xs">
+                    <div className="flex items-center gap-2 text-slate-300 min-w-0">
+                      <span className="text-amber-400 font-bold shrink-0">💡 해결 방법:</span>
+                      <span className="font-medium text-slate-200 truncate">{err.actionHint}</span>
+                    </div>
+                    {err.actionTab && (
+                      <button
+                        onClick={() => {
+                          setPoolTab(err.actionTab!);
+                          if (err.category === 'CHARACTERS') {
+                            setSelectedSlot('LEADER');
+                          }
+                          setIsValidationModalOpen(false);
+                        }}
+                        className="shrink-0 flex items-center gap-1 px-3 py-1 rounded-lg bg-amber-500 hover:bg-yellow-400 text-slate-950 font-black text-xs shadow transition cursor-pointer"
+                      >
+                        <span>바로 수정하기</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 모달 푸터 */}
+            <div className="p-4 bg-slate-950 border-t border-slate-800 flex items-center justify-between gap-3">
+              <span className="text-xs text-slate-400">
+                모든 항목을 조정한 후 저장을 다시 시도해주세요.
+              </span>
+              <button
+                onClick={() => {
+                  const first = validationErrors[0];
+                  if (first?.actionTab) {
+                    setPoolTab(first.actionTab);
+                    if (first.category === 'CHARACTERS') setSelectedSlot('LEADER');
+                  }
+                  setIsValidationModalOpen(false);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs shadow-lg transition cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                확인 및 덱 수정하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
