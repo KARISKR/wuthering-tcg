@@ -20,13 +20,13 @@ export const FeedbackWidget: React.FC<FeedbackWidgetProps> = ({ currentContextVi
     return () => window.removeEventListener('storage', updateCount);
   }, [isOpen]);
 
-  // 화면별 UI 요소와 겹치지 않도록 동적 위치 배정
-  const positionClass =
-    currentContextView === 'BATTLE'
-      ? 'fixed bottom-4 left-4 z-40' // 배틀 중: 우측 조작 콘솔 간섭 방지를 위해 좌측 하단 배치
-      : currentContextView === 'LOBBY'
-      ? 'fixed bottom-20 right-5 z-40' // 로비: 패치노트 위젯 바로 위에 단정하게 스택
-      : 'fixed bottom-5 right-5 z-40'; // 덱빌더 등 기본 위치
+  // 메인 화면(LOBBY)에서만 표시되도록 제한
+  if (currentContextView !== 'LOBBY') {
+    return null;
+  }
+
+  // 로비: 패치노트 위젯 바로 위에 단정하게 스택
+  const positionClass = 'fixed bottom-20 right-5 z-40';
 
   return (
     <>

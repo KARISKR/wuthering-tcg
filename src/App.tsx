@@ -73,8 +73,8 @@ export function App() {
         />
       )}
 
-      {/* 전역 버그 제보 & 피드백 플로팅 위젯 */}
-      <FeedbackWidget currentContextView={currentView} />
+      {/* 메인 화면(로비) 전용 버그 제보 & 피드백 플로팅 위젯 */}
+      {currentView === 'LOBBY' && <FeedbackWidget currentContextView="LOBBY" />}
     </div>
   );
 }
