@@ -690,6 +690,156 @@ export function upgradeCharacter(
     }
   );
 
+  // 레벨업 시 발동 효과 (Optional Choice)
+  // 1. BP01-003 카멜리아 Lv.1: 트래시에서 일반 공격 1장 패에 추가 가능
+  if (upgradeCard.code === 'BP01-003') {
+    const normalAttacks = player.dropZone.filter(
+      (c) => c.kind === 'ACTION' && (c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격'))
+    ) as ActionCard[];
+    if (normalAttacks.length > 0) {
+      if (player.isAi) {
+        const [reclaimed] = player.dropZone.splice(0, 1);
+        player.hand.push(reclaimed as ActionCard);
+      } else {
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: '카멜리아 레벨업 효과 (트래시 회수)',
+          sourceCardName: '카멜리아 [BP01-003]',
+          sourceCardArt: upgradeCard.artUrl,
+          description: '레벨업 효과로 트래시 에리어에서 <일반 공격> 카드 1장을 패에 추가할 수 있습니다.',
+          revealedCards: normalAttacks,
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'RECOVER_FROM_DROP',
+        };
+      }
+    }
+  }
+
+  // 2. BP01-009 파수인 Lv.1: 트래시에서 <변주 스킬> 카드 1장 패에 추가 가능
+  if (upgradeCard.code === 'BP01-009') {
+    const introSkills = player.dropZone.filter((c) => c.kind === 'ACTION' && c.nameKr.includes('변주 스킬')) as ActionCard[];
+    if (introSkills.length > 0) {
+      if (player.isAi) {
+        const [reclaimed] = player.dropZone.splice(0, 1);
+        player.hand.push(reclaimed as ActionCard);
+      } else {
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: '파수인 레벨업 효과 (트래시 회수)',
+          sourceCardName: '파수인 [BP01-009]',
+          sourceCardArt: upgradeCard.artUrl,
+          description: '레벨업 효과로 트래시 에리어에서 <변주 스킬> 카드 1장을 패에 추가할 수 있습니다.',
+          revealedCards: introSkills,
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'RECOVER_FROM_DROP',
+        };
+      }
+    }
+  }
+
+  // 3. BP01-013 앙코 Lv.1: 트래시에서 【앙코】의 적색 카드 1장 패에 추가 가능
+  if (upgradeCard.code === 'BP01-013') {
+    const ankeRed = player.dropZone.filter(
+      (c) => c.kind === 'ACTION' && (c as ActionCard).color === 'RED' && c.characterExclusive?.includes('앙코')
+    ) as ActionCard[];
+    if (ankeRed.length > 0) {
+      if (player.isAi) {
+        const [reclaimed] = player.dropZone.splice(0, 1);
+        player.hand.push(reclaimed as ActionCard);
+      } else {
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: '앙코 레벨업 효과 (트래시 회수)',
+          sourceCardName: '앙코 [BP01-013]',
+          sourceCardArt: upgradeCard.artUrl,
+          description: '레벨업 효과로 트래시 에리어에서 【앙코】의 적색 카드 1장을 패에 추가할 수 있습니다.',
+          revealedCards: ankeRed,
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'RECOVER_FROM_DROP',
+        };
+      }
+    }
+  }
+
+  // 4. BP01-026 치샤 Lv.1: 트래시에서 <기본 공격> 카드 1장 패에 추가 가능
+  if (upgradeCard.code === 'BP01-026') {
+    const normalAttacks = player.dropZone.filter(
+      (c) => c.kind === 'ACTION' && (c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격'))
+    ) as ActionCard[];
+    if (normalAttacks.length > 0) {
+      if (player.isAi) {
+        const [reclaimed] = player.dropZone.splice(0, 1);
+        player.hand.push(reclaimed as ActionCard);
+      } else {
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: '치샤 레벨업 효과 (트래시 회수)',
+          sourceCardName: '치샤 [BP01-026]',
+          sourceCardArt: upgradeCard.artUrl,
+          description: '레벨업 효과로 트래시 에리어에서 <기본 공격> 카드 1장을 패에 추가할 수 있습니다.',
+          revealedCards: normalAttacks,
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'RECOVER_FROM_DROP',
+        };
+      }
+    }
+  }
+
+  // 5. BP01-032 산화 Lv.1: 트래시에서 카드 1장을 협주 에리어에 배치 가능
+  if (upgradeCard.code === 'BP01-032') {
+    const dropCards = player.dropZone.filter((c) => c.kind === 'ACTION') as ActionCard[];
+    if (dropCards.length > 0) {
+      if (player.isAi) {
+        const [chosen] = player.dropZone.splice(0, 1);
+        player.concertoZone.push(chosen as ActionCard);
+      } else {
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: '산화 레벨업 효과 (협주 배치)',
+          sourceCardName: '산화 [BP01-032]',
+          sourceCardArt: upgradeCard.artUrl,
+          description: '레벨업 효과로 트래시 에리어에서 카드 1장을 협주 에리어에 배치할 수 있습니다.',
+          revealedCards: dropCards,
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'SET_CONCERTO',
+        };
+      }
+    }
+  }
+
+  // 6. BP01-017 / BP01-020 방랑자 Lv.1: 덱 위의 카드 1장을 공개하고 패에 추가 가능
+  if (upgradeCard.code === 'BP01-017' || upgradeCard.code === 'BP01-020') {
+    const topCard = drawSingleCardFromDeck(player);
+    if (topCard) {
+      if (player.isAi) {
+        player.hand.push(topCard);
+      } else {
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: `${upgradeCard.nameKr} 레벨업 효과`,
+          sourceCardName: `${upgradeCard.nameKr} [${upgradeCard.code}]`,
+          sourceCardArt: upgradeCard.artUrl,
+          description: '레벨업 효과로 덱 위의 카드 1장을 공개하고 패에 추가할 수 있습니다 (0장 선택 시 덱 유지).',
+          revealedCards: [topCard],
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'ADD_TO_HAND',
+        };
+      }
+    }
+  }
+
   return { success: true, newState };
 }
 
@@ -906,7 +1056,7 @@ export function setClashCard(
     }
   }
 
-  // 2. 파수인 [BP01-010] 리더 배틀 효과: 녹색 카드로 배틀 시 덱 위 1장 드로우
+  // 2. 파수인 [BP01-010] 리더 배틀 효과: 녹색 카드로 배틀 시 덱 위 1장 공개 후 패에 추가 가능 (선택 효과)
   if (
     player.clashCard &&
     player.clashCard.color === 'GREEN' &&
@@ -914,18 +1064,33 @@ export function setClashCard(
   ) {
     const card = drawSingleCardFromDeck(player);
     if (card) {
-      player.hand.push(card);
-      newState = addLog(
-        newState,
-        `[파수인 BP01-010 리더 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱에서 1장을 드로우했습니다.`,
-        'ACTION',
-        playerIndex,
-        { cardArt: player.slots.leader.artUrl, cardName: player.slots.leader.nameKr, effectTag: '배틀 드로우' }
-      );
+      if (player.isAi) {
+        player.hand.push(card);
+        newState = addLog(
+          newState,
+          `[파수인 BP01-010 리더 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱에서 1장을 드로우했습니다.`,
+          'ACTION',
+          playerIndex,
+          { cardArt: player.slots.leader.artUrl, cardName: player.slots.leader.nameKr, effectTag: '배틀 드로우' }
+        );
+      } else {
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: '파수인 배틀 효과 (패 추가 선택)',
+          sourceCardName: '파수인 [BP01-010]',
+          sourceCardArt: player.slots.leader.artUrl,
+          description: '녹색 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 공개하고 패에 추가하시겠습니까? (선택하지 않을 경우 덱 맨 위에 유지됩니다)',
+          revealedCards: [card],
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'ADD_TO_HAND',
+        };
+      }
     }
   }
 
-  // 3. 양양 [BP01-024] / 산화 [BP01-033] 리더 배틀 효과: 청색(방어) 카드로 배틀 시 덱 위 1장 협주 충전
+  // 3. 양양 [BP01-024] / 산화 [BP01-033] 리더 배틀 효과: 청색(방어) 카드로 배틀 시 덱 위 1장 협주 에리어에 배치 가능 (선택 효과)
   if (
     player.clashCard &&
     player.clashCard.color === 'BLUE' &&
@@ -936,14 +1101,30 @@ export function setClashCard(
   ) {
     const card = drawSingleCardFromDeck(player);
     if (card) {
-      player.concertoZone.push(card);
-      newState = addLog(
-        newState,
-        `[${player.slots.leader.nameKr} 리더 효과] ${player.name}이(가) 청색 카드 배틀 효과로 덱 위 1장을 협주 에리어에 충전했습니다!`,
-        'ACTION',
-        playerIndex,
-        { cardArt: player.slots.leader.artUrl, cardName: player.slots.leader.nameKr, effectTag: '협주 충전' }
-      );
+      if (player.isAi) {
+        player.concertoZone.push(card);
+        newState = addLog(
+          newState,
+          `[${player.slots.leader.nameKr} 리더 효과] ${player.name}이(가) 청색 카드 배틀 효과로 덱 위 1장을 협주 에리어에 충전했습니다!`,
+          'ACTION',
+          playerIndex,
+          { cardArt: player.slots.leader.artUrl, cardName: player.slots.leader.nameKr, effectTag: '협주 충전' }
+        );
+      } else {
+        const leaderName = player.slots.leader.nameKr;
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: `${leaderName} 배틀 효과 (협주 배치 선택)`,
+          sourceCardName: `${leaderName} [배틀 효과]`,
+          sourceCardArt: player.slots.leader.artUrl,
+          description: '청색(방어) 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 협주 에리어에 배치하시겠습니까? (선택하지 않을 경우 덱 맨 위에 유지됩니다)',
+          revealedCards: [card],
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'SET_CONCERTO',
+        };
+      }
     }
   }
 
@@ -1260,19 +1441,35 @@ export function resolveClash(state: GameState): GameState {
     }
 
     // 2. 카드/리더 승리 특수 효과 발동
-    // A. BP01-005 카멜리아 리더 승리: 트래시에서 일반 공격 1장 회수
+    // A. BP01-005 카멜리아 리더 승리: 트래시에서 일반 공격 1장 패에 추가 가능 (선택 효과)
     if (winnerPlayer.slots.leader.characterName === '카멜리아') {
-      const normalAtkIdx = winnerPlayer.dropZone.findIndex((c) => c.kind === 'ACTION' && (c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격')));
-      if (normalAtkIdx !== -1) {
-        const [reclaimed] = winnerPlayer.dropZone.splice(normalAtkIdx, 1);
-        winnerPlayer.hand.push(reclaimed as ActionCard);
-        newState = addLog(
-          newState,
-          `[카멜리아 BP01-005 리더 효과] 판정 승리로 트래시에서 [${reclaimed.nameKr}]을(를) 패에 회수했습니다!`,
-          'ACTION',
-          winnerIndex,
-          { cardArt: reclaimed.artUrl, cardName: reclaimed.nameKr, effectTag: '트래시 회수' }
-        );
+      const normalAttacks = winnerPlayer.dropZone.filter((c) => c.kind === 'ACTION' && (c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격'))) as ActionCard[];
+      if (normalAttacks.length > 0) {
+        if (winnerPlayer.isAi) {
+          const reclaimed = normalAttacks[0];
+          winnerPlayer.dropZone = winnerPlayer.dropZone.filter((c) => c.id !== reclaimed.id);
+          winnerPlayer.hand.push(reclaimed);
+          newState = addLog(
+            newState,
+            `[카멜리아 BP01-005 리더 효과] 판정 승리로 트래시에서 [${reclaimed.nameKr}]을(를) 패에 회수했습니다!`,
+            'ACTION',
+            winnerIndex,
+            { cardArt: reclaimed.artUrl, cardName: reclaimed.nameKr, effectTag: '트래시 회수' }
+          );
+        } else {
+          newState.pendingChoice = {
+            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            playerIndex: winnerIndex,
+            title: '카멜리아 판정 효과 (트래시 회수)',
+            sourceCardName: '카멜리아 [BP01-005]',
+            sourceCardArt: winnerPlayer.slots.leader.artUrl,
+            description: '판정 승리 효과로 트래시 에리어의 일반 공격 카드 1장을 패에 추가할 수 있습니다. 회수할 카드를 선택하세요 (선택하지 않고 패스 가능).',
+            revealedCards: normalAttacks,
+            minSelect: 0,
+            maxSelect: 1,
+            onResolveType: 'RECOVER_FROM_DROP',
+          };
+        }
       }
     }
 
@@ -1827,7 +2024,8 @@ export function executeComboAttack(
   state: GameState,
   playerIndex: 0 | 1,
   cardId: string,
-  spentConcertoIds?: string[]
+  spentConcertoIds?: string[],
+  discardForBonusDmgId?: string
 ): { success: boolean; newState: GameState; error?: string } {
   const player = { ...state.players[playerIndex] };
   const opponent = { ...state.players[playerIndex === 0 ? 1 : 0] };
@@ -2081,13 +2279,23 @@ export function executeComboAttack(
   if (card.code === 'BP01-050') {
     dmg += 1;
   }
-  // BP01-065 / BP01-067 소리의 변화·강공격: 패 1장 버리고 데미지 +1
-  if ((card.code === 'BP01-065' || card.code === 'BP01-067') && player.hand.length > 0) {
-    const discarded = player.hand.pop();
-    if (discarded) {
-      player.dropZone.push(discarded);
-      dmg += 1;
-      newState = addLog(newState, `[${card.nameKr} 콤보 효과] 패 1장을 버리고 데미지가 +1 증가했습니다!`, 'ACTION', playerIndex);
+  // BP01-065 / BP01-067 소리의 변화·강공격: 패 1장 버릴 수 있다. 패를 버렸을 경우, 데미지 +1 (선택 효과)
+  if (card.code === 'BP01-065' || card.code === 'BP01-067') {
+    if (player.isAi && player.hand.length > 0) {
+      const discarded = player.hand.pop();
+      if (discarded) {
+        player.dropZone.push(discarded);
+        dmg += 1;
+        newState = addLog(newState, `[${card.nameKr} 콤보 효과] 패 1장을 버리고 데미지가 +1 증가했습니다!`, 'ACTION', playerIndex);
+      }
+    } else if (discardForBonusDmgId) {
+      const idx = player.hand.findIndex((c) => c.id === discardForBonusDmgId);
+      if (idx !== -1) {
+        const [discarded] = player.hand.splice(idx, 1);
+        player.dropZone.push(discarded);
+        dmg += 1;
+        newState = addLog(newState, `[${card.nameKr} 콤보 효과] [${discarded.nameKr}]을(를) 버리고 데미지가 +1 증가했습니다!`, 'ACTION', playerIndex);
+      }
     }
   }
 
@@ -2238,21 +2446,104 @@ export function resolvePendingChoice(
 ): GameState {
   if (!state.pendingChoice) return state;
 
-  const { playerIndex, revealedCards, sourceCardName } = state.pendingChoice;
+  const { playerIndex, revealedCards, sourceCardName, onResolveType } = state.pendingChoice;
   const player = { ...state.players[playerIndex] };
-
-  // 선택된 카드는 패로
-  const chosenCards = revealedCards.filter((c) => chosenCardIds.includes(c.id));
-  player.hand = [...player.hand, ...chosenCards];
-
-  // 선택되지 않은 카드는 덱 맨 아래로
-  const unchosenCards = revealedCards.filter((c) => !chosenCardIds.includes(c.id));
-  player.actionDeck = [...player.actionDeck, ...unchosenCards];
 
   let newState: GameState = {
     ...state,
     pendingChoice: null,
   };
+
+  const chosenCards = revealedCards.filter((c) => chosenCardIds.includes(c.id));
+  const unchosenCards = revealedCards.filter((c) => !chosenCardIds.includes(c.id));
+
+  if (onResolveType === 'SET_CONCERTO') {
+    // 1. 협주 에리어 배치 선택
+    if (chosenCards.length > 0) {
+      player.concertoZone = [...player.concertoZone, ...chosenCards];
+    }
+    // 미선택된 카드는 덱 맨 위에 유지 (덱 깎이지 않음!)
+    if (unchosenCards.length > 0) {
+      player.actionDeck = [...unchosenCards, ...player.actionDeck];
+    }
+
+    newState.players[playerIndex] = player;
+
+    if (chosenCards.length > 0) {
+      newState.lastEffectEvent = {
+        id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        sourceCardName,
+        effectType: 'CHARGE',
+        title: '협주 에리어 배치 완료',
+        description: `[${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 협주 에리어에 배치했습니다!`,
+        playerIndex,
+        timestamp: Date.now(),
+      };
+      newState = addLog(
+        newState,
+        `[${sourceCardName}] ${player.name}이(가) [${chosenCards.map((c) => c.nameKr).join(', ')}]을(를) 협주 에리어에 배치했습니다. (현재 협주: ${player.concertoZone.length})`,
+        'ACTION',
+        playerIndex
+      );
+    } else {
+      newState = addLog(
+        newState,
+        `[${sourceCardName}] ${player.name}이(가) 협주 에리어 배치를 건너뛰었습니다 (덱 맨 위 유지).`,
+        'ACTION',
+        playerIndex
+      );
+    }
+    return newState;
+  }
+
+  if (onResolveType === 'RECOVER_FROM_DROP') {
+    // 2. 트래시 에리어 회수 선택
+    if (chosenCards.length > 0) {
+      const chosenIds = chosenCards.map((c) => c.id);
+      player.dropZone = player.dropZone.filter((c) => !chosenIds.includes(c.id));
+      player.hand = [...player.hand, ...chosenCards];
+    }
+
+    newState.players[playerIndex] = player;
+
+    if (chosenCards.length > 0) {
+      newState.lastEffectEvent = {
+        id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        sourceCardName,
+        effectType: 'DRAW',
+        title: '트래시 카드 회수 완료',
+        description: `[${sourceCardName}] 효과로 [${chosenCards.map((c) => c.nameKr).join(', ')}]을(를) 패에 회수했습니다!`,
+        playerIndex,
+        timestamp: Date.now(),
+      };
+      newState = addLog(
+        newState,
+        `[${sourceCardName}] ${player.name}이(가) 트래시에서 [${chosenCards.map((c) => c.nameKr).join(', ')}]을(를) 패에 회수했습니다.`,
+        'ACTION',
+        playerIndex
+      );
+    } else {
+      newState = addLog(
+        newState,
+        `[${sourceCardName}] ${player.name}이(가) 트래시 회수를 건너뛰었습니다.`,
+        'ACTION',
+        playerIndex
+      );
+    }
+    return newState;
+  }
+
+  // 3. 패에 추가 (ADD_TO_HAND)
+  player.hand = [...player.hand, ...chosenCards];
+
+  // 단일 공개 카드(파수인 BP01-010 또는 판정 패배 드로우)인 경우 미선택 시 덱 맨 위에 유지!
+  // 다중 공개(방랑자 BP01-018)인 경우 미선택 카드는 덱 맨 아래로
+  if (revealedCards.length <= 1) {
+    player.actionDeck = [...unchosenCards, ...player.actionDeck];
+  } else {
+    player.actionDeck = [...player.actionDeck, ...unchosenCards];
+  }
+
   newState.players[playerIndex] = player;
 
   if (chosenCards.length > 0) {
@@ -2270,7 +2561,11 @@ export function resolvePendingChoice(
   newState = addLog(
     newState,
     `${player.name}이(가) [${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 선택하여 패에 추가했습니다.${
-      unchosenCards.length > 0 ? ` (선택하지 않은 ${unchosenCards.length}장은 덱 맨 아래로)` : ''
+      unchosenCards.length > 0
+        ? revealedCards.length <= 1
+          ? ' (선택하지 않은 카드는 덱 맨 위 유지)'
+          : ` (선택하지 않은 ${unchosenCards.length}장은 덱 맨 아래로)`
+        : ''
     }`,
     'ACTION',
     playerIndex

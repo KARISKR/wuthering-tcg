@@ -1298,7 +1298,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canSwitch={!p0.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isP0Turn}
                           onUpgradeClick={() => openUpgradeModal('leftSupport', 0)}
                           onCardClick={() => {
-                            if (checkCanUpgradeSlot('leftSupport', 0)) openUpgradeModal('leftSupport', 0);
+                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn) openUpgradeModal('leftSupport', 0);
                           }}
                           onSwitchClick={() => handleSwitchLeader(0, 'leftSupport')}
                           onMouseEnter={() => p0.slots.leftSupport && setPreviewCard(p0.slots.leftSupport)}
@@ -1317,7 +1317,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canSwitch={false}
                           onUpgradeClick={() => openUpgradeModal('leader', 0)}
                           onCardClick={() => {
-                            if (checkCanUpgradeSlot('leader', 0)) openUpgradeModal('leader', 0);
+                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn) openUpgradeModal('leader', 0);
                           }}
                           onMouseEnter={() => setPreviewCard(p0.slots.leader)}
                           isAi={false}
@@ -1335,7 +1335,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canSwitch={!p0.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isP0Turn}
                           onUpgradeClick={() => openUpgradeModal('rightSupport', 0)}
                           onCardClick={() => {
-                            if (checkCanUpgradeSlot('rightSupport', 0)) openUpgradeModal('rightSupport', 0);
+                            if (gameState.phase === 'ACTION_PHASE' && isP0Turn) openUpgradeModal('rightSupport', 0);
                           }}
                           onSwitchClick={() => handleSwitchLeader(0, 'rightSupport')}
                           onMouseEnter={() => p0.slots.rightSupport && setPreviewCard(p0.slots.rightSupport)}

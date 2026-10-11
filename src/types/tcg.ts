@@ -161,7 +161,7 @@ export interface PendingChoice {
   revealedCards: ActionCard[]; // 공개된 덱 위 카드들
   minSelect: number; // 예: 0장 선택 가능
   maxSelect: number; // 예: 최대 2장 선택 가능
-  onResolveType: 'ADD_TO_HAND' | 'SET_CONCERTO';
+  onResolveType: 'ADD_TO_HAND' | 'SET_CONCERTO' | 'RECOVER_FROM_DROP' | 'DISCARD_FOR_DAMAGE';
 }
 
 export interface GameState {
