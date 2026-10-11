@@ -1029,7 +1029,7 @@ export function setClashCard(
         playerIndex,
         timestamp: Date.now(),
       };
-      newState.lastEffectEvent = effectEv;
+      newState.deferredEffectEvent = effectEv;
 
       if (player.isAi) {
         player.hand.push(...revealed);
@@ -1040,7 +1040,7 @@ export function setClashCard(
           playerIndex
         );
       } else {
-        newState.pendingChoice = {
+        newState.deferredChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: '방랑자(여) 배틀 효과',
@@ -1074,7 +1074,7 @@ export function setClashCard(
           { cardArt: player.slots.leader.artUrl, cardName: player.slots.leader.nameKr, effectTag: '배틀 드로우' }
         );
       } else {
-        newState.pendingChoice = {
+        newState.deferredChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: '파수인 배틀 효과 (패 추가 선택)',
@@ -1112,7 +1112,7 @@ export function setClashCard(
         );
       } else {
         const leaderName = player.slots.leader.nameKr;
-        newState.pendingChoice = {
+        newState.deferredChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: `${leaderName} 배틀 효과 (협주 배치 선택)`,
@@ -1457,7 +1457,7 @@ export function resolveClash(state: GameState): GameState {
             { cardArt: reclaimed.artUrl, cardName: reclaimed.nameKr, effectTag: '트래시 회수' }
           );
         } else {
-          newState.pendingChoice = {
+          newState.deferredChoice = {
             id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             playerIndex: winnerIndex,
             title: '카멜리아 판정 효과 (트래시 회수)',
@@ -1500,7 +1500,7 @@ export function resolveClash(state: GameState): GameState {
             ...nextSh,
             underlyingCards: [...prevUnderlying, currentSh],
           };
-          newState.lastUpgrade = {
+          newState.deferredUpgrade = {
             id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             playerIndex: winnerIndex,
             playerName: winnerPlayer.name,
@@ -1531,7 +1531,7 @@ export function resolveClash(state: GameState): GameState {
           ...nextSanhua,
           underlyingCards: [...prevUnderlying, currentSanhua],
         };
-        newState.lastUpgrade = {
+        newState.deferredUpgrade = {
           id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex: winnerIndex,
           playerName: winnerPlayer.name,
@@ -1910,7 +1910,7 @@ export function resolveClash(state: GameState): GameState {
             loserIndex
           );
         } else {
-          newState.pendingChoice = {
+          newState.deferredChoice = {
             id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             playerIndex: loserIndex,
             title: `${loserPlayer.slots.leader.nameKr} 판정 패배 효과`,
@@ -1942,7 +1942,7 @@ export function resolveClash(state: GameState): GameState {
   newState.clashResult = clashResult;
   newState.players = [p0, p1];
   if (triggeredEffects.length > 0) {
-    newState.lastEffectEvent = triggeredEffects[0];
+    newState.deferredEffectEvent = triggeredEffects[0];
   }
 
   const winCard = winnerIndex === 0 ? c0 : c1;
@@ -1994,6 +1994,20 @@ export function proceedAfterClashReveal(state: GameState): GameState {
   }
 
   newState.players = [p0, p1];
+
+  // 전투 데미지 결과 후 보류(deferred)되었던 효과 발동 화면들을 활성화!
+  if (newState.deferredChoice) {
+    newState.pendingChoice = newState.deferredChoice;
+    newState.deferredChoice = null;
+  }
+  if (newState.deferredUpgrade) {
+    newState.lastUpgrade = newState.deferredUpgrade;
+    newState.deferredUpgrade = null;
+  }
+  if (newState.deferredEffectEvent) {
+    newState.lastEffectEvent = newState.deferredEffectEvent;
+    newState.deferredEffectEvent = null;
+  }
 
   // 연격권이 남아있고 패에 빨간색 카드가 있는 플레이어가 있는지 확인
   const p0HasCombo = p0.comboCount > 0 && p0.hand.some((c) => c.color === 'RED');

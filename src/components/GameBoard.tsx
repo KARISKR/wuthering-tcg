@@ -254,12 +254,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [gameState.lastComboStrike?.id]);
 
-  // gameState.lastUpgrade 변경 시 레벨업 시네마틱 오버레이 자동 실행
+  // gameState.lastUpgrade 변경 시 레벨업 시네마틱 오버레이 자동 실행 (전투 데미지 결과 후 실행되도록 CLASH_REVEAL 동안은 보류)
   useEffect(() => {
-    if (gameState.lastUpgrade) {
+    if (gameState.lastUpgrade && gameState.phase !== 'CLASH_REVEAL') {
       setActiveUpgrade(gameState.lastUpgrade);
     }
-  }, [gameState.lastUpgrade?.id]);
+  }, [gameState.lastUpgrade?.id, gameState.phase]);
 
   // 1인 2역 (SOLO_DUAL) 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
   const [controlledPlayerIndex, setControlledPlayerIndex] = useState<0 | 1>(0);
@@ -2128,9 +2128,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }}
       />
 
-      {/* 선택 발동 효과 모달 (방랑자 BP01-018 녹색 배틀 덱 2장 공개 선택, SD01-002 판정 패배 선택 등) */}
+      {/* 선택 발동 효과 모달 (전투 데미지 결과가 완전히 나온 뒤(CLASH_REVEAL 이후)에만 표출) */}
       <EffectChoiceModal
-        choice={gameState.pendingChoice}
+        choice={gameState.phase !== 'CLASH_REVEAL' ? gameState.pendingChoice : null}
         onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
       />
 
@@ -2141,8 +2141,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         character={evolutionModalChar}
       />
 
-      {/* 실시간 카드 효과 발동 알림 토스트 (어떤 카드의 어떤 효과로 무슨 사건이 일어났는지 시각적 표출) */}
-      <EffectNotificationToast event={gameState.lastEffectEvent} />
+      {/* 실시간 카드 효과 발동 알림 토스트 (전투 진행 중인 CLASH_REVEAL 동안에는 숨기고 전투 결과 후 표출) */}
+      <EffectNotificationToast event={gameState.phase !== 'CLASH_REVEAL' ? gameState.lastEffectEvent : null} />
 
     </div>
   );

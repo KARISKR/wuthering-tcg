@@ -174,6 +174,9 @@ export interface GameState {
   lastUpgrade?: UpgradeEffect | null;
   lastEffectEvent?: TriggeredEffectEvent | null; // 최근 발동된 효과 이벤트 (화면 토스트 연출용)
   pendingChoice?: PendingChoice | null;
+  deferredChoice?: PendingChoice | null; // 전투 데미지 결과 후 발동할 보류 선택 효과
+  deferredUpgrade?: UpgradeEffect | null; // 전투 데미지 결과 후 발동할 보류 레벨업 연출
+  deferredEffectEvent?: TriggeredEffectEvent | null; // 전투 데미지 결과 후 발동할 보류 알림 이벤트
   winner: 0 | 1 | null;
   logs: LogItem[];
   gameMode: 'AI' | 'SOLO_DUAL'; // AI 대전 vs 1인 2역 듀얼
