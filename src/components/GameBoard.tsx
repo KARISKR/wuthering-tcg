@@ -852,9 +852,48 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 text-xs sm:text-sm text-slate-300 font-bold">
+                  <div className="flex items-center gap-2.5 sm:gap-3 text-xs sm:text-sm text-slate-300 font-bold">
+                    {/* 추격(연격) 게이지 & 카운트 */}
+                    {p1.comboCount > 0 && (
+                      <div className="flex items-center gap-1.5 bg-gradient-to-r from-red-950/90 to-orange-950/90 px-3 py-1 rounded-full border border-red-500/80 shadow-lg shadow-red-500/30 animate-pulse">
+                        <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
+                        <span className="text-xs font-black text-orange-300">추격 게이지</span>
+                        <div className="flex items-center gap-0.5 ml-0.5">
+                          {Array.from({ length: Math.min(p1.comboCount, 8) }).map((_, i) => (
+                            <span
+                              key={i}
+                              className="w-1.5 h-3 bg-gradient-to-t from-red-600 to-amber-400 rounded-xs shadow-[0_0_5px_rgba(249,115,22,0.8)] inline-block"
+                            />
+                          ))}
+                        </div>
+                        <strong className="text-xs font-black text-white font-mono bg-red-600 px-2 py-0.5 rounded-full shadow ml-0.5">
+                          {p1.comboCount}회
+                        </strong>
+                      </div>
+                    )}
+
                     <span>패 <strong className="text-white text-sm sm:text-base font-black">{p1.hand.length}장</strong></span>
-                    <span>협주 <strong className="text-cyan-300 text-sm sm:text-base font-black font-mono">{p1.concertoZone.length}</strong></span>
+
+                    {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
+                      <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="text-[11px] text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-1 sm:w-1.5 h-2.5 rounded-xs transition-all ${
+                              i < p1.concertoZone.length
+                                ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
+                                : 'bg-slate-800'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <strong className="text-xs font-black text-cyan-300 font-mono ml-0.5">
+                        {p1.concertoZone.length} / 10
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
@@ -1000,9 +1039,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       title="상대 협주 에리어 (클릭 시 충전된 카드 목록 보기)"
                     >
                       <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주</span>
-                        <span className="text-[9px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
-                          {p1.concertoZone.length}장
+                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주 게이지</span>
+                        <span className="text-[9px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
+                          {p1.concertoZone.length} / 10
                         </span>
                       </div>
 
@@ -1067,7 +1106,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     {gameState.phase === 'ACTION_PHASE' && 'BATTLE ARENA • MAIN PHASE'}
                     {gameState.phase === 'CLASH_SET' && 'BATTLE ARENA • CLASH SETTING'}
                     {gameState.phase === 'CLASH_REVEAL' && 'BATTLE ARENA • CLASH JUDGMENT'}
-                    {gameState.phase === 'COMBO_STEP' && 'BATTLE ARENA • COMBO STRIKE'}
+                    {gameState.phase === 'COMBO_STEP' && `BATTLE ARENA • COMBO STRIKE (추격 게이지: ${activeControlledPlayer.comboCount}회)`}
                     {gameState.phase === 'DISCARD_OVERFLOW' && 'BATTLE ARENA • END PHASE'}
                     {gameState.phase === 'START_PHASE' && 'BATTLE ARENA • START'}
                     {gameState.phase === 'DRAW_PHASE' && 'BATTLE ARENA • DRAW'}
@@ -1114,9 +1153,48 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 text-xs sm:text-sm text-slate-300 font-bold">
+                  <div className="flex items-center gap-2.5 sm:gap-3 text-xs sm:text-sm text-slate-300 font-bold">
+                    {/* 추격(연격) 게이지 & 카운트 */}
+                    {p0.comboCount > 0 && (
+                      <div className="flex items-center gap-1.5 bg-gradient-to-r from-red-950/90 to-orange-950/90 px-3 py-1 rounded-full border border-red-500/80 shadow-lg shadow-red-500/30 animate-pulse">
+                        <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
+                        <span className="text-xs font-black text-orange-300">추격 게이지</span>
+                        <div className="flex items-center gap-0.5 ml-0.5">
+                          {Array.from({ length: Math.min(p0.comboCount, 8) }).map((_, i) => (
+                            <span
+                              key={i}
+                              className="w-1.5 h-3 bg-gradient-to-t from-red-600 to-amber-400 rounded-xs shadow-[0_0_5px_rgba(249,115,22,0.8)] inline-block"
+                            />
+                          ))}
+                        </div>
+                        <strong className="text-xs font-black text-white font-mono bg-red-600 px-2 py-0.5 rounded-full shadow ml-0.5">
+                          {p0.comboCount}회
+                        </strong>
+                      </div>
+                    )}
+
                     <span>패 <strong className="text-white text-sm sm:text-base font-black">{p0.hand.length}장</strong></span>
-                    <span>협주 <strong className="text-cyan-300 text-sm sm:text-base font-black font-mono">{p0.concertoZone.length}</strong></span>
+
+                    {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
+                      <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="text-[11px] text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-1 sm:w-1.5 h-2.5 rounded-xs transition-all ${
+                              i < p0.concertoZone.length
+                                ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
+                                : 'bg-slate-800'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <strong className="text-xs font-black text-cyan-300 font-mono ml-0.5">
+                        {p0.concertoZone.length} / 10
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
@@ -1132,9 +1210,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       title="내 협주 에리어 (클릭 시 충전된 카드 목록 보기)"
                     >
                       <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주</span>
-                        <span className="text-[9px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
-                          {p0.concertoZone.length}장
+                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주 게이지</span>
+                        <span className="text-[9px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
+                          {p0.concertoZone.length} / 10
                         </span>
                       </div>
 
@@ -1548,12 +1626,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {/* 3. 연격 단계 (COMBO_STEP) 액션 버튼 */}
               {gameState.phase === 'COMBO_STEP' && activeControlledPlayer.comboCount > 0 && (
                 <div className="flex flex-col gap-2">
-                  <div className="p-2.5 rounded-xl bg-red-950/90 border border-red-500 text-red-200 font-black text-xs flex items-center justify-between animate-pulse">
-                    <span className="flex items-center gap-1.5">
-                      <Flame className="w-4 h-4 text-red-400" />
-                      <span>연격 공격 가능!</span>
-                    </span>
-                    <span className="font-mono text-sm text-red-300">{activeControlledPlayer.comboCount}회 남음</span>
+                  <div className="p-3 rounded-2xl bg-gradient-to-r from-red-950/95 via-orange-950/90 to-red-950/95 border-2 border-red-500 text-red-200 font-black text-xs flex items-center justify-between shadow-xl shadow-red-500/30 animate-pulse">
+                    <div className="flex items-center gap-2.5">
+                      <Flame className="w-5 h-5 text-orange-400 fill-orange-400 animate-bounce" />
+                      <div>
+                        <div className="text-xs font-black text-white flex items-center gap-1.5">
+                          <span>추격 게이지 가동 중!</span>
+                          <span className="text-[10px] bg-red-800 text-red-100 px-1.5 py-0.2 rounded font-mono">연격 연속 공격</span>
+                        </div>
+                        <div className="text-[10px] text-orange-300 mt-0.5">손패의 [RED] 카드로 연속 공격 가능</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] text-orange-400 font-bold">남은 추격 카운트</span>
+                      <span className="font-mono text-base font-black text-amber-300 bg-red-900/90 px-3 py-0.5 rounded-lg border border-red-500/60 shadow-inner">
+                        {activeControlledPlayer.comboCount}회
+                      </span>
+                    </div>
                   </div>
                   <button
                     onClick={() => handleFinishCombo(controlledPlayerIndex)}

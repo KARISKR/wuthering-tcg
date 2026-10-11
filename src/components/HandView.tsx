@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ActionCard, GamePhase } from '../types/tcg';
 import { CardView } from './CardView';
-import { BatteryCharging, Swords, Zap, Trash2, X, Sparkles } from 'lucide-react';
+import { BatteryCharging, Swords, Zap, Trash2, X, Sparkles, Flame } from 'lucide-react';
 import { canLeaderUseCard } from '../engine/gameEngine';
 import { soundEffects } from '../utils/soundEffects';
 
@@ -121,7 +121,23 @@ export const HandView: React.FC<HandViewProps> = ({
         <div className="text-xs sm:text-sm text-slate-300 font-bold">
           {phase === 'CLASH_SET' && <span className="text-amber-400 font-black">⚔️ 대결에 낼 액션 카드를 선택하세요</span>}
           {phase === 'ACTION_PHASE' && <span className="text-cyan-400 font-bold">💡 패를 눌러 [협주 충전]을 할 수 있습니다</span>}
-          {isComboStep && <span className="text-red-400 font-black">🔥 연격 기회! 남은 연격: {comboCount}회</span>}
+          {isComboStep && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-950/90 border border-red-500 shadow-lg shadow-red-500/30 animate-pulse">
+              <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
+              <span className="text-xs font-black text-orange-300">추격 게이지</span>
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: Math.min(comboCount, 8) }).map((_, i) => (
+                  <span
+                    key={i}
+                    className="w-1.5 h-3 bg-gradient-to-t from-red-600 to-amber-400 rounded-xs shadow-[0_0_5px_rgba(249,115,22,0.8)] inline-block"
+                  />
+                ))}
+              </div>
+              <strong className="text-xs font-black text-amber-200 font-mono bg-red-900/90 px-2 py-0.5 rounded-full border border-red-500/40">
+                남은 추격: {comboCount}회
+              </strong>
+            </div>
+          )}
         </div>
       </div>
 

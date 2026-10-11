@@ -286,9 +286,9 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                 </span>
 
                 {clashResult.comboGranted > 0 && (
-                  <span className="text-amber-300 bg-amber-950/80 px-3.5 py-1 rounded-full border-2 border-amber-400/80 shadow-lg shadow-amber-500/30 flex items-center gap-1.5 animate-flame-pulse">
-                    <Flame className="w-4 h-4 text-orange-400 fill-orange-400" />
-                    <span>🔥 COMBO UNLOCKED! 연격 횟수 +{clashResult.comboGranted}회 획득!</span>
+                  <span className="text-amber-300 bg-amber-950/80 px-3.5 py-1.5 rounded-full border-2 border-amber-400/80 shadow-lg shadow-amber-500/30 flex items-center gap-2 animate-flame-pulse">
+                    <Flame className="w-4 h-4 text-orange-400 fill-orange-400 animate-bounce" />
+                    <span>🔥 추격 게이지 충전! 연격 횟수 +{clashResult.comboGranted}회 획득</span>
                   </span>
                 )}
               </div>

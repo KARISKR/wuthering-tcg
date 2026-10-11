@@ -604,9 +604,28 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 text-xs sm:text-sm text-slate-300 font-bold">
+                  <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-300 font-bold">
                     <span>패 <strong className="text-white text-sm sm:text-base font-black">{p1.handCount}장</strong></span>
-                    <span>협주 <strong className="text-cyan-300 text-sm sm:text-base font-black font-mono">{p1.concerto}</strong></span>
+                    {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
+                      <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="text-[11px] text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-1 sm:w-1.5 h-2.5 rounded-xs transition-all ${
+                              i < p1.concerto
+                                ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
+                                : 'bg-slate-800'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <strong className="text-xs font-black text-cyan-300 font-mono ml-0.5">
+                        {p1.concerto} / 10
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
@@ -705,9 +724,9 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                   <div className="flex flex-col gap-2">
                     <div className="flex-1 rounded-2xl border border-cyan-500/50 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg">
                       <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주</span>
-                        <span className="text-[9px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
-                          {p1.concerto}장
+                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주 게이지</span>
+                        <span className="text-[9px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
+                          {p1.concerto} / 10
                         </span>
                       </div>
                       <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
@@ -787,9 +806,28 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 text-xs sm:text-sm text-slate-300 font-bold">
+                  <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-300 font-bold">
                     <span>패 <strong className="text-white text-sm sm:text-base font-black">{p0.handCount}장</strong></span>
-                    <span>협주 <strong className="text-cyan-300 text-sm sm:text-base font-black font-mono">{p0.concerto}</strong></span>
+                    {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
+                      <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
+                      <span className="text-[11px] text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 10 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`w-1 sm:w-1.5 h-2.5 rounded-xs transition-all ${
+                              i < p0.concerto
+                                ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
+                                : 'bg-slate-800'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <strong className="text-xs font-black text-cyan-300 font-mono ml-0.5">
+                        {p0.concerto} / 10
+                      </strong>
+                    </div>
                   </div>
                 </div>
 
@@ -799,9 +837,9 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                   <div className="flex flex-col gap-2">
                     <div className="flex-1 rounded-2xl border border-cyan-500/50 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg">
                       <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주</span>
-                        <span className="text-[9px] font-mono font-bold text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
-                          {p0.concerto}장
+                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주 게이지</span>
+                        <span className="text-[9px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
+                          {p0.concerto} / 10
                         </span>
                       </div>
                       <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
