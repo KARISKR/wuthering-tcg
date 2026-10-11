@@ -59,7 +59,19 @@ export function getSharedDecks(): SharedDeck[] {
     'shared-preset-jinhsi-burst',
   ]);
 
-  let cleanedDecks = decks.filter((d) => !PURGE_IDS.has(d.id));
+  const ALLOWED_INITIAL_IDS = new Set([
+    'shared-deck-sld-rin',
+    'shared-deck-sld-nv-yang-chun',
+    'shared-deck-sld-anke-loop',
+    'shared-deck-sld-an-san-shou',
+  ]);
+
+  let cleanedDecks = decks.filter(
+    (d) =>
+      !PURGE_IDS.has(d.id) &&
+      !d.id.startsWith('shared-deck-preset-sld-') &&
+      (!d.id.startsWith('shared-deck-sld-') || ALLOWED_INITIAL_IDS.has(d.id))
+  );
 
   // 신규 4종 커뮤니티 실전 덱 시드 보장 (기존 유저 생성 덱 유지하며 누락된 시드 덱 자동 보충)
   const initialDecks = generateInitialSharedDecks();

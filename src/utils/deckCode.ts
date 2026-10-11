@@ -57,6 +57,7 @@ export function encodeDeckCode(deck: CustomDeckConfig): string {
 }
 
 import { COMMUNITY_DECK_PRESETS } from '../data/communityDecks';
+import { SLDARK_DECK_PRESETS } from '../data/sldarkDecks';
 export { COMMUNITY_DECK_PRESETS };
 
 // 덱 코드를 파싱하여 CustomDeckConfig로 복원
@@ -66,21 +67,27 @@ export function decodeDeckCode(codeStr: string): CustomDeckConfig | null {
 
     // 1. mc.sldark.com 공유 코드 (SLD-XXXX) 패턴 매칭 (덱 코드: SLD-... 등 접두사/공백 유연 허용)
     const sldMatch = clean.match(/SLD\s*[-_]?\s*([A-Za-z0-9]{6,12})/i);
+    let sldCode = '';
     if (sldMatch) {
-      const sldCode = `SLD-${sldMatch[1].toUpperCase()}`;
-      const matchedPreset = COMMUNITY_DECK_PRESETS.find(
-        (p) => p.externalCode?.toUpperCase() === sldCode
-      );
-      if (matchedPreset) {
-        return presetToCustomDeck(matchedPreset);
-      }
+      sldCode = `SLD-${sldMatch[1].toUpperCase()}`;
     } else if (/^[A-Za-z0-9]{8}$/i.test(clean)) {
-      const sldCode = `SLD-${clean.toUpperCase()}`;
-      const matchedPreset = COMMUNITY_DECK_PRESETS.find(
+      sldCode = `SLD-${clean.toUpperCase()}`;
+    }
+
+    if (sldCode) {
+      // 1) 기본 4종 커뮤니티 프리셋에서 매칭
+      const matchedCommunity = COMMUNITY_DECK_PRESETS.find(
         (p) => p.externalCode?.toUpperCase() === sldCode
       );
-      if (matchedPreset) {
-        return presetToCustomDeck(matchedPreset);
+      if (matchedCommunity) {
+        return presetToCustomDeck(matchedCommunity);
+      }
+      // 2) SLDark 라이브러리에서 매칭 (SLD-4M5XF7B2 등 코드 불러오기 전용 지원)
+      const matchedSldark = SLDARK_DECK_PRESETS.find(
+        (p) => p.externalCode?.toUpperCase() === sldCode
+      );
+      if (matchedSldark) {
+        return presetToCustomDeck(matchedSldark);
       }
     }
 
@@ -226,12 +233,17 @@ export function getStoredPresets(): DeckPreset[] {
     const parsed: DeckPreset[] = JSON.parse(raw);
     const activeDefaultIds = new Set(activeDefaults.map((d) => d.id));
     // 삭제된 ID 및 임의 생성 프리셋 제외, 기본 프리셋과의 중복 방지
+    // (SLDark 라이브러리 프리셋 ID 중 기본 4종 이외의 것은 로컬스토리지에서 자동 소거)
     const customOnly = parsed.filter(
       (p) =>
         !p.isOfficial &&
         !deletedIds.includes(p.id) &&
         p.id !== 'preset-official-camellya' &&
-        !activeDefaultIds.has(p.id)
+        !activeDefaultIds.has(p.id) &&
+        !(
+          p.id.startsWith('preset-sld-') &&
+          !['preset-sld-rin', 'preset-sld-nv-yang-chun', 'preset-sld-anke-loop', 'preset-sld-an-san-shou'].includes(p.id)
+        )
     );
     const updatedList = [...activeDefaults, ...customOnly];
     localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(updatedList));
