@@ -8,6 +8,7 @@ import { PatchNotesModal } from './PatchNotesModal';
 import { SfxGuideModal } from './SfxGuideModal';
 import { CommunityDeckModal } from './CommunityDeckModal';
 import { BattleReplayModal } from './BattleReplayModal';
+import { FeedbackModal } from './FeedbackModal';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import { DeckSelectModal } from './DeckSelectModal';
@@ -29,6 +30,7 @@ import {
   Volume2,
   Share2,
   History,
+  Bug,
 } from 'lucide-react';
 
 import { BattleReplayData } from '../utils/replayManager';
@@ -54,6 +56,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
 
@@ -89,6 +92,16 @@ export const Lobby: React.FC<LobbyProps> = ({
           >
             <History className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">리플레이 & 복기</span>
+          </button>
+
+          {/* 버그 제보 & 피드백 상단 버튼 */}
+          <button
+            onClick={() => setIsFeedbackOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/15 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-black transition cursor-pointer shadow-md"
+            title="버그 제보 및 개선 피드백 메모창 열기"
+          >
+            <Bug className="w-4 h-4 text-red-400" />
+            <span className="hidden sm:inline">버그제보 & 피드백</span>
           </button>
 
           {/* 커뮤니티 공유된 덱 리스트 상단 버튼 */}
@@ -398,6 +411,15 @@ export const Lobby: React.FC<LobbyProps> = ({
             <span>Game {CURRENT_GAME_VERSION}</span>
             <span className="text-[10px] text-amber-500/90 underline font-sans font-bold">(패치노트)</span>
           </button>
+          <span>•</span>
+          <button
+            onClick={() => setIsFeedbackOpen(true)}
+            className="hover:text-amber-400 text-slate-400 transition cursor-pointer flex items-center gap-1.5"
+            title="버그 제보 및 개선 피드백 메모창 열기"
+          >
+            <Bug className="w-3.5 h-3.5 text-red-400" />
+            <span>버그제보 & 피드백</span>
+          </button>
         </div>
       </footer>
 
@@ -575,6 +597,13 @@ export const Lobby: React.FC<LobbyProps> = ({
         isOpen={isReplayOpen}
         onClose={() => setIsReplayOpen(false)}
         onPlayBattleReplay={onPlayBattleReplay}
+      />
+
+      {/* 버그 제보 & 피드백 모달 */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        currentContextView="LOBBY"
       />
     </div>
   );

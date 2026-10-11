@@ -16,6 +16,7 @@ import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { GameOverModal } from './GameOverModal';
 import { BattleReplayModal } from './BattleReplayModal';
+import { FeedbackModal } from './FeedbackModal';
 import { saveBattleReplay, BattleReplayData } from '../utils/replayManager';
 import { CardListModal } from './CardListModal';
 import { ConcertoSelectModal } from './ConcertoSelectModal';
@@ -49,6 +50,7 @@ import {
   ArrowLeftRight,
   Crown,
   Trash2,
+  Bug,
 } from 'lucide-react';
 
 import { BgmPlayer } from './BgmPlayer';
@@ -200,6 +202,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const replaySavedRef = useRef<boolean>(false);
 
   // 게임 종료 시 리플레이 자동 저장
@@ -626,6 +629,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           >
             <ScrollText className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden md:inline">로그</span>
+          </button>
+
+          <button
+            onClick={() => setIsFeedbackOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer border border-slate-700"
+            title="버그 제보 & 피드백 메모창 열기"
+          >
+            <Bug className="w-3.5 h-3.5 text-red-400" />
+            <span className="hidden md:inline">제보</span>
           </button>
 
           <button
@@ -2036,6 +2048,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 실시간 카드 효과 발동 알림 토스트 (어떤 카드의 어떤 효과로 무슨 사건이 일어났는지 시각적 표출) */}
       <EffectNotificationToast event={gameState.lastEffectEvent} />
+
+      {/* 버그 제보 & 피드백 모달 */}
+      <FeedbackModal
+        isOpen={isFeedbackOpen}
+        onClose={() => setIsFeedbackOpen(false)}
+        currentContextView="BATTLE"
+      />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { GameBoard } from './components/GameBoard';
 import { DeckBuilder, CustomDeckConfig } from './components/DeckBuilder';
 import { BattleReplayStage } from './components/BattleReplayStage';
 import { BattleReplayData } from './utils/replayManager';
+import { FeedbackWidget } from './components/FeedbackWidget';
 
 export function App() {
   const [currentView, setCurrentView] = useState<'LOBBY' | 'BATTLE' | 'DECK_BUILDER' | 'REPLAY_STAGE'>('LOBBY');
@@ -71,6 +72,9 @@ export function App() {
           onExit={handleExitReplay}
         />
       )}
+
+      {/* 전역 버그 제보 & 피드백 플로팅 위젯 */}
+      <FeedbackWidget currentContextView={currentView} />
     </div>
   );
 }
