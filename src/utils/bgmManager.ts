@@ -1,5 +1,5 @@
 // 명조: 대결 TCG 시뮬레이터 글로벌 BGM 오디오 매니저
-// 사이트 진입 시 기본 무한 자동재생(Pull Up A Chair) 및 화면 전환 시 끊김 없는 연속 재생 지원
+// 신규 공식 BGM 7트랙 탑재, 한 곡 무한반복 해제 및 랜덤 재생(Shuffle) 기본 적용
 
 export interface BgmTrack {
   id: string;
@@ -11,21 +11,45 @@ export interface BgmTrack {
 export const BGM_TRACKS: BgmTrack[] = [
   {
     id: 'track-1',
-    title: 'Pull Up A Chair',
-    subtitle: '메인 타이틀 테마',
-    src: '/audio/bgm/bgm_pull_up_a_chair.mp3',
+    title: 'Unfinished Journey',
+    subtitle: '03. 끝없는 여정',
+    src: '/audio/bgm/03.%20Unfinished%20Journey.mp3',
   },
   {
     id: 'track-2',
-    title: 'Better Hand',
-    subtitle: '전투 대결 테마',
-    src: '/audio/bgm/bgm_better_hand.mp3',
+    title: 'Waves Sing Goodnight',
+    subtitle: '03. 파도의 자장가',
+    src: '/audio/bgm/03.%20Waves%20Sing%20Goodnight.mp3',
   },
   {
     id: 'track-3',
-    title: 'Tavern Brawl',
-    subtitle: '난투 하이텐션 테마',
-    src: '/audio/bgm/bgm_tavern_brawl.mp3',
+    title: 'City Bathed in Sea Breeze',
+    subtitle: '05. 바닷바람 머금은 도시',
+    src: '/audio/bgm/05.%20City%20Bathed%20in%20Sea%20Breeze.mp3',
+  },
+  {
+    id: 'track-4',
+    title: 'The Sound of Midday Bells',
+    subtitle: '06. 한낮의 종소리',
+    src: '/audio/bgm/06.%20The%20Sound%20of%20Midday%20Bells.mp3',
+  },
+  {
+    id: 'track-5',
+    title: 'Hot Night Inspiration',
+    subtitle: '07. 열정적인 밤의 영감',
+    src: '/audio/bgm/07.%20Hot%20Night%20Inspiration.mp3',
+  },
+  {
+    id: 'track-6',
+    title: 'Where the Reactor Drive Shines',
+    subtitle: '08. 반응로가 찬란한 곳',
+    src: '/audio/bgm/08.%20Where%20the%20Reactor%20Drive%20Shines.mp3',
+  },
+  {
+    id: 'track-7',
+    title: 'Rest Now, You Are Still Home',
+    subtitle: '16. 안식의 보금자리',
+    src: '/audio/bgm/16.%20Rest%20Now%2C%20You%20Are%20Still%20Home.mp3',
   },
 ];
 
@@ -38,15 +62,17 @@ class BgmManager {
   private customTrackName: string | null = null;
   private isPlaying: boolean = false;
   private isMuted: boolean = false;
-  private isLooping: boolean = true; // 기본 무한 반복 모드
+  private isLooping: boolean = false; // 기본 한 곡 무한반복 해제 (false)
+  private isShuffle: boolean = true; // 기본 랜덤 재생 활성화 (true)
   private volume: number = 0.1; // 기본 10% 은은한 배경 볼륨
   private listeners: Set<BgmListener> = new Set();
   private hasInitialized: boolean = false;
+  private playHistory: number[] = [];
 
   constructor() {
     if (typeof window === 'undefined') return;
 
-    // 로컬스토리지에서 볼륨 복원 (기본값 0.10)
+    // 로컬스토리지에서 볼륨 및 설정 복원
     try {
       const savedVol = localStorage.getItem('wuthering_bgm_volume_v2');
       if (savedVol !== null) {
@@ -56,6 +82,14 @@ class BgmManager {
       const savedMute = localStorage.getItem('wuthering_bgm_muted');
       if (savedMute !== null) {
         this.isMuted = savedMute === 'true';
+      }
+      const savedShuffle = localStorage.getItem('wuthering_bgm_shuffle');
+      if (savedShuffle !== null) {
+        this.isShuffle = savedShuffle === 'true';
+      }
+      const savedLoop = localStorage.getItem('wuthering_bgm_loop');
+      if (savedLoop !== null) {
+        this.isLooping = savedLoop === 'true';
       }
     } catch {
       // ignore
@@ -68,17 +102,28 @@ class BgmManager {
     if (this.hasInitialized || typeof window === 'undefined') return;
     this.hasInitialized = true;
 
+    // 랜덤 재생이 기본이므로 첫 곡도 무작위 선정
+    if (this.isShuffle && BGM_TRACKS.length > 0) {
+      this.currentTrackIdx = Math.floor(Math.random() * BGM_TRACKS.length);
+    } else {
+      this.currentTrackIdx = 0;
+    }
+
     const audio = new Audio();
     this.audio = audio;
 
-    // 기본 트랙 1번 (Pull Up A Chair) 세팅
-    audio.src = BGM_TRACKS[0].src;
+    audio.src = BGM_TRACKS[this.currentTrackIdx].src;
     audio.volume = this.isMuted ? 0 : this.volume;
-    audio.loop = this.isLooping; // 기본 무한 루프
+    audio.loop = this.isLooping;
 
-    // 트랙 종료 시 (무한 루프가 꺼져 있을 때 다음 트랙으로 이동)
+    // 트랙 종료 시: 한곡 반복이 아니면 랜덤/다음 곡 자동 전환
     audio.onended = () => {
-      if (!this.isLooping) {
+      if (this.isLooping) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      } else if (this.isShuffle) {
+        this.playRandomTrack();
+      } else {
         this.nextTrack();
       }
     };
@@ -99,8 +144,7 @@ class BgmManager {
           this.notify();
         })
         .catch(() => {
-          // 브라우저 자동재생 제한 정책 (사용자 제스처 전 오디오 차단)
-          // 화면 어디든 첫 클릭/터치/키보드 입력 발생 즉시 자동 잠금 해제되어 재생 시작!
+          // 브라우저 자동재생 제한 정책 (사용자 제스처 전 오디오 차단 대응)
           const unlock = () => {
             if (this.audio && !this.isPlaying) {
               this.audio.volume = this.isMuted ? 0 : this.volume;
@@ -139,11 +183,12 @@ class BgmManager {
 
   // 게터
   public getState() {
-    const currentTrack = BGM_TRACKS[this.currentTrackIdx];
+    const currentTrack = BGM_TRACKS[this.currentTrackIdx] || BGM_TRACKS[0];
     return {
       isPlaying: this.isPlaying,
       isMuted: this.isMuted,
       isLooping: this.isLooping,
+      isShuffle: this.isShuffle,
       volume: this.volume,
       currentTrackIdx: this.currentTrackIdx,
       currentTrack,
@@ -176,13 +221,18 @@ class BgmManager {
     }
   }
 
-  // 트랙 선택
-  public selectTrack(idx: number) {
+  // 트랙 선택 (특정 인덱스로 이동)
+  public selectTrack(idx: number, recordHistory: boolean = true) {
     if (!this.audio) return;
     this.customTrackUrl = null;
     this.customTrackName = null;
-    this.currentTrackIdx = (idx + BGM_TRACKS.length) % BGM_TRACKS.length;
 
+    if (recordHistory && this.currentTrackIdx !== idx) {
+      this.playHistory.push(this.currentTrackIdx);
+      if (this.playHistory.length > 20) this.playHistory.shift();
+    }
+
+    this.currentTrackIdx = (idx + BGM_TRACKS.length) % BGM_TRACKS.length;
     this.audio.src = BGM_TRACKS[this.currentTrackIdx].src;
     this.audio.loop = this.isLooping;
     this.audio.volume = this.isMuted ? 0 : this.volume;
@@ -196,22 +246,57 @@ class BgmManager {
       .catch(() => {});
   }
 
+  // 랜덤 트랙 선택 및 재생
+  public playRandomTrack() {
+    if (BGM_TRACKS.length <= 1) {
+      this.selectTrack(0);
+      return;
+    }
+    // 현재 재생 중인 곡을 제외한 나머지 중에서 무작위 선택
+    let nextIdx = Math.floor(Math.random() * (BGM_TRACKS.length - 1));
+    if (nextIdx >= this.currentTrackIdx) {
+      nextIdx += 1;
+    }
+    this.selectTrack(nextIdx);
+  }
+
   // 다음 곡
   public nextTrack() {
-    this.selectTrack(this.currentTrackIdx + 1);
+    if (this.isShuffle) {
+      this.playRandomTrack();
+    } else {
+      this.selectTrack(this.currentTrackIdx + 1);
+    }
   }
 
   // 이전 곡
   public prevTrack() {
-    this.selectTrack(this.currentTrackIdx - 1);
+    if (this.playHistory.length > 0) {
+      const prevIdx = this.playHistory.pop()!;
+      this.selectTrack(prevIdx, false);
+    } else {
+      this.selectTrack(this.currentTrackIdx - 1);
+    }
   }
 
-  // 무한 반복(Loop) 토글
+  // 셔플(랜덤 재생) 토글
+  public toggleShuffle() {
+    this.isShuffle = !this.isShuffle;
+    try {
+      localStorage.setItem('wuthering_bgm_shuffle', String(this.isShuffle));
+    } catch {}
+    this.notify();
+  }
+
+  // 무한 반복(한 곡 반복) 토글
   public toggleLoop() {
     this.isLooping = !this.isLooping;
     if (this.audio) {
       this.audio.loop = this.isLooping;
     }
+    try {
+      localStorage.setItem('wuthering_bgm_loop', String(this.isLooping));
+    } catch {}
     this.notify();
   }
 
@@ -246,7 +331,7 @@ class BgmManager {
     this.customTrackName = name;
 
     this.audio.src = url;
-    this.audio.loop = true;
+    this.audio.loop = this.isLooping;
     this.audio.volume = this.isMuted ? 0 : this.volume;
 
     this.audio

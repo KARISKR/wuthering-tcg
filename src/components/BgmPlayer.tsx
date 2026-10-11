@@ -13,6 +13,7 @@ import {
   Upload,
   Check,
   Repeat,
+  Shuffle,
 } from 'lucide-react';
 
 export const BgmPlayer: React.FC = () => {
@@ -56,6 +57,7 @@ export const BgmPlayer: React.FC = () => {
     isPlaying,
     isMuted,
     isLooping,
+    isShuffle,
     volume,
     currentTrackIdx,
     activeTitle,
@@ -84,13 +86,17 @@ export const BgmPlayer: React.FC = () => {
       >
         <div className="flex items-center gap-1">
           <span className="text-[9px] font-mono text-amber-400 leading-none">
-            BGM {isCustom ? 'CUSTOM' : `0${currentTrackIdx + 1}/03`}
+            BGM {isCustom ? 'CUSTOM' : `0${currentTrackIdx + 1}/0${BGM_TRACKS.length}`}
           </span>
-          {isLooping && (
+          {isLooping ? (
             <span className="text-[8px] font-bold text-emerald-400 bg-emerald-950/80 px-1 rounded border border-emerald-500/30">
-              무한반복
+              한곡반복
             </span>
-          )}
+          ) : isShuffle ? (
+            <span className="text-[8px] font-bold text-amber-400 bg-amber-950/80 px-1 rounded border border-amber-500/30">
+              랜덤재생
+            </span>
+          ) : null}
         </div>
         <span className="font-bold text-slate-200 group-hover:text-amber-300 text-[11px] truncate mt-0.5 transition">
           {activeTitle}
@@ -127,13 +133,24 @@ export const BgmPlayer: React.FC = () => {
         </button>
       </div>
 
-      {/* 무한 반복(Loop) 토글 버튼 */}
+      {/* 셔플 (랜덤 재생) 토글 버튼 */}
+      <button
+        onClick={() => bgmManager.toggleShuffle()}
+        className={`p-1 rounded-lg transition cursor-pointer hidden md:flex items-center ${
+          isShuffle ? 'text-amber-400 bg-amber-950/60 border border-amber-500/30' : 'text-slate-500 hover:text-slate-300'
+        }`}
+        title={isShuffle ? '랜덤 재생 켜짐 (기본)' : '랜덤 재생 꺼짐 (순차)'}
+      >
+        <Shuffle className="w-3 h-3" />
+      </button>
+
+      {/* 한 곡 반복(Loop) 토글 버튼 */}
       <button
         onClick={() => bgmManager.toggleLoop()}
         className={`p-1 rounded-lg transition cursor-pointer hidden md:flex items-center ${
-          isLooping ? 'text-emerald-400 bg-emerald-950/60' : 'text-slate-500 hover:text-slate-300'
+          isLooping ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-500/30' : 'text-slate-500 hover:text-slate-300'
         }`}
-        title={isLooping ? '무한 반복 켜짐' : '무한 반복 꺼짐'}
+        title={isLooping ? '한 곡 반복 켜짐' : '한 곡 반복 꺼짐'}
       >
         <Repeat className="w-3 h-3" />
       </button>
@@ -191,19 +208,19 @@ export const BgmPlayer: React.FC = () => {
       {showPlaylist && (
         <div
           ref={playlistRef}
-          className="absolute right-0 top-full mt-2 w-64 bg-slate-900/95 border-2 border-amber-500/50 rounded-2xl p-2.5 shadow-2xl shadow-black/90 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 top-full mt-2 w-72 bg-slate-900/95 border-2 border-amber-500/50 rounded-2xl p-2.5 shadow-2xl shadow-black/90 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
         >
           <div className="flex items-center justify-between pb-2 mb-1.5 border-b border-slate-800 px-1.5">
             <div className="flex items-center gap-1.5 text-xs font-black text-amber-400">
               <Disc className="w-3.5 h-3.5" />
-              <span>명조 공식 BGM 트랙</span>
+              <span>명조 공식 OST BGM ({BGM_TRACKS.length}곡)</span>
             </div>
             <span className="text-[10px] font-mono text-slate-400">
-              기본 {currentDisplayVol}%
+              {isLooping ? '한곡반복 중' : isShuffle ? '랜덤재생 중' : '순차재생'}
             </span>
           </div>
 
-          <div className="space-y-1">
+          <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
             {BGM_TRACKS.map((track, idx) => {
               const isSelected = !isCustom && currentTrackIdx === idx;
               return (
@@ -224,11 +241,6 @@ export const BgmPlayer: React.FC = () => {
                       <span className="font-bold text-xs truncate">
                         {idx + 1}. {track.title}
                       </span>
-                      {idx === 0 && (
-                        <span className="text-[9px] font-black bg-amber-500/20 text-amber-400 px-1 rounded border border-amber-500/40">
-                          기본 자동재생
-                        </span>
-                      )}
                     </div>
                     <span className="text-[10px] text-slate-400 truncate">
                       {track.subtitle}
