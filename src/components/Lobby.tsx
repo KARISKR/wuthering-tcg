@@ -31,16 +31,20 @@ import {
   History,
 } from 'lucide-react';
 
+import { BattleReplayData } from '../utils/replayManager';
+
 interface LobbyProps {
   onStartGame: (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, opponentDeck?: CustomDeckConfig) => void;
   onOpenDeckBuilder: () => void;
   onStartBattleWithCustomDeck?: (deck: CustomDeckConfig) => void;
+  onPlayBattleReplay?: (replay: BattleReplayData) => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
   onStartGame,
   onOpenDeckBuilder,
   onStartBattleWithCustomDeck,
+  onPlayBattleReplay,
 }) => {
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
@@ -570,6 +574,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       <BattleReplayModal
         isOpen={isReplayOpen}
         onClose={() => setIsReplayOpen(false)}
+        onPlayBattleReplay={onPlayBattleReplay}
       />
     </div>
   );

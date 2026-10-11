@@ -42,12 +42,14 @@ interface BattleReplayModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialSelectedReplayId?: string;
+  onPlayBattleReplay?: (replay: BattleReplayData) => void;
 }
 
 export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
   isOpen,
   onClose,
   initialSelectedReplayId,
+  onPlayBattleReplay,
 }) => {
   const [replays, setReplays] = useState<BattleReplayData[]>(() => getSavedReplays());
   const [selectedReplayId, setSelectedReplayId] = useState<string | null>(null);
@@ -498,18 +500,34 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                         </div>
                       </div>
 
-                      {/* 하단 메타 & 삭제 버튼 */}
+                      {/* 하단 메타 & 빠른 전투 관전 버튼 & 삭제 버튼 */}
                       <div className="flex items-center justify-between mt-2 pt-1 text-[11px] text-slate-500">
-                        <span className="truncate max-w-[190px]">
-                          {rep.gameMode === 'AI' ? '🤖 AI 봇전' : '👥 1인 2역'} · 로그 {rep.totalLogCount}건
+                        <span className="truncate max-w-[150px]">
+                          {rep.gameMode === 'AI' ? '🤖 AI전' : '👥 1인2역'} · {rep.totalLogCount}액션
                         </span>
-                        <button
-                          onClick={(e) => handleDelete(rep.id, e)}
-                          className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 rounded transition cursor-pointer"
-                          title="삭제"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          {onPlayBattleReplay && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onPlayBattleReplay(rep);
+                                onClose();
+                              }}
+                              className="px-2 py-0.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 border border-amber-500/40 text-[10px] font-black transition cursor-pointer flex items-center gap-1 shadow-sm"
+                              title="전투 화면으로 바로 재생"
+                            >
+                              <Swords className="w-3 h-3 text-amber-400" />
+                              <span>관전</span>
+                            </button>
+                          )}
+                          <button
+                            onClick={(e) => handleDelete(rep.id, e)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 rounded transition cursor-pointer"
+                            title="삭제"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -555,8 +573,22 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 내보내기 및 코드 복사 버튼 */}
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                  {/* 전투 화면 재생 및 내보내기/코드 복사 버튼 */}
+                  <div className="flex flex-wrap items-center gap-2 self-end sm:self-auto">
+                    {onPlayBattleReplay && (
+                      <button
+                        onClick={() => {
+                          onPlayBattleReplay(selectedReplay);
+                          onClose();
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-lg shadow-amber-500/25 ring-1 ring-amber-300 transform hover:scale-105 active:scale-95"
+                        title="실제 대전 보드 화면에서 전투 연출과 함께 관전"
+                      >
+                        <Swords className="w-4 h-4 fill-slate-950 text-slate-950" />
+                        <span>전투 화면으로 실제 재생</span>
+                      </button>
+                    )}
+
                     <button
                       onClick={() => handleCopyJson(selectedReplay)}
                       className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"

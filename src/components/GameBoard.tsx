@@ -15,7 +15,7 @@ import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { GameOverModal } from './GameOverModal';
 import { BattleReplayModal } from './BattleReplayModal';
-import { saveBattleReplay } from '../utils/replayManager';
+import { saveBattleReplay, BattleReplayData } from '../utils/replayManager';
 import { CardListModal } from './CardListModal';
 import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
@@ -57,6 +57,7 @@ interface GameBoardProps {
   initialMode?: 'AI' | 'SOLO_DUAL';
   customDeck?: CustomDeckConfig | null;
   opponentDeck?: CustomDeckConfig | null;
+  onPlayBattleReplay?: (replay: BattleReplayData) => void;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({
@@ -64,6 +65,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   initialMode = 'AI',
   customDeck,
   opponentDeck,
+  onPlayBattleReplay,
 }) => {
   const {
     gameState,
@@ -1837,6 +1839,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       <BattleReplayModal
         isOpen={isReplayOpen}
         onClose={() => setIsReplayOpen(false)}
+        onPlayBattleReplay={onPlayBattleReplay}
       />
 
       {/* 협주 게이지 소모 선택 모달 */}
