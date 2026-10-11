@@ -3,6 +3,7 @@ import { CustomDeckConfig, DeckPreset } from '../types/tcg';
 import {
   encodeDeckCode,
   decodeDeckCode,
+  fetchSldarkDeck,
   getStoredPresets,
   savePreset,
   deletePreset,
@@ -71,6 +72,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   const [inputCode, setInputCode] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [parsedPreviewDeck, setParsedPreviewDeck] = useState<CustomDeckConfig | null>(null);
+  const [isFetchingOnline, setIsFetchingOnline] = useState(false);
 
   // 클립보드 복사 피드백 상태 (presetId -> copied boolean)
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -104,6 +106,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       setInputCode('');
       setImportError(null);
       setParsedPreviewDeck(null);
+      setIsFetchingOnline(false);
       setIsSavingCurrent(false);
       setPresetSearch('');
       setInspectingCard(null);
@@ -122,7 +125,8 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
         (p) =>
           p.name.toLowerCase().includes(q) ||
           p.description?.toLowerCase().includes(q) ||
-          p.leaderCode.toLowerCase().includes(q)
+          p.leaderCode.toLowerCase().includes(q) ||
+          (p.externalCode && p.externalCode.toLowerCase().includes(q))
       );
     }
     return result;
@@ -158,18 +162,52 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
 
   // 덱 코드 파싱 미리보기 감지
   useEffect(() => {
-    if (!inputCode.trim()) {
+    const raw = inputCode.trim();
+    if (!raw) {
       setImportError(null);
       setParsedPreviewDeck(null);
+      setIsFetchingOnline(false);
       return;
     }
 
-    const decoded = decodeDeckCode(inputCode.trim());
+    const decoded = decodeDeckCode(raw);
     if (decoded) {
       setParsedPreviewDeck(decoded);
       setImportError(null);
+      setIsFetchingOnline(false);
+      return;
+    }
+
+    // 로컬 매칭 실패 시 SLD 패턴이면 온라인 페치 비동기 시도
+    const isSldPattern = /SLD/i.test(raw) || /^[A-Za-z0-9]{8}$/.test(raw);
+    if (isSldPattern) {
+      setIsFetchingOnline(true);
+      setImportError(null);
+      let canceled = false;
+      fetchSldarkDeck(raw)
+        .then((deck) => {
+          if (canceled) return;
+          setIsFetchingOnline(false);
+          if (deck) {
+            setParsedPreviewDeck(deck);
+            setImportError(null);
+          } else {
+            setParsedPreviewDeck(null);
+            setImportError('mc.sldark.com에서 해당 덱 코드를 찾을 수 없습니다.');
+          }
+        })
+        .catch(() => {
+          if (canceled) return;
+          setIsFetchingOnline(false);
+          setParsedPreviewDeck(null);
+          setImportError('mc.sldark.com 온라인 덱 코드 조회 중 오류가 발생했습니다.');
+        });
+      return () => {
+        canceled = true;
+      };
     } else {
       setParsedPreviewDeck(null);
+      setIsFetchingOnline(false);
       setImportError('올바른 덱 코드 형식이 아닙니다 (SLD-XXXX, WWTCG1_..., 또는 JSON 형식).');
     }
   }, [inputCode]);
@@ -370,7 +408,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 type="text"
                 value={inputCode}
                 onChange={(e) => setInputCode(e.target.value)}
-                placeholder="덱 코드를 입력하세요 (예: SLD-TLL2EZT6 또는 WWTCG1_...)"
+                placeholder="덱 코드를 입력하세요 (예: SLD-4M5XF7B2, SLD-TLL2EZT6 또는 WWTCG1_...)"
                 className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-amber-400 placeholder:text-slate-600"
               />
               <button
@@ -389,6 +427,13 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 클립보드 붙여넣기
               </button>
             </div>
+
+            {isFetchingOnline && (
+              <div className="flex items-center gap-2 text-xs text-amber-300 font-bold bg-amber-500/10 border border-amber-500/30 px-3.5 py-2 rounded-xl animate-pulse">
+                <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
+                <span>mc.sldark.com 온라인 덱 코드 실시간 조회 중...</span>
+              </div>
+            )}
 
             {importError && (
               <div className="flex items-center gap-1.5 text-xs text-red-400 font-semibold">

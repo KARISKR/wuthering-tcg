@@ -74,6 +74,14 @@ export function decodeDeckCode(codeStr: string): CustomDeckConfig | null {
       if (matchedPreset) {
         return presetToCustomDeck(matchedPreset);
       }
+    } else if (/^[A-Za-z0-9]{8}$/i.test(clean)) {
+      const sldCode = `SLD-${clean.toUpperCase()}`;
+      const matchedPreset = COMMUNITY_DECK_PRESETS.find(
+        (p) => p.externalCode?.toUpperCase() === sldCode
+      );
+      if (matchedPreset) {
+        return presetToCustomDeck(matchedPreset);
+      }
     }
 
     // 2. 덱 명칭으로 직접 입력 매칭 (RIN, 女秧椿 등)
@@ -408,3 +416,117 @@ export function setActiveCustomDeck(deck: CustomDeckConfig): void {
     })
   );
 }
+
+export interface SldarkDeckResponse {
+  deck: {
+    version: number;
+    name?: string;
+    characters: string[];
+    actions: Record<string, number>;
+  };
+}
+
+// mc.sldark.com 원시 API 응답 데이터를 CustomDeckConfig로 변환
+export function sldarkRawToCustomDeck(
+  sldCode: string,
+  raw: SldarkDeckResponse,
+  fallbackName?: string
+): CustomDeckConfig {
+  const characters = raw.deck?.characters || [];
+  const actions = raw.deck?.actions || {};
+
+  // 1. 캐릭터 식별 (15장 카드 중 유니크 캐릭터 3명 선별)
+  const charCards = characters
+    .map((c) => OFFICIAL_CARDS.find((o) => o.code === c && o.kind === 'CHARACTER'))
+    .filter(Boolean) as OfficialCardData[];
+
+  const uniqueCharNames: string[] = [];
+  charCards.forEach((c) => {
+    if (!uniqueCharNames.includes(c.characterName)) {
+      uniqueCharNames.push(c.characterName);
+    }
+  });
+
+  const resolveLv0 = (charName: string | undefined, fallbackIdx: number): CharacterCard => {
+    if (!charName) return DEDUPED_LV0_CHARACTERS[fallbackIdx] || DEDUPED_LV0_CHARACTERS[0];
+    const lv0 =
+      DEDUPED_LV0_CHARACTERS.find((c) => c.characterName === charName) ||
+      ALL_CHARACTERS.find((c) => c.characterName === charName && c.level === 0) ||
+      DEDUPED_LV0_CHARACTERS[fallbackIdx] ||
+      DEDUPED_LV0_CHARACTERS[0];
+    return lv0;
+  };
+
+  const leader = resolveLv0(uniqueCharNames[0], 0);
+  const leftSupport = resolveLv0(uniqueCharNames[1], 1);
+  const rightSupport = resolveLv0(uniqueCharNames[2], 2);
+
+  // 2. 액션 카드 복원
+  const actionCards: ActionCard[] = [];
+  Object.entries(actions).forEach(([code, count]) => {
+    const template =
+      ACTION_CARD_TEMPLATES.find((c) => c.code === code) ||
+      ACTION_CARD_TEMPLATES[0];
+    if (template) {
+      const qty = Math.min(Math.max(1, Number(count) || 1), 3);
+      for (let i = 0; i < qty; i++) {
+        actionCards.push({
+          ...template,
+          id: `deck-${template.code}-${Date.now()}-${actionCards.length}`,
+        });
+      }
+    }
+  });
+
+  return {
+    id: `custom-deck-${sldCode.toLowerCase()}`,
+    name: fallbackName || raw.deck?.name || `SLDark 덱 (${sldCode})`,
+    leader,
+    leftSupport,
+    rightSupport,
+    actionCards,
+  };
+}
+
+// 온라인 mc.sldark.com 실시간 덱 비동기 페처
+export async function fetchSldarkDeck(codeStr: string): Promise<CustomDeckConfig | null> {
+  const clean = codeStr.trim();
+  // 1. 로컬 번들 및 프리셋 매칭 우선 확인
+  const local = decodeDeckCode(clean);
+  if (local) return local;
+
+  let sldCode = '';
+  const sldMatch = clean.match(/SLD\s*[-_]?\s*([A-Za-z0-9]{6,12})/i);
+  if (sldMatch) {
+    sldCode = `SLD-${sldMatch[1].toUpperCase()}`;
+  } else if (/^[A-Za-z0-9]{8}$/i.test(clean)) {
+    sldCode = `SLD-${clean.toUpperCase()}`;
+  } else {
+    return null;
+  }
+
+  // API 엔드포인트 목록 (Vite 프록시 우선 -> CORS 프록시 폴백)
+  const endpoints = [
+    `/api/sldark/deck-codes/${sldCode}`,
+    `https://corsproxy.io/?https://mc.sldark.com/api/deck-codes/${sldCode}`,
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://mc.sldark.com/api/deck-codes/${sldCode}`)}`,
+  ];
+
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.deck && data.deck.characters && data.deck.actions) {
+          const customDeck = sldarkRawToCustomDeck(sldCode, data);
+          return customDeck;
+        }
+      }
+    } catch {
+      // 다음 엔드포인트 시도
+    }
+  }
+
+  return null;
+}
+

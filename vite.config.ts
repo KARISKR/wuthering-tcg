@@ -8,4 +8,13 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
+  server: {
+    proxy: {
+      '/api/sldark': {
+        target: 'https://mc.sldark.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/sldark/, '/api'),
+      },
+    },
+  },
 })
