@@ -1297,6 +1297,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canUpgrade={checkCanUpgradeSlot('leftSupport', 0)}
                           canSwitch={!p0.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isP0Turn}
                           onUpgradeClick={() => openUpgradeModal('leftSupport', 0)}
+                          onCardClick={() => {
+                            if (checkCanUpgradeSlot('leftSupport', 0)) openUpgradeModal('leftSupport', 0);
+                          }}
                           onSwitchClick={() => handleSwitchLeader(0, 'leftSupport')}
                           onMouseEnter={() => p0.slots.leftSupport && setPreviewCard(p0.slots.leftSupport)}
                           isAi={false}
@@ -1313,6 +1316,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canUpgrade={checkCanUpgradeSlot('leader', 0)}
                           canSwitch={false}
                           onUpgradeClick={() => openUpgradeModal('leader', 0)}
+                          onCardClick={() => {
+                            if (checkCanUpgradeSlot('leader', 0)) openUpgradeModal('leader', 0);
+                          }}
                           onMouseEnter={() => setPreviewCard(p0.slots.leader)}
                           isAi={false}
                         />
@@ -1328,6 +1334,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canUpgrade={checkCanUpgradeSlot('rightSupport', 0)}
                           canSwitch={!p0.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isP0Turn}
                           onUpgradeClick={() => openUpgradeModal('rightSupport', 0)}
+                          onCardClick={() => {
+                            if (checkCanUpgradeSlot('rightSupport', 0)) openUpgradeModal('rightSupport', 0);
+                          }}
                           onSwitchClick={() => handleSwitchLeader(0, 'rightSupport')}
                           onMouseEnter={() => p0.slots.rightSupport && setPreviewCard(p0.slots.rightSupport)}
                           isAi={false}
@@ -1540,6 +1549,68 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <>
                   {isCurrentControlledTurn ? (
                     <>
+                      {/* 메인 페이즈 캐릭터 진화(레벨업) 퀵 액션 카드 */}
+                      {(() => {
+                        const canLeaderUp = checkCanUpgradeSlot('leader', controlledPlayerIndex);
+                        const canLeftUp = checkCanUpgradeSlot('leftSupport', controlledPlayerIndex);
+                        const canRightUp = checkCanUpgradeSlot('rightSupport', controlledPlayerIndex);
+                        const canAnyUp = canLeaderUp || canLeftUp || canRightUp;
+                        const isUpgraded = activeControlledPlayer.actionFlags.upgraded;
+
+                        return (
+                          <div className="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px] font-black text-slate-300">
+                              <span className="flex items-center gap-1">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                캐릭터 진화 (레벨업)
+                              </span>
+                              <span
+                                className={`text-[10px] font-mono font-bold ${
+                                  isUpgraded
+                                    ? 'text-slate-500'
+                                    : canAnyUp
+                                    ? 'text-emerald-400 animate-pulse'
+                                    : 'text-amber-500/80'
+                                }`}
+                              >
+                                {isUpgraded ? '이번 턴 완료' : canAnyUp ? '진화 가능!' : '조건 부족'}
+                              </span>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                if (canLeaderUp) openUpgradeModal('leader', controlledPlayerIndex);
+                                else if (canLeftUp) openUpgradeModal('leftSupport', controlledPlayerIndex);
+                                else if (canRightUp) openUpgradeModal('rightSupport', controlledPlayerIndex);
+                              }}
+                              disabled={isUpgraded || !canAnyUp}
+                              className={`w-full py-2.5 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer border ${
+                                isUpgraded
+                                  ? 'bg-slate-900/60 text-slate-500 border-slate-800 cursor-not-allowed'
+                                  : canAnyUp
+                                  ? 'bg-gradient-to-r from-amber-500/20 via-yellow-500/20 to-amber-500/20 hover:from-amber-500/30 hover:to-yellow-500/30 text-amber-300 border-amber-400 shadow-md shadow-amber-500/10 animate-pulse'
+                                  : 'bg-slate-950/60 text-slate-500 border-slate-800 hover:text-slate-400'
+                              }`}
+                              title={
+                                isUpgraded
+                                  ? '이미 이번 턴에 캐릭터를 진화시켰습니다 (턴당 1회 제한)'
+                                  : canAnyUp
+                                  ? '캐릭터 레벨업 창을 열어 손패를 소모하고 진화합니다'
+                                  : '진화 조건 미충족 (캐릭터 덱에 다음 레벨 카드 및 소모할 손패 필요)'
+                              }
+                            >
+                              <span>
+                                {isUpgraded
+                                  ? '이번 턴 레벨업 완료 (턴 1회)'
+                                  : canAnyUp
+                                  ? '🆙 캐릭터 레벨업(진화) 실행'
+                                  : '캐릭터 진화 불가 (조건 미달)'}
+                              </span>
+                            </button>
+                          </div>
+                        );
+                      })()}
+
                       <button
                         onClick={() => handleDecideClash(true)}
                         className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/30 transition transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer animate-pulse flex items-center justify-center gap-2 border border-amber-300"
