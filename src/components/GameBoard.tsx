@@ -21,6 +21,7 @@ import { CardListModal } from './CardListModal';
 import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
 import { EffectNotificationToast } from './EffectNotificationToast';
+import { EvolutionTreeModal } from './EvolutionTreeModal';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect } from '../types/tcg';
 import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
@@ -49,6 +50,7 @@ import {
   ArrowLeftRight,
   Crown,
   Trash2,
+  ExternalLink,
 } from 'lucide-react';
 
 import { BgmPlayer } from './BgmPlayer';
@@ -200,6 +202,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
+  const [evolutionModalChar, setEvolutionModalChar] = useState<CharacterCard | null>(null);
   const replaySavedRef = useRef<boolean>(false);
 
   // 게임 종료 시 리플레이 자동 저장
@@ -756,11 +759,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         <Layers className="w-4 h-4 text-amber-400" />
                         <span>진화 스택 & 누적 상속 스킬</span>
                       </span>
-                      <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                        {previewCard.underlyingCards && previewCard.underlyingCards.length > 0
-                          ? `스택: 총 ${previewCard.underlyingCards.length + 1}장 보유`
-                          : `Lv.${previewCard.level} 단일`}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {previewCard.underlyingCards && previewCard.underlyingCards.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setEvolutionModalChar(previewCard)}
+                            className="text-[10px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold px-1.5 py-0.5 rounded border border-amber-400/40 transition flex items-center gap-1 cursor-pointer shadow-sm"
+                            title="진화 계보 및 상속 스킬 전체 팝업 보기"
+                          >
+                            <ExternalLink className="w-2.5 h-2.5" />
+                            <span>계보 전체보기</span>
+                          </button>
+                        )}
+                        <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                          {previewCard.underlyingCards && previewCard.underlyingCards.length > 0
+                            ? `스택: 총 ${previewCard.underlyingCards.length + 1}장`
+                            : `Lv.${previewCard.level} 단일`}
+                        </span>
+                      </div>
                     </div>
 
                     {/* 하위 카드 스택이 있는 경우 */}
@@ -972,6 +988,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           onUpgradeClick={() => openUpgradeModal('leftSupport', 1)}
                           onSwitchClick={() => handleSwitchLeader(1, 'leftSupport')}
                           onMouseEnter={() => p1.slots.leftSupport && setPreviewCard(p1.slots.leftSupport)}
+                          onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                          onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                           isAi={p1.isAi}
                         />
                         <span className="text-xs sm:text-sm font-black text-slate-400 mt-1">백 (SUPPORT)</span>
@@ -987,6 +1005,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canSwitch={false}
                           onUpgradeClick={() => openUpgradeModal('leader', 1)}
                           onMouseEnter={() => setPreviewCard(p1.slots.leader)}
+                          onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                          onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                           isAi={p1.isAi}
                         />
                         <span className="text-xs sm:text-sm font-black text-cyan-300 mt-1">리더 (LEADER)</span>
@@ -1003,6 +1023,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           onUpgradeClick={() => openUpgradeModal('rightSupport', 1)}
                           onSwitchClick={() => handleSwitchLeader(1, 'rightSupport')}
                           onMouseEnter={() => p1.slots.rightSupport && setPreviewCard(p1.slots.rightSupport)}
+                          onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                          onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                           isAi={p1.isAi}
                         />
                         <span className="text-xs sm:text-sm font-black text-slate-400 mt-1">백 (SUPPORT)</span>
@@ -1291,6 +1313,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           }}
                           onSwitchClick={() => handleSwitchLeader(0, 'leftSupport')}
                           onMouseEnter={() => p0.slots.leftSupport && setPreviewCard(p0.slots.leftSupport)}
+                          onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                          onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                           isAi={false}
                         />
                         <span className="text-xs sm:text-sm font-black text-slate-400 mt-1">백 (SUPPORT)</span>
@@ -1309,6 +1333,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                             if (gameState.phase === 'ACTION_PHASE' && isP0Turn) openUpgradeModal('leader', 0);
                           }}
                           onMouseEnter={() => setPreviewCard(p0.slots.leader)}
+                          onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                          onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                           isAi={false}
                         />
                         <span className="text-xs sm:text-sm font-black text-amber-300 mt-1">리더 (LEADER)</span>
@@ -1328,6 +1354,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           }}
                           onSwitchClick={() => handleSwitchLeader(0, 'rightSupport')}
                           onMouseEnter={() => p0.slots.rightSupport && setPreviewCard(p0.slots.rightSupport)}
+                          onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                          onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                           isAi={false}
                         />
                         <span className="text-xs sm:text-sm font-black text-slate-400 mt-1">백 (SUPPORT)</span>
@@ -2104,6 +2132,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       <EffectChoiceModal
         choice={gameState.pendingChoice}
         onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
+      />
+
+      {/* 캐릭터 진화 계보 & 상속 스킬 모람 팝업 모달 */}
+      <EvolutionTreeModal
+        isOpen={Boolean(evolutionModalChar)}
+        onClose={() => setEvolutionModalChar(null)}
+        character={evolutionModalChar}
       />
 
       {/* 실시간 카드 효과 발동 알림 토스트 (어떤 카드의 어떤 효과로 무슨 사건이 일어났는지 시각적 표출) */}

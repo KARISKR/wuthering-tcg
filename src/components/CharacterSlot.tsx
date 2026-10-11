@@ -13,6 +13,8 @@ interface CharacterSlotProps {
   onSwitchClick?: () => void;
   onCardClick?: () => void;
   onMouseEnter?: () => void;
+  onOpenEvolutionModal?: (char: CharacterCard) => void;
+  onHoverUnderlyingCard?: (card: CharacterCard) => void;
   isAi?: boolean;
 }
 
@@ -26,15 +28,18 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
   onSwitchClick,
   onCardClick,
   onMouseEnter,
+  onOpenEvolutionModal,
+  onHoverUnderlyingCard,
   isAi = false,
 }) => {
   const isLeader = role === 'leader';
+  const cardSizeClass = isLeader ? 'w-48 h-72' : 'w-36 h-52';
 
   return (
     <div
       onMouseEnter={onMouseEnter}
       onClick={onCardClick}
-      className={`relative flex flex-col items-center rounded-2xl p-1.5 transition-all duration-200 cursor-pointer ${
+      className={`relative flex flex-col items-center rounded-2xl p-1.5 transition-all duration-200 cursor-pointer group/slot ${
         isLeader
           ? 'bg-slate-950/90 border-2 border-amber-400/90 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
           : 'bg-slate-950/60 border border-slate-800/80 hover:border-slate-700'
@@ -55,22 +60,73 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
         )}
       </div>
 
-      {/* 카드 본체: 리더 대형(lg), 서포터 중형(md)으로 대폭 확대 */}
+      {/* 카드 본체: 리더 대형(lg), 서포터 중형(md) */}
       <div className="relative">
-        {/* 하위 카드 겹침(스택) 계단식 섀도우 연출 */}
+        {/* 하위 카드 실물 계단식 겹침 & 마우스 호버 시 부채꼴 펼치기 (Fan-Out) */}
         {card && card.underlyingCards && card.underlyingCards.length > 0 && (
           <>
-            <div className="absolute -top-1 -right-1 w-full h-full rounded-2xl border border-amber-500/40 bg-slate-800/60 -z-10 shadow-md" />
-            {card.underlyingCards.length > 1 && (
-              <div className="absolute -top-2 -right-2 w-full h-full rounded-2xl border border-amber-500/20 bg-slate-800/30 -z-20" />
-            )}
-            <div
-              className="absolute -top-2.5 -left-2 z-20 px-2 py-0.5 rounded-full bg-slate-900/95 border border-amber-400 text-amber-300 font-mono font-black text-[10px] shadow-lg flex items-center gap-1"
-              title={`이전 레벨 카드 ${card.underlyingCards.length}장 겹침 (이전 모든 스킬 보유 중)`}
+            {card.underlyingCards.map((underCard, idx) => {
+              const isBottom = idx === 0;
+              const count = card.underlyingCards!.length;
+
+              // 이전 카드 계단식 오프셋 및 호버 시 부채꼴 펼치기 클래스
+              const baseTopClass = count === 1 ? '-top-3.5 -left-2.5' : isBottom ? '-top-6 -left-4' : '-top-3 -left-2';
+              const hoverTopClass =
+                count === 1
+                  ? 'group-hover/slot:-top-7 group-hover/slot:-left-4'
+                  : isBottom
+                  ? 'group-hover/slot:-top-11 group-hover/slot:-left-7'
+                  : 'group-hover/slot:-top-6 group-hover/slot:-left-3.5';
+              const rotateClass =
+                count === 1
+                  ? '-rotate-2 group-hover/slot:-rotate-4'
+                  : isBottom
+                  ? '-rotate-3 group-hover/slot:-rotate-6'
+                  : '-rotate-1 group-hover/slot:-rotate-3';
+              const zClass = isBottom ? '-z-20' : '-z-10';
+
+              return (
+                <div
+                  key={underCard.id || idx}
+                  onMouseEnter={(e) => {
+                    e.stopPropagation();
+                    onHoverUnderlyingCard?.(underCard);
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenEvolutionModal?.(card);
+                  }}
+                  className={`absolute ${cardSizeClass} ${baseTopClass} ${hoverTopClass} ${rotateClass} ${zClass} rounded-2xl border-2 border-amber-500/80 bg-slate-900 shadow-2xl overflow-hidden transition-all duration-300 ease-out cursor-pointer hover:border-amber-300 hover:ring-2 hover:ring-amber-400/50 group/undercard`}
+                  title={`클릭하여 진화 계보 전체 보기 | Lv.${underCard.level} [${underCard.nameKr}] (상속 스킬 보유 중)`}
+                >
+                  {/* 하위 카드 실물 일러스트 */}
+                  <img
+                    src={underCard.artUrl}
+                    alt={underCard.nameKr}
+                    className="w-full h-full object-cover opacity-80 group-hover/undercard:opacity-100 transition-opacity"
+                  />
+
+                  {/* 계단식 돌출 상단 영역의 레벨 배지 */}
+                  <div className="absolute top-1.5 left-1.5 flex items-center gap-1 bg-black/90 backdrop-blur-sm px-2 py-0.5 rounded-full border border-amber-400 text-amber-300 font-mono font-black text-[9px] shadow-lg">
+                    <span>Lv.{underCard.level}</span>
+                    <span className="text-[8px] text-slate-300">상속</span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* 상단 스택 배지 (클릭 시 진화 계보 팝업 오픈) */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenEvolutionModal?.(card);
+              }}
+              className="absolute -top-3 -left-3 z-30 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-[10px] sm:text-[11px] shadow-xl border border-white/80 flex items-center gap-1.5 cursor-pointer transform hover:scale-110 active:scale-95 transition"
+              title="클릭하여 진화 계보(Lv.0~Lv.2) 및 상속 스킬 모람 보기"
             >
-              <Layers className="w-3 h-3 text-amber-400" />
-              <span>스택 {card.underlyingCards.length + 1}</span>
-            </div>
+              <Layers className="w-3.5 h-3.5" />
+              <span>스택 {card.underlyingCards.length + 1}장 ⤢</span>
+            </button>
           </>
         )}
 
