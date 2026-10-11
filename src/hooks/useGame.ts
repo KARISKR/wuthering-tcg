@@ -66,18 +66,27 @@ export function useGame(
 
   // 0. 선공 주사위 결정 (LEADER_SELECT 또는 MULLIGAN 단계에서 적용)
   const handleSetInitiative = useCallback(
-    (firstPlayerIndex: 0 | 1, roll0: number, roll1: number) => {
+    (
+      firstPlayerIndex: 0 | 1,
+      roll0: number,
+      roll1: number,
+      choiceDetail?: { winnerIndex: 0 | 1; chosenOrder: 'FIRST' | 'SECOND' }
+    ) => {
       setGameState((prev) => {
         if (prev.phase !== 'LEADER_SELECT' && prev.phase !== 'MULLIGAN') return prev;
         if (prev.logs.some((l) => l.id.startsWith('log-dice-'))) return prev;
 
-        const winnerName = prev.players[firstPlayerIndex].name;
+        const firstPlayerName = prev.players[firstPlayerIndex].name;
+        const diceWinnerIndex = choiceDetail?.winnerIndex ?? (roll0 > roll1 ? 0 : 1);
+        const diceWinnerName = prev.players[diceWinnerIndex].name;
+        const orderText = choiceDetail?.chosenOrder === 'SECOND' ? '후공' : '선공';
+
         const rollLog: import('../types/tcg').LogItem = {
           id: `log-dice-${Date.now()}`,
           turn: prev.turn,
           playerIndex: firstPlayerIndex,
           type: 'SYSTEM',
-          text: `🎲 [선공 결정 주사위] ${prev.players[0].name}: ${roll0} vs ${prev.players[1].name}: ${roll1} ➔ [${winnerName}] 선공 확정!`,
+          text: `🎲 [선/후공 결정] ${prev.players[0].name}: ${roll0} vs ${prev.players[1].name}: ${roll1} ➔ [${diceWinnerName}] 주사위 승리! [${orderText}]을(를) 선택하여 [${firstPlayerName}] 1턴 선공 확정!`,
           timestamp: Date.now(),
         };
         return {

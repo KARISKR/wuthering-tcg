@@ -2014,9 +2014,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         isOpen={isInitiativeRolling && (gameState.phase === 'LEADER_SELECT' || gameState.phase === 'MULLIGAN')}
         player0={gameState.players[0]}
         player1={gameState.players[1]}
-        onComplete={(winnerIndex, roll0, roll1) => {
+        onComplete={(firstPlayerIndex, roll0, roll1, choiceDetail) => {
           setIsInitiativeRolling(false);
-          handleSetInitiative(winnerIndex, roll0, roll1);
+          handleSetInitiative(firstPlayerIndex, roll0, roll1, choiceDetail);
         }}
       />
 
