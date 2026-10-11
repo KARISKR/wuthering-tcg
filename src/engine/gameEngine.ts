@@ -1132,6 +1132,16 @@ export function setClashCard(
     );
     if (hasChixia0) {
       newState.players[oppIdx].hp = Math.max(0, newState.players[oppIdx].hp - 1);
+      newState.lastEffectEvent = {
+        id: `eff-${Date.now()}-chixia0`,
+        sourceCardName: '치샤 Lv.0',
+        sourceCardArt: player.slots.leader.artUrl,
+        effectType: 'DAMAGE',
+        title: '치샤 배틀 효과',
+        description: '적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!',
+        playerIndex,
+        timestamp: Date.now(),
+      };
       newState = addLog(
         newState,
         `[치샤 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
@@ -1147,6 +1157,16 @@ export function setClashCard(
     );
     if (hasJinhsi0) {
       newState.players[oppIdx].hp = Math.max(0, newState.players[oppIdx].hp - 1);
+      newState.lastEffectEvent = {
+        id: `eff-${Date.now()}-jinhsi0`,
+        sourceCardName: '금희 Lv.0',
+        sourceCardArt: player.slots.leader.artUrl,
+        effectType: 'DAMAGE',
+        title: '금희 배틀 효과',
+        description: '적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!',
+        playerIndex,
+        timestamp: Date.now(),
+      };
       newState = addLog(
         newState,
         `[금희 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,

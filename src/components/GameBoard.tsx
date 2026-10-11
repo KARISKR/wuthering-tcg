@@ -21,6 +21,7 @@ import { CardListModal } from './CardListModal';
 import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
 import { EffectNotificationToast } from './EffectNotificationToast';
+import { CenterActionHUD } from './CenterActionHUD';
 import { EvolutionTreeModal } from './EvolutionTreeModal';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect } from '../types/tcg';
 import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill } from '../engine/gameEngine';
@@ -378,33 +379,57 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const p1 = gameState.players[1];
   const isP0Turn = gameState.activePlayerIndex === 0;
 
-  // 피격/대미지 효과음 자동 감지
+  // 좌측 패널 탭 (카드 상세 정보 vs 실시간 대전 기록 타임라인)
+  const [leftPanelTab, setLeftPanelTab] = useState<'PREVIEW' | 'LOG'>('PREVIEW');
+
+  // 대미지 트랜지션 애니메이션 상태 (20 -> 14 등 실시간 피격 팝업)
+  const [p0DamageAlert, setP0DamageAlert] = useState<{ prev: number; curr: number; diff: number } | null>(null);
+  const [p1DamageAlert, setP1DamageAlert] = useState<{ prev: number; curr: number; diff: number } | null>(null);
+
+  // 피격/대미지 효과음 및 시각적 배지 자동 감지
   const prevP0Hp = useRef(p0.hp);
   const prevP1Hp = useRef(p1.hp);
 
   useEffect(() => {
     if (p0.hp < prevP0Hp.current) {
+      const diff = prevP0Hp.current - p0.hp;
+      setP0DamageAlert({ prev: prevP0Hp.current, curr: p0.hp, diff });
+      const timer = setTimeout(() => setP0DamageAlert(null), 2500);
+
       // 대결 연출 중에는 ClashAnimationOverlay가 참격 타이밍(1.5초)에 직접 효과음을 내므로 중복 방지
       if (gameState.phase !== 'CLASH_REVEAL') {
         const attackerLeader = p1.slots.leader;
         const weapon = attackerLeader ? getWeaponByCharacter(attackerLeader.characterName || attackerLeader.nameKr) : undefined;
-        soundEffects.playDamage(prevP0Hp.current - p0.hp, weapon);
+        soundEffects.playDamage(diff, weapon);
       }
+      return () => clearTimeout(timer);
     }
     prevP0Hp.current = p0.hp;
   }, [p0.hp, gameState.phase, p1.slots.leader]);
 
   useEffect(() => {
     if (p1.hp < prevP1Hp.current) {
+      const diff = prevP1Hp.current - p1.hp;
+      setP1DamageAlert({ prev: prevP1Hp.current, curr: p1.hp, diff });
+      const timer = setTimeout(() => setP1DamageAlert(null), 2500);
+
       // 대결 연출 중에는 ClashAnimationOverlay가 참격 타이밍(1.5초)에 직접 효과음을 내므로 중복 방지
       if (gameState.phase !== 'CLASH_REVEAL') {
         const attackerLeader = p0.slots.leader;
         const weapon = attackerLeader ? getWeaponByCharacter(attackerLeader.characterName || attackerLeader.nameKr) : undefined;
-        soundEffects.playDamage(prevP1Hp.current - p1.hp, weapon);
+        soundEffects.playDamage(diff, weapon);
       }
+      return () => clearTimeout(timer);
     }
     prevP1Hp.current = p1.hp;
   }, [p1.hp, gameState.phase, p0.slots.leader]);
+
+  // 호버 시 프리뷰 탭 자동 활성화
+  useEffect(() => {
+    if (previewCard) {
+      setLeftPanelTab('PREVIEW');
+    }
+  }, [previewCard?.id]);
 
   // 1인 2역 (SOLO_DUAL) 시 페이즈에 따른 자동 조종 시점 전환 로직
   useEffect(() => {
@@ -670,11 +695,95 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           onWheel={handleLeftPanelWheel}
           className="w-[360px] lg:w-[400px] xl:w-[440px] 2xl:w-[480px] shrink-0 min-w-[340px] bg-slate-950 border-r border-slate-800 p-3.5 sm:p-4 flex flex-col justify-start overflow-y-auto overflow-x-hidden custom-scrollbar select-text relative h-full min-h-0"
         >
-          <div
-            ref={previewContentRef}
-            style={{ transform: `translateY(${previewTranslateY}px)` }}
-            className="transition-transform duration-150 ease-out will-change-transform flex flex-col space-y-3"
-          >
+          {/* 상단 탭 스위처: [카드 상세 정보] ↔ [실시간 대전 기록] */}
+          <div className="flex items-center gap-1.5 mb-3 p-1 bg-slate-900/90 rounded-xl border border-slate-800 shrink-0">
+            <button
+              onClick={() => setLeftPanelTab('PREVIEW')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                leftPanelTab === 'PREVIEW'
+                  ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>카드 상세 정보</span>
+            </button>
+            <button
+              onClick={() => setLeftPanelTab('LOG')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-black transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                leftPanelTab === 'LOG'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md font-extrabold'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+              }`}
+            >
+              <ScrollText className="w-3.5 h-3.5" />
+              <span>실시간 대전 기록</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-950/60 text-slate-200 font-mono">
+                {gameState.logs.length}
+              </span>
+            </button>
+          </div>
+
+          {leftPanelTab === 'LOG' ? (
+            /* 실시간 대전 기록 타임라인 뷰 (중국 시뮬레이터 벤치마킹 상시 타임라인) */
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 shrink-0">
+                <div className="flex items-center gap-1.5">
+                  <ScrollText className="w-4 h-4 text-emerald-400" />
+                  <span className="text-xs font-black text-white">대전 타임라인 로그</span>
+                </div>
+                <span className="text-[11px] font-mono text-amber-300 font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                  TURN {gameState.turn}
+                </span>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {gameState.logs.map((log) => (
+                  <div
+                    key={log.id}
+                    className={`p-2.5 rounded-xl border text-xs leading-relaxed transition flex flex-col gap-1 ${
+                      log.type === 'PHASE'
+                        ? 'bg-indigo-950/40 border-indigo-700/60 text-indigo-200 font-semibold'
+                        : log.type === 'CLASH'
+                        ? 'bg-amber-950/30 border-amber-700/60 text-amber-200 font-medium'
+                        : log.type === 'DAMAGE'
+                        ? 'bg-red-950/30 border-red-700/60 text-red-200 font-medium'
+                        : log.type === 'HEAL'
+                        ? 'bg-cyan-950/30 border-cyan-700/60 text-cyan-200 font-medium'
+                        : 'bg-slate-900/60 border-slate-800 text-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono font-bold text-slate-400">
+                        [턴 {log.turn}] {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                      {log.effectTag && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-amber-300 border border-slate-700">
+                          {log.effectTag}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-start gap-2">
+                      {log.cardArt && (
+                        <img
+                          src={log.cardArt}
+                          alt={log.cardName || '카드'}
+                          className="w-8 h-11 rounded object-cover border border-slate-700 shrink-0 shadow mt-0.5"
+                        />
+                      )}
+                      <p className="flex-1 text-slate-200 break-words font-medium">
+                        {log.text}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div
+              ref={previewContentRef}
+              style={{ transform: `translateY(${previewTranslateY}px)` }}
+              className="transition-transform duration-150 ease-out will-change-transform flex flex-col space-y-3"
+            >
             {previewCard ? (
               <>
                 {/* 덱 빌더 동일 규격 초대형 카드 실물 일러스트 (상하 잘림 없이 원본 비율 100% 선명 보존) */}
@@ -839,6 +948,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               </div>
             )}
           </div>
+        )}
 
           <div className="mt-auto text-xs text-slate-500 text-center pt-2 border-t border-slate-800/80 font-medium shrink-0">
             마우스 스크롤 & 손패 호버 실시간 연동
@@ -870,8 +980,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       <span>{p1.name}</span>
                     </div>
                     {/* HP 바 */}
-                    <div className="flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border border-slate-800 shadow-inner">
-                      <Heart className="w-5 h-5 text-red-400 fill-red-400" />
+                    <div className={`flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border transition-all duration-300 shadow-inner ${
+                      p1DamageAlert ? 'border-red-500 ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'border-slate-800'
+                    }`}>
+                      <Heart className={`w-5 h-5 text-red-400 fill-red-400 ${p1DamageAlert ? 'animate-bounce text-red-500' : ''}`} />
                       <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p1.hp} / 20</span>
                       <div className="w-28 sm:w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
@@ -879,6 +991,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           style={{ width: `${(p1.hp / 20) * 100}%` }}
                         />
                       </div>
+                      {p1DamageAlert && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white font-mono font-black text-xs animate-bounce shadow-lg shadow-red-500/50 flex items-center gap-1 border border-red-400 ml-1 shrink-0">
+                          <span>{p1DamageAlert.prev} → {p1DamageAlert.curr}</span>
+                          <span className="text-red-200">(-{p1DamageAlert.diff})</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1121,9 +1239,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {/* ------------------------------------------------------- */}
               {/* 2. 중앙 전장 경계선 (슬림 & 쾌적한 배틀 아레나 디바이더) */}
               {/* ------------------------------------------------------- */}
-              <div className="h-11 sm:h-12 w-full rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900/90 to-slate-950 border border-amber-500/30 shadow-lg flex items-center justify-between px-3 sm:px-4 shrink-0 overflow-hidden">
+              <div className="h-12 sm:h-14 w-full rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900/95 to-slate-950 border border-amber-500/40 shadow-xl flex items-center justify-between px-3 sm:px-4 shrink-0 overflow-hidden relative">
+                {/* 배경 은은한 네온 빔 라인 */}
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[1px] bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent pointer-events-none" />
+
                 {/* 좌측: 상성 가이드 */}
-                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black px-2.5 py-1 rounded-xl bg-slate-950/90 border border-slate-800/80 shadow-inner shrink-0">
+                <div className="flex items-center gap-1.5 text-xs sm:text-sm font-black px-2.5 py-1 rounded-xl bg-slate-950/90 border border-slate-800 shadow-inner shrink-0 z-10">
                   <span className="text-red-400">RED</span>
                   <span className="text-slate-600">&gt;</span>
                   <span className="text-emerald-400">GREEN</span>
@@ -1133,16 +1254,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <span className="text-red-400">RED</span>
                 </div>
 
-                {/* 중앙: 전장 상태 인디케이터 */}
-                <div className="flex items-center gap-2">
+                {/* 중앙: 전장 상태 인디케이터 (대형화 & 가독성 강화) */}
+                <div className="flex items-center gap-2.5 z-10">
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-                  <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wider">
+                  <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wider font-mono">
                     {gameState.phase === 'LEADER_SELECT' && 'BATTLE ARENA • LEADER SELECTION'}
                     {gameState.phase === 'MULLIGAN' && 'BATTLE ARENA • MULLIGAN'}
                     {gameState.phase === 'ACTION_PHASE' && 'BATTLE ARENA • MAIN PHASE'}
                     {gameState.phase === 'CLASH_SET' && 'BATTLE ARENA • CLASH SETTING'}
                     {gameState.phase === 'CLASH_REVEAL' && 'BATTLE ARENA • CLASH JUDGMENT'}
-                    {gameState.phase === 'COMBO_STEP' && `BATTLE ARENA • COMBO STRIKE (추격 게이지: ${activeControlledPlayer.comboCount}회)`}
+                    {gameState.phase === 'COMBO_STEP' && `BATTLE ARENA • COMBO STRIKE (${activeControlledPlayer.comboUnlimited ? '무제한 연격 진행 중' : `추격: ${activeControlledPlayer.comboCount}회`})`}
                     {gameState.phase === 'DISCARD_OVERFLOW' && 'BATTLE ARENA • END PHASE'}
                     {gameState.phase === 'START_PHASE' && 'BATTLE ARENA • START'}
                     {gameState.phase === 'DRAW_PHASE' && 'BATTLE ARENA • DRAW'}
@@ -1151,15 +1272,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
                 </div>
 
-                {/* 우측: 로고 및 조작 안내 */}
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono tracking-widest text-slate-500 font-bold hidden sm:inline">
-                    KURO GAMES
-                  </span>
-                  <span className="text-xs text-amber-400 font-bold bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
-                    <span>우측 콘솔 조작</span>
-                    <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
-                  </span>
+                {/* 우측: 공상 테크 턴 카운터 서클 배지 (중국 시뮬레이터 벤치마킹) */}
+                <div className="flex items-center gap-2 z-10">
+                  <div className="flex items-center gap-2 bg-slate-950/90 pl-3 pr-1 py-1 rounded-full border border-amber-500/40 shadow-inner">
+                    <span className="text-[11px] font-mono text-slate-400 font-bold hidden sm:inline">CURRENT</span>
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-amber-400/90 bg-gradient-to-br from-amber-500/20 to-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.5)] flex flex-col items-center justify-center font-mono">
+                      <span className="text-[8px] font-black text-amber-400/90 uppercase leading-none">TURN</span>
+                      <strong className="text-sm sm:text-base font-black text-amber-300 leading-none mt-0.5">{String(gameState.turn).padStart(2, '0')}</strong>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1177,8 +1298,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       <span>{p0.name}</span>
                     </div>
                     {/* HP 바 */}
-                    <div className="flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border border-slate-800 shadow-inner">
-                      <Heart className="w-5 h-5 text-red-400 fill-red-400" />
+                    <div className={`flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border transition-all duration-300 shadow-inner ${
+                      p0DamageAlert ? 'border-red-500 ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'border-slate-800'
+                    }`}>
+                      <Heart className={`w-5 h-5 text-red-400 fill-red-400 ${p0DamageAlert ? 'animate-bounce text-red-500' : ''}`} />
                       <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p0.hp} / 20</span>
                       <div className="w-28 sm:w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
@@ -1186,6 +1309,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           style={{ width: `${(p0.hp / 20) * 100}%` }}
                         />
                       </div>
+                      {p0DamageAlert && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white font-mono font-black text-xs animate-bounce shadow-lg shadow-red-500/50 flex items-center gap-1 border border-red-400 ml-1 shrink-0">
+                          <span>{p0DamageAlert.prev} → {p0DamageAlert.curr}</span>
+                          <span className="text-red-200">(-{p0DamageAlert.diff})</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -2181,6 +2310,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* 실시간 카드 효과 발동 알림 토스트 (전투 진행 중인 CLASH_REVEAL 동안에는 숨기고 전투 결과 후 표출) */}
       <EffectNotificationToast event={gameState.phase !== 'CLASH_REVEAL' ? gameState.lastEffectEvent : null} />
 
+      {/* 중앙 시네마틱 카드 액션 알림 HUD */}
+      <CenterActionHUD event={gameState.phase !== 'CLASH_REVEAL' ? gameState.lastEffectEvent : null} />
     </div>
   );
 };
