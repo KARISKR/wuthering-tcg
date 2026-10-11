@@ -359,13 +359,106 @@ export function customDeckToPreset(deck: CustomDeckConfig, customName?: string):
   };
 }
 
-// 현재 활성 덱(localStorage) 조회 (없으면 기본 SD01 생성)
+const USER_DECKS_STORAGE_KEY = 'wuthering_user_decks';
+
+// 보유 중인 내 덱 리스트 조회
+export function getUserDecks(): CustomDeckConfig[] {
+  const raw = localStorage.getItem(USER_DECKS_STORAGE_KEY);
+  if (raw) {
+    try {
+      const parsed: any[] = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((d) => {
+          const leader =
+            DEDUPED_LV0_CHARACTERS.find(
+              (c) =>
+                c.code === d.leader?.code ||
+                c.characterName === d.leader?.characterName ||
+                c.nameKr === d.leader?.nameKr
+            ) || d.leader;
+          const leftSupport =
+            DEDUPED_LV0_CHARACTERS.find(
+              (c) =>
+                c.code === d.leftSupport?.code ||
+                c.characterName === d.leftSupport?.characterName ||
+                c.nameKr === d.leftSupport?.nameKr
+            ) || d.leftSupport || DEDUPED_LV0_CHARACTERS[1];
+          const rightSupport =
+            DEDUPED_LV0_CHARACTERS.find(
+              (c) =>
+                c.code === d.rightSupport?.code ||
+                c.characterName === d.rightSupport?.characterName ||
+                c.nameKr === d.rightSupport?.nameKr
+            ) || d.rightSupport || DEDUPED_LV0_CHARACTERS[2];
+
+          const upgradedActions: ActionCard[] = (d.actionCards || d.actionDeck || []).map((c: ActionCard) => {
+            const best = ACTION_CARD_TEMPLATES.find((a) => a.code === c.code);
+            return best ? { ...best, id: c.id } : c;
+          });
+
+          return {
+            id: d.id || `user-deck-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            name: d.name || d.deckName || '나만의 커스텀 덱',
+            leader,
+            leftSupport,
+            rightSupport,
+            actionCards: upgradedActions,
+          };
+        });
+      }
+    } catch (e) {
+      console.error('내 덱 리스트 파싱 실패:', e);
+    }
+  }
+
+  // 마이그레이션: 기존 ACTIVE_DECK_STORAGE_KEY 가 있다면 초기 내 덱 1번으로 등록
+  const active = getActiveCustomDeck();
+  const initialUserDecks: CustomDeckConfig[] = [
+    {
+      ...active,
+      id: 'user-deck-1',
+      name: active.name || '나만의 커스텀 덱 1',
+    },
+  ];
+  localStorage.setItem(USER_DECKS_STORAGE_KEY, JSON.stringify(initialUserDecks));
+  return initialUserDecks;
+}
+
+// 보유 중인 내 덱 리스트 전체 저장
+export function saveAllUserDecks(decks: CustomDeckConfig[]): void {
+  localStorage.setItem(USER_DECKS_STORAGE_KEY, JSON.stringify(decks));
+}
+
+// 특정 내 덱 저장/업데이트
+export function saveUserDeck(deck: CustomDeckConfig): void {
+  const list = getUserDecks();
+  const idx = list.findIndex((d) => d.id === deck.id);
+  if (idx !== -1) {
+    list[idx] = deck;
+  } else {
+    list.unshift(deck);
+  }
+  saveAllUserDecks(list);
+  // 활성 덱도 동기화
+  setActiveCustomDeck(deck);
+}
+
+// 내 덱 삭제
+export function deleteUserDeck(deckId: string): CustomDeckConfig[] {
+  const list = getUserDecks();
+  const filtered = list.filter((d) => d.id !== deckId);
+  const remaining = filtered.length > 0 ? filtered : [presetToCustomDeck(getDefaultPresets()[0])];
+  saveAllUserDecks(remaining);
+  return remaining;
+}
+
+// 현재 활성 덱(localStorage) 조회 (없으면 내 덱 리스트의 첫 번째 반환)
 export function getActiveCustomDeck(): CustomDeckConfig {
   const saved = localStorage.getItem(ACTIVE_DECK_STORAGE_KEY);
   if (saved) {
     try {
       const parsed = JSON.parse(saved);
-      if (parsed.leader && parsed.actionDeck) {
+      if (parsed.leader && (parsed.actionDeck || parsed.actionCards)) {
         // 최고 성급 자동 업그레이드 매핑
         const leader =
           DEDUPED_LV0_CHARACTERS.find(
@@ -391,14 +484,15 @@ export function getActiveCustomDeck(): CustomDeckConfig {
               c.nameKr === parsed.rightSupport?.nameKr
           ) || parsed.rightSupport || DEDUPED_LV0_CHARACTERS[2];
 
-        const upgradedActions: ActionCard[] = (parsed.actionDeck || []).map((c: ActionCard) => {
+        const cardsToUpgrade = parsed.actionDeck || parsed.actionCards || [];
+        const upgradedActions: ActionCard[] = cardsToUpgrade.map((c: ActionCard) => {
           const best = ACTION_CARD_TEMPLATES.find((a) => a.code === c.code);
           return best ? { ...best, id: c.id } : c;
         });
 
         return {
-          id: 'wuthering_custom_deck',
-          name: parsed.deckName || '나만의 커스텀 덱',
+          id: parsed.id || 'wuthering_custom_deck',
+          name: parsed.name || parsed.deckName || '나만의 커스텀 덱',
           leader,
           leftSupport,
           rightSupport,
@@ -420,8 +514,11 @@ export function setActiveCustomDeck(deck: CustomDeckConfig): void {
   localStorage.setItem(
     ACTIVE_DECK_STORAGE_KEY,
     JSON.stringify({
+      id: deck.id,
       deckName: deck.name,
+      name: deck.name,
       actionDeck: deck.actionCards,
+      actionCards: deck.actionCards,
       leader: deck.leader,
       leftSupport: deck.leftSupport,
       rightSupport: deck.rightSupport,

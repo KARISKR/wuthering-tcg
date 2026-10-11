@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, Swords, Bot, Users, Shuffle, Crown, Check, Layers, ArrowLeft } from 'lucide-react';
 import type { CustomDeckConfig, DeckPreset } from '../types/tcg';
-import { getStoredPresets, presetToCustomDeck } from '../utils/deckCode';
+import { getStoredPresets, presetToCustomDeck, getUserDecks, customDeckToPreset } from '../utils/deckCode';
 
 interface DeckSelectModalProps {
   isOpen: boolean;
@@ -70,12 +70,14 @@ const DeckColumn: React.FC<{
                 <div className="min-w-0 flex items-center gap-2">
                   <span
                     className={`shrink-0 text-xs font-black px-2 py-0.5 rounded-md ${
-                      preset.isOfficial
+                      preset.authorName === '내 덱'
+                        ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50'
+                        : preset.isOfficial
                         ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
                         : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
                     }`}
                   >
-                    {preset.isOfficial ? '공식' : '커스텀'}
+                    {preset.authorName === '내 덱' ? '★ 보유 덱' : preset.isOfficial ? '공식' : '프리셋'}
                   </span>
                   <span className="font-black text-base text-white truncate">{preset.name}</span>
                 </div>
@@ -127,13 +129,29 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
 
   useEffect(() => {
     if (!isOpen) return;
-    const list = getStoredPresets().filter((p) => presetToCustomDeck(p).actionCards.length >= 40);
-    setPresets(list);
+    // 1. 내 보유 덱 리스트를 프리셋 형태로 변환하여 최상단에 배치
+    const userDecks = getUserDecks();
+    const userPresets: DeckPreset[] = userDecks.map((d) => ({
+      ...customDeckToPreset(d),
+      id: d.id,
+      name: d.name,
+      authorName: '내 덱',
+      isOfficial: false,
+    }));
+
+    // 2. 프리셋 보관함 목록 (중복 제외)
+    const storedPresets = getStoredPresets();
+    const existingIds = new Set(userPresets.map((u) => u.id));
+    const uniqueStored = storedPresets.filter((p) => !existingIds.has(p.id));
+
+    const combined = [...userPresets, ...uniqueStored].filter((p) => presetToCustomDeck(p).actionCards.length >= 40);
+    setPresets(combined);
+
     const lastMy = localStorage.getItem(LAST_MY_KEY);
     const lastOpp = localStorage.getItem(LAST_OPP_KEY);
-    setMyId(list.find((p) => p.id === lastMy)?.id ?? list[0]?.id ?? '');
+    setMyId(combined.find((p) => p.id === lastMy)?.id ?? combined[0]?.id ?? '');
     setOppId(
-      lastOpp === RANDOM_ID ? RANDOM_ID : list.find((p) => p.id === lastOpp)?.id ?? list[1]?.id ?? list[0]?.id ?? ''
+      lastOpp === RANDOM_ID ? RANDOM_ID : combined.find((p) => p.id === lastOpp)?.id ?? combined[1]?.id ?? combined[0]?.id ?? ''
     );
   }, [isOpen]);
 

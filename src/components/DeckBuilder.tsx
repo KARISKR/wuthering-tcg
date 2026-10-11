@@ -27,6 +27,16 @@ import { DeckPresetModal } from './DeckPresetModal';
 import { DeckExportModal } from './DeckExportModal';
 import { CommunityDeckModal } from './CommunityDeckModal';
 import type { CustomDeckConfig } from '../types/tcg';
+import {
+  getUserDecks,
+  saveUserDeck,
+  saveAllUserDecks,
+  deleteUserDeck,
+  getActiveCustomDeck,
+  setActiveCustomDeck,
+  customDeckToPreset,
+  savePreset,
+} from '../utils/deckCode';
 export type { CustomDeckConfig };
 
 interface DeckBuilderProps {
@@ -38,6 +48,10 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isCommunityModalOpen, setIsCommunityModalOpen] = useState(false);
+
+  // 보유 중인 내 덱 리스트 상태
+  const [userDecks, setUserDecks] = useState<CustomDeckConfig[]>([]);
+  const [selectedDeckId, setSelectedDeckId] = useState<string>('');
 
   // Lv.0 출전 캐릭터 목록: 같은 캐릭터 중 가장 높은 성급 1장씩 선별하여 중복 제거
   const lv0Characters = useMemo(() => {
@@ -123,51 +137,106 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     return Array.from(charMap.values());
   }, []);
 
-  // 덱 로컬스토리지 로드 (저장된 덱의 카드들을 최신 최고 성급 카드로 자동 동기화)
+  // 덱 로컬스토리지 로드 (저장된 내 덱 리스트를 불러오고 최고 성급 카드로 자동 동기화)
   useEffect(() => {
-    const saved = localStorage.getItem('wuthering_custom_deck');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.deckName) setDeckName(parsed.deckName);
-        if (parsed.actionDeck && Array.isArray(parsed.actionDeck)) {
-          // 저장된 카드들을 항상 최고 성급 버전으로 업그레이드 동기화
-          const upgradedDeck: ActionCard[] = parsed.actionDeck.map((c: ActionCard) => {
-            const best = availableActionCards.find((a) => a.code === c.code);
-            if (best) {
-              return {
-                ...best,
-                id: c.id,
-              };
-            }
-            return c;
-          });
-          setActionDeck(upgradedDeck);
-        }
-        if (parsed.leader) {
-          const bestLeader = lv0Characters.find((c) => c.nameKr === parsed.leader.nameKr) || parsed.leader;
-          setLeader(bestLeader);
-          const off = getOfficialCardByCode(bestLeader.code);
-          if (off) setActiveCard(off);
-        }
-        if (parsed.leftSupport) {
-          const bestLeft = lv0Characters.find((c) => c.nameKr === parsed.leftSupport.nameKr) || parsed.leftSupport;
-          setLeftSupport(bestLeft);
-        }
-        if (parsed.rightSupport) {
-          const bestRight = lv0Characters.find((c) => c.nameKr === parsed.rightSupport.nameKr) || parsed.rightSupport;
-          setRightSupport(bestRight);
-        }
-      } catch (e) {
-        console.error(e);
-      }
+    const list = getUserDecks();
+    if (list.length > 0) {
+      setUserDecks(list);
+      const active = getActiveCustomDeck();
+      const current = list.find((d) => d.id === active.id) || list[0];
+      setSelectedDeckId(current.id);
+      applyDeckToEditor(current);
     } else {
       fillDefaultStarterDeck();
-      // 초기 활성 카드로 리더 설정
       const off = getOfficialCardByCode(leader.code);
       if (off) setActiveCard(off);
     }
   }, [availableActionCards, lv0Characters]);
+
+  // 특정 덱 데이터를 현재 에디터 화면에 적용
+  const applyDeckToEditor = (deck: CustomDeckConfig) => {
+    setDeckName(deck.name);
+    // 액션 카드 최고 성급 매핑 동기화
+    const upgradedDeck: ActionCard[] = (deck.actionCards || []).map((c: ActionCard) => {
+      const best = availableActionCards.find((a) => a.code === c.code);
+      return best ? { ...best, id: c.id } : c;
+    });
+    setActionDeck(upgradedDeck);
+
+    if (deck.leader) {
+      const bestLeader = lv0Characters.find((c) => c.nameKr === deck.leader.nameKr) || deck.leader;
+      setLeader(bestLeader);
+      const off = getOfficialCardByCode(bestLeader.code);
+      if (off) setActiveCard(off);
+    }
+    if (deck.leftSupport) {
+      const bestLeft = lv0Characters.find((c) => c.nameKr === deck.leftSupport.nameKr) || deck.leftSupport;
+      setLeftSupport(bestLeft);
+    }
+    if (deck.rightSupport) {
+      const bestRight = lv0Characters.find((c) => c.nameKr === deck.rightSupport.nameKr) || deck.rightSupport;
+      setRightSupport(bestRight);
+    }
+  };
+
+  // 덱 전환 핸들러
+  const handleSelectDeck = (deckId: string) => {
+    const target = userDecks.find((d) => d.id === deckId);
+    if (!target) return;
+    setSelectedDeckId(deckId);
+    applyDeckToEditor(target);
+    setActiveCustomDeck(target);
+  };
+
+  // 새 덱 생성
+  const handleCreateNewDeck = () => {
+    const newId = `user-deck-${Date.now()}`;
+    const newName = `나만의 커스텀 덱 ${userDecks.length + 1}`;
+    // 기본 스타터 덱 카드로 40장 구성
+    const initial: ActionCard[] = [];
+    let idx = 0;
+    while (initial.length < 40 && availableActionCards.length > 0) {
+      const card = availableActionCards[idx % availableActionCards.length];
+      const count = initial.filter((c) => c.code === card.code).length;
+      if (count < 3) {
+        initial.push({ ...card, id: `deck-${card.code}-${initial.length}` });
+      }
+      idx++;
+    }
+
+    const newDeck: CustomDeckConfig = {
+      id: newId,
+      name: newName,
+      leader: lv0Characters.find((c) => c.characterName.includes('방랑자')) || lv0Characters[0],
+      leftSupport: lv0Characters.find((c) => c.characterName.includes('양양')) || lv0Characters[1],
+      rightSupport: lv0Characters.find((c) => c.characterName.includes('치샤')) || lv0Characters[2],
+      actionCards: initial,
+    };
+
+    const updated = [...userDecks, newDeck];
+    setUserDecks(updated);
+    saveAllUserDecks(updated);
+    setSelectedDeckId(newId);
+    applyDeckToEditor(newDeck);
+    setActiveCustomDeck(newDeck);
+  };
+
+  // 덱 삭제
+  const handleDeleteCurrentDeck = (deckIdToDelete: string) => {
+    if (userDecks.length <= 1) {
+      alert('최소 1개 이상의 덱은 유지되어야 합니다.');
+      return;
+    }
+    const target = userDecks.find((d) => d.id === deckIdToDelete);
+    if (!window.confirm(`'${target?.name || '선택한 덱'}'을 정말 삭제하시겠습니까?`)) return;
+
+    const remaining = deleteUserDeck(deckIdToDelete);
+    setUserDecks(remaining);
+    const nextDeck = remaining[0];
+    setSelectedDeckId(nextDeck.id);
+    applyDeckToEditor(nextDeck);
+    setActiveCustomDeck(nextDeck);
+  };
 
   // 기본 스타터 덱 채우기 (항상 최고 성급 액션 카드로 40장 구성)
   const fillDefaultStarterDeck = () => {
@@ -220,13 +289,22 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     }
   };
 
-  // 덱 저장
+  // 덱 저장 (현재 선택된 내 덱 및 로컬스토리지에 동기화 저장)
   const saveDeck = () => {
-    localStorage.setItem(
-      'wuthering_custom_deck',
-      JSON.stringify({ deckName, actionDeck, leader, leftSupport, rightSupport })
-    );
-    alert('덱이 성공적으로 저장되었습니다!');
+    const currentDeck: CustomDeckConfig = {
+      id: selectedDeckId || `user-deck-${Date.now()}`,
+      name: deckName,
+      leader,
+      leftSupport,
+      rightSupport,
+      actionCards: actionDeck,
+    };
+    saveUserDeck(currentDeck);
+    // 목록 갱신
+    const updated = getUserDecks();
+    setUserDecks(updated);
+    setSelectedDeckId(currentDeck.id);
+    alert(`'${deckName}' 덱이 성공적으로 저장되었습니다!`);
   };
 
   // 필터링된 액션 카드 풀 (순수 액션 카드 또는 에코 카드 구분)
@@ -375,13 +453,50 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           </div>
         </div>
 
-        {/* 덱 이름 및 저장/완료 버튼 */}
-        <div className="flex items-center gap-3">
+        {/* 덱 선택 드롭다운, 이름 변경, 프리셋/코드 및 저장/완료 버튼 */}
+        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* 내 보유 덱 리스트 셀렉터 & 신규 생성/삭제 */}
+          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-xl p-1 shadow-inner">
+            <span className="text-xs font-black text-amber-400 pl-2 pr-1 flex items-center gap-1 shrink-0">
+              <Layers className="w-3.5 h-3.5" />
+              <span className="hidden xl:inline">보유 덱:</span>
+            </span>
+            <select
+              value={selectedDeckId}
+              onChange={(e) => handleSelectDeck(e.target.value)}
+              className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-amber-400 cursor-pointer max-w-[160px] sm:max-w-[200px] truncate"
+              title="내가 보유 중인 덱 리스트에서 전환"
+            >
+              {userDecks.map((d, idx) => (
+                <option key={d.id} value={d.id}>
+                  #{idx + 1} {d.name} ({d.actionCards?.length ?? 0}/40)
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={handleCreateNewDeck}
+              className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer flex items-center gap-1 shrink-0"
+              title="새 덱 만들기"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">새 덱</span>
+            </button>
+            {userDecks.length > 1 && (
+              <button
+                onClick={() => handleDeleteCurrentDeck(selectedDeckId)}
+                className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold transition cursor-pointer shrink-0"
+                title="현재 덱 삭제"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
           <input
             type="text"
             value={deckName}
             onChange={(e) => setDeckName(e.target.value)}
-            className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm text-slate-100 focus:outline-none focus:border-amber-400 font-bold w-48 sm:w-64"
+            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-400 font-bold w-36 sm:w-48"
             placeholder="덱 이름 입력"
           />
           <button
@@ -1413,7 +1528,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
         currentEditingDeck={{
-          id: 'custom-deck',
+          id: selectedDeckId || 'custom-deck',
           name: deckName,
           leader,
           leftSupport,
@@ -1421,13 +1536,18 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           actionCards: actionDeck,
         }}
         onApplyActiveDeck={(deck) => {
-          setDeckName(deck.name);
-          setLeader(deck.leader);
-          setLeftSupport(deck.leftSupport);
-          setRightSupport(deck.rightSupport);
-          setActionDeck(deck.actionCards);
-          const off = getOfficialCardByCode(deck.leader.code);
-          if (off) setActiveCard(off);
+          saveUserDeck(deck);
+          const list = getUserDecks();
+          setUserDecks(list);
+          setSelectedDeckId(deck.id);
+          applyDeckToEditor(deck);
+        }}
+        onSelectAndEdit={(deck) => {
+          saveUserDeck(deck);
+          const list = getUserDecks();
+          setUserDecks(list);
+          setSelectedDeckId(deck.id);
+          applyDeckToEditor(deck);
         }}
         onSelectAndBattle={(deck) => {
           onStartBattleWithDeck(deck);

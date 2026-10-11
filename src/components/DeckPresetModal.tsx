@@ -12,6 +12,8 @@ import {
   getActiveCustomDeck,
   setActiveCustomDeck,
   restoreDefaultPresets,
+  saveUserDeck,
+  getUserDecks,
 } from '../utils/deckCode';
 import { DEDUPED_LV0_CHARACTERS, ACTION_CARD_TEMPLATES } from '../data/cards';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
@@ -237,9 +239,10 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   const handleConfirmImport = (action: 'SAVE_AND_APPLY' | 'EDIT' | 'BATTLE') => {
     if (!parsedPreviewDeck) return;
 
-    // 1. 프리셋으로 저장
+    // 1. 프리셋으로 저장 및 내 덱 리스트에 등록
     const newPreset = customDeckToPreset(parsedPreviewDeck, parsedPreviewDeck.name);
     savePreset(newPreset);
+    saveUserDeck(parsedPreviewDeck);
     setActiveCustomDeck(parsedPreviewDeck);
     reloadPresets();
     setSelectedPresetId(newPreset.id);
@@ -255,9 +258,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       onClose();
     } else if (onApplyActiveDeck) {
       onApplyActiveDeck(parsedPreviewDeck);
-      alert(`'${parsedPreviewDeck.name}' 덱이 성공적으로 적용되었습니다!`);
+      alert(`'${parsedPreviewDeck.name}' 덱이 내 덱 리스트에 등록되고 적용되었습니다!`);
     } else {
-      alert(`'${parsedPreviewDeck.name}' 덱이 프리셋에 저장되고 활성화되었습니다!`);
+      alert(`'${parsedPreviewDeck.name}' 덱이 프리셋 및 내 덱 리스트에 추가되었습니다!`);
     }
   };
 
@@ -821,10 +824,26 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                     <span>프리셋 삭제</span>
                   </button>
 
+                  {/* 내 덱 리스트에 추가 */}
+                  <button
+                    onClick={() => {
+                      saveUserDeck(currentPreviewDeck);
+                      setActiveCustomDeck(currentPreviewDeck);
+                      if (onApplyActiveDeck) onApplyActiveDeck(currentPreviewDeck);
+                      alert(`'${currentPreviewDeck.name}' 덱이 내 덱 리스트에 성공적으로 추가되었습니다!`);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-black transition cursor-pointer border border-amber-500/50 flex items-center gap-1.5 shadow"
+                    title="이 프리셋을 내 덱 리스트에 추가하여 덱 빌더에서 즉시 수정하고 사용할 수 있습니다"
+                  >
+                    <Plus className="w-4 h-4 text-amber-400" />
+                    <span>내 덱 리스트에 추가</span>
+                  </button>
+
                   {/* 현재 덱으로 적용 */}
                   <button
                     onClick={() => {
                       setActiveCustomDeck(currentPreviewDeck);
+                      saveUserDeck(currentPreviewDeck);
                       if (onApplyActiveDeck) onApplyActiveDeck(currentPreviewDeck);
                       alert(`'${currentPreviewDeck.name}' 덱이 활성 덱으로 설정되었습니다!`);
                     }}
