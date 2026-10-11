@@ -22,7 +22,7 @@ import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
 import { EffectNotificationToast } from './EffectNotificationToast';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect } from '../types/tcg';
-import { CustomDeckConfig, isSameCharacter } from '../engine/gameEngine';
+import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
 import {
   Swords,
@@ -177,9 +177,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const card = player.hand.find((c) => c.id === cardId);
     if (!card) return;
 
-    // 금희 Lv.1 비용 경감 고려
+    // 금희 Lv.1 비용 경감 고려 (Lv.2 이상이거나 하위 스택 보유 시 상속 적용)
     let effectiveCost = card.cost;
-    if (player.slots.leader.characterName === '금희' && player.slots.leader.level >= 1) {
+    if (slotHasCharacterSkill(player.slots.leader, '금희', 1)) {
       effectiveCost = Math.max(0, effectiveCost - 1);
     }
 
@@ -448,10 +448,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     );
 
     let requiredDiscard = nextLevel;
-    const hasYangyangLv2 =
-      (targetPlayer.slots.leader.characterName === '양양' && targetPlayer.slots.leader.level === 2) ||
-      (targetPlayer.slots.leftSupport?.characterName === '양양' && targetPlayer.slots.leftSupport?.level === 2) ||
-      (targetPlayer.slots.rightSupport?.characterName === '양양' && targetPlayer.slots.rightSupport?.level === 2);
+    const hasYangyangLv2 = playerHasCharacterSkill(targetPlayer, '양양', 2);
 
     if (hasYangyangLv2 && requiredDiscard > 1) {
       requiredDiscard -= 1;
@@ -481,10 +478,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     );
 
     let requiredDiscard = nextLevel;
-    const hasYangyangLv2 =
-      (targetPlayer.slots.leader.characterName === '양양' && targetPlayer.slots.leader.level === 2) ||
-      (targetPlayer.slots.leftSupport?.characterName === '양양' && targetPlayer.slots.leftSupport?.level === 2) ||
-      (targetPlayer.slots.rightSupport?.characterName === '양양' && targetPlayer.slots.rightSupport?.level === 2);
+    const hasYangyangLv2 = playerHasCharacterSkill(targetPlayer, '양양', 2);
     if (hasYangyangLv2 && requiredDiscard > 1) requiredDiscard -= 1;
 
     return hasEvolution && targetPlayer.hand.length >= requiredDiscard;
@@ -746,12 +740,68 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800 space-y-1 shrink-0">
                   <span className="text-xs font-black text-amber-300 flex items-center gap-1">
                     <Info className="w-3.5 h-3.5 text-amber-400" />
-                    공식 효과 텍스트
+                    공식 효과 텍스트 {previewCard.kind === 'CHARACTER' ? `(Lv.${previewCard.level} 현재 레벨)` : ''}
                   </span>
                   <p className="text-xs sm:text-sm text-slate-100 leading-relaxed whitespace-pre-line font-medium max-h-[140px] overflow-y-auto pr-1">
                     {previewCard.description}
                   </p>
                 </div>
+
+                {/* 캐릭터 레벨업 진화 스택 & 누적 상속 스킬 (공식 룰: 하위 카드 효과 영구 보유) */}
+                {previewCard.kind === 'CHARACTER' && (
+                  <div className="bg-slate-900/95 rounded-xl p-3 border border-amber-500/40 space-y-2 shrink-0 shadow-lg">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-amber-400" />
+                        <span>진화 스택 & 누적 상속 스킬</span>
+                      </span>
+                      <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                        {previewCard.underlyingCards && previewCard.underlyingCards.length > 0
+                          ? `스택: 총 ${previewCard.underlyingCards.length + 1}장 보유`
+                          : `Lv.${previewCard.level} 단일`}
+                      </span>
+                    </div>
+
+                    {/* 하위 카드 스택이 있는 경우 */}
+                    {previewCard.underlyingCards && previewCard.underlyingCards.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="text-[11px] text-amber-200/90 bg-amber-950/40 border border-amber-500/20 p-2 rounded-lg leading-relaxed flex items-start gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                          <span>
+                            공식 룰: 레벨업한 캐릭터는 하위에 겹쳐진 <strong>이전 레벨의 모든 스킬 효과를 영구 상속하여 함께 보유</strong>합니다.
+                          </span>
+                        </div>
+
+                        {/* 상속된 이전 레벨 스킬 카드 목록 */}
+                        {previewCard.underlyingCards.map((underCard, idx) => (
+                          <div
+                            key={underCard.id || idx}
+                            onClick={() => setPreviewCard({ ...underCard, underlyingCards: previewCard.underlyingCards })}
+                            className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-700 hover:border-amber-400 transition cursor-pointer group"
+                            title="클릭하여 이 카드의 대형 일러스트와 원문 스탯 보기"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-black text-[10px] border border-amber-400/30 flex items-center gap-1">
+                                <Crown className="w-2.5 h-2.5" />
+                                <span>Lv.{underCard.level} 상속 효과</span>
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono group-hover:text-amber-300">
+                                {underCard.nameKr}
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-medium pl-1">
+                              {underCard.description}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 leading-relaxed">
+                        캐릭터가 레벨업되면 기존 카드가 하위 스택으로 누적되며, 이전 레벨의 모든 스킬 효과가 이곳에 표시되고 함께 발동됩니다.
+                      </p>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               <div className="my-auto text-center text-slate-500 text-sm py-12">

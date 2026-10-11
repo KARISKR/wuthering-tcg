@@ -45,6 +45,60 @@ export function isSameCharacter(charA: CharacterCard | undefined, charB: Charact
   return charA.characterName === charB.characterName || charA.nameKr === charB.nameKr;
 }
 
+/**
+ * 캐릭터 슬롯이 특정 캐릭터의 특정 레벨 이상 스킬을 보유(상속)하고 있는지 검사
+ * (현재 레벨업된 최상위 카드뿐만 아니라 하위에 겹쳐진 이전 레벨 카드까지 모두 탐색)
+ */
+export function slotHasCharacterSkill(
+  slot: CharacterCard | null | undefined,
+  characterName: string,
+  minLevel?: number
+): boolean {
+  if (!slot) return false;
+
+  // 1. 현재 최상위 카드 검사
+  const matchTop = slot.characterName === characterName || slot.nameKr.includes(characterName);
+  if (matchTop) {
+    if (minLevel === undefined || slot.level >= minLevel) {
+      return true;
+    }
+  }
+
+  // 2. 하위에 겹쳐진 이전 레벨 카드들(underlyingCards) 검사
+  if (slot.underlyingCards && slot.underlyingCards.length > 0) {
+    return slot.underlyingCards.some((under) => {
+      const matchUnder = under.characterName === characterName || under.nameKr.includes(characterName);
+      if (matchUnder) {
+        if (minLevel === undefined || under.level >= minLevel) {
+          return true;
+        }
+      }
+      return false;
+    });
+  }
+
+  return false;
+}
+
+/**
+ * 플레이어의 전체 필드 슬롯(리더, 서포트) 중 특정 캐릭터/레벨 스킬을 보유한 슬롯이 있는지 검사
+ */
+export function playerHasCharacterSkill(
+  player: PlayerState,
+  characterName: string,
+  minLevel?: number,
+  leaderOnly: boolean = false
+): boolean {
+  if (slotHasCharacterSkill(player.slots.leader, characterName, minLevel)) {
+    return true;
+  }
+  if (!leaderOnly) {
+    if (slotHasCharacterSkill(player.slots.leftSupport, characterName, minLevel)) return true;
+    if (slotHasCharacterSkill(player.slots.rightSupport, characterName, minLevel)) return true;
+  }
+  return false;
+}
+
 // 전용 카드 사용 가능 여부 판별 헬퍼 (공식 규칙: '일반'은 누구나 사용 가능, 캐릭터 전용은 해당 캐릭터가 리더일 때 사용 가능)
 export function canLeaderUseCard(leader: CharacterCard | undefined, card: ActionCard): boolean {
   if (!card.characterExclusive || card.characterExclusive === '일반' || card.characterExclusive === '-') {
@@ -438,9 +492,8 @@ export function executeStartPhase(state: GameState): GameState {
   );
 
   // 캐릭터 패시브 확인
-  // 1) Lv.2 방랑자 패시브: 턴 시작 시 추가 드로우 1장
-  const hasRoverLv2 =
-    activePlayer.slots.leader.characterName === '방랑자' && activePlayer.slots.leader.level === 2;
+  // 1) Lv.2 방랑자 패시브: 턴 시작 시 추가 드로우 1장 (방랑자 Lv.2 이상이거나 하위 스택 보유 시)
+  const hasRoverLv2 = slotHasCharacterSkill(activePlayer.slots.leader, '방랑자', 2);
   if (hasRoverLv2) {
     const card = drawSingleCardFromDeck(activePlayer);
     if (card) {
@@ -449,9 +502,8 @@ export function executeStartPhase(state: GameState): GameState {
     }
   }
 
-  // 2) Lv.1 양양 리더 효과: 턴 시작 시 협주 존 카드가 1장 이하라면 덱에서 1장 충전
-  const hasYangyangLv1 =
-    activePlayer.slots.leader.characterName === '양양' && activePlayer.slots.leader.level >= 1;
+  // 2) Lv.1 양양 리더 효과: 턴 시작 시 협주 존 카드가 1장 이하라면 덱에서 1장 충전 (Lv.2 양양이어도 하위 Lv.1 스킬 보유!)
+  const hasYangyangLv1 = slotHasCharacterSkill(activePlayer.slots.leader, '양양', 1);
   if (hasYangyangLv1 && activePlayer.concertoZone.length <= 1) {
     const card = drawSingleCardFromDeck(activePlayer);
     if (card) {
@@ -547,10 +599,7 @@ export function upgradeCharacter(
   // 레벨업 비용 계산: 기본 목표 레벨 수만큼 패 버림
   // 단, Lv.2 양양 지속 효과(코스트 1장 경감, 최소 1장) 적용
   let requiredDiscard = upgradeCard.level;
-  const hasYangyangLv2 =
-    (player.slots.leader.characterName === '양양' && player.slots.leader.level === 2) ||
-    (player.slots.leftSupport?.characterName === '양양' && player.slots.leftSupport?.level === 2) ||
-    (player.slots.rightSupport?.characterName === '양양' && player.slots.rightSupport?.level === 2);
+  const hasYangyangLv2 = playerHasCharacterSkill(player, '양양', 2);
 
   if (hasYangyangLv2 && requiredDiscard > 1) {
     requiredDiscard -= 1;
@@ -569,9 +618,19 @@ export function upgradeCharacter(
   player.hand = player.hand.filter((c) => !discardCardIds.includes(c.id));
   player.dropZone = [...player.dropZone, ...discarded];
 
-  // 캐릭터 덱에서 제거하고 슬롯에 배치 (기존 카드는 묘지로 가지 않고 겹침/보관)
+  // 캐릭터 덱에서 제거하고 슬롯에 배치 (기존 카드는 묘지로 가지 않고 하위 스택으로 누적 보존!)
   player.characterDeck = player.characterDeck.filter((c) => c.id !== upgradeCardId);
-  player.slots[targetSlot] = { ...upgradeCard };
+
+  const previousStack = currentSlotCard.underlyingCards || [];
+  const updatedUnderlyingCards = [
+    ...previousStack,
+    { ...currentSlotCard, underlyingCards: undefined },
+  ];
+
+  player.slots[targetSlot] = {
+    ...upgradeCard,
+    underlyingCards: updatedUnderlyingCards,
+  };
   player.actionFlags.upgraded = true;
 
   let newState = { ...state };

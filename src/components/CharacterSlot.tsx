@@ -1,7 +1,7 @@
 import React from 'react';
 import { CharacterCard } from '../types/tcg';
 import { CardView } from './CardView';
-import { ArrowLeftRight, ChevronUp, Crown, UserCheck } from 'lucide-react';
+import { ArrowLeftRight, ChevronUp, Crown, UserCheck, Layers } from 'lucide-react';
 
 interface CharacterSlotProps {
   card: CharacterCard | null;
@@ -57,6 +57,23 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
 
       {/* 카드 본체: 리더 대형(lg), 서포터 중형(md)으로 대폭 확대 */}
       <div className="relative">
+        {/* 하위 카드 겹침(스택) 계단식 섀도우 연출 */}
+        {card && card.underlyingCards && card.underlyingCards.length > 0 && (
+          <>
+            <div className="absolute -top-1 -right-1 w-full h-full rounded-2xl border border-amber-500/40 bg-slate-800/60 -z-10 shadow-md" />
+            {card.underlyingCards.length > 1 && (
+              <div className="absolute -top-2 -right-2 w-full h-full rounded-2xl border border-amber-500/20 bg-slate-800/30 -z-20" />
+            )}
+            <div
+              className="absolute -top-2.5 -left-2 z-20 px-2 py-0.5 rounded-full bg-slate-900/95 border border-amber-400 text-amber-300 font-mono font-black text-[10px] shadow-lg flex items-center gap-1"
+              title={`이전 레벨 카드 ${card.underlyingCards.length}장 겹침 (이전 모든 스킬 보유 중)`}
+            >
+              <Layers className="w-3 h-3 text-amber-400" />
+              <span>스택 {card.underlyingCards.length + 1}</span>
+            </div>
+          </>
+        )}
+
         <CardView
           card={card}
           size={isLeader ? 'lg' : 'md'}

@@ -18,6 +18,7 @@ export interface CharacterCard {
   judgmentSkill?: string; // 판정 중 발동
   passiveSkill?: string; // 지속 패시브
   rarity?: string; // 공식 희귀도 (★ ~ ★★★★★, PR★★)
+  underlyingCards?: CharacterCard[]; // 진화/레벨업으로 하위에 겹쳐진 이전 레벨 카드 스택 (보유 스킬 상속용)
 }
 
 // 액션 카드 (메인 덱)
