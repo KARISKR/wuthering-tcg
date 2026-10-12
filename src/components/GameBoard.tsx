@@ -2353,9 +2353,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }}
       />
 
-      {/* 선택 발동 효과 모달 (전투 데미지 결과가 완전히 나온 뒤(CLASH_REVEAL 이후)에만 표출) */}
+      {/* 선택 발동 효과 모달 (전투 데미지 결과가 완전히 나온 뒤(CLASH_REVEAL 이후) 및 레벨업 연출 완료 후 표출) */}
       <EffectChoiceModal
-        choice={gameState.phase !== 'CLASH_REVEAL' ? gameState.pendingChoice : null}
+        choice={gameState.phase !== 'CLASH_REVEAL' && !activeUpgrade ? gameState.pendingChoice : null}
         onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
       />
 

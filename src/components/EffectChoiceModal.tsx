@@ -10,6 +10,16 @@ interface EffectChoiceModalProps {
 export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, onResolve }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  React.useEffect(() => {
+    if (choice) {
+      if (choice.maxSelect === 1 && choice.revealedCards.length === 1) {
+        setSelectedIds([choice.revealedCards[0].id]);
+      } else {
+        setSelectedIds([]);
+      }
+    }
+  }, [choice?.id]);
+
   if (!choice) return null;
 
   const toggleSelect = (cardId: string) => {

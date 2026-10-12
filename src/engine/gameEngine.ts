@@ -998,6 +998,41 @@ export function upgradeCharacter(
     }
   }
 
+  // 7. BP01-023 양양 Lv.1: 【등장】/【레벨업】자신의 덱 위의 카드 1장을 협주 에리어에 배치한다.
+  if (
+    upgradeCard.code === 'BP01-023' ||
+    (upgradeCard.level === 1 &&
+      (upgradeCard.characterName === '양양' || upgradeCard.nameKr?.includes('양양')) &&
+      upgradeCard.description?.includes('협주 에리어에 배치'))
+  ) {
+    const topCard = drawSingleCardFromDeck(player);
+    if (topCard) {
+      if (player.isAi) {
+        player.concertoZone.push(topCard);
+        newState = addLog(
+          newState,
+          `[양양 Lv.1 등장/레벨업 효과] ${player.name}이(가) 덱 위의 카드 [${topCard.nameKr}]을(를) 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length})`,
+          'ACTION',
+          playerIndex,
+          { cardArt: upgradeCard.artUrl, cardName: '양양 Lv.1', effectTag: '협주 충전' }
+        );
+      } else {
+        newState.pendingChoice = {
+          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          playerIndex,
+          title: '양양 Lv.1 등장/레벨업 효과 (협주 배치)',
+          sourceCardName: '양양 [BP01-023]',
+          sourceCardArt: upgradeCard.artUrl,
+          description: '【등장】/【레벨업】 효과로 자신의 덱 위의 카드 1장을 협주 에리어에 배치합니다.',
+          revealedCards: [topCard],
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'SET_CONCERTO',
+        };
+      }
+    }
+  }
+
   return { success: true, newState };
 }
 
