@@ -268,14 +268,20 @@ export function useGame(
       };
     }
 
-    // 3) AI 연격 단계 (연격 콤보 연출을 충분히 볼 수 있도록 1.8초 템포)
-    if (gameState.phase === 'COMBO_STEP' && gameState.players[1].isAi) {
+    // 3) AI 연격 단계 (AI인 플레이어 1에게 연격 권한이 있을 때만 가동)
+    const p1HasCombo =
+      gameState.players[1].isAi &&
+      (Boolean(gameState.players[1].comboUnlimited) || (gameState.players[1].comboCount ?? 0) > 0);
+
+    if (gameState.phase === 'COMBO_STEP' && p1HasCombo) {
       const p1CanCombo = canPlayerExecuteCombo(gameState.players[1]);
       if (p1CanCombo) {
         setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
-            if (prev.phase === 'COMBO_STEP') {
+            const stillHasCombo =
+              Boolean(prev.players[1].comboUnlimited) || (prev.players[1].comboCount ?? 0) > 0;
+            if (prev.phase === 'COMBO_STEP' && prev.players[1].isAi && stillHasCombo) {
               if (canPlayerExecuteCombo(prev.players[1])) {
                 return runAiComboStep(prev, 1);
               } else {
@@ -291,11 +297,11 @@ export function useGame(
           setIsAiThinking(false);
         };
       } else {
-        // AI가 실제로 낼 수 있는 연격 카드가 없거나 비용이 부족하면 즉시 턴 종료 진행
+        // AI에게 연격 권한은 있으나 낼 수 있는 적색 카드나 코스트가 부족할 때만 AI 연격 종료
         setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
-            if (prev.phase === 'COMBO_STEP') {
+            if (prev.phase === 'COMBO_STEP' && prev.players[1].isAi) {
               return finishComboStep(prev, 1);
             }
             return prev;
