@@ -41,6 +41,7 @@ import {
   Clock,
   Send,
   Trash2,
+  Crown,
 } from 'lucide-react';
 
 interface CommunityDeckModalProps {
@@ -613,7 +614,81 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
 
                       {/* 펼쳐진 덱 구성 상세 */}
                       {isExpanded && (
-                        <div className="mt-3 p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2 animate-in fade-in duration-150">
+                        <div className="mt-3 p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3 animate-in fade-in duration-150">
+                          {/* 1. 캐릭터 덱 목록 (3~15장) */}
+                          {(() => {
+                            const charList = (() => {
+                              if (deck.deckPreset.characterDeckCards && deck.deckPreset.characterDeckCards.length > 0) {
+                                const list: typeof OFFICIAL_CARDS = [];
+                                deck.deckPreset.characterDeckCards.forEach(({ code, count }) => {
+                                  const found = OFFICIAL_CARDS.find((c) => c.code === code);
+                                  if (found) {
+                                    for (let i = 0; i < count; i++) list.push(found);
+                                  }
+                                });
+                                return list;
+                              }
+                              const l = getCharInfo(deck.deckPreset.leaderCode);
+                              const s1 = getCharInfo(deck.deckPreset.leftSupportCode);
+                              const s2 = getCharInfo(deck.deckPreset.rightSupportCode);
+                              const result: typeof OFFICIAL_CARDS = [];
+                              [l, s1, s2].filter(Boolean).forEach((c) => {
+                                const cName = c!.characterName || c!.nameKr;
+                                for (let lvl = 0; lvl <= 2; lvl++) {
+                                  const match = OFFICIAL_CARDS.find(
+                                    (ac) =>
+                                      ac.kind === 'CHARACTER' &&
+                                      (ac.nameKr.includes(cName) || ac.characterName?.includes(cName)) &&
+                                      ac.level === lvl
+                                  );
+                                  if (match) result.push(match);
+                                }
+                              });
+                              return result;
+                            })();
+
+                            return (
+                              <div className="space-y-1.5 pb-2 border-b border-slate-800/80">
+                                <div className="flex items-center justify-between text-xs text-slate-300">
+                                  <span className="font-black text-amber-300 flex items-center gap-1.5">
+                                    <Crown className="w-3.5 h-3.5 text-amber-400" />
+                                    캐릭터 덱 목록 ({charList.length} / 15장)
+                                  </span>
+                                  <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                                    <span>출전:</span>
+                                    <span className="text-amber-300 font-bold">{leader?.nameKr} (리더)</span>
+                                    <span>·</span>
+                                    <span>{leftSup?.nameKr}</span>
+                                    <span>·</span>
+                                    <span>{rightSup?.nameKr}</span>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-1.5 max-h-[140px] overflow-y-auto">
+                                  {charList.map((c, i) => (
+                                    <div
+                                      key={`${c.code}-${i}`}
+                                      className={`relative aspect-[5/7] rounded-lg overflow-hidden border bg-slate-900 shadow ${
+                                        c.code === deck.deckPreset.leaderCode
+                                          ? 'border-amber-400 ring-1 ring-amber-400/50'
+                                          : 'border-slate-800'
+                                      }`}
+                                      title={`${c.nameKr} (Lv.${c.level})`}
+                                    >
+                                      <img src={c.artUrl} alt={c.nameKr} className="w-full h-full object-cover" />
+                                      <div className="absolute top-0.5 left-0.5 px-1 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[8px]">
+                                        Lv.{c.level}
+                                      </div>
+                                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-0.5 text-center">
+                                        <p className="text-[9px] font-black text-white truncate">{c.nameKr}</p>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* 2. 메인 액션 덱 리스트 */}
                           <div className="flex items-center justify-between text-xs text-slate-400">
                             <span className="font-bold text-slate-300">
                               메인 액션 덱 리스트 (총 {deck.deckPreset.actionCards.reduce((acc, c) => acc + c.count, 0)}장)

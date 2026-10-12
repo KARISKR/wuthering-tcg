@@ -14,6 +14,7 @@ import {
   restoreDefaultPresets,
   saveUserDeck,
   getUserDecks,
+  generateCharacterDeckFor3,
 } from '../utils/deckCode';
 import { DEDUPED_LV0_CHARACTERS, ACTION_CARD_TEMPLATES } from '../data/cards';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
@@ -45,6 +46,7 @@ import {
   Zap,
   Info,
   ArrowLeft,
+  Users,
 } from 'lucide-react';
 
 interface DeckPresetModalProps {
@@ -142,8 +144,42 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   // 미리보기용 덱 객체 (CustomDeckConfig)
   const currentPreviewDeck = useMemo(() => {
     if (!currentPreviewPreset) return null;
-    return presetToCustomDeck(currentPreviewPreset);
+    const deck = presetToCustomDeck(currentPreviewPreset);
+    if (!deck.characterDeck || deck.characterDeck.length === 0) {
+      deck.characterDeck = generateCharacterDeckFor3(deck.leader, deck.leftSupport, deck.rightSupport);
+    }
+    return deck;
   }, [currentPreviewPreset]);
+
+  // 캐릭터 덱 카드 목록 (3~15장)
+  const previewCharDeck = useMemo(() => {
+    if (!currentPreviewDeck) return [];
+    if (currentPreviewDeck.characterDeck && currentPreviewDeck.characterDeck.length > 0) {
+      return currentPreviewDeck.characterDeck;
+    }
+    return generateCharacterDeckFor3(
+      currentPreviewDeck.leader,
+      currentPreviewDeck.leftSupport,
+      currentPreviewDeck.rightSupport
+    );
+  }, [currentPreviewDeck]);
+
+  // 출전 멤버 3인 고유 명칭
+  const previewCharNames = useMemo(() => {
+    const set = new Set<string>();
+    previewCharDeck.forEach((c) => {
+      const name = c.characterName || c.nameKr;
+      if (name) set.add(name);
+    });
+    if (set.size === 0 && currentPreviewDeck) {
+      if (currentPreviewDeck.leader?.characterName) set.add(currentPreviewDeck.leader.characterName);
+      if (currentPreviewDeck.leftSupport?.characterName) set.add(currentPreviewDeck.leftSupport.characterName);
+      if (currentPreviewDeck.rightSupport?.characterName) set.add(currentPreviewDeck.rightSupport.characterName);
+    }
+    return Array.from(set);
+  }, [previewCharDeck, currentPreviewDeck]);
+
+  const leaderCharName = currentPreviewDeck?.leader?.characterName || currentPreviewDeck?.leader?.nameKr || '';
 
   // 덱 통계 (속성 분포 및 평균 코스트)
   const deckStats = useMemo(() => {
@@ -888,110 +924,127 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               </div>
 
               {/* --------------------------------------------------- */}
-              {/* B. 출전 공명자 3인 (대형 쇼케이스) */}
+              {/* B. 캐릭터 덱 목록 (3~15장) - 덱 빌더 통일 규격 */}
               {/* --------------------------------------------------- */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-black text-white flex items-center gap-2">
-                    <Crown className="w-4 h-4 text-amber-400" />
-                    출전 공명자 3인 편성 (리더 1인 + 서포터 2인)
-                  </h4>
-                  <span className="text-xs text-slate-400">
-                    카드를 클릭하면 고해상도 일러스트와 효과를 확인할 수 있습니다
-                  </span>
+              <div className="bg-slate-950/95 border border-slate-800 rounded-2xl p-3.5 shadow-lg space-y-2.5">
+                {/* 상단 헤더: 매수 배지 및 출전 3인 태그 */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xs sm:text-sm font-black text-amber-300 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-amber-400" />
+                      캐릭터 덱 목록 (3~15장)
+                    </span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full font-mono font-black text-xs ${
+                        previewCharDeck.length >= 3 && previewCharDeck.length <= 15
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                      }`}
+                    >
+                      {previewCharDeck.length} / 15장
+                    </span>
+                    <span className="text-[11px] text-slate-400 hidden sm:inline">
+                      (카드를 클릭하면 상세 효과와 일러스트를 확인할 수 있습니다)
+                    </span>
+                  </div>
+
+                  {/* 출전 캐릭터 3인 멤버 태그 */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[11px] text-slate-400 font-bold mr-0.5">출전 멤버:</span>
+                    {previewCharNames.map((name) => {
+                      const isLeader = name === leaderCharName;
+                      return (
+                        <div
+                          key={name}
+                          className={`px-2.5 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 shadow ${
+                            isLeader
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 border border-amber-300 ring-2 ring-amber-400/40'
+                              : 'bg-slate-800 text-slate-200 border border-slate-700'
+                          }`}
+                        >
+                          {isLeader ? (
+                            <Crown className="w-3.5 h-3.5 text-slate-950 animate-bounce" />
+                          ) : (
+                            <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                          )}
+                          <span>{name}</span>
+                          {isLeader ? (
+                            <span className="text-[10px] bg-slate-950/20 px-1 rounded font-black">★ 리더</span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-normal">서포터</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {/* 리더 */}
-                  <div
-                    onClick={() => handleInspectCard(currentPreviewDeck.leader.code)}
-                    className="p-3.5 rounded-2xl bg-gradient-to-b from-amber-950/30 via-slate-900 to-slate-950 border-2 border-amber-500/70 shadow-lg flex items-center gap-3.5 cursor-pointer hover:border-amber-400 hover:scale-[1.01] transition duration-200"
-                  >
-                    <div className="relative w-16 h-20 rounded-xl overflow-hidden border-2 border-amber-400 shrink-0 shadow-md">
-                      <img
-                        src={currentPreviewDeck.leader.artUrl}
-                        alt={currentPreviewDeck.leader.nameKr}
-                        className="w-full h-full object-cover"
-                      />
-                      <Crown className="w-3.5 h-3.5 text-amber-400 absolute bottom-1 right-1" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-black text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-md border border-amber-500/40">
-                          중앙 리더
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-300 bg-slate-800 px-1.5 py-0.5 rounded">
-                          {getElementKr(currentPreviewDeck.leader.element)}
-                        </span>
-                      </div>
-                      <h5 className="font-black text-white text-base truncate">
-                        {currentPreviewDeck.leader.nameKr}
-                      </h5>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        전투 진두지휘 & 메인 필드 장악
-                      </p>
-                    </div>
-                  </div>
+                {/* 캐릭터 덱 15장 슬롯 그리드 (덱 빌더 동일 규격) */}
+                <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-15 gap-2 overflow-x-auto pb-1 max-h-[185px] overflow-y-auto pr-1">
+                  {previewCharDeck.map((charCard, idx) => {
+                    const isLeaderCard =
+                      (charCard.characterName === leaderCharName && charCard.level === 0) ||
+                      charCard.code === currentPreviewDeck.leader.code;
 
-                  {/* 서포터 1 */}
-                  <div
-                    onClick={() => handleInspectCard(currentPreviewDeck.leftSupport.code)}
-                    className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-lg flex items-center gap-3.5 cursor-pointer hover:border-slate-600 hover:scale-[1.01] transition duration-200"
-                  >
-                    <div className="relative w-16 h-20 rounded-xl overflow-hidden border border-slate-700 shrink-0 shadow-md">
-                      <img
-                        src={currentPreviewDeck.leftSupport.artUrl}
-                        alt={currentPreviewDeck.leftSupport.nameKr}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-black text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
-                          후방 서포터 1
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-300 bg-slate-800 px-1.5 py-0.5 rounded">
-                          {getElementKr(currentPreviewDeck.leftSupport.element)}
-                        </span>
-                      </div>
-                      <h5 className="font-black text-white text-base truncate">
-                        {currentPreviewDeck.leftSupport.nameKr}
-                      </h5>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        원호 사격 & 연격 콤보 보조
-                      </p>
-                    </div>
-                  </div>
+                    return (
+                      <div
+                        key={`${charCard.code}-${idx}`}
+                        onClick={() => handleInspectCard(charCard.code)}
+                        className={`relative group aspect-[5/7] rounded-xl overflow-hidden border transition-all cursor-pointer shadow-md shrink-0 bg-slate-900 hover:scale-105 hover:z-10 ${
+                          isLeaderCard
+                            ? 'border-amber-400 ring-2 ring-amber-400/50 shadow-amber-500/20'
+                            : 'border-slate-700 hover:border-slate-400'
+                        }`}
+                        title={`${charCard.nameKr} (Lv.${charCard.level}) - 클릭하여 고해상도 상세 정보 확인`}
+                      >
+                        <img
+                          src={charCard.artUrl}
+                          alt={charCard.nameKr}
+                          className="w-full h-full object-cover object-top"
+                        />
 
-                  {/* 서포터 2 */}
-                  <div
-                    onClick={() => handleInspectCard(currentPreviewDeck.rightSupport.code)}
-                    className="p-3.5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-lg flex items-center gap-3.5 cursor-pointer hover:border-slate-600 hover:scale-[1.01] transition duration-200"
-                  >
-                    <div className="relative w-16 h-20 rounded-xl overflow-hidden border border-slate-700 shrink-0 shadow-md">
-                      <img
-                        src={currentPreviewDeck.rightSupport.artUrl}
-                        alt={currentPreviewDeck.rightSupport.nameKr}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span className="text-[10px] font-black text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md border border-slate-700">
-                          후방 서포터 2
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-300 bg-slate-800 px-1.5 py-0.5 rounded">
-                          {getElementKr(currentPreviewDeck.rightSupport.element)}
-                        </span>
+                        {/* 레벨 뱃지 */}
+                        <div className="absolute top-1 left-1 px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[9px] shadow">
+                          Lv.{charCard.level}
+                        </div>
+
+                        {/* 속성 뱃지 */}
+                        {charCard.element && (
+                          <div className="absolute top-1 right-1 px-1 py-0.2 rounded bg-slate-950/80 text-slate-300 font-bold text-[8px] border border-slate-700">
+                            {getElementKr(charCard.element)}
+                          </div>
+                        )}
+
+                        {/* 리더 마크 */}
+                        {isLeaderCard && (
+                          <div className="absolute bottom-5 right-1">
+                            <Crown className="w-3.5 h-3.5 text-amber-400 drop-shadow" />
+                          </div>
+                        )}
+
+                        {/* 하단 카드명 */}
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-1 pt-3 pointer-events-none">
+                          <p className="text-[10px] font-black text-white truncate text-center">
+                            {charCard.nameKr}
+                          </p>
+                        </div>
                       </div>
-                      <h5 className="font-black text-white text-base truncate">
-                        {currentPreviewDeck.rightSupport.nameKr}
-                      </h5>
-                      <p className="text-[11px] text-slate-400 truncate">
-                        원호 사격 & 연격 콤보 보조
-                      </p>
-                    </div>
-                  </div>
+                    );
+                  })}
+
+                  {/* 빈 슬롯 (15장까지 표시) */}
+                  {Array.from({ length: Math.max(0, 15 - previewCharDeck.length) }).map((_, i) => {
+                    const slotNum = previewCharDeck.length + i + 1;
+                    return (
+                      <div
+                        key={`empty-char-slot-${slotNum}`}
+                        className="aspect-[5/7] rounded-xl border border-dashed border-slate-800 bg-slate-950/30 flex flex-col items-center justify-center text-slate-600 gap-0.5 select-none shrink-0"
+                      >
+                        <span className="font-mono text-[9px] font-bold text-slate-600">#{slotNum}</span>
+                        <span className="text-[8px] text-slate-700">빈 슬롯</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
