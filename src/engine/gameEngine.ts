@@ -857,9 +857,16 @@ export function upgradeCharacter(
     }
   );
 
-  // 레벨업 시 발동 효과 (Optional Choice)
+  // ==========================================
+  // 【등장】 및 【레벨업】 효과 발동 처리
+  // 1) 0 -> 1 레벨업 시: 새로 필드에 올라온 1레벨 카드의 【등장】 효과 발동!
+  // 2) 1 -> 2 레벨업 시: 그 위에 2레벨 카드가 겹쳐지면서 밑에 깔린 1레벨 카드의 【레벨업】 효과 발동!
+  // ==========================================
+
   // 1. BP01-003 카멜리아 Lv.1: 트래시에서 일반 공격 1장 패에 추가 가능
-  if (upgradeCard.code === 'BP01-003') {
+  const cam1 = upgradeCard.code === 'BP01-003' ? upgradeCard : currentSlotCard.code === 'BP01-003' ? currentSlotCard : null;
+  if (cam1) {
+    const isEntry = cam1 === upgradeCard;
     const normalAttacks = player.dropZone.filter(
       (c) => c.kind === 'ACTION' && (c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격'))
     ) as ActionCard[];
@@ -867,14 +874,20 @@ export function upgradeCharacter(
       if (player.isAi) {
         const [reclaimed] = player.dropZone.splice(0, 1);
         player.hand.push(reclaimed as ActionCard);
+        newState = addLog(
+          newState,
+          `[카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
+          'ACTION',
+          playerIndex
+        );
       } else {
         newState.pendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
-          title: '카멜리아 레벨업 효과 (트래시 회수)',
+          title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (트래시 회수)`,
           sourceCardName: '카멜리아 [BP01-003]',
-          sourceCardArt: upgradeCard.artUrl,
-          description: '레벨업 효과로 트래시 에리어에서 <일반 공격> 카드 1장을 패에 추가할 수 있습니다.',
+          sourceCardArt: cam1.artUrl,
+          description: `【${isEntry ? '등장' : '레벨업'}】 효과로 트래시 에리어에서 <일반 공격> 카드 1장을 패에 추가할 수 있습니다.`,
           revealedCards: normalAttacks,
           minSelect: 0,
           maxSelect: 1,
@@ -885,20 +898,28 @@ export function upgradeCharacter(
   }
 
   // 2. BP01-009 파수인 Lv.1: 트래시에서 <변주 스킬> 카드 1장 패에 추가 가능
-  if (upgradeCard.code === 'BP01-009') {
+  const sh1 = upgradeCard.code === 'BP01-009' ? upgradeCard : currentSlotCard.code === 'BP01-009' ? currentSlotCard : null;
+  if (sh1) {
+    const isEntry = sh1 === upgradeCard;
     const introSkills = player.dropZone.filter((c) => c.kind === 'ACTION' && c.nameKr.includes('변주 스킬')) as ActionCard[];
     if (introSkills.length > 0) {
       if (player.isAi) {
         const [reclaimed] = player.dropZone.splice(0, 1);
         player.hand.push(reclaimed as ActionCard);
+        newState = addLog(
+          newState,
+          `[파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
+          'ACTION',
+          playerIndex
+        );
       } else {
         newState.pendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
-          title: '파수인 레벨업 효과 (트래시 회수)',
+          title: `파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (트래시 회수)`,
           sourceCardName: '파수인 [BP01-009]',
-          sourceCardArt: upgradeCard.artUrl,
-          description: '레벨업 효과로 트래시 에리어에서 <변주 스킬> 카드 1장을 패에 추가할 수 있습니다.',
+          sourceCardArt: sh1.artUrl,
+          description: `【${isEntry ? '등장' : '레벨업'}】 효과로 트래시 에리어에서 <변주 스킬> 카드 1장을 패에 추가할 수 있습니다.`,
           revealedCards: introSkills,
           minSelect: 0,
           maxSelect: 1,
@@ -909,7 +930,9 @@ export function upgradeCharacter(
   }
 
   // 3. BP01-013 앙코 Lv.1: 트래시에서 【앙코】의 적색 카드 1장 패에 추가 가능
-  if (upgradeCard.code === 'BP01-013') {
+  const anke1 = upgradeCard.code === 'BP01-013' ? upgradeCard : currentSlotCard.code === 'BP01-013' ? currentSlotCard : null;
+  if (anke1) {
+    const isEntry = anke1 === upgradeCard;
     const ankeRed = player.dropZone.filter(
       (c) => c.kind === 'ACTION' && (c as ActionCard).color === 'RED' && c.characterExclusive?.includes('앙코')
     ) as ActionCard[];
@@ -917,14 +940,20 @@ export function upgradeCharacter(
       if (player.isAi) {
         const [reclaimed] = player.dropZone.splice(0, 1);
         player.hand.push(reclaimed as ActionCard);
+        newState = addLog(
+          newState,
+          `[앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
+          'ACTION',
+          playerIndex
+        );
       } else {
         newState.pendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
-          title: '앙코 레벨업 효과 (트래시 회수)',
+          title: `앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (트래시 회수)`,
           sourceCardName: '앙코 [BP01-013]',
-          sourceCardArt: upgradeCard.artUrl,
-          description: '레벨업 효과로 트래시 에리어에서 【앙코】의 적색 카드 1장을 패에 추가할 수 있습니다.',
+          sourceCardArt: anke1.artUrl,
+          description: `【${isEntry ? '등장' : '레벨업'}】 효과로 트래시 에리어에서 【앙코】의 적색 카드 1장을 패에 추가할 수 있습니다.`,
           revealedCards: ankeRed,
           minSelect: 0,
           maxSelect: 1,
@@ -935,7 +964,9 @@ export function upgradeCharacter(
   }
 
   // 4. BP01-026 치샤 Lv.1: 트래시에서 <기본 공격> 카드 1장 패에 추가 가능
-  if (upgradeCard.code === 'BP01-026') {
+  const chixia1 = upgradeCard.code === 'BP01-026' ? upgradeCard : currentSlotCard.code === 'BP01-026' ? currentSlotCard : null;
+  if (chixia1) {
+    const isEntry = chixia1 === upgradeCard;
     const normalAttacks = player.dropZone.filter(
       (c) => c.kind === 'ACTION' && (c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격'))
     ) as ActionCard[];
@@ -943,14 +974,20 @@ export function upgradeCharacter(
       if (player.isAi) {
         const [reclaimed] = player.dropZone.splice(0, 1);
         player.hand.push(reclaimed as ActionCard);
+        newState = addLog(
+          newState,
+          `[치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
+          'ACTION',
+          playerIndex
+        );
       } else {
         newState.pendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
-          title: '치샤 레벨업 효과 (트래시 회수)',
+          title: `치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (트래시 회수)`,
           sourceCardName: '치샤 [BP01-026]',
-          sourceCardArt: upgradeCard.artUrl,
-          description: '레벨업 효과로 트래시 에리어에서 <기본 공격> 카드 1장을 패에 추가할 수 있습니다.',
+          sourceCardArt: chixia1.artUrl,
+          description: `【${isEntry ? '등장' : '레벨업'}】 효과로 트래시 에리어에서 <기본 공격> 카드 1장을 패에 추가할 수 있습니다.`,
           revealedCards: normalAttacks,
           minSelect: 0,
           maxSelect: 1,
@@ -961,20 +998,28 @@ export function upgradeCharacter(
   }
 
   // 5. BP01-032 산화 Lv.1: 트래시에서 카드 1장을 협주 에리어에 배치 가능
-  if (upgradeCard.code === 'BP01-032') {
+  const sanhua1 = upgradeCard.code === 'BP01-032' ? upgradeCard : currentSlotCard.code === 'BP01-032' ? currentSlotCard : null;
+  if (sanhua1) {
+    const isEntry = sanhua1 === upgradeCard;
     const dropCards = player.dropZone.filter((c) => c.kind === 'ACTION') as ActionCard[];
     if (dropCards.length > 0) {
       if (player.isAi) {
         const [chosen] = player.dropZone.splice(0, 1);
         player.concertoZone.push(chosen as ActionCard);
+        newState = addLog(
+          newState,
+          `[산화 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(chosen as ActionCard).nameKr}]을(를) 협주 에리어에 배치했습니다!`,
+          'ACTION',
+          playerIndex
+        );
       } else {
         newState.pendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
-          title: '산화 레벨업 효과 (협주 배치)',
+          title: `산화 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (협주 배치)`,
           sourceCardName: '산화 [BP01-032]',
-          sourceCardArt: upgradeCard.artUrl,
-          description: '레벨업 효과로 트래시 에리어에서 카드 1장을 협주 에리어에 배치할 수 있습니다.',
+          sourceCardArt: sanhua1.artUrl,
+          description: `【${isEntry ? '등장' : '레벨업'}】 효과로 트래시 에리어에서 카드 1장을 협주 에리어에 배치할 수 있습니다.`,
           revealedCards: dropCards,
           minSelect: 0,
           maxSelect: 1,
@@ -985,19 +1030,27 @@ export function upgradeCharacter(
   }
 
   // 6. BP01-017 / BP01-020 방랑자 Lv.1: 덱 위의 카드 1장을 공개하고 패에 추가 가능
-  if (upgradeCard.code === 'BP01-017' || upgradeCard.code === 'BP01-020') {
+  const rover1 = (upgradeCard.code === 'BP01-017' || upgradeCard.code === 'BP01-020') ? upgradeCard : (currentSlotCard.code === 'BP01-017' || currentSlotCard.code === 'BP01-020') ? currentSlotCard : null;
+  if (rover1) {
+    const isEntry = rover1 === upgradeCard;
     const topCard = drawSingleCardFromDeck(player);
     if (topCard) {
       if (player.isAi) {
         player.hand.push(topCard);
+        newState = addLog(
+          newState,
+          `[방랑자 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 덱 위에서 [${topCard.nameKr}]을(를) 패에 추가했습니다.`,
+          'ACTION',
+          playerIndex
+        );
       } else {
         newState.pendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
-          title: `${upgradeCard.nameKr} 레벨업 효과`,
-          sourceCardName: `${upgradeCard.nameKr} [${upgradeCard.code}]`,
-          sourceCardArt: upgradeCard.artUrl,
-          description: '레벨업 효과로 덱 위의 카드 1장을 공개하고 패에 추가할 수 있습니다 (0장 선택 시 덱 유지).',
+          title: `방랑자 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과`,
+          sourceCardName: `${rover1.nameKr} [${rover1.code}]`,
+          sourceCardArt: rover1.artUrl,
+          description: `【${isEntry ? '등장' : '레벨업'}】 효과로 덱 위의 카드 1장을 공개하고 패에 추가할 수 있습니다 (0장 선택 시 덱 유지).`,
           revealedCards: [topCard],
           minSelect: 0,
           maxSelect: 1,
@@ -1008,31 +1061,28 @@ export function upgradeCharacter(
   }
 
   // 7. BP01-023 양양 Lv.1: 【등장】/【레벨업】자신의 덱 위의 카드 1장을 협주 에리어에 배치한다.
-  if (
-    upgradeCard.code === 'BP01-023' ||
-    (upgradeCard.level === 1 &&
-      (upgradeCard.characterName === '양양' || upgradeCard.nameKr?.includes('양양')) &&
-      upgradeCard.description?.includes('협주 에리어에 배치'))
-  ) {
+  const yang1 = (upgradeCard.code === 'BP01-023' || (upgradeCard.level === 1 && (upgradeCard.characterName === '양양' || upgradeCard.nameKr?.includes('양양')) && upgradeCard.description?.includes('협주'))) ? upgradeCard : (currentSlotCard.code === 'BP01-023' || (currentSlotCard.level === 1 && (currentSlotCard.characterName === '양양' || currentSlotCard.nameKr?.includes('양양')) && currentSlotCard.description?.includes('협주'))) ? currentSlotCard : null;
+  if (yang1) {
+    const isEntry = yang1 === upgradeCard;
     const topCard = drawSingleCardFromDeck(player);
     if (topCard) {
       if (player.isAi) {
         player.concertoZone.push(topCard);
         newState = addLog(
           newState,
-          `[양양 Lv.1 등장/레벨업 효과] ${player.name}이(가) 덱 위의 카드 [${topCard.nameKr}]을(를) 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length})`,
+          `[양양 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] ${player.name}이(가) 덱 위의 카드 [${topCard.nameKr}]을(를) 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length})`,
           'ACTION',
           playerIndex,
-          { cardArt: upgradeCard.artUrl, cardName: '양양 Lv.1', effectTag: '협주 충전' }
+          { cardArt: yang1.artUrl, cardName: '양양 Lv.1', effectTag: '협주 충전' }
         );
       } else {
         newState.pendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
-          title: '양양 Lv.1 등장/레벨업 효과 (협주 배치)',
+          title: `양양 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (협주 배치)`,
           sourceCardName: '양양 [BP01-023]',
-          sourceCardArt: upgradeCard.artUrl,
-          description: '【등장】/【레벨업】 효과로 자신의 덱 위의 카드 1장을 협주 에리어에 배치합니다.',
+          sourceCardArt: yang1.artUrl,
+          description: `【${isEntry ? '등장' : '레벨업'}】 효과로 자신의 덱 위의 카드 1장을 협주 에리어에 배치합니다.`,
           revealedCards: [topCard],
           minSelect: 0,
           maxSelect: 1,
@@ -1040,6 +1090,22 @@ export function upgradeCharacter(
         };
       }
     }
+  }
+
+  // 8. BP01-001 / BP01-002 카멜리아 Lv.2: 【레벨업】이 카드를 캐릭터 덱으로 되돌린다.
+  if (currentSlotCard.code === 'BP01-001' || currentSlotCard.code === 'BP01-002') {
+    player.characterDeck.push({ ...currentSlotCard, underlyingCards: undefined });
+    if (player.slots[targetSlot]?.underlyingCards) {
+      player.slots[targetSlot]!.underlyingCards = player.slots[targetSlot]!.underlyingCards!.filter(
+        (c) => c.id !== currentSlotCard.id
+      );
+    }
+    newState = addLog(
+      newState,
+      `[카멜리아 Lv.2 레벨업 효과] [${currentSlotCard.nameKr}] 카드가 캐릭터 덱으로 되돌아갔습니다.`,
+      'ACTION',
+      playerIndex
+    );
   }
 
   return { success: true, newState };
