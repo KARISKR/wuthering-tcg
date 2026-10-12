@@ -788,6 +788,15 @@ export function upgradeCharacter(
     return { success: false, newState: state, error: `레벨 ${currentSlotCard.level + 1} 캐릭터로만 레벨업할 수 있습니다.` };
   }
 
+  // BP01-011 앙코 Lv.2는 카드 효과(그늘이의 대폭주 등)로만 등장 가능
+  if (upgradeCard.code === 'BP01-011') {
+    return {
+      success: false,
+      newState: state,
+      error: `[앙코 BP01-011]은(는) 일반 레벨업이 불가능하며, 카드 효과로만 등장할 수 있습니다.`,
+    };
+  }
+
   // 레벨업 비용 계산: 기본 목표 레벨 수만큼 패 버림
   // 단, Lv.2 양양 지속 효과(코스트 1장 경감, 최소 1장) 적용
   let requiredDiscard = upgradeCard.level;

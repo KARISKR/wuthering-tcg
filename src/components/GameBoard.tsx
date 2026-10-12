@@ -485,7 +485,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
     const nextLevel = (currentChar.level + 1) as 1 | 2;
     const available = targetPlayer.characterDeck.filter(
-      (c) => isSameCharacter(c, currentChar) && c.level === nextLevel
+      (c) => isSameCharacter(c, currentChar) && c.level === nextLevel && c.code !== 'BP01-011'
     );
 
     let requiredDiscard = nextLevel;
