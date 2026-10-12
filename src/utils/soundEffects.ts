@@ -114,9 +114,9 @@ export const SFX_SPECIFICATIONS: Record<SfxCategory, SfxSpec> = {
   phase: {
     category: 'phase',
     nameKr: '페이즈 전환 (배너 등장)',
-    recommendedDuration: '0.5초 ~ 1.2초',
-    recommendedDurationSec: 0.8,
-    description: '액션/대결/엔드 페이즈 전환 시 웅장한 시네마틱 붐',
+    recommendedDuration: '0.4초 ~ 0.8초',
+    recommendedDurationSec: 0.5,
+    description: '대결/연격 페이즈 전환 시 청아하고 맑은 공명 크리스탈 차임',
     folderPath: '/audio/sfx/phase/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
@@ -677,8 +677,9 @@ class SoundEffectsEngine {
   }
 
   // =========================================================================
-  // 3. 페이즈 전환 효과음 (PHASE TRANSITION - 권장 0.5~1.2초)
-  // =========================================================================
+  // ==========================================
+  // 3. 페이즈 전환 효과음 (PHASE TRANSITION - 맑고 청아한 공명 크리스탈 차임)
+  // ==========================================
   public playPhaseChange() {
     if (this.isMuted) return;
 
@@ -689,24 +690,28 @@ class SoundEffectsEngine {
 
     const now = ctx.currentTime;
 
-    // A. 시네마틱 딥 서브 붐
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(75, now);
-    osc.frequency.exponentialRampToValueAtTime(30, now + 0.55);
+    // 공격 타격음(서브 베이스 쿵/칼바람) 대신, 세련되고 맑은 공명 3음 차임 (E5 -> G#5 -> B5)
+    const freqs = [659.25, 830.61, 987.77];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.045);
 
-    gain.gain.setValueAtTime(0.01, now);
-    gain.gain.linearRampToValueAtTime(this.volume * 0.75, now + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+      const start = now + idx * 0.045;
+      const dur = 0.42;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.linearRampToValueAtTime(this.volume * 0.28, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.55);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + dur);
+    });
 
-    // B. 시네마틱 로우패스 후시
-    this.playCinematicWhoosh(0.48, this.volume * 0.45);
+    // 부드럽고 가벼운 에테르 글래스 스위시 (타격감 없는 실크 바람)
+    this.playSoftGlassSwoosh(0.3, this.volume * 0.15);
   }
 
   // =========================================================================
@@ -774,7 +779,7 @@ class SoundEffectsEngine {
   }
 
   // =========================================================================
-  // 6. 턴 전환 / 교대 알림음 (TURN CHANGE - 권장 0.4~0.8초)
+  // 6. 턴 전환 / 교대 알림음 (TURN CHANGE - 산뜻하고 맑은 2음 핑)
   // =========================================================================
   public playTurnStart() {
     if (this.isMuted) return;
@@ -786,19 +791,24 @@ class SoundEffectsEngine {
 
     const now = ctx.currentTime;
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(120, now);
-    osc.frequency.exponentialRampToValueAtTime(60, now + 0.4);
+    // A4 (440Hz) -> E5 (659.25Hz) 상쾌한 UI 턴 핑
+    const notes = [440.0, 659.25];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.06);
 
-    gain.gain.setValueAtTime(this.volume * 0.6, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      const start = now + idx * 0.06;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.linearRampToValueAtTime(this.volume * 0.25, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.32);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start(now);
-    osc.stop(now + 0.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.32);
+    });
   }
 
   // =========================================================================
@@ -1027,6 +1037,44 @@ class SoundEffectsEngine {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(volume, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+
+    noise.start(now);
+    noise.stop(now + duration);
+  }
+
+  // =========================================================================
+  // 내부 합성 헬퍼: 부드러운 에테르 글래스 스위시 (투명하고 산뜻한 UI 바람)
+  // =========================================================================
+  private playSoftGlassSwoosh(duration: number, volume: number) {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+
+    const bufferSize = Math.floor(ctx.sampleRate * duration);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = ctx.createBufferSource();
+    noise.buffer = buffer;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'bandpass';
+    const now = ctx.currentTime;
+    filter.frequency.setValueAtTime(1400, now);
+    filter.frequency.exponentialRampToValueAtTime(800, now + duration);
+    filter.Q.value = 0.8;
+
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.linearRampToValueAtTime(volume, now + 0.05);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
     noise.connect(filter);
     filter.connect(gain);

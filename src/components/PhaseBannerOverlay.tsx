@@ -109,8 +109,12 @@ export const PhaseBannerOverlay: React.FC<PhaseBannerOverlayProps> = ({
       setIsVisible(true);
       setIsFadingOut(false);
 
-      // 둔탁하고 묵직한 시네마틱 트랜지션 사운드 재생
-      soundEffects.playPhaseChange();
+      // 페이즈 성격에 맞춘 맑고 세련된 UI 사운드 분기 재생 (공격음 오해 방지)
+      if (eventKey.startsWith('turn-start') || eventKey.startsWith('end')) {
+        soundEffects.playTurnStart();
+      } else {
+        soundEffects.playPhaseChange();
+      }
 
       // 유저가 충분히 인지할 수 있도록 1750ms 동안 안정적으로 노출 (1450ms 시점에 페이드아웃 시작)
       const tFade = setTimeout(() => {
