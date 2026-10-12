@@ -2303,25 +2303,76 @@ export function proceedAfterClashReveal(state: GameState): GameState {
     newState.deferredEffectEvent = null;
   }
 
-  // 연격권이 남아있거나 무제한이고, 실제로 비용과 조건을 충족하여 낼 수 있는 적색 카드가 있는 플레이어가 있는지 확인
-  const p0HasCombo = canPlayerExecuteCombo(p0);
-  const p1HasCombo = canPlayerExecuteCombo(p1);
+  // 연격 권한이 있는 플레이어 확인 (적색 승리 무제한 또는 추격 카운트 보유)
+  const p0HasComboPerm = Boolean(p0.comboUnlimited) || (p0.comboCount ?? 0) > 0;
+  const p1HasComboPerm = Boolean(p1.comboUnlimited) || (p1.comboCount ?? 0) > 0;
 
-  if (p0HasCombo || p1HasCombo) {
-    newState.phase = 'COMBO_STEP';
-    const comboPlayerIdx = p0HasCombo ? 0 : 1;
-    newState = addLog(
-      newState,
-      `${newState.players[comboPlayerIdx].name}의 [연격 단계(Combo Step)]! ${
-        newState.players[comboPlayerIdx].comboUnlimited
-          ? '적색 승리: 연속 연격 무제한 가능'
-          : `남은 연격 횟수: ${newState.players[comboPlayerIdx].comboCount}회`
-      }`,
-      'ACTION',
-      comboPlayerIdx as 0 | 1
-    );
+  if (p0HasComboPerm || p1HasComboPerm) {
+    const comboPlayerIdx: 0 | 1 = p0HasComboPerm ? 0 : 1;
+    const comboPlayer = newState.players[comboPlayerIdx];
+
+    if (comboPlayer.isAi) {
+      if (canPlayerExecuteCombo(comboPlayer)) {
+        newState.phase = 'COMBO_STEP';
+        newState = addLog(
+          newState,
+          `⚡ ${comboPlayer.name}의 [연격 단계(Combo Step)]! ${
+            comboPlayer.comboUnlimited
+              ? '적색 승리: 연속 연격 무제한 가동'
+              : `남은 연격 횟수: ${comboPlayer.comboCount}회`
+          }`,
+          'ACTION',
+          comboPlayerIdx
+        );
+      } else {
+        // AI는 낼 수 있는 카드가 없으면 연격 종료
+        newState = addLog(
+          newState,
+          `[연격 단계] ${comboPlayer.name}의 연격 권한이 있으나 사용할 수 있는 적색 카드나 협주 에너지가 없어 연격을 종료합니다.`,
+          'SYSTEM',
+          comboPlayerIdx
+        );
+        p0.comboCount = 0;
+        p0.comboUnlimited = false;
+        p1.comboCount = 0;
+        p1.comboUnlimited = false;
+        newState.players = [p0, p1];
+        return checkHandOverflowOrEndTurn(newState);
+      }
+    } else {
+      // Human 유저 플레이어:
+      // 손패에 적색 카드가 1장이라도 있으면(협주 에너지가 현재 부족하더라도) 유저가 상황을 인지하고 조작할 수 있도록 COMBO_STEP 진입!
+      const hasAnyRedCard = comboPlayer.hand.some((c) => c.color === 'RED');
+      if (hasAnyRedCard) {
+        newState.phase = 'COMBO_STEP';
+        newState = addLog(
+          newState,
+          `⚡ ${comboPlayer.name}의 [연격 단계(Combo Step)] 돌입! ${
+            comboPlayer.comboUnlimited
+              ? '적색 승리: 연속 연격 무제한 가능!'
+              : `남은 연격 횟수: ${comboPlayer.comboCount}회`
+          }`,
+          'ACTION',
+          comboPlayerIdx
+        );
+      } else {
+        // 손패에 적색 카드가 전혀 없는 경우
+        newState = addLog(
+          newState,
+          `[연격 단계] ${comboPlayer.name}이(가) 연격 권한을 얻었으나, 손패에 연격(적색) 카드가 없어 연격 단계를 건너뜁니다.`,
+          'SYSTEM',
+          comboPlayerIdx
+        );
+        p0.comboCount = 0;
+        p0.comboUnlimited = false;
+        p1.comboCount = 0;
+        p1.comboUnlimited = false;
+        newState.players = [p0, p1];
+        return checkHandOverflowOrEndTurn(newState);
+      }
+    }
   } else {
-    // 낼 수 있는 연격 카드 없음 -> 연격 플래그 리셋 후 패 초과 체크 및 턴 종료
+    // 연격 권한 없음 -> 연격 플래그 리셋 후 패 초과 체크 및 턴 종료
     p0.comboCount = 0;
     p0.comboUnlimited = false;
     p1.comboCount = 0;
@@ -2740,6 +2791,12 @@ export function executeComboAttack(
     });
 
   if (!canStillCombo) {
+    newState = addLog(
+      newState,
+      `[연격 단계 완료] ${player.name}이(가) 더 이상 사용할 수 있는 연격 카드가 없어 연격 단계를 종료합니다.`,
+      'ACTION',
+      playerIndex
+    );
     newState = checkHandOverflowOrEndTurn(newState);
   }
 

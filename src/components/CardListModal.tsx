@@ -324,15 +324,17 @@ export const CardListModal: React.FC<CardListModalProps> = ({
                       <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">
                         <div className="text-slate-400 text-[10px] font-bold">속성 (ELEMENT)</div>
                         <strong className="text-cyan-300 text-sm font-black">
-                          {zoomCard.element === 'GLACIO'
+                          {zoomCard.element === 'GLACIO' || zoomCard.element === '응결'
                             ? '응결 (얼음)'
-                            : zoomCard.element === 'FUSION'
+                            : zoomCard.element === 'FUSION' || zoomCard.element === '용융'
                             ? '용융 (화염)'
-                            : zoomCard.element === 'AERO'
+                            : zoomCard.element === 'AERO' || zoomCard.element === '기류'
                             ? '기류 (바람)'
-                            : zoomCard.element === 'SPECTRO'
-                            ? '회광 (빛)'
-                            : '인멸 (어둠)'}
+                            : zoomCard.element === 'SPECTRO' || zoomCard.element === '회절'
+                            ? '회절 (빛)'
+                            : zoomCard.element === 'HAVOC' || zoomCard.element === '인멸'
+                            ? '인멸 (어둠)'
+                            : zoomCard.element}
                         </strong>
                       </div>
                       <div className="bg-slate-900/90 p-2.5 rounded-xl border border-slate-800">

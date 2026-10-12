@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { CustomDeckConfig, DeckPreset } from '../types/tcg';
+import { CustomDeckConfig, DeckPreset, getElementKr } from '../types/tcg';
 import {
   encodeDeckCode,
   decodeDeckCode,
@@ -921,7 +921,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                           중앙 리더
                         </span>
                         <span className="text-[10px] font-bold text-slate-300 bg-slate-800 px-1.5 py-0.5 rounded">
-                          {currentPreviewDeck.leader.element}
+                          {getElementKr(currentPreviewDeck.leader.element)}
                         </span>
                       </div>
                       <h5 className="font-black text-white text-base truncate">
@@ -951,7 +951,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                           후방 서포터 1
                         </span>
                         <span className="text-[10px] font-bold text-slate-300 bg-slate-800 px-1.5 py-0.5 rounded">
-                          {currentPreviewDeck.leftSupport.element}
+                          {getElementKr(currentPreviewDeck.leftSupport.element)}
                         </span>
                       </div>
                       <h5 className="font-black text-white text-base truncate">
@@ -981,7 +981,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                           후방 서포터 2
                         </span>
                         <span className="text-[10px] font-bold text-slate-300 bg-slate-800 px-1.5 py-0.5 rounded">
-                          {currentPreviewDeck.rightSupport.element}
+                          {getElementKr(currentPreviewDeck.rightSupport.element)}
                         </span>
                       </div>
                       <h5 className="font-black text-white text-base truncate">
@@ -1140,7 +1140,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                   <div className="flex items-center gap-2 mt-1 text-xs">
                     {inspectingCard.element && (
                       <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-200 font-bold border border-slate-700">
-                        {inspectingCard.element}
+                        {getElementKr(inspectingCard.element)}
                       </span>
                     )}
                     {inspectingCard.color && (

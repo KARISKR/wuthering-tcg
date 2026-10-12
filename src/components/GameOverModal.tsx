@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { PlayerState } from '../types/tcg';
+import { PlayerState, getElementKr } from '../types/tcg';
 import { Trophy, Skull, RotateCcw, Home, Crown, Flame, Sparkles, Swords, Heart, Shield, Star, History } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -208,7 +208,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                   {leaderCard.nameKr}
                 </span>
                 <span className="text-xs font-mono text-cyan-400 font-bold ml-auto">
-                  {leaderCard.element}
+                  {getElementKr(leaderCard.element)}
                 </span>
               </div>
 

@@ -1,6 +1,45 @@
 export type CardColor = 'RED' | 'GREEN' | 'BLUE';
 export type CardKind = 'CHARACTER' | 'ACTION';
 
+// 속성 타입 (명조 원작 설정: 회절, 기류, 용융, 응결, 인멸, 전도 및 영문 하위호환)
+export type ElementType =
+  | '회절'
+  | '기류'
+  | '용융'
+  | '응결'
+  | '인멸'
+  | '전도'
+  | 'SPECTRO'
+  | 'AERO'
+  | 'FUSION'
+  | 'GLACIO'
+  | 'HAVOC'
+  | 'ELECTRO';
+
+export const ELEMENT_KR_MAP: Record<string, string> = {
+  AERO: '기류',
+  SPECTRO: '회절',
+  GLACIO: '응결',
+  FUSION: '용융',
+  HAVOC: '인멸',
+  ELECTRO: '전도',
+  CONDUCTO: '전도',
+  기류: '기류',
+  회절: '회절',
+  응결: '응결',
+  용융: '용융',
+  인멸: '인멸',
+  전도: '전도',
+};
+
+// 속성 한글명 변환 헬퍼 (AERO -> 기류, SPECTRO -> 회절 등)
+export function getElementKr(elem?: string | null): string {
+  if (!elem) return '-';
+  const clean = elem.trim();
+  const upper = clean.toUpperCase();
+  return ELEMENT_KR_MAP[upper] || ELEMENT_KR_MAP[clean] || clean;
+}
+
 // 캐릭터 카드
 export interface CharacterCard {
   id: string;
@@ -9,7 +48,7 @@ export interface CharacterCard {
   characterName: string; // "방랑자", "금희", "양양", "치샤", "산화"
   nameKr: string;
   level: 0 | 1 | 2;
-  element: 'GLACIO' | 'FUSION' | 'AERO' | 'SPECTRO' | 'HAVOC'; // 속성 (명조 원작 설정)
+  element: ElementType; // 속성 (한글: 회절, 기류, 용융, 응결, 인멸)
   artUrl: string;
   description: string;
   // 스킬 타이밍

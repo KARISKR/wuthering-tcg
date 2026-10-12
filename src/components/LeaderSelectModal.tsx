@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PlayerState, CharacterCard } from '../types/tcg';
+import { PlayerState, CharacterCard, getElementKr } from '../types/tcg';
 import { CardView } from './CardView';
 import { Crown, Sparkles, Swords, CheckCircle2, Shield, User, ArrowRight } from 'lucide-react';
 import { soundEffects } from '../utils/soundEffects';
@@ -109,7 +109,7 @@ export const LeaderSelectModal: React.FC<LeaderSelectModalProps> = ({
                 <div className="mt-3 w-full">
                   <div className="flex items-center justify-center gap-1.5 mb-1">
                     <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px] font-bold border border-slate-700">
-                      {char.element}
+                      {getElementKr(char.element)}
                     </span>
                     <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
                       Lv.{char.level}

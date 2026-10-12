@@ -117,6 +117,7 @@ function simulateMatch(
 
   let stepLimit = 500;
   let steps = 0;
+  let comboCount = 0;
 
   while (state.phase !== 'GAME_OVER' && steps < stepLimit) {
     steps++;
@@ -170,6 +171,7 @@ function simulateMatch(
       if (redCard && (cp.comboUnlimited || cp.comboCount > 0)) {
         const res = executeComboAttack(state, comboIdx, redCard.id);
         if (res.success) {
+          comboCount++;
           state = res.newState;
         } else {
           state = finishComboStep(state, comboIdx);
@@ -211,6 +213,7 @@ function simulateMatch(
     turns: state.turn,
     winner: state.winner ?? -1,
     logCount: state.logs.length,
+    comboStrikes: comboCount,
     errors,
   };
 }
@@ -230,6 +233,7 @@ let errorsFound = 0;
 let p0Wins = 0;
 let p1Wins = 0;
 let totalTurns = 0;
+let totalComboStrikes = 0;
 
 for (let i = 0; i < totalGames; i++) {
   const matchup = matchups[i % matchups.length];
@@ -242,6 +246,7 @@ for (let i = 0; i < totalGames; i++) {
     if (res.winner === 0) p0Wins++;
     else if (res.winner === 1) p1Wins++;
     totalTurns += res.turns;
+    totalComboStrikes += res.comboStrikes;
   }
 }
 
@@ -251,6 +256,7 @@ console.log(`Successfully Completed to GAME_OVER: ${completedGames}/${totalGames
 console.log(`Errors: ${errorsFound}`);
 console.log(`P0 Wins: ${p0Wins}, P1 Wins: ${p1Wins}`);
 console.log(`Average Turns per Match: ${(totalTurns / completedGames).toFixed(1)}`);
+console.log(`Total Combo Strikes Executed: ${totalComboStrikes} (Avg ${(totalComboStrikes / completedGames).toFixed(1)} per game)`);
 
 if (errorsFound === 0 && completedGames === totalGames) {
   console.log('✅ ALL 50 SIMULATED GAMES COMPLETED PERFECTLY WITH ZERO ERRORS!');

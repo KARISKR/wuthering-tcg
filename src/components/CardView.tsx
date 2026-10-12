@@ -258,17 +258,24 @@ const CharacterCardView: React.FC<{
   className?: string;
 }> = ({ card, size, sizeStyles, isSelected, isDisabled, onClick, onZoom, badge, className = '' }) => {
   const elementColors: Record<
-    CharacterCard['element'],
+    string,
     { border: string; bg: string; text: string; label: string }
   > = {
     SPECTRO: { border: 'border-amber-400/90', bg: 'from-amber-950/30 to-slate-900', text: 'text-amber-300', label: '회절' },
+    회절: { border: 'border-amber-400/90', bg: 'from-amber-950/30 to-slate-900', text: 'text-amber-300', label: '회절' },
     HAVOC: { border: 'border-purple-500/90', bg: 'from-purple-950/30 to-slate-900', text: 'text-purple-300', label: '인멸' },
+    인멸: { border: 'border-purple-500/90', bg: 'from-purple-950/30 to-slate-900', text: 'text-purple-300', label: '인멸' },
     AERO: { border: 'border-teal-400/90', bg: 'from-teal-950/30 to-slate-900', text: 'text-teal-300', label: '기류' },
+    기류: { border: 'border-teal-400/90', bg: 'from-teal-950/30 to-slate-900', text: 'text-teal-300', label: '기류' },
     FUSION: { border: 'border-orange-500/90', bg: 'from-orange-950/30 to-slate-900', text: 'text-orange-300', label: '용융' },
+    용융: { border: 'border-orange-500/90', bg: 'from-orange-950/30 to-slate-900', text: 'text-orange-300', label: '용융' },
     GLACIO: { border: 'border-sky-400/90', bg: 'from-sky-950/30 to-slate-900', text: 'text-sky-300', label: '응결' },
+    응결: { border: 'border-sky-400/90', bg: 'from-sky-950/30 to-slate-900', text: 'text-sky-300', label: '응결' },
+    ELECTRO: { border: 'border-violet-400/90', bg: 'from-violet-950/30 to-slate-900', text: 'text-violet-300', label: '전도' },
+    전도: { border: 'border-violet-400/90', bg: 'from-violet-950/30 to-slate-900', text: 'text-violet-300', label: '전도' },
   };
 
-  const elem = elementColors[card.element];
+  const elem = elementColors[card.element] || elementColors['회절'];
   const hasArt = Boolean(card.artUrl);
 
   return (

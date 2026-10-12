@@ -23,7 +23,7 @@ import { EffectChoiceModal } from './EffectChoiceModal';
 import { EffectNotificationToast } from './EffectNotificationToast';
 import { CenterActionHUD } from './CenterActionHUD';
 import { EvolutionTreeModal } from './EvolutionTreeModal';
-import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect } from '../types/tcg';
+import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect, getElementKr } from '../types/tcg';
 import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
 import {
@@ -444,8 +444,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           setControlledPlayerIndex(0);
         }
       } else if (gameState.phase === 'COMBO_STEP') {
-        if (p0.comboCount > 0) setControlledPlayerIndex(0);
-        else if (p1.comboCount > 0) setControlledPlayerIndex(1);
+        if (p0.comboUnlimited || p0.comboCount > 0) setControlledPlayerIndex(0);
+        else if (p1.comboUnlimited || p1.comboCount > 0) setControlledPlayerIndex(1);
       } else if (gameState.phase === 'DISCARD_OVERFLOW') {
         if (p0.hand.length > 8) setControlledPlayerIndex(0);
         else if (p1.hand.length > 8) setControlledPlayerIndex(1);
@@ -852,7 +852,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[11px] text-slate-400 font-bold mb-0.5">속성</span>
-                        <strong className="text-lg sm:text-xl text-cyan-400 font-black">{previewCard.element}</strong>
+                        <strong className="text-lg sm:text-xl text-cyan-400 font-black">{getElementKr(previewCard.element)}</strong>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[11px] text-slate-400 font-bold mb-0.5">무기</span>

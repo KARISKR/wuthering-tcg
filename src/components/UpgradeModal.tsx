@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CharacterCard, ActionCard } from '../types/tcg';
+import { CharacterCard, ActionCard, getElementKr } from '../types/tcg';
 import { ChevronUp, X, Sparkles, AlertCircle, Trash2 } from 'lucide-react';
 
 interface UpgradeModalProps {
@@ -128,7 +128,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                           {up.nameKr}
                         </span>
                         <span className="text-[10px] sm:text-xs font-bold text-cyan-400 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-500/40">
-                          {up.element}
+                          {getElementKr(up.element)}
                         </span>
                       </div>
                       {up.description && (

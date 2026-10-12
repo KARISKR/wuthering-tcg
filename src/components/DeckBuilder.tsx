@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 import { ALL_CHARACTERS, DEDUPED_LV0_CHARACTERS, getRarityScore } from '../data/cards';
 import type { CharacterCard, ActionCard, CardColor } from '../types/tcg';
+import { getElementKr } from '../types/tcg';
 import {
   Sparkles,
   ArrowLeft,
@@ -123,7 +124,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       characterName: charName,
       nameKr: c.nameKr,
       level: (c.level ?? 0) as 0 | 1 | 2,
-      element: c.element || 'SPECTRO',
+      element: getElementKr(c.element) as any,
       artUrl: c.artUrl,
       description: c.description,
       leaderSkill: c.description,
@@ -258,7 +259,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
               nameKr: off.nameKr,
               artUrl: off.artUrl,
               rarity: off.rarity,
-              element: off.element,
+              element: getElementKr(off.element) as any,
               description: off.description,
             }
           : c;
@@ -983,7 +984,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                     </div>
                     <div className="flex flex-col">
                       <span className="text-xs text-slate-400 font-bold">속성</span>
-                      <strong className="text-xl text-cyan-400 font-black">{activeCard.element}</strong>
+                      <strong className="text-xl text-cyan-400 font-black">{getElementKr(activeCard.element)}</strong>
                     </div>
                     <div className="flex flex-col">
                       <span className="text-xs text-slate-400 font-bold">무기</span>
@@ -1783,7 +1784,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                             {charCard.nameKr}
                           </p>
                           <p className="text-[10px] font-bold text-amber-400/90 truncate text-center">
-                            {charCard.element} · {charCard.weaponType}
+                            {getElementKr(charCard.element)} · {charCard.weaponType}
                           </p>
                         </div>
 
@@ -1845,7 +1846,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                             {charCard.nameKr}
                           </span>
                           <span className="text-[10px] text-slate-400">
-                            ({charCard.element})
+                            ({getElementKr(charCard.element)})
                           </span>
                         </div>
 

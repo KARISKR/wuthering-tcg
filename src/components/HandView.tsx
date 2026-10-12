@@ -169,7 +169,7 @@ export const HandView: React.FC<HandViewProps> = ({
           <div className="py-8 text-slate-500 text-sm font-medium">패에 카드가 없습니다.</div>
         ) : (
           hand.map((card) => {
-            const { canPlayClash, canCombo } = checkCardUsable(card);
+            const { canPlayClash, canCombo, reason } = checkCardUsable(card);
             const isSelected = selectedCardId === card.id || selectedOverflowCardIds.includes(card.id);
             const isHighlighted = (canSetClashCard && canPlayClash) || (isComboStep && canCombo);
 
@@ -198,6 +198,15 @@ export const HandView: React.FC<HandViewProps> = ({
                     onSelectOverflowCard?.(card.id);
                   } else {
                     setSelectedCardId(selectedCardId === card.id ? null : card.id);
+                  }
+                }}
+                onDoubleClick={() => {
+                  if (isComboStep && canCombo) {
+                    onComboAttack(card.id);
+                    setSelectedCardId(null);
+                  } else if (canSetClashCard && canPlayClash) {
+                    onSetClashCard(card.id);
+                    setSelectedCardId(null);
                   }
                 }}
                 style={isNewlyDrawn ? { animationDelay: drawDelay } : undefined}
@@ -283,6 +292,21 @@ export const HandView: React.FC<HandViewProps> = ({
                     <span>속도: <strong className="text-amber-200 text-xs sm:text-sm font-black">{card.speed ?? '-'}</strong></span>
                     <span>피해: <strong className="text-red-400 text-xs sm:text-sm font-black">{card.damage}</strong></span>
                   </div>
+
+                  {/* 연격 단계 전용 즉시 시전 상태 표시 */}
+                  {isComboStep && card.color === 'RED' && (
+                    <div className="mt-1">
+                      {canCombo ? (
+                        <div className="w-full py-0.5 rounded bg-gradient-to-r from-red-600 to-rose-600 text-white font-black text-[10px] text-center shadow shadow-red-500/40 animate-pulse border border-red-400">
+                          ⚡ 연격 시전 (더블클릭)
+                        </div>
+                      ) : (
+                        <div className="w-full py-0.5 rounded bg-slate-800/90 text-red-300/80 font-bold text-[10px] text-center border border-slate-700">
+                          {reason || '사용 불가'}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             );

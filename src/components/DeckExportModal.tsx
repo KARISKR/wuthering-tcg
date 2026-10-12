@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { CustomDeckConfig, CardColor } from '../types/tcg';
+import { CustomDeckConfig, CardColor, getElementKr } from '../types/tcg';
 import { encodeDeckCode } from '../utils/deckCode';
 import { OFFICIAL_CARDS } from '../data/officialCards';
 import {
@@ -107,9 +107,9 @@ export const DeckExportModal: React.FC<DeckExportModalProps> = ({
     text += `■ 덱 명칭: ${deck.name}\n`;
     text += `■ 평균 코스트: C.${stats.avgCost} (총 ${deck.actionCards.length}장)\n\n`;
     text += `■ 출전 공명자 (3인 세로 편성):\n`;
-    text += `  - 👑 [리더] ${deck.leader.nameKr} (Lv.0 / ${deck.leader.element} / ${getCharWeapon(deck.leader.code)})\n`;
-    text += `  - 🛡️ [서포터 1] ${deck.leftSupport.nameKr} (Lv.0 / ${deck.leftSupport.element} / ${getCharWeapon(deck.leftSupport.code)})\n`;
-    text += `  - 🛡️ [서포터 2] ${deck.rightSupport.nameKr} (Lv.0 / ${deck.rightSupport.element} / ${getCharWeapon(deck.rightSupport.code)})\n\n`;
+    text += `  - 👑 [리더] ${deck.leader.nameKr} (Lv.0 / ${getElementKr(deck.leader.element)} / ${getCharWeapon(deck.leader.code)})\n`;
+    text += `  - 🛡️ [서포터 1] ${deck.leftSupport.nameKr} (Lv.0 / ${getElementKr(deck.leftSupport.element)} / ${getCharWeapon(deck.leftSupport.code)})\n`;
+    text += `  - 🛡️ [서포터 2] ${deck.rightSupport.nameKr} (Lv.0 / ${getElementKr(deck.rightSupport.element)} / ${getCharWeapon(deck.rightSupport.code)})\n\n`;
     text += `■ 메인 액션 덱 (${deck.actionCards.length}장 / RED ${stats.red}장 · GREEN ${stats.green}장 · BLUE ${stats.blue}장):\n\n`;
 
     text += `🔴 [RED 공격 카드 - 총 ${stats.red}장]\n`;
@@ -314,7 +314,7 @@ export const DeckExportModal: React.FC<DeckExportModalProps> = ({
         // 스펙
         ctx.fillStyle = '#cbd5e1';
         ctx.font = 'bold 15px sans-serif';
-        ctx.fillText(`Lv.0 · ${slot.card.element}`, infoX, infoY + 58);
+        ctx.fillText(`Lv.0 · ${getElementKr(slot.card.element)}`, infoX, infoY + 58);
         ctx.fillText(`무기: ${getCharWeapon(slot.card.code)}`, infoX, infoY + 84);
 
         // 희귀도
@@ -653,7 +653,7 @@ export const DeckExportModal: React.FC<DeckExportModalProps> = ({
                           <span className="text-white text-sm font-black">{deck.leader.nameKr}</span>
                         </div>
                         <span className="text-[10px] text-amber-300 font-mono">
-                          {deck.leader.element} · {getCharWeapon(deck.leader.code)}
+                          {getElementKr(deck.leader.element)} · {getCharWeapon(deck.leader.code)}
                         </span>
                       </div>
                       <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/50 flex items-center justify-between">
@@ -662,7 +662,7 @@ export const DeckExportModal: React.FC<DeckExportModalProps> = ({
                           <span className="text-white text-sm font-black">{deck.leftSupport.nameKr}</span>
                         </div>
                         <span className="text-[10px] text-cyan-300 font-mono">
-                          {deck.leftSupport.element} · {getCharWeapon(deck.leftSupport.code)}
+                          {getElementKr(deck.leftSupport.element)} · {getCharWeapon(deck.leftSupport.code)}
                         </span>
                       </div>
                       <div className="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/50 flex items-center justify-between">
@@ -671,7 +671,7 @@ export const DeckExportModal: React.FC<DeckExportModalProps> = ({
                           <span className="text-white text-sm font-black">{deck.rightSupport.nameKr}</span>
                         </div>
                         <span className="text-[10px] text-cyan-300 font-mono">
-                          {deck.rightSupport.element} · {getCharWeapon(deck.rightSupport.code)}
+                          {getElementKr(deck.rightSupport.element)} · {getCharWeapon(deck.rightSupport.code)}
                         </span>
                       </div>
                     </div>

@@ -7,7 +7,7 @@ import { CharacterSlot } from './CharacterSlot';
 import { CardView } from './CardView';
 import { HandView } from './HandView';
 import { BgmPlayer } from './BgmPlayer';
-import { CharacterCard, ActionCard, AnyCard } from '../types/tcg';
+import { CharacterCard, ActionCard, AnyCard, getElementKr } from '../types/tcg';
 import { OFFICIAL_CARDS, getOfficialCardByCode, OfficialCardData } from '../data/officialCards';
 import {
   Play,
@@ -482,7 +482,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[11px] text-slate-400 font-bold mb-0.5">속성</span>
-                        <strong className="text-lg sm:text-xl text-cyan-400 font-black">{previewCard.element}</strong>
+                        <strong className="text-lg sm:text-xl text-cyan-400 font-black">{getElementKr(previewCard.element)}</strong>
                       </div>
                       <div className="flex flex-col">
                         <span className="text-[11px] text-slate-400 font-bold mb-0.5">무기</span>

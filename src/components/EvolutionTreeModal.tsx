@@ -38,26 +38,31 @@ export const EvolutionTreeModal: React.FC<EvolutionTreeModalProps> = ({
   const getElementBadge = (element: CharacterCard['element']) => {
     switch (element) {
       case 'SPECTRO':
+      case '회절':
         return {
-          label: '회광 (빛)',
+          label: '회절 (빛)',
           style: 'bg-amber-500/20 text-amber-300 border-amber-400/50',
         };
       case 'HAVOC':
+      case '인멸':
         return {
           label: '인멸 (어둠)',
           style: 'bg-purple-500/20 text-purple-300 border-purple-400/50',
         };
       case 'AERO':
+      case '기류':
         return {
           label: '기류 (바람)',
           style: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/50',
         };
       case 'FUSION':
+      case '용융':
         return {
           label: '용융 (화염)',
           style: 'bg-red-500/20 text-red-300 border-red-400/50',
         };
       case 'GLACIO':
+      case '응결':
         return {
           label: '응결 (얼음)',
           style: 'bg-sky-500/20 text-sky-300 border-sky-400/50',

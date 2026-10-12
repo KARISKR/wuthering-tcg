@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
+import { getElementKr } from '../types/tcg';
 import {
   X,
   Search,
@@ -633,7 +634,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           <td className="py-2 px-3">
                             {c.kind === 'CHARACTER' ? (
                               <span className="font-bold text-cyan-300">
-                                {c.element}
+                                {getElementKr(c.element)}
                               </span>
                             ) : (
                               <span className={`font-black ${
@@ -867,7 +868,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                     </div>
                     <div className="bg-slate-900/80 p-2 rounded-xl">
                       <div className="text-slate-400 text-[10px] font-bold">속성 (Element)</div>
-                      <strong className="text-cyan-400 text-sm font-black">{detailCard.element}</strong>
+                      <strong className="text-cyan-400 text-sm font-black">{getElementKr(detailCard.element)}</strong>
                     </div>
                     <div className="bg-slate-900/80 p-2 rounded-xl">
                       <div className="text-slate-400 text-[10px] font-bold">무기 (Weapon)</div>
