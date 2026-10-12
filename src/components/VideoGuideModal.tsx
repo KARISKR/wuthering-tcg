@@ -114,7 +114,7 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
                 src="/videos/rules_tutorial.mp4"
                 controls
                 playsInline
-                autoPlay
+                preload="none"
                 className="w-full h-full object-contain"
               />
             </div>
