@@ -379,6 +379,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const p1 = gameState.players[1];
   const isP0Turn = gameState.activePlayerIndex === 0;
 
+  // 액션 에리어에 배치된 카드 목록 (공식 룰 604.1.2.1, 604.1.3.2)
+  const p0ActionCards = (p0.actionArea && p0.actionArea.length > 0)
+    ? p0.actionArea
+    : (p0.clashCard ? [p0.clashCard] : []);
+
+  const p0NormalAttackCount = p0ActionCards.filter(
+    (c) => c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격')
+  ).length;
+
+  const p1ActionCards = (p1.actionArea && p1.actionArea.length > 0)
+    ? p1.actionArea
+    : (p1.clashCard ? [p1.clashCard] : []);
+
+  const p1NormalAttackCount = p1ActionCards.filter(
+    (c) => c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격')
+  ).length;
+
   // 좌측 패널 탭 (카드 상세 정보 vs 실시간 대전 기록 타임라인)
   const [leftPanelTab, setLeftPanelTab] = useState<'PREVIEW' | 'LOG'>('PREVIEW');
 
@@ -1162,39 +1179,81 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </div>
                     </div>
 
-                    {/* 상대 액션 에리어 (화면에 꽉 차는 대형 규격) */}
-                    <div
-                      onMouseEnter={() => {
-                        // 상대의 대결 카드는 공개(Reveal)된 상태이거나 내가 P2일 때만 미리보기 창에 표시
-                        const isP1ClashRevealed =
-                          controlledPlayerIndex === 1 ||
-                          gameState.phase === 'CLASH_REVEAL' ||
-                          gameState.phase === 'COMBO_STEP';
-                        if (isP1ClashRevealed && p1.clashCard) {
-                          setPreviewCard(p1.clashCard);
-                        }
-                      }}
-                      className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
-                    >
-                      <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-cyan-500/70 uppercase tracking-widest z-10">
-                        액션 에리어 (상대)
-                      </span>
-                      {p1.clashCard ? (
-                        <div className={`max-h-full ${p0.clashCardReady && p1.clashCardReady && gameState.phase === 'CLASH_SET' ? 'animate-card-tense' : 'animate-card-slam'}`}>
-                          <CardView
-                            card={p1.clashCard}
-                            size="md"
-                            isFacedown={
-                              controlledPlayerIndex !== 1 &&
-                              gameState.phase !== 'CLASH_REVEAL' &&
-                              gameState.phase !== 'COMBO_STEP'
-                            }
-                          />
+                    {/* 상대 액션 에리어 (배치된 모든 액션 카드 다열 렌더링) */}
+                    <div className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/80 p-2 flex flex-col justify-center relative shadow-inner overflow-hidden">
+                      {/* 상단 정보 뱃지 바 */}
+                      <div className="absolute top-2 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs sm:text-sm font-mono font-black text-cyan-400/80 uppercase tracking-widest">
+                            액션 에리어 (상대)
+                          </span>
+                          {p1ActionCards.length > 0 && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                              총 {p1ActionCards.length}장 배치
+                            </span>
+                          )}
+                        </div>
+
+                        {p1NormalAttackCount > 0 && (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow">
+                            <span>⚔️ 일반 공격</span>
+                            <strong className="text-white font-mono">{p1NormalAttackCount}장</strong>
+                          </span>
+                        )}
+                      </div>
+
+                      {p1ActionCards.length > 0 ? (
+                        <div className="w-full h-full flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto px-2 pt-6 pb-2 custom-scrollbar">
+                          {p1ActionCards.map((card, idx) => {
+                            const isLastCard = idx === p1ActionCards.length - 1;
+                            const isP1ClashRevealed =
+                              controlledPlayerIndex === 1 ||
+                              gameState.phase === 'CLASH_REVEAL' ||
+                              gameState.phase === 'COMBO_STEP' ||
+                              gameState.phase === 'ACTION_PHASE' ||
+                              gameState.phase === 'END_PHASE' ||
+                              gameState.phase === 'DISCARD_OVERFLOW';
+                            const isFacedown = !isP1ClashRevealed;
+
+                            return (
+                              <div
+                                key={card.id || `p1-action-${idx}`}
+                                onMouseEnter={() => {
+                                  if (!isFacedown) setPreviewCard(card);
+                                }}
+                                onClick={() => {
+                                  if (!isFacedown) setPreviewCard(card);
+                                }}
+                                className={`shrink-0 transition-transform hover:scale-105 cursor-pointer relative ${
+                                  isLastCard ? 'ring-2 ring-cyan-400 rounded-xl shadow-lg shadow-cyan-500/30' : 'opacity-90'
+                                } ${
+                                  p0.clashCardReady && p1.clashCardReady && gameState.phase === 'CLASH_SET'
+                                    ? 'animate-card-tense'
+                                    : 'animate-card-slam'
+                                }`}
+                              >
+                                <CardView
+                                  card={card}
+                                  size={p1ActionCards.length <= 2 ? 'md' : 'sm'}
+                                  isFacedown={isFacedown}
+                                  badge={
+                                    isFacedown
+                                      ? undefined
+                                      : idx === 0
+                                      ? '대결'
+                                      : `연격 ${idx}`
+                                  }
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
-                        <div className="w-40 h-56 rounded-xl border-2 border-dashed border-cyan-500/30 bg-cyan-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
-                          <Swords className="w-7 h-7 text-cyan-500/40" />
-                          <span className="text-xs font-bold text-slate-400">대결 대기</span>
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-500">
+                          <div className="w-36 h-48 sm:w-40 sm:h-52 rounded-xl border-2 border-dashed border-cyan-500/30 bg-cyan-950/20 flex flex-col items-center justify-center gap-2">
+                            <Swords className="w-7 h-7 text-cyan-500/40" />
+                            <span className="text-xs font-bold text-slate-400">대결 대기</span>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1462,38 +1521,81 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
                   {/* [내 중앙] 액션 에리어 (상단 대형화) + 캐릭터 3인 진형 [백 / 리더 / 백] (하단) */}
                   <div className="flex flex-col justify-between gap-3 flex-1">
-                    {/* 내 액션 에리어 (화면에 꽉 차는 대형 규격) */}
-                    <div
-                      onMouseEnter={() => {
-                        const isP0ClashRevealed =
-                          controlledPlayerIndex === 0 ||
-                          gameState.phase === 'CLASH_REVEAL' ||
-                          gameState.phase === 'COMBO_STEP';
-                        if (isP0ClashRevealed && p0.clashCard) {
-                          setPreviewCard(p0.clashCard);
-                        }
-                      }}
-                      className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
-                    >
-                      <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-amber-500/80 uppercase tracking-widest z-10">
-                        액션 에리어 (내 대결 존)
-                      </span>
-                      {p0.clashCard ? (
-                        <div className={`max-h-full ${p0.clashCardReady && p1.clashCardReady && gameState.phase === 'CLASH_SET' ? 'animate-card-tense' : 'animate-card-slam'}`}>
-                          <CardView
-                            card={p0.clashCard}
-                            size="md"
-                            isFacedown={
-                              controlledPlayerIndex === 1 &&
-                              gameState.phase !== 'CLASH_REVEAL' &&
-                              gameState.phase !== 'COMBO_STEP'
-                            }
-                          />
+                    {/* 내 액션 에리어 (배치된 모든 액션 카드 다열 렌더링) */}
+                    <div className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-950/80 p-2 flex flex-col justify-center relative shadow-inner overflow-hidden">
+                      {/* 상단 정보 뱃지 바 */}
+                      <div className="absolute top-2 left-3 right-3 flex items-center justify-between pointer-events-none z-10">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs sm:text-sm font-mono font-black text-amber-500/90 uppercase tracking-widest">
+                            액션 에리어 (내 대결 존)
+                          </span>
+                          {p0ActionCards.length > 0 && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                              총 {p0ActionCards.length}장 배치
+                            </span>
+                          )}
+                        </div>
+
+                        {p0NormalAttackCount > 0 && (
+                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow">
+                            <span>⚔️ 일반 공격</span>
+                            <strong className="text-white font-mono">{p0NormalAttackCount}장</strong>
+                          </span>
+                        )}
+                      </div>
+
+                      {p0ActionCards.length > 0 ? (
+                        <div className="w-full h-full flex items-center justify-center gap-2 sm:gap-3 overflow-x-auto px-2 pt-6 pb-2 custom-scrollbar">
+                          {p0ActionCards.map((card, idx) => {
+                            const isLastCard = idx === p0ActionCards.length - 1;
+                            const isP0ClashRevealed =
+                              controlledPlayerIndex === 0 ||
+                              gameState.phase === 'CLASH_REVEAL' ||
+                              gameState.phase === 'COMBO_STEP' ||
+                              gameState.phase === 'ACTION_PHASE' ||
+                              gameState.phase === 'END_PHASE' ||
+                              gameState.phase === 'DISCARD_OVERFLOW';
+                            const isFacedown = !isP0ClashRevealed;
+
+                            return (
+                              <div
+                                key={card.id || `p0-action-${idx}`}
+                                onMouseEnter={() => {
+                                  if (!isFacedown) setPreviewCard(card);
+                                }}
+                                onClick={() => {
+                                  if (!isFacedown) setPreviewCard(card);
+                                }}
+                                className={`shrink-0 transition-transform hover:scale-105 cursor-pointer relative ${
+                                  isLastCard ? 'ring-2 ring-amber-400 rounded-xl shadow-lg shadow-amber-500/30' : 'opacity-90'
+                                } ${
+                                  p0.clashCardReady && p1.clashCardReady && gameState.phase === 'CLASH_SET'
+                                    ? 'animate-card-tense'
+                                    : 'animate-card-slam'
+                                }`}
+                              >
+                                <CardView
+                                  card={card}
+                                  size={p0ActionCards.length <= 2 ? 'md' : 'sm'}
+                                  isFacedown={isFacedown}
+                                  badge={
+                                    isFacedown
+                                      ? undefined
+                                      : idx === 0
+                                      ? '대결'
+                                      : `연격 ${idx}`
+                                  }
+                                />
+                              </div>
+                            );
+                          })}
                         </div>
                       ) : (
-                        <div className="w-40 h-56 rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
-                          <Swords className="w-7 h-7 text-amber-500/40" />
-                          <span className="text-xs font-bold text-slate-400">대결 대기</span>
+                        <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-slate-500">
+                          <div className="w-36 h-48 sm:w-40 sm:h-52 rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-950/20 flex flex-col items-center justify-center gap-2">
+                            <Swords className="w-7 h-7 text-amber-500/40" />
+                            <span className="text-xs font-bold text-slate-400">대결 대기</span>
+                          </div>
                         </div>
                       )}
                     </div>
