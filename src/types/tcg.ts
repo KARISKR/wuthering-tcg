@@ -186,7 +186,7 @@ export interface UpgradeEffect {
   playerIndex: 0 | 1;
   playerName: string;
   character: CharacterCard;
-  previousLevel: 0 | 1;
+  previousLevel: 0 | 1 | 2;
   newLevel: 1 | 2;
   slotName: 'leader' | 'leftSupport' | 'rightSupport';
 }

@@ -7,7 +7,8 @@ interface UpgradeModalProps {
   currentChar: CharacterCard;
   availableUpgrades: CharacterCard[];
   hand: ActionCard[];
-  requiredDiscardCount: number;
+  hasYangyangLv2?: boolean;
+  requiredDiscardCount?: number;
   onUpgrade: (upgradeCardId: string, discardCardIds: string[]) => void;
   onClose: () => void;
 }
@@ -16,7 +17,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   currentChar,
   availableUpgrades,
   hand,
-  requiredDiscardCount,
+  hasYangyangLv2 = false,
+  requiredDiscardCount: initialDiscardCount,
   onUpgrade,
   onClose,
 }) => {
@@ -25,11 +27,33 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   );
   const [selectedDiscardIds, setSelectedDiscardIds] = useState<string[]>([]);
 
+  const selectedUpgradeCard = availableUpgrades.find((c) => c.id === selectedUpgradeId) || availableUpgrades[0];
+  const targetLevel = selectedUpgradeCard ? selectedUpgradeCard.level : ((currentChar.level + 1) as 1 | 2);
+
+  let effectiveRequiredDiscard: number = targetLevel;
+  if (hasYangyangLv2 && effectiveRequiredDiscard > 1) {
+    effectiveRequiredDiscard -= 1;
+  }
+  if (initialDiscardCount !== undefined && availableUpgrades.length === 0) {
+    effectiveRequiredDiscard = initialDiscardCount;
+  }
+
+  const handleSelectUpgrade = (cardId: string) => {
+    setSelectedUpgradeId(cardId);
+    const newCard = availableUpgrades.find((c) => c.id === cardId);
+    const newLevel = newCard ? newCard.level : targetLevel;
+    let newReq = newLevel;
+    if (hasYangyangLv2 && newReq > 1) newReq -= 1;
+    if (selectedDiscardIds.length > newReq) {
+      setSelectedDiscardIds(selectedDiscardIds.slice(0, newReq));
+    }
+  };
+
   const toggleDiscardCard = (cardId: string) => {
     if (selectedDiscardIds.includes(cardId)) {
       setSelectedDiscardIds(selectedDiscardIds.filter((id) => id !== cardId));
     } else {
-      if (selectedDiscardIds.length < requiredDiscardCount) {
+      if (selectedDiscardIds.length < effectiveRequiredDiscard) {
         setSelectedDiscardIds([...selectedDiscardIds, cardId]);
       }
     }
@@ -37,7 +61,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
 
   const canConfirm =
     selectedUpgradeId !== null &&
-    selectedDiscardIds.length === requiredDiscardCount;
+    selectedDiscardIds.length === effectiveRequiredDiscard;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
@@ -56,7 +80,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 </span>
               </h3>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                현재 [<strong className="text-amber-300">Lv.{currentChar.level} {currentChar.characterName}</strong>]을(를) 상위 레벨로 진화시킵니다.
+                현재 [<strong className="text-amber-300">Lv.{currentChar.level} {currentChar.characterName}</strong>]에 동일 레벨 또는 상위 레벨 카드를 중첩하여 레벨업합니다.
               </p>
             </div>
           </div>
@@ -88,7 +112,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           {availableUpgrades.length === 0 ? (
             <div className="p-6 rounded-xl bg-slate-950/80 border border-slate-800 text-center text-xs sm:text-sm text-slate-400 flex items-center justify-center gap-2">
               <AlertCircle className="w-5 h-5 text-amber-400" />
-              <span>캐릭터 덱에 진화 가능한 다음 레벨 카드가 없습니다.</span>
+              <span>캐릭터 덱에 진화 가능한 동명 캐릭터 카드(동일 레벨 또는 1단계 높은 레벨)가 없습니다.</span>
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5 sm:gap-4 w-full">
@@ -97,7 +121,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 return (
                   <div
                     key={up.id}
-                    onClick={() => setSelectedUpgradeId(up.id)}
+                    onClick={() => handleSelectUpgrade(up.id)}
                     className={`flex flex-col justify-between rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border-2 p-2 sm:p-2.5 transition-all duration-200 cursor-pointer select-none group shadow-lg ${
                       isSelected
                         ? 'border-amber-400 ring-4 ring-amber-400/60 -translate-y-2 shadow-[0_15px_30px_rgba(245,158,11,0.35)] bg-slate-900'
@@ -152,11 +176,14 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                 2
               </span>
               <span className="text-sm sm:text-base font-black text-amber-300">
-                2단계: 소비할 패 선택 ({selectedDiscardIds.length} / {requiredDiscardCount}장 선택됨)
+                2단계: 소비할 패 선택 ({selectedDiscardIds.length} / {effectiveRequiredDiscard}장 선택됨)
               </span>
             </div>
             <span className="text-xs font-bold text-rose-300 bg-rose-950/60 px-3 py-1 rounded-full border border-rose-500/40 shrink-0">
-              Lv.{currentChar.level + 1} 레벨업 비용: 패 {requiredDiscardCount}장 버리기
+              Lv.{targetLevel} 레벨업 비용: 패 {effectiveRequiredDiscard}장 버리기
+              {hasYangyangLv2 && targetLevel > 1 && (
+                <span className="text-emerald-400 ml-1.5 font-normal">(양양 Lv.2 효과: -1장)</span>
+              )}
             </span>
           </div>
 
@@ -229,9 +256,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           <div className="text-xs sm:text-sm text-slate-400 font-semibold">
             {!selectedUpgradeId ? (
               <span>진화할 캐릭터 카드를 선택해주세요.</span>
-            ) : selectedDiscardIds.length < requiredDiscardCount ? (
+            ) : selectedDiscardIds.length < effectiveRequiredDiscard ? (
               <span className="text-amber-300">
-                비용으로 버릴 패를 {requiredDiscardCount - selectedDiscardIds.length}장 더 선택해주세요.
+                비용으로 버릴 패를 {effectiveRequiredDiscard - selectedDiscardIds.length}장 더 선택해주세요.
               </span>
             ) : (
               <span className="text-emerald-300 font-bold">

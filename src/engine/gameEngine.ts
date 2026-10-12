@@ -256,6 +256,16 @@ export function findLv2Card(characterDeck: CharacterCard[], slotChar: CharacterC
   });
 }
 
+// 공식 룰 603.1.2.2: 선택한 캐릭터와 레벨이 동일하거나 1단계 높은, 동명의 캐릭터 카드 전체 탐색
+export function findAllUpgradableCards(characterDeck: CharacterCard[], slotChar: CharacterCard): CharacterCard[] {
+  return characterDeck.filter(
+    (c) =>
+      isSameCharacter(c, slotChar) &&
+      (c.level === slotChar.level + 1 || c.level === slotChar.level) &&
+      c.code !== 'BP01-011'
+  );
+}
+
 
 // ==========================================
 // 1. 초기 상태 생성
@@ -785,8 +795,9 @@ export function upgradeCharacter(
     };
   }
 
-  if (upgradeCard.level !== currentSlotCard.level + 1) {
-    return { success: false, newState: state, error: `레벨 ${currentSlotCard.level + 1} 캐릭터로만 레벨업할 수 있습니다.` };
+  const isValidLevel = upgradeCard.level === currentSlotCard.level + 1 || upgradeCard.level === currentSlotCard.level;
+  if (!isValidLevel) {
+    return { success: false, newState: state, error: `동일 레벨 또는 1단계 높은 레벨 캐릭터로만 레벨업할 수 있습니다.` };
   }
 
   // BP01-011 앙코 Lv.2는 카드 효과(그늘이의 대폭주 등)로만 등장 가능
@@ -842,7 +853,7 @@ export function upgradeCharacter(
     playerIndex,
     playerName: player.name,
     character: { ...upgradeCard },
-    previousLevel: currentSlotCard.level as 0 | 1,
+    previousLevel: currentSlotCard.level as 0 | 1 | 2,
     newLevel: upgradeCard.level as 1 | 2,
     slotName: targetSlot,
   };

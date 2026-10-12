@@ -24,7 +24,7 @@ import { EffectNotificationToast } from './EffectNotificationToast';
 import { CenterActionHUD } from './CenterActionHUD';
 import { EvolutionTreeModal } from './EvolutionTreeModal';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect, getElementKr } from '../types/tcg';
-import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill } from '../engine/gameEngine';
+import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill, findAllUpgradableCards } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
 import {
   Swords,
@@ -370,6 +370,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     char: CharacterCard;
     available: CharacterCard[];
     requiredDiscard: number;
+    hasYangyangLv2: boolean;
   } | null>(null);
 
   // 패 상한 버리기 선택 상태
@@ -491,7 +492,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const activeControlledPlayer = gameState.players[controlledPlayerIndex];
   const isCurrentControlledTurn = gameState.activePlayerIndex === controlledPlayerIndex;
 
-  // 레벨업 버튼 클릭 시 가능한 진화 후보 계산
+  // 레벨업 버튼 클릭 시 가능한 진화 후보 계산 (공식 룰 603.1.2.2: 동일 레벨 또는 +1 레벨의 동명 카드)
   const openUpgradeModal = (slotName: 'leader' | 'leftSupport' | 'rightSupport', playerIdx: 0 | 1 = 0) => {
     const targetPlayer = gameState.players[playerIdx];
     const currentChar = targetPlayer.slots[slotName];
@@ -500,14 +501,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     // 이미 이번 턴에 레벨업했거나 액션 단계가 아니면 차단
     if (targetPlayer.actionFlags.upgraded || gameState.phase !== 'ACTION_PHASE') return;
 
-    const nextLevel = (currentChar.level + 1) as 1 | 2;
-    const available = targetPlayer.characterDeck.filter(
-      (c) => isSameCharacter(c, currentChar) && c.level === nextLevel && c.code !== 'BP01-011'
-    );
+    const available = findAllUpgradableCards(targetPlayer.characterDeck, currentChar);
 
-    let requiredDiscard = nextLevel;
     const hasYangyangLv2 = playerHasCharacterSkill(targetPlayer, '양양', 2);
-
+    // 기본 선택 후보(첫 카드) 기준 비용 계산
+    const firstCandidate = available[0];
+    const initialTargetLevel = firstCandidate ? firstCandidate.level : ((currentChar.level + 1) as 1 | 2);
+    let requiredDiscard = initialTargetLevel;
     if (hasYangyangLv2 && requiredDiscard > 1) {
       requiredDiscard -= 1;
     }
@@ -518,10 +518,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       char: currentChar,
       available,
       requiredDiscard,
+      hasYangyangLv2,
     });
   };
 
-  // 슬롯별 레벨업 가능 여부 체크
+  // 슬롯별 레벨업 가능 여부 체크 (동일 레벨 중첩 또는 +1 레벨 진화)
   const checkCanUpgradeSlot = (slotName: 'leader' | 'leftSupport' | 'rightSupport', playerIdx: 0 | 1 = 0) => {
     const targetPlayer = gameState.players[playerIdx];
     const isPlayerTurn = gameState.activePlayerIndex === playerIdx;
@@ -530,16 +531,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const currentChar = targetPlayer.slots[slotName];
     if (!currentChar) return false;
 
-    const nextLevel = (currentChar.level + 1) as 1 | 2;
-    const hasEvolution = targetPlayer.characterDeck.some(
-      (c) => isSameCharacter(c, currentChar) && c.level === nextLevel
-    );
+    const validCandidates = findAllUpgradableCards(targetPlayer.characterDeck, currentChar);
+    if (validCandidates.length === 0) return false;
 
-    let requiredDiscard = nextLevel;
+    // 후보 중 최소 요구 코스트
+    const minLevel = Math.min(...validCandidates.map((c) => c.level));
+    let requiredDiscard = minLevel;
     const hasYangyangLv2 = playerHasCharacterSkill(targetPlayer, '양양', 2);
     if (hasYangyangLv2 && requiredDiscard > 1) requiredDiscard -= 1;
 
-    return hasEvolution && targetPlayer.hand.length >= requiredDiscard;
+    return targetPlayer.hand.length >= requiredDiscard;
   };
 
   // 패 상한 버리기 토글
@@ -2353,6 +2354,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           currentChar={upgradeTarget.char}
           availableUpgrades={upgradeTarget.available}
           hand={gameState.players[upgradeTarget.playerIndex].hand}
+          hasYangyangLv2={upgradeTarget.hasYangyangLv2}
           requiredDiscardCount={upgradeTarget.requiredDiscard}
           onUpgrade={(upgradeCardId: string, discardIds: string[]) => {
             handleUpgrade(upgradeTarget.playerIndex, upgradeTarget.slotName, upgradeCardId, discardIds);

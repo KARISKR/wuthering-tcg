@@ -32,9 +32,8 @@ function runPlayerAction(state: GameState, playerIdx: 0 | 1): GameState {
     for (const slotKey of slots) {
       const cur = p.slots[slotKey];
       if (!cur) continue;
-      const nextLevel = (cur.level + 1) as 1 | 2;
       const upCard = p.characterDeck.find(
-        (c) => c.characterName === cur.characterName && c.level === nextLevel
+        (c) => c.characterName === cur.characterName && (c.level === cur.level + 1 || c.level === cur.level) && c.code !== 'BP01-011'
       );
       if (upCard) {
         let reqDiscard = upCard.level;
@@ -139,6 +138,7 @@ function simulateMatch(
     if (state.phase === 'ACTION_PHASE') {
       const active = state.activePlayerIndex;
       state = runPlayerAction(state, active);
+      state = decideClash(state, true);
       continue;
     }
 
@@ -185,16 +185,14 @@ function simulateMatch(
     if (state.phase === 'DISCARD_OVERFLOW') {
       const pIdx = state.activePlayerIndex;
       const p = state.players[pIdx];
-      const excess = p.hand.length - 8;
-      if (excess > 0) {
-        const disc = p.hand.slice(0, excess).map((c) => c.id);
-        const res = discardOverflowCards(state, pIdx, disc);
-        if (res.success) {
-          state = res.newState;
-        } else {
-          errors.push(`Step ${steps}: Discard overflow failed: ${res.error}`);
-          break;
-        }
+      const excess = Math.max(0, p.hand.length - 8);
+      const disc = excess > 0 ? p.hand.slice(0, excess).map((c) => c.id) : [];
+      const res = discardOverflowCards(state, pIdx, disc);
+      if (res.success) {
+        state = res.newState;
+      } else {
+        errors.push(`Step ${steps}: Discard overflow failed: ${res.error}`);
+        break;
       }
       continue;
     }
