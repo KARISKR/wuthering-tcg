@@ -9,6 +9,7 @@ import {
   CardColor,
   TriggeredEffectEvent,
   CustomDeckConfig,
+  PendingChoice,
 } from '../types/tcg';
 import {
   generateStarterActionDeck,
@@ -859,6 +860,26 @@ export function upgradeCharacter(
 
   // ==========================================
   // 【등장】 및 【레벨업】 효과 발동 처리
+  // ==========================================
+  newState = applyCharacterEvolutionSkills(newState, playerIndex, targetSlot, upgradeCard, currentSlotCard, false);
+
+  return { success: true, newState };
+}
+
+// 등장 및 레벨업 스킬 공통 발동 헬퍼 (공식 Q&A Q6 기준)
+export function applyCharacterEvolutionSkills(
+  state: GameState,
+  playerIndex: 0 | 1,
+  targetSlot: 'leader' | 'leftSupport' | 'rightSupport',
+  upgradeCard: CharacterCard,
+  currentSlotCard: CharacterCard,
+  isDeferred = false
+): GameState {
+  let newState = { ...state };
+  const player = { ...newState.players[playerIndex] };
+
+  // ==========================================
+  // 【등장】 및 【레벨업】 효과 발동 처리
   // 1) 0 -> 1 레벨업 시: 새로 필드에 올라온 1레벨 카드의 【등장】 효과 발동!
   // 2) 1 -> 2 레벨업 시: 그 위에 2레벨 카드가 겹쳐지면서 밑에 깔린 1레벨 카드의 【레벨업】 효과 발동!
   // ==========================================
@@ -874,6 +895,7 @@ export function upgradeCharacter(
       if (player.isAi) {
         const [reclaimed] = player.dropZone.splice(0, 1);
         player.hand.push(reclaimed as ActionCard);
+        newState.players[playerIndex] = player;
         newState = addLog(
           newState,
           `[카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
@@ -881,7 +903,7 @@ export function upgradeCharacter(
           playerIndex
         );
       } else {
-        newState.pendingChoice = {
+        const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (트래시 회수)`,
@@ -893,6 +915,11 @@ export function upgradeCharacter(
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
         };
+        if (isDeferred) {
+          newState.deferredChoice = choice;
+        } else {
+          newState.pendingChoice = choice;
+        }
       }
     }
   }
@@ -906,6 +933,7 @@ export function upgradeCharacter(
       if (player.isAi) {
         const [reclaimed] = player.dropZone.splice(0, 1);
         player.hand.push(reclaimed as ActionCard);
+        newState.players[playerIndex] = player;
         newState = addLog(
           newState,
           `[파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
@@ -913,7 +941,7 @@ export function upgradeCharacter(
           playerIndex
         );
       } else {
-        newState.pendingChoice = {
+        const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: `파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (트래시 회수)`,
@@ -925,6 +953,11 @@ export function upgradeCharacter(
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
         };
+        if (isDeferred) {
+          newState.deferredChoice = choice;
+        } else {
+          newState.pendingChoice = choice;
+        }
       }
     }
   }
@@ -940,6 +973,7 @@ export function upgradeCharacter(
       if (player.isAi) {
         const [reclaimed] = player.dropZone.splice(0, 1);
         player.hand.push(reclaimed as ActionCard);
+        newState.players[playerIndex] = player;
         newState = addLog(
           newState,
           `[앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
@@ -947,7 +981,7 @@ export function upgradeCharacter(
           playerIndex
         );
       } else {
-        newState.pendingChoice = {
+        const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: `앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (트래시 회수)`,
@@ -959,6 +993,11 @@ export function upgradeCharacter(
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
         };
+        if (isDeferred) {
+          newState.deferredChoice = choice;
+        } else {
+          newState.pendingChoice = choice;
+        }
       }
     }
   }
@@ -974,6 +1013,7 @@ export function upgradeCharacter(
       if (player.isAi) {
         const [reclaimed] = player.dropZone.splice(0, 1);
         player.hand.push(reclaimed as ActionCard);
+        newState.players[playerIndex] = player;
         newState = addLog(
           newState,
           `[치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
@@ -981,7 +1021,7 @@ export function upgradeCharacter(
           playerIndex
         );
       } else {
-        newState.pendingChoice = {
+        const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: `치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (트래시 회수)`,
@@ -993,6 +1033,11 @@ export function upgradeCharacter(
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
         };
+        if (isDeferred) {
+          newState.deferredChoice = choice;
+        } else {
+          newState.pendingChoice = choice;
+        }
       }
     }
   }
@@ -1006,6 +1051,7 @@ export function upgradeCharacter(
       if (player.isAi) {
         const [chosen] = player.dropZone.splice(0, 1);
         player.concertoZone.push(chosen as ActionCard);
+        newState.players[playerIndex] = player;
         newState = addLog(
           newState,
           `[산화 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(chosen as ActionCard).nameKr}]을(를) 협주 에리어에 배치했습니다!`,
@@ -1013,7 +1059,7 @@ export function upgradeCharacter(
           playerIndex
         );
       } else {
-        newState.pendingChoice = {
+        const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: `산화 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (협주 배치)`,
@@ -1025,6 +1071,11 @@ export function upgradeCharacter(
           maxSelect: 1,
           onResolveType: 'SET_CONCERTO',
         };
+        if (isDeferred) {
+          newState.deferredChoice = choice;
+        } else {
+          newState.pendingChoice = choice;
+        }
       }
     }
   }
@@ -1037,6 +1088,7 @@ export function upgradeCharacter(
     if (topCard) {
       if (player.isAi) {
         player.hand.push(topCard);
+        newState.players[playerIndex] = player;
         newState = addLog(
           newState,
           `[방랑자 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 덱 위에서 [${topCard.nameKr}]을(를) 패에 추가했습니다.`,
@@ -1044,7 +1096,7 @@ export function upgradeCharacter(
           playerIndex
         );
       } else {
-        newState.pendingChoice = {
+        const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: `방랑자 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과`,
@@ -1056,6 +1108,11 @@ export function upgradeCharacter(
           maxSelect: 1,
           onResolveType: 'ADD_TO_HAND',
         };
+        if (isDeferred) {
+          newState.deferredChoice = choice;
+        } else {
+          newState.pendingChoice = choice;
+        }
       }
     }
   }
@@ -1068,6 +1125,7 @@ export function upgradeCharacter(
     if (topCard) {
       if (player.isAi) {
         player.concertoZone.push(topCard);
+        newState.players[playerIndex] = player;
         newState = addLog(
           newState,
           `[양양 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] ${player.name}이(가) 덱 위의 카드 [${topCard.nameKr}]을(를) 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length})`,
@@ -1076,7 +1134,7 @@ export function upgradeCharacter(
           { cardArt: yang1.artUrl, cardName: '양양 Lv.1', effectTag: '협주 충전' }
         );
       } else {
-        newState.pendingChoice = {
+        const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
           playerIndex,
           title: `양양 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (협주 배치)`,
@@ -1088,6 +1146,11 @@ export function upgradeCharacter(
           maxSelect: 1,
           onResolveType: 'SET_CONCERTO',
         };
+        if (isDeferred) {
+          newState.deferredChoice = choice;
+        } else {
+          newState.pendingChoice = choice;
+        }
       }
     }
   }
@@ -1100,6 +1163,7 @@ export function upgradeCharacter(
         (c) => c.id !== currentSlotCard.id
       );
     }
+    newState.players[playerIndex] = player;
     newState = addLog(
       newState,
       `[카멜리아 Lv.2 레벨업 효과] [${currentSlotCard.nameKr}] 카드가 캐릭터 덱으로 되돌아갔습니다.`,
@@ -1108,7 +1172,7 @@ export function upgradeCharacter(
     );
   }
 
-  return { success: true, newState };
+  return newState;
 }
 
 // 행동 2: 리더 위치 변경 (교대)
@@ -1324,7 +1388,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
 
   // 양 플레이어 순회하며 공개된 대결 카드에 따른 배틀 스킬 처리
   for (const playerIndex of [0, 1] as const) {
-    const player = players[playerIndex];
+    let player = players[playerIndex];
     const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
     const oppPlayer = players[oppIdx];
     const clashCard = player.clashCard;
@@ -1551,6 +1615,11 @@ export function applyBattleStepSkills(state: GameState): GameState {
             playerIndex,
             { cardArt: nextCam.artUrl, cardName: nextCam.nameKr, effectTag: '배틀 레벨업' }
           );
+          // 레벨업/등장 스킬 발동 연계
+          newState.players = players;
+          newState = applyCharacterEvolutionSkills(newState, playerIndex, camSlotKey, nextCam, currentCam, true);
+          player = { ...newState.players[playerIndex] };
+          players[playerIndex] = player;
         }
       }
     }
@@ -1592,6 +1661,13 @@ export function applyBattleStepSkills(state: GameState): GameState {
           playerIndex,
           { cardArt: clashCard.artUrl, cardName: '그늘이의 대폭주', effectTag: '리더 교체&진화' }
         );
+        if (lv2Anke) {
+          // 레벨업/등장 스킬 발동 연계
+          newState.players = players;
+          newState = applyCharacterEvolutionSkills(newState, playerIndex, 'leader', lv2Anke, currentAnke, true);
+          player = { ...newState.players[playerIndex] };
+          players[playerIndex] = player;
+        }
       }
     }
 
@@ -1738,7 +1814,7 @@ export function resolveClash(state: GameState): GameState {
 
   // 승리 시 효과 처리 및 대미지 적용
   if (winnerIndex !== -1) {
-    const winnerPlayer = winnerIndex === 0 ? p0 : p1;
+    let winnerPlayer = winnerIndex === 0 ? p0 : p1;
     const loserIndex = (winnerIndex === 0 ? 1 : 0) as 0 | 1;
     const loserPlayer = loserIndex === 0 ? p0 : p1;
     const winCard = winnerIndex === 0 ? c0! : c1!;
@@ -1979,6 +2055,10 @@ export function resolveClash(state: GameState): GameState {
             winnerIndex,
             { cardArt: nextSh.artUrl, cardName: nextSh.nameKr, effectTag: '판정 레벨업' }
           );
+          // 레벨업/등장 스킬 연계
+          newState.players[winnerIndex] = winnerPlayer;
+          newState = applyCharacterEvolutionSkills(newState, winnerIndex, shSlotKey, nextSh, currentSh, true);
+          winnerPlayer = { ...newState.players[winnerIndex] };
         }
       }
     }
@@ -2010,6 +2090,10 @@ export function resolveClash(state: GameState): GameState {
           winnerIndex,
           { cardArt: nextSanhua.artUrl, cardName: nextSanhua.nameKr, effectTag: '판정 레벨업' }
         );
+        // 레벨업/등장 스킬 연계
+        newState.players[winnerIndex] = winnerPlayer;
+        newState = applyCharacterEvolutionSkills(newState, winnerIndex, 'leader', nextSanhua, currentSanhua, true);
+        winnerPlayer = { ...newState.players[winnerIndex] };
       }
     }
 
@@ -2520,7 +2604,7 @@ export function executeComboAttack(
   spentConcertoIds?: string[],
   discardForBonusDmgId?: string
 ): { success: boolean; newState: GameState; error?: string } {
-  const player = { ...state.players[playerIndex] };
+  let player = { ...state.players[playerIndex] };
   const opponent = { ...state.players[playerIndex === 0 ? 1 : 0] };
 
   if (!player.comboUnlimited && player.comboCount <= 0) {
@@ -2656,6 +2740,10 @@ export function executeComboAttack(
           newLevel: nextCam.level as 1 | 2,
           slotName: targetKey,
         };
+        // 레벨업/등장 스킬 연계
+        newState.players[playerIndex] = player;
+        newState = applyCharacterEvolutionSkills(newState, playerIndex, targetKey, nextCam, curCam, false);
+        player = { ...newState.players[playerIndex] };
       }
     }
     newState = addLog(
@@ -2968,16 +3056,6 @@ export function finishComboStep(state: GameState, playerIndex: 0 | 1): GameState
 // ==========================================
 
 function checkHandOverflowOrEndTurn(state: GameState): GameState {
-  const activeIdx = state.activePlayerIndex;
-  const activePlayer = state.players[activeIdx];
-
-  if (activePlayer.hand.length > 8) {
-    return {
-      ...state,
-      phase: 'DISCARD_OVERFLOW',
-    };
-  }
-
   return executeEndPhase(state);
 }
 
@@ -3005,7 +3083,8 @@ export function discardOverflowCards(
   newState.players[playerIndex] = player;
   newState = addLog(newState, `${player.name}이(가) 패 상한 초과로 ${discarded.length}장을 버렸습니다.`, 'ACTION', playerIndex);
 
-  return { success: true, newState: executeEndPhase(newState) };
+  // 패 버리기 완료 후 턴 종료 마무리 처리 (더블 트리거 방지)
+  return { success: true, newState: finalizeEndPhase(newState) };
 }
 
 export function executeEndPhase(state: GameState): GameState {
@@ -3023,7 +3102,6 @@ export function executeEndPhase(state: GameState): GameState {
   // 605.1.1 턴 종료 스킬 발동 (중첩 스킬 지원)
   for (let i = 0; i < 2; i++) {
     const pl = i === 0 ? p0 : p1;
-    const opp = i === 0 ? p1 : p0;
     const lCards = getAllCardsInSlot(pl.slots.leader);
 
     // 방랑자(남) Lv.2 [SD02-001] 리더: 각 턴 종료 시 카드 1장 드로우
@@ -3056,6 +3134,27 @@ export function executeEndPhase(state: GameState): GameState {
       }
     }
   }
+
+  newState.players = [p0, p1];
+
+  // 605.1.2 패 상한 체크 (공식 Q&A Q1: 턴 종료 스킬 발동 후 패가 8장을 초과하면 반드시 버려야 함)
+  const activeIdx = newState.activePlayerIndex;
+  const activePlayer = newState.players[activeIdx];
+  if (activePlayer.hand.length > 8) {
+    return {
+      ...newState,
+      phase: 'DISCARD_OVERFLOW',
+    };
+  }
+
+  return finalizeEndPhase(newState);
+}
+
+// 턴 종료 마무리 (605.1.3 & 605.1.4 및 다음 턴 전환)
+export function finalizeEndPhase(state: GameState): GameState {
+  let newState = { ...state };
+  const p0 = { ...newState.players[0] };
+  const p1 = { ...newState.players[1] };
 
   // 605.1.3 각 플레이어는 액션 에리어에 있는 모든 카드를 트래시 에리어로 이동
   if (p0.actionArea && p0.actionArea.length > 0) {
