@@ -15,6 +15,7 @@ import {
   discardOverflowCards,
   executeEndPhase,
   forceResolveClash,
+  resolveClash,
   resolvePendingChoice,
   canPlayerExecuteCombo,
   CustomDeckConfig,
@@ -265,6 +266,21 @@ export function useGame(
       return () => {
         clearTimeout(timer);
         setIsAiThinking(false);
+      };
+    }
+
+    // 2-B) 양 플레이어 카드 세트 완료 후 전장 대치 연출 (900ms 대치 후 자동 오픈 및 판정)
+    if (gameState.phase === 'CLASH_SET' && gameState.players[0].clashCardReady && gameState.players[1].clashCardReady) {
+      const timer = setTimeout(() => {
+        setGameState((prev) => {
+          if (prev.phase === 'CLASH_SET' && prev.players[0].clashCardReady && prev.players[1].clashCardReady) {
+            return resolveClash(prev);
+          }
+          return prev;
+        });
+      }, 900);
+      return () => {
+        clearTimeout(timer);
       };
     }
 

@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { ClashResult, PlayerState } from '../types/tcg';
 import { CardView } from './CardView';
-import { Flame, Wind, Shield, Swords, Sparkles, CheckCircle2, XCircle, Zap, Crown, Heart, BatteryCharging, ShieldAlert } from 'lucide-react';
+import { Flame, Wind, Shield, Swords, Sparkles, XCircle, Zap, Crown, Heart, BatteryCharging, ShieldAlert } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
@@ -17,8 +17,14 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
   players,
   onDismiss,
 }) => {
-  // 4단계 시네마틱 연출: REVEAL (오픈) -> COLLIDE (격돌) -> SLASH (참격 및 대미지) -> RESULT (결과 및 연격 해금)
-  const [stage, setStage] = useState<'REVEAL' | 'COLLIDE' | 'SLASH' | 'RESULT'>('REVEAL');
+  // 5단계 시네마틱 연출:
+  // SET_WAIT (0~800ms 양측 뒷면 대치)
+  // -> REVEAL (800~2400ms 3D 카드 플립 오픈 & 카드 정보/스피드 확인)
+  // -> COLLIDE (2400~3400ms 양 카드 돌진 격돌)
+  // -> SLASH (3400~4400ms 승리 참격 & 대미지 슬램)
+  // -> RESULT (4400ms+ 최종 판정 배너 & 연격 해금)
+  const [stage, setStage] = useState<'SET_WAIT' | 'REVEAL' | 'COLLIDE' | 'SLASH' | 'RESULT'>('SET_WAIT');
+  const timersRef = useRef<number[]>([]);
 
   const p0 = players[0];
   const p1 = players[1];
@@ -31,24 +37,33 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
   const winnerWeapon = winnerLeader ? getWeaponByCharacter(winnerLeader.characterName || winnerLeader.nameKr) : undefined;
 
   useEffect(() => {
-    // 1단계: 700ms 후 격돌 (양 카드 돌진 & 화면 셰이크 & 스파크 & 효과음)
-    const tCollide = setTimeout(() => {
+    // 0ms 시작 시 카드 세트 효과음
+    soundEffects.playCardPlace();
+
+    // 1단계: 800ms 후 3D 카드 플립 오픈 (REVEAL)
+    const tReveal = window.setTimeout(() => {
+      setStage('REVEAL');
+      soundEffects.playCardPlace();
+    }, 800);
+
+    // 2단계: 2400ms 후 격돌 (양 카드 돌진 & 화면 셰이크 & 스파크 & 효과음)
+    const tCollide = window.setTimeout(() => {
       setStage('COLLIDE');
       soundEffects.playClash();
-    }, 700);
+    }, 2400);
 
-    // 2단계: 1500ms 후 승리자의 참격 및 대미지 슬램 (피해 효과음 + 무기 직군 타격음)
-    const tSlash = setTimeout(() => {
+    // 3단계: 3400ms 후 승리자의 참격 및 대미지 슬램 (피해 효과음 + 무기 직군 타격음)
+    const tSlash = window.setTimeout(() => {
       setStage('SLASH');
       if (clashResult.damageDealt > 0) {
         soundEffects.playDamage(clashResult.damageDealt, winnerWeapon);
       } else {
         soundEffects.playClash();
       }
-    }, 1500);
+    }, 3400);
 
-    // 3단계: 2300ms 후 승리 배너 & 연격권 해금 & 콘페티
-    const tResult = setTimeout(() => {
+    // 4단계: 4400ms 후 승리 배너 & 연격권 해금 & 콘페티
+    const tResult = window.setTimeout(() => {
       setStage('RESULT');
       if (clashResult.winnerIndex === 0) {
         confetti({
@@ -57,33 +72,51 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
           origin: { y: 0.65 },
         });
       }
-    }, 2300);
+    }, 4400);
+
+    timersRef.current = [tReveal, tCollide, tSlash, tResult];
 
     return () => {
-      clearTimeout(tCollide);
-      clearTimeout(tSlash);
-      clearTimeout(tResult);
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
     };
-  }, [clashResult]);
+  }, [clashResult, winnerWeapon]);
 
-  // 키보드 Space/Enter 키 누르면 즉시 다음 단계 진행
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
+  // 클릭 또는 스페이스바/Enter 입력 시: 진행 중이면 즉시 결과로 스킵, 결과 상태면 닫기
+  const handleFastForwardOrDismiss = useCallback(() => {
+    if (stage !== 'RESULT') {
+      timersRef.current.forEach(clearTimeout);
+      timersRef.current = [];
+      setStage('RESULT');
+      if (clashResult.winnerIndex === 0) {
+        confetti({
+          particleCount: 50,
+          spread: 70,
+          origin: { y: 0.65 },
+        });
+      }
+    } else {
+      onDismiss();
+    }
+  }, [stage, clashResult, onDismiss]);
+
+  // 키보드 Space/Enter 키 핸들러
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
-        onDismiss();
+        handleFastForwardOrDismiss();
       }
-    },
-    [onDismiss]
-  );
-
-  useEffect(() => {
+    };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
+  }, [handleFastForwardOrDismiss]);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 p-4 select-none overflow-hidden">
+    <div
+      onClick={handleFastForwardOrDismiss}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 p-4 select-none overflow-hidden cursor-pointer"
+    >
       {/* 배경 충돌 비네트 효과 */}
       <div
         className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
@@ -95,6 +128,12 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
 
       {/* 전체 화면 진동 래퍼 (COLLIDE & SLASH 단계 시 발동) */}
       <div
+        onClick={(e) => {
+          // 내부 인터랙티브 요소(버튼/스크롤) 외 전체 영역 클릭 허용
+          if ((e.target as HTMLElement).closest('button')) {
+            e.stopPropagation();
+          }
+        }}
         className={`relative w-full max-w-5xl flex flex-col items-center justify-center ${
           stage === 'COLLIDE' || stage === 'SLASH' ? 'animate-screen-shake' : ''
         }`}
@@ -108,7 +147,8 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
           </div>
 
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide">
-            {stage === 'REVEAL' && '카드를 오픈합니다!'}
+            {stage === 'SET_WAIT' && '🔒 대결 카드 세트 완료 · 카드를 오픈합니다!'}
+            {stage === 'REVEAL' && '🎴 카드 동시 오픈 (REVEAL) · 상성 및 속도 판정!'}
             {stage === 'COLLIDE' && '⚔️ 양측 카드 전면 격돌 (CLASH)! ⚔️'}
             {stage === 'SLASH' && '💥 결정타 참격 & 상성 격파! 💥'}
             {stage === 'RESULT' && '🏆 판정 승리 및 전투 결과 🏆'}
@@ -138,9 +178,13 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
               )}
             </div>
 
-            {/* 카드 래퍼 (격돌 및 승/패 애니메이션 적용) */}
+            {/* 카드 래퍼 (세트 대기 / 3D 오픈 / 격돌 / 승·패 애니메이션 적용) */}
             <div
               className={`relative transition-all duration-300 transform ${
+                stage === 'SET_WAIT' ? 'animate-card-tense' : ''
+              } ${
+                stage === 'REVEAL' ? 'animate-card-flip' : ''
+              } ${
                 stage === 'COLLIDE' ? 'animate-charge-left' : ''
               } ${
                 (stage === 'SLASH' || stage === 'RESULT') && isP0Winner
@@ -152,11 +196,18 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                   : ''
               }`}
             >
-              <CardView
-                card={clashResult.p0Card}
-                size="lg"
-                isFacedown={stage === 'REVEAL'}
-              />
+              {clashResult.p0Card ? (
+                <CardView
+                  card={clashResult.p0Card}
+                  size="lg"
+                  isFacedown={stage === 'SET_WAIT'}
+                />
+              ) : (
+                <div className="w-44 h-64 sm:w-52 sm:h-76 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/40 flex flex-col items-center justify-center gap-2 text-slate-500">
+                  <Swords className="w-8 h-8 opacity-40" />
+                  <span className="text-xs font-bold">카드 미제출 (패스)</span>
+                </div>
+              )}
 
               {/* P0가 패배했을 때: 상대 승리 참격 궤적 & 대미지 팝업 */}
               {(stage === 'SLASH' || stage === 'RESULT') && isP1Winner && (
@@ -175,6 +226,46 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                 </>
               )}
             </div>
+
+            {/* 카드 오픈 후 스펙 및 상성 인디케이터 (REVEAL 이후 단계) */}
+            {clashResult.p0Card && stage !== 'SET_WAIT' && (
+              <div className="mt-3 flex flex-col items-center gap-1 animate-in fade-in duration-300">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-700 text-xs font-mono font-black shadow">
+                  <span
+                    className={
+                      clashResult.p0Card.color === 'RED'
+                        ? 'text-red-400'
+                        : clashResult.p0Card.color === 'GREEN'
+                        ? 'text-emerald-400'
+                        : 'text-cyan-400'
+                    }
+                  >
+                    {clashResult.p0Card.color}
+                  </span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-amber-300">⚡ SPD {clashResult.p0Card.speed}</span>
+                </div>
+                <span
+                  className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${
+                    isP0Winner
+                      ? 'text-amber-300 bg-amber-950/80 border border-amber-500/50 animate-pulse'
+                      : isDraw
+                      ? 'text-slate-400 bg-slate-900 border border-slate-700'
+                      : 'text-rose-400 bg-rose-950/80 border border-rose-500/40'
+                  }`}
+                >
+                  {isP0Winner
+                    ? clashResult.reason === 'COLOR_ADVANTAGE'
+                      ? '🔺 상성 우위'
+                      : clashResult.reason === 'SPEED_ADVANTAGE'
+                      ? '⚡ 속도 우위'
+                      : '승리'
+                    : isDraw
+                    ? '무승부'
+                    : '패배'}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* ========================================================= */}
@@ -187,10 +278,12 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
             )}
 
             <div
-              className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900 border-2 border-amber-400 flex items-center justify-center shadow-2xl transition-all duration-300 ${
-                stage === 'COLLIDE'
+              className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-900 border-2 flex items-center justify-center shadow-2xl transition-all duration-300 ${
+                stage === 'SET_WAIT'
+                  ? 'border-slate-600 scale-95 shadow-none'
+                  : stage === 'COLLIDE'
                   ? 'scale-125 border-yellow-300 shadow-[0_0_40px_rgba(250,204,21,0.8)]'
-                  : 'shadow-amber-500/20'
+                  : 'border-amber-400 shadow-amber-500/20'
               }`}
             >
               <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono tracking-tighter">VS</span>
@@ -229,9 +322,13 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
               )}
             </div>
 
-            {/* 카드 래퍼 (격돌 및 승/패 애니메이션 적용) */}
+            {/* 카드 래퍼 (세트 대기 / 3D 오픈 / 격돌 / 승·패 애니메이션 적용) */}
             <div
               className={`relative transition-all duration-300 transform ${
+                stage === 'SET_WAIT' ? 'animate-card-tense' : ''
+              } ${
+                stage === 'REVEAL' ? 'animate-card-flip' : ''
+              } ${
                 stage === 'COLLIDE' ? 'animate-charge-right' : ''
               } ${
                 (stage === 'SLASH' || stage === 'RESULT') && isP1Winner
@@ -243,11 +340,18 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                   : ''
               }`}
             >
-              <CardView
-                card={clashResult.p1Card}
-                size="lg"
-                isFacedown={stage === 'REVEAL'}
-              />
+              {clashResult.p1Card ? (
+                <CardView
+                  card={clashResult.p1Card}
+                  size="lg"
+                  isFacedown={stage === 'SET_WAIT'}
+                />
+              ) : (
+                <div className="w-44 h-64 sm:w-52 sm:h-76 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-900/40 flex flex-col items-center justify-center gap-2 text-slate-500">
+                  <Swords className="w-8 h-8 opacity-40" />
+                  <span className="text-xs font-bold">카드 미제출 (패스)</span>
+                </div>
+              )}
 
               {/* P1이 패배했을 때: 승자(P0)의 승리 참격 궤적 & 대미지 팝업 */}
               {(stage === 'SLASH' || stage === 'RESULT') && isP0Winner && (
@@ -266,13 +370,53 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                 </>
               )}
             </div>
+
+            {/* 카드 오픈 후 스펙 및 상성 인디케이터 (REVEAL 이후 단계) */}
+            {clashResult.p1Card && stage !== 'SET_WAIT' && (
+              <div className="mt-3 flex flex-col items-center gap-1 animate-in fade-in duration-300">
+                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900/90 border border-slate-700 text-xs font-mono font-black shadow">
+                  <span
+                    className={
+                      clashResult.p1Card.color === 'RED'
+                        ? 'text-red-400'
+                        : clashResult.p1Card.color === 'GREEN'
+                        ? 'text-emerald-400'
+                        : 'text-cyan-400'
+                    }
+                  >
+                    {clashResult.p1Card.color}
+                  </span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-amber-300">⚡ SPD {clashResult.p1Card.speed}</span>
+                </div>
+                <span
+                  className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${
+                    isP1Winner
+                      ? 'text-amber-300 bg-amber-950/80 border border-amber-500/50 animate-pulse'
+                      : isDraw
+                      ? 'text-slate-400 bg-slate-900 border border-slate-700'
+                      : 'text-rose-400 bg-rose-950/80 border border-rose-500/40'
+                  }`}
+                >
+                  {isP1Winner
+                    ? clashResult.reason === 'COLOR_ADVANTAGE'
+                      ? '🔺 상성 우위'
+                      : clashResult.reason === 'SPEED_ADVANTAGE'
+                      ? '⚡ 속도 우위'
+                      : '승리'
+                    : isDraw
+                    ? '무승부'
+                    : '패배'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* ========================================================= */}
         {/* 결과 배너 설명 (RESULT 스테이지) */}
         {/* ========================================================= */}
-        <div className="mt-5 w-full max-w-xl text-center">
+        <div className="mt-4 w-full max-w-xl text-center">
           {stage === 'RESULT' ? (
             <div className="bg-slate-900/95 border-2 border-amber-500/70 rounded-2xl p-5 shadow-2xl animate-victory-banner">
               <div className="text-base font-extrabold text-slate-100 mb-2">
@@ -293,7 +437,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                 )}
               </div>
 
-              {/* [신규] 발동된 카드 효과 및 발생한 사건 상세 목록 */}
+              {/* 발동된 카드 효과 및 발생한 사건 상세 목록 */}
               {clashResult.triggeredEffects && clashResult.triggeredEffects.length > 0 && (
                 <div className="my-3 pt-3 border-t border-slate-800 text-left">
                   <div className="text-[11px] font-mono font-black text-amber-400/90 uppercase tracking-wider mb-2 flex items-center gap-1.5">
@@ -350,12 +494,21 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
             </div>
           ) : (
             <div className="text-sm font-bold text-amber-300 animate-pulse">
-              {stage === 'REVEAL' && '카드를 확인하고 있습니다...'}
+              {stage === 'SET_WAIT' && '양측 플레이어의 카드가 전장에 세트되었습니다...'}
+              {stage === 'REVEAL' && '카드를 오픈하여 상성과 속도를 비교합니다!'}
               {stage === 'COLLIDE' && '동시 오픈! 양측 카드가 격돌합니다!'}
               {stage === 'SLASH' && '상성과 속도를 판정하여 공격이 적중합니다!'}
             </div>
           )}
         </div>
+
+        {/* 하단 스킵 안내 툴팁 */}
+        {stage !== 'RESULT' && (
+          <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 animate-pulse">
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+            <span>클릭 또는 스페이스바를 누르면 즉시 결과로 스킵합니다</span>
+          </div>
+        )}
       </div>
     </div>
   );

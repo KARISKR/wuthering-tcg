@@ -1180,7 +1180,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         액션 에리어 (상대)
                       </span>
                       {p1.clashCard ? (
-                        <div className="animate-card-slam max-h-full">
+                        <div className={`max-h-full ${p0.clashCardReady && p1.clashCardReady && gameState.phase === 'CLASH_SET' ? 'animate-card-tense' : 'animate-card-slam'}`}>
                           <CardView
                             card={p1.clashCard}
                             size="md"
@@ -1301,8 +1301,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wider font-mono">
                     {gameState.phase === 'LEADER_SELECT' && 'BATTLE ARENA • LEADER SELECTION'}
                     {gameState.phase === 'MULLIGAN' && 'BATTLE ARENA • MULLIGAN'}
-                    {gameState.phase === 'ACTION_PHASE' && 'BATTLE ARENA • MAIN PHASE'}
-                    {gameState.phase === 'CLASH_SET' && 'BATTLE ARENA • CLASH SETTING'}
+                    {gameState.phase === 'CLASH_SET' &&
+                      (p0.clashCardReady && p1.clashCardReady
+                        ? '🔒 BATTLE ARENA • 세트 완료! 결투 개시 대기 중...'
+                        : 'BATTLE ARENA • CLASH SETTING')}
                     {gameState.phase === 'CLASH_REVEAL' && 'BATTLE ARENA • CLASH JUDGMENT'}
                     {gameState.phase === 'COMBO_STEP' && `BATTLE ARENA • COMBO STRIKE (${activeControlledPlayer.comboUnlimited ? '무제한 연격 진행 중' : `추격: ${activeControlledPlayer.comboCount}회`})`}
                     {gameState.phase === 'DISCARD_OVERFLOW' && 'BATTLE ARENA • END PHASE'}
@@ -1477,7 +1479,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         액션 에리어 (내 대결 존)
                       </span>
                       {p0.clashCard ? (
-                        <div className="animate-card-slam max-h-full">
+                        <div className={`max-h-full ${p0.clashCardReady && p1.clashCardReady && gameState.phase === 'CLASH_SET' ? 'animate-card-tense' : 'animate-card-slam'}`}>
                           <CardView
                             card={p0.clashCard}
                             size="md"

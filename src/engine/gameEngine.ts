@@ -1169,11 +1169,8 @@ export function setClashCard(
     ] as [PlayerState, PlayerState],
   };
 
-  // 양 플레이어 모두 카드를 세트했다면 자동 공개 및 판정!
-  if (newState.players[0].clashCardReady && newState.players[1].clashCardReady) {
-    newState = resolveClash(newState);
-  }
-
+  // 양 플레이어 모두 카드를 세트한 후에는 전장 대치 연출(900ms)을 거쳐 useGame에서 비동기로 resolveClash를 호출합니다.
+  // 수동 즉시 판정은 forceResolveClash를 통해 지원됩니다.
   return { success: true, newState };
 }
 
