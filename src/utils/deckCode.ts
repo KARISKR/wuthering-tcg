@@ -701,9 +701,6 @@ export function sldarkRawToCustomDeck(
 // 온라인 mc.sldark.com 실시간 덱 비동기 페처
 export async function fetchSldarkDeck(codeStr: string): Promise<CustomDeckConfig | null> {
   const clean = codeStr.trim();
-  // 1. 로컬 번들 및 프리셋 매칭 우선 확인
-  const local = decodeDeckCode(clean);
-  if (local) return local;
 
   let sldCode = '';
   const sldMatch = clean.match(/SLD\s*[-_]?\s*([A-Za-z0-9]{6,12})/i);
@@ -712,10 +709,11 @@ export async function fetchSldarkDeck(codeStr: string): Promise<CustomDeckConfig
   } else if (/^[A-Za-z0-9]{8}$/i.test(clean)) {
     sldCode = `SLD-${clean.toUpperCase()}`;
   } else {
-    return null;
+    // SLD 코드가 아니면 로컬 디코드만 수행
+    return decodeDeckCode(clean);
   }
 
-  // API 엔드포인트 목록 (Vite 프록시 우선 -> CORS 프록시 폴백)
+  // 1. 온라인 API 엔드포인트 목록 우선 조회 (Vite 프록시 우선 -> CORS 프록시 폴백)
   const endpoints = [
     `/api/sldark/deck-codes/${sldCode}`,
     `https://corsproxy.io/?https://mc.sldark.com/api/deck-codes/${sldCode}`,
@@ -736,6 +734,10 @@ export async function fetchSldarkDeck(codeStr: string): Promise<CustomDeckConfig
       // 다음 엔드포인트 시도
     }
   }
+
+  // 2. 네트워크 장애나 오프라인 시 로컬 번들 및 프리셋 매칭 폴백
+  const local = decodeDeckCode(clean);
+  if (local) return local;
 
   return null;
 }

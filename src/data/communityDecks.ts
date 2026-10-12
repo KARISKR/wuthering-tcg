@@ -11,7 +11,69 @@ export const COMMUNITY_DECK_PRESETS: DeckPreset[] = [
     externalCode: 'SLD-TLL2EZT6',
     leaderCode: 'BP01-005', // 카멜리아 Lv.0
     leftSupportCode: 'BP01-015', // 앙코 Lv.0
-    rightSupportCode: 'BP01-024', // 양양 Lv.0
+    rightSupportCode: 'BP01-024',
+    characterDeckCards: [
+      {
+            code: "BP01-015",
+            count: 1
+      },
+      {
+            code: "BP01-014",
+            count: 1
+      },
+      {
+            code: "BP01-011",
+            count: 1
+      },
+      {
+            code: "BP01-013",
+            count: 1
+      },
+      {
+            code: "BP01-012",
+            count: 1
+      },
+      {
+            code: "BP01-001",
+            count: 1
+      },
+      {
+            code: "BP01-002",
+            count: 1
+      },
+      {
+            code: "BP01-003",
+            count: 1
+      },
+      {
+            code: "BP01-004",
+            count: 1
+      },
+      {
+            code: "BP01-005",
+            count: 1
+      },
+      {
+            code: "SD01-004",
+            count: 1
+      },
+      {
+            code: "SD01-003",
+            count: 1
+      },
+      {
+            code: "BP01-024",
+            count: 1
+      },
+      {
+            code: "BP01-023",
+            count: 1
+      },
+      {
+            code: "BP01-022",
+            count: 1
+      }
+], // 양양 Lv.0
     actionCards: [
       { code: 'BP01-044', count: 3 },
       { code: 'BP01-045', count: 3 },
@@ -40,7 +102,69 @@ export const COMMUNITY_DECK_PRESETS: DeckPreset[] = [
     externalCode: 'SLD-7LKN8P9G',
     leaderCode: 'BP01-005', // 카멜리아 Lv.0
     leftSupportCode: 'BP01-018', // 방랑자(여) Lv.0
-    rightSupportCode: 'BP01-024', // 양양 Lv.0
+    rightSupportCode: 'BP01-024',
+    characterDeckCards: [
+      {
+            code: "BP01-001",
+            count: 1
+      },
+      {
+            code: "BP01-002",
+            count: 1
+      },
+      {
+            code: "BP01-003",
+            count: 1
+      },
+      {
+            code: "BP01-004",
+            count: 1
+      },
+      {
+            code: "BP01-005",
+            count: 1
+      },
+      {
+            code: "SD01-003",
+            count: 1
+      },
+      {
+            code: "SD01-004",
+            count: 1
+      },
+      {
+            code: "BP01-022",
+            count: 1
+      },
+      {
+            code: "BP01-023",
+            count: 1
+      },
+      {
+            code: "BP01-024",
+            count: 1
+      },
+      {
+            code: "BP01-016",
+            count: 1
+      },
+      {
+            code: "BP01-017",
+            count: 1
+      },
+      {
+            code: "BP01-018",
+            count: 1
+      },
+      {
+            code: "SD01-001",
+            count: 1
+      },
+      {
+            code: "SD01-002",
+            count: 1
+      }
+], // 양양 Lv.0
     actionCards: [
       { code: 'BP01-044', count: 3 },
       { code: 'BP01-045', count: 2 },
@@ -69,7 +193,69 @@ export const COMMUNITY_DECK_PRESETS: DeckPreset[] = [
     externalCode: 'SLD-DVQMKQPG',
     leaderCode: 'BP01-015', // 앙코 Lv.0
     leftSupportCode: 'BP01-024', // 양양 Lv.0
-    rightSupportCode: 'BP01-033', // 산화 Lv.0
+    rightSupportCode: 'BP01-033',
+    characterDeckCards: [
+      {
+            code: "BP01-011",
+            count: 1
+      },
+      {
+            code: "BP01-012",
+            count: 1
+      },
+      {
+            code: "BP01-013",
+            count: 1
+      },
+      {
+            code: "BP01-014",
+            count: 1
+      },
+      {
+            code: "BP01-015",
+            count: 1
+      },
+      {
+            code: "BP01-022",
+            count: 1
+      },
+      {
+            code: "BP01-023",
+            count: 1
+      },
+      {
+            code: "BP01-024",
+            count: 1
+      },
+      {
+            code: "BP01-031",
+            count: 1
+      },
+      {
+            code: "BP01-032",
+            count: 1
+      },
+      {
+            code: "BP01-033",
+            count: 1
+      },
+      {
+            code: "SD01-004",
+            count: 1
+      },
+      {
+            code: "SD01-003",
+            count: 1
+      },
+      {
+            code: "SD02-003",
+            count: 1
+      },
+      {
+            code: "SD02-004",
+            count: 1
+      }
+], // 산화 Lv.0
     actionCards: [
       { code: 'BP01-059', count: 1 },
       { code: 'BP01-060', count: 3 },
@@ -96,7 +282,69 @@ export const COMMUNITY_DECK_PRESETS: DeckPreset[] = [
     externalCode: 'SLD-DV56VXTG',
     leaderCode: 'BP01-010', // 파수인 Lv.0
     leftSupportCode: 'BP01-015', // 앙코 Lv.0
-    rightSupportCode: 'BP01-024', // 양양 Lv.0
+    rightSupportCode: 'BP01-024',
+    characterDeckCards: [
+      {
+            code: "BP01-015",
+            count: 1
+      },
+      {
+            code: "BP01-014",
+            count: 1
+      },
+      {
+            code: "BP01-013",
+            count: 1
+      },
+      {
+            code: "BP01-012",
+            count: 1
+      },
+      {
+            code: "BP01-011",
+            count: 1
+      },
+      {
+            code: "BP01-009",
+            count: 1
+      },
+      {
+            code: "BP01-010",
+            count: 1
+      },
+      {
+            code: "BP01-008",
+            count: 1
+      },
+      {
+            code: "BP01-007",
+            count: 1
+      },
+      {
+            code: "BP01-006",
+            count: 1
+      },
+      {
+            code: "SD01-003",
+            count: 1
+      },
+      {
+            code: "SD01-004",
+            count: 1
+      },
+      {
+            code: "BP01-022",
+            count: 1
+      },
+      {
+            code: "BP01-024",
+            count: 1
+      },
+      {
+            code: "BP01-023",
+            count: 1
+      }
+], // 양양 Lv.0
     actionCards: [
       { code: 'BP01-053', count: 1 },
       { code: 'BP01-054', count: 3 },

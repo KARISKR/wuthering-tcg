@@ -13,6 +13,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-015",
     "leftSupportCode": "BP01-005",
     "rightSupportCode": "BP01-024",
+    "characterDeckCards": [
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-005",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-044",
@@ -91,6 +153,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-018",
     "leftSupportCode": "BP01-021",
     "rightSupportCode": "BP01-030",
+    "characterDeckCards": [
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-065",
@@ -177,6 +301,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-015",
     "rightSupportCode": "BP01-024",
+    "characterDeckCards": [
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-054",
@@ -251,6 +437,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-015",
+    "characterDeckCards": [
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-015",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-054",
@@ -329,6 +577,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-033",
     "rightSupportCode": "BP01-027",
+    "characterDeckCards": [
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-025",
+            "count": 1
+      },
+      {
+            "code": "BP01-026",
+            "count": 1
+      },
+      {
+            "code": "BP01-027",
+            "count": 1
+      },
+      {
+            "code": "SD01-005",
+            "count": 1
+      },
+      {
+            "code": "SD01-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-034",
@@ -403,6 +713,64 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-024",
     "leftSupportCode": "BP01-010",
     "rightSupportCode": "BP01-027",
+    "characterDeckCards": [
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "SD01-005",
+            "count": 1
+      },
+      {
+            "code": "BP01-025",
+            "count": 1
+      },
+      {
+            "code": "BP01-027",
+            "count": 1
+      },
+      {
+            "code": "BP01-026",
+            "count": 1
+      },
+      {
+            "code": "SD01-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-053",
@@ -473,6 +841,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-024",
     "leftSupportCode": "BP01-030",
     "rightSupportCode": "BP01-021",
+    "characterDeckCards": [
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-019",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-042",
@@ -563,6 +993,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-018",
     "leftSupportCode": "BP01-021",
     "rightSupportCode": "BP01-030",
+    "characterDeckCards": [
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-065",
@@ -645,6 +1137,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-024",
     "leftSupportCode": "BP01-030",
     "rightSupportCode": "BP01-018",
+    "characterDeckCards": [
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-066",
@@ -719,6 +1273,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-021",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-030",
+    "characterDeckCards": [
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-068",
@@ -793,6 +1409,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-015",
     "rightSupportCode": "BP01-024",
+    "characterDeckCards": [
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-034",
@@ -867,6 +1545,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-005",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-018",
+    "characterDeckCards": [
+      {
+            "code": "BP01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-005",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-040",
@@ -945,6 +1685,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-033",
     "rightSupportCode": "BP01-030",
+    "characterDeckCards": [
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-042",
@@ -1015,6 +1817,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-030",
     "rightSupportCode": "BP01-033",
+    "characterDeckCards": [
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-053",
@@ -1093,6 +1957,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-021",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-030",
+    "characterDeckCards": [
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-068",
@@ -1175,6 +2101,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-033",
     "rightSupportCode": "BP01-027",
+    "characterDeckCards": [
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-025",
+            "count": 1
+      },
+      {
+            "code": "BP01-026",
+            "count": 1
+      },
+      {
+            "code": "BP01-027",
+            "count": 1
+      },
+      {
+            "code": "SD01-005",
+            "count": 1
+      },
+      {
+            "code": "SD01-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-034",
@@ -1245,6 +2233,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-021",
     "leftSupportCode": "BP01-033",
     "rightSupportCode": "BP01-027",
+    "characterDeckCards": [
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-025",
+            "count": 1
+      },
+      {
+            "code": "BP01-026",
+            "count": 1
+      },
+      {
+            "code": "BP01-027",
+            "count": 1
+      },
+      {
+            "code": "SD01-005",
+            "count": 1
+      },
+      {
+            "code": "SD01-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-034",
@@ -1319,6 +2369,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-024",
     "leftSupportCode": "BP01-010",
     "rightSupportCode": "BP01-030",
+    "characterDeckCards": [
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-053",
@@ -1393,6 +2505,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-005",
     "leftSupportCode": "BP01-018",
     "rightSupportCode": "BP01-024",
+    "characterDeckCards": [
+      {
+            "code": "BP01-005",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-044",
@@ -1467,6 +2641,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-005",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-018",
+    "characterDeckCards": [
+      {
+            "code": "BP01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-005",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-044",
@@ -1541,6 +2777,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-033",
     "leftSupportCode": "BP01-005",
     "rightSupportCode": "BP01-010",
+    "characterDeckCards": [
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-005",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-044",
@@ -1611,6 +2909,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-021",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-030",
+    "characterDeckCards": [
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-069",
@@ -1697,6 +3057,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-021",
     "leftSupportCode": "BP01-030",
     "rightSupportCode": "BP01-033",
+    "characterDeckCards": [
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-068",
@@ -1783,6 +3205,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-015",
     "leftSupportCode": "BP01-010",
     "rightSupportCode": "BP01-024",
+    "characterDeckCards": [
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-053",
@@ -1865,6 +3349,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-015",
     "leftSupportCode": "BP01-018",
     "rightSupportCode": "BP01-027",
+    "characterDeckCards": [
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-025",
+            "count": 1
+      },
+      {
+            "code": "BP01-026",
+            "count": 1
+      },
+      {
+            "code": "BP01-027",
+            "count": 1
+      },
+      {
+            "code": "SD01-006",
+            "count": 1
+      },
+      {
+            "code": "SD01-005",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-059",
@@ -1935,6 +3481,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-015",
     "rightSupportCode": "BP01-033",
+    "characterDeckCards": [
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-054",
@@ -2005,6 +3613,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-021",
     "leftSupportCode": "BP01-030",
     "rightSupportCode": "BP01-033",
+    "characterDeckCards": [
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-068",
@@ -2083,6 +3753,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-005",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-010",
+    "characterDeckCards": [
+      {
+            "code": "BP01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-005",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-046",
@@ -2153,6 +3885,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-018",
     "leftSupportCode": "BP01-033",
     "rightSupportCode": "BP01-010",
+    "characterDeckCards": [
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-053",
@@ -2247,6 +4041,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-015",
     "rightSupportCode": "BP01-024",
+    "characterDeckCards": [
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-054",
@@ -2321,6 +4177,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-030",
     "leftSupportCode": "BP01-021",
     "rightSupportCode": "BP01-033",
+    "characterDeckCards": [
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-019",
+            "count": 1
+      },
+      {
+            "code": "BP01-020",
+            "count": 1
+      },
+      {
+            "code": "SD02-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-021",
+            "count": 1
+      },
+      {
+            "code": "SD02-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-073",
@@ -2399,6 +4317,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-015",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-033",
+    "characterDeckCards": [
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-059",
@@ -2469,6 +4449,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-030",
     "leftSupportCode": "BP01-033",
     "rightSupportCode": "BP01-018",
+    "characterDeckCards": [
+      {
+            "code": "BP01-030",
+            "count": 1
+      },
+      {
+            "code": "SD02-006",
+            "count": 1
+      },
+      {
+            "code": "SD02-005",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "BP01-029",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-028",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-016",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-074",
@@ -2559,6 +4601,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-010",
     "leftSupportCode": "BP01-015",
     "rightSupportCode": "BP01-005",
+    "characterDeckCards": [
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-005",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-045",
@@ -2633,6 +4737,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-015",
     "leftSupportCode": "BP01-010",
     "rightSupportCode": "BP01-024",
+    "characterDeckCards": [
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-053",
@@ -2715,6 +4881,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-005",
     "leftSupportCode": "BP01-024",
     "rightSupportCode": "BP01-018",
+    "characterDeckCards": [
+      {
+            "code": "BP01-001",
+            "count": 1
+      },
+      {
+            "code": "BP01-002",
+            "count": 1
+      },
+      {
+            "code": "BP01-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-005",
+            "count": 1
+      },
+      {
+            "code": "SD01-003",
+            "count": 1
+      },
+      {
+            "code": "SD01-004",
+            "count": 1
+      },
+      {
+            "code": "BP01-022",
+            "count": 1
+      },
+      {
+            "code": "BP01-023",
+            "count": 1
+      },
+      {
+            "code": "BP01-024",
+            "count": 1
+      },
+      {
+            "code": "BP01-016",
+            "count": 1
+      },
+      {
+            "code": "BP01-017",
+            "count": 1
+      },
+      {
+            "code": "BP01-018",
+            "count": 1
+      },
+      {
+            "code": "SD01-001",
+            "count": 1
+      },
+      {
+            "code": "SD01-002",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-044",
@@ -2793,6 +5021,68 @@ export const SLDARK_DECK_PRESETS: DeckPreset[] = [
     "leaderCode": "BP01-015",
     "leftSupportCode": "BP01-033",
     "rightSupportCode": "BP01-010",
+    "characterDeckCards": [
+      {
+            "code": "BP01-015",
+            "count": 1
+      },
+      {
+            "code": "BP01-014",
+            "count": 1
+      },
+      {
+            "code": "BP01-012",
+            "count": 1
+      },
+      {
+            "code": "BP01-013",
+            "count": 1
+      },
+      {
+            "code": "BP01-011",
+            "count": 1
+      },
+      {
+            "code": "SD02-004",
+            "count": 1
+      },
+      {
+            "code": "SD02-003",
+            "count": 1
+      },
+      {
+            "code": "BP01-033",
+            "count": 1
+      },
+      {
+            "code": "BP01-032",
+            "count": 1
+      },
+      {
+            "code": "BP01-031",
+            "count": 1
+      },
+      {
+            "code": "BP01-010",
+            "count": 1
+      },
+      {
+            "code": "BP01-009",
+            "count": 1
+      },
+      {
+            "code": "BP01-008",
+            "count": 1
+      },
+      {
+            "code": "BP01-007",
+            "count": 1
+      },
+      {
+            "code": "BP01-006",
+            "count": 1
+      }
+],
     "actionCards": [
       {
         "code": "BP01-053",

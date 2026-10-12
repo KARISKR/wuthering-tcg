@@ -208,15 +208,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       return;
     }
 
-    const decoded = decodeDeckCode(raw);
-    if (decoded) {
-      setParsedPreviewDeck(decoded);
-      setImportError(null);
-      setIsFetchingOnline(false);
-      return;
-    }
-
-    // 로컬 매칭 실패 시 SLD 패턴이면 온라인 페치 비동기 시도
+    // 1. SLD 패턴(SLD-XXXX 또는 8자리 코드)인 경우 온라인 실시간 페치 우선 실행 (최신 캐릭터 덱 14~15장 완벽 동기화)
     const isSldPattern = /SLD/i.test(raw) || /^[A-Za-z0-9]{8}$/.test(raw);
     if (isSldPattern) {
       setIsFetchingOnline(true);
@@ -230,24 +222,46 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
             setParsedPreviewDeck(deck);
             setImportError(null);
           } else {
-            setParsedPreviewDeck(null);
-            setImportError('mc.sldark.com에서 해당 덱 코드를 찾을 수 없습니다.');
+            // 온라인 실패 시 로컬 번들 프리셋 디코드 시도
+            const localDecoded = decodeDeckCode(raw);
+            if (localDecoded) {
+              setParsedPreviewDeck(localDecoded);
+              setImportError(null);
+            } else {
+              setParsedPreviewDeck(null);
+              setImportError('mc.sldark.com에서 해당 덱 코드를 찾을 수 없습니다.');
+            }
           }
         })
         .catch(() => {
           if (canceled) return;
           setIsFetchingOnline(false);
-          setParsedPreviewDeck(null);
-          setImportError('mc.sldark.com 온라인 덱 코드 조회 중 오류가 발생했습니다.');
+          const localDecoded = decodeDeckCode(raw);
+          if (localDecoded) {
+            setParsedPreviewDeck(localDecoded);
+            setImportError(null);
+          } else {
+            setParsedPreviewDeck(null);
+            setImportError('mc.sldark.com 온라인 덱 코드 조회 중 오류가 발생했습니다.');
+          }
         });
       return () => {
         canceled = true;
       };
-    } else {
-      setParsedPreviewDeck(null);
-      setIsFetchingOnline(false);
-      setImportError('올바른 덱 코드 형식이 아닙니다 (SLD-XXXX, WWTCG1_..., 또는 JSON 형식).');
     }
+
+    // 2. 일반 덱 코드(WWTCG1_... 또는 JSON 형식)는 로컬 즉시 디코드
+    const decoded = decodeDeckCode(raw);
+    if (decoded) {
+      setParsedPreviewDeck(decoded);
+      setImportError(null);
+      setIsFetchingOnline(false);
+      return;
+    }
+
+    setParsedPreviewDeck(null);
+    setIsFetchingOnline(false);
+    setImportError('올바른 덱 코드 형식이 아닙니다 (SLD-XXXX, WWTCG1_..., 또는 JSON 형식).');
   }, [inputCode]);
 
   // 덱 코드 복사 핸들러
