@@ -1169,299 +1169,6 @@ export function setClashCard(
     ] as [PlayerState, PlayerState],
   };
 
-  // ==========================================
-  // 배틀 스텝 (Battle Step 604.1.1) 캐릭터 스킬 처리
-  // (공식 룰 504.4.1: 하위에 겹쳐 놓은 카드의 스킬은 계속 유효)
-  // ==========================================
-  const leaderCards = getAllCardsInSlot(player.slots.leader);
-
-  // 1. 적색 배틀 시 스킬
-  if (player.clashCard && player.clashCard.color === 'RED') {
-    const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
-
-    // 1-A. 치샤 Lv.0 [BP01-027]: 적색 카드로 배틀 시 상대에게 1pt 피해
-    const hasChixia0 = leaderCards.some(
-      (c) => c.code === 'BP01-027' || (c.level === 0 && (c.characterName === '치샤' || c.nameKr.includes('치샤')))
-    );
-    if (hasChixia0) {
-      newState.players[oppIdx].hp = Math.max(0, newState.players[oppIdx].hp - 1);
-      newState.lastEffectEvent = {
-        id: `eff-${Date.now()}-chixia0`,
-        sourceCardName: '치샤 Lv.0',
-        sourceCardArt: player.slots.leader.artUrl,
-        effectType: 'DAMAGE',
-        title: '치샤 배틀 효과',
-        description: '적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!',
-        playerIndex,
-        timestamp: Date.now(),
-      };
-      newState = addLog(
-        newState,
-        `[치샤 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
-        'DAMAGE',
-        playerIndex,
-        { amount: 1, effectTag: '배틀 피해' }
-      );
-    }
-
-    // 1-B. 금희 Lv.0 [BP01-030]: 적색 카드로 배틀 시 상대에게 1pt 피해
-    const hasJinhsi0 = leaderCards.some(
-      (c) => c.code === 'BP01-030' || (c.level === 0 && (c.characterName === '금희' || c.nameKr.includes('금희')))
-    );
-    if (hasJinhsi0) {
-      newState.players[oppIdx].hp = Math.max(0, newState.players[oppIdx].hp - 1);
-      newState.lastEffectEvent = {
-        id: `eff-${Date.now()}-jinhsi0`,
-        sourceCardName: '금희 Lv.0',
-        sourceCardArt: player.slots.leader.artUrl,
-        effectType: 'DAMAGE',
-        title: '금희 배틀 효과',
-        description: '적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!',
-        playerIndex,
-        timestamp: Date.now(),
-      };
-      newState = addLog(
-        newState,
-        `[금희 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
-        'DAMAGE',
-        playerIndex,
-        { amount: 1, effectTag: '배틀 피해' }
-      );
-    }
-
-    // 1-C. 상대 양양 Lv.2 [SD01-003]: 상대가 적색 카드로 배틀 시 1 COST 지불 가능. 미지불 시 3pt 피해
-    const oppLeaderCards = getAllCardsInSlot(newState.players[oppIdx].slots.leader);
-    const oppHasYangyangLv2 = oppLeaderCards.some(
-      (c) => c.code === 'SD01-003' || (c.characterName === '양양' && c.level === 2)
-    );
-    if (oppHasYangyangLv2) {
-      if (player.concertoZone.length >= 1) {
-        const [spent] = player.concertoZone.splice(0, 1);
-        player.dropZone.push(spent);
-        newState = addLog(
-          newState,
-          `[상대 양양 Lv.2 배틀 효과] 상대 적색 배틀 견제로 1 COST를 지불했습니다.`,
-          'ACTION',
-          playerIndex
-        );
-      } else {
-        player.hp = Math.max(0, player.hp - 3);
-        newState = addLog(
-          newState,
-          `[상대 양양 Lv.2 배틀 효과] 1 COST를 지불할 수 없어 3pt 데미지를 받았습니다!`,
-          'DAMAGE',
-          oppIdx,
-          { amount: 3, effectTag: '배틀 피해' }
-        );
-      }
-    }
-  }
-
-  // 2. 녹색 배틀 시 스킬
-  if (player.clashCard && player.clashCard.color === 'GREEN') {
-    // 2-A. 방랑자(여) [BP01-018] / 방랑자(남) [BP01-021] Lv.0 배틀 효과: 덱 위 최대 2장 공개 후 패로
-    const hasRover0 = leaderCards.some(
-      (c) =>
-        c.code === 'BP01-018' ||
-        c.code === 'BP01-021' ||
-        (c.level === 0 && (c.characterName?.includes('방랑자') || c.nameKr?.includes('방랑자')))
-    );
-    if (hasRover0) {
-      const revealed = player.actionDeck.splice(0, Math.min(2, player.actionDeck.length));
-      if (revealed.length > 0) {
-        if (player.isAi) {
-          player.hand.push(...revealed);
-          newState = addLog(
-            newState,
-            `[방랑자 Lv.0 배틀 효과] 녹색 카드 배틀 효과로 덱 위의 카드 ${revealed.length}장을 패에 추가했습니다.`,
-            'ACTION',
-            playerIndex
-          );
-        } else {
-          newState.deferredChoice = {
-            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            playerIndex,
-            title: '방랑자 배틀 효과',
-            sourceCardName: '방랑자 Lv.0',
-            sourceCardArt: player.slots.leader.artUrl,
-            description: '녹색 카드로 배틀하여 덱 위의 카드를 최대 2장까지 패에 추가할 수 있습니다 (0장~2장 선택).',
-            revealedCards: revealed,
-            minSelect: 0,
-            maxSelect: revealed.length,
-            onResolveType: 'ADD_TO_HAND',
-          };
-        }
-      }
-    }
-
-    // 2-B. 파수인 Lv.0 [BP01-010]: 녹색 카드로 배틀 시 덱 위 1장 공개 후 패 추가 가능
-    const hasShorekeeper0 = leaderCards.some(
-      (c) => c.code === 'BP01-010' || (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))
-    );
-    if (hasShorekeeper0) {
-      const card = drawSingleCardFromDeck(player);
-      if (card) {
-        if (player.isAi) {
-          player.hand.push(card);
-          newState = addLog(
-            newState,
-            `[파수인 Lv.0 배틀 효과] 녹색 카드 배틀 효과로 덱에서 1장을 패에 추가했습니다.`,
-            'ACTION',
-            playerIndex
-          );
-        } else {
-          newState.deferredChoice = {
-            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            playerIndex,
-            title: '파수인 배틀 효과 (패 추가 선택)',
-            sourceCardName: '파수인 [BP01-010]',
-            sourceCardArt: player.slots.leader.artUrl,
-            description: '녹색 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 패에 추가하시겠습니까?',
-            revealedCards: [card],
-            minSelect: 0,
-            maxSelect: 1,
-            onResolveType: 'ADD_TO_HAND',
-          };
-        }
-      }
-    }
-  }
-
-  // 3. 청색 배틀 시 스킬
-  if (player.clashCard && player.clashCard.color === 'BLUE') {
-    // 3-A. 양양 [BP01-024] / 산화 [BP01-033] Lv.0 배틀 효과: 청색 카드로 배틀 시 덱 위 1장 협주 에리어에 배치 가능
-    const hasYangyang0 = leaderCards.some(
-      (c) => c.code === 'BP01-024' || (c.level === 0 && (c.characterName === '양양' || c.nameKr.includes('양양')))
-    );
-    const hasSanhua0 = leaderCards.some(
-      (c) => c.code === 'BP01-033' || (c.level === 0 && (c.characterName === '산화' || c.nameKr.includes('산화')))
-    );
-    if (hasYangyang0 || hasSanhua0) {
-      const card = drawSingleCardFromDeck(player);
-      if (card) {
-        if (player.isAi) {
-          player.concertoZone.push(card);
-          newState = addLog(
-            newState,
-            `[${hasYangyang0 ? '양양' : '산화'} Lv.0 배틀 효과] 청색 카드 배틀 효과로 덱 위 1장을 협주 에리어에 충전했습니다!`,
-            'ACTION',
-            playerIndex
-          );
-        } else {
-          const charName = hasYangyang0 ? '양양' : '산화';
-          newState.deferredChoice = {
-            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            playerIndex,
-            title: `${charName} 배틀 효과 (협주 배치 선택)`,
-            sourceCardName: `${charName} Lv.0 [배틀 효과]`,
-            sourceCardArt: player.slots.leader.artUrl,
-            description: '청색 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 협주 에리어에 배치하시겠습니까?',
-            revealedCards: [card],
-            minSelect: 0,
-            maxSelect: 1,
-            onResolveType: 'SET_CONCERTO',
-          };
-        }
-      }
-    }
-  }
-
-  // 4. 피어난 동백꽃 [BP01-048] 배틀 효과: 카멜리아 레벨업!
-  if (player.clashCard && player.clashCard.code === 'BP01-048') {
-    // 리더 또는 서포터의 카멜리아 찾기
-    const camSlotKey = (['leader', 'leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '카멜리아'
-    );
-    if (camSlotKey && player.slots[camSlotKey]) {
-      const currentCam = player.slots[camSlotKey]!;
-      const nextCam = findEvolutionCard(player.characterDeck, currentCam);
-      if (nextCam) {
-        player.characterDeck = player.characterDeck.filter((c) => c.id !== nextCam.id);
-        const prevUnderlying = currentCam.underlyingCards || [];
-        player.slots[camSlotKey] = {
-          ...nextCam,
-          underlyingCards: [...prevUnderlying, currentCam],
-        };
-        newState.lastUpgrade = {
-          id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          playerIndex,
-          playerName: player.name,
-          character: { ...nextCam },
-          previousLevel: currentCam.level as 0 | 1,
-          newLevel: nextCam.level as 1 | 2,
-          slotName: camSlotKey,
-        };
-        newState = addLog(
-          newState,
-          `[피어난 동백꽃 BP01-048 배틀 효과] [카멜리아]가 [${nextCam.nameKr}](Lv.${nextCam.level})(으)로 각성 레벨업했습니다!`,
-          'ACTION',
-          playerIndex,
-          { cardArt: nextCam.artUrl, cardName: nextCam.nameKr, effectTag: '배틀 레벨업' }
-        );
-      }
-    }
-  }
-
-  // 5. 그늘이의 대폭주 [BP01-062] 배틀 효과: 앙코를 Lv.2로 진화시키고 리더를 앙코로 교체!
-  if (player.clashCard && player.clashCard.code === 'BP01-062') {
-    const ankeSlotKey = (['leader', 'leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '앙코'
-    );
-    if (ankeSlotKey && player.slots[ankeSlotKey]) {
-      const currentAnke = player.slots[ankeSlotKey]!;
-      const lv2Anke = findLv2Card(player.characterDeck, currentAnke);
-      if (lv2Anke) {
-        player.characterDeck = player.characterDeck.filter((c) => c.id !== lv2Anke.id);
-        const prevUnderlying = currentAnke.underlyingCards || [];
-        player.slots[ankeSlotKey] = {
-          ...lv2Anke,
-          underlyingCards: [...prevUnderlying, currentAnke],
-        };
-        newState.lastUpgrade = {
-          id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          playerIndex,
-          playerName: player.name,
-          character: { ...lv2Anke },
-          previousLevel: currentAnke.level as 0 | 1,
-          newLevel: 2,
-          slotName: ankeSlotKey,
-        };
-      }
-      // 리더가 앙코가 아니라면 앙코와 리더 교체
-      if (ankeSlotKey !== 'leader') {
-        const prevLeader = player.slots.leader;
-        player.slots.leader = player.slots[ankeSlotKey]!;
-        player.slots[ankeSlotKey] = prevLeader;
-      }
-      newState = addLog(
-        newState,
-        `[그늘이의 대폭주 BP01-062 배틀 효과] 앙코를 Lv.2로 각성시키고 리더를 [앙코]로 교체했습니다!`,
-        'ACTION',
-        playerIndex,
-        { cardArt: player.clashCard.artUrl, cardName: '그늘이의 대폭주', effectTag: '리더 교체&진화' }
-      );
-    }
-  }
-
-  // 6. 매서운 가시 [BP01-076] 배틀 효과: 리더를 산화로 교체 가능
-  if (player.clashCard && player.clashCard.code === 'BP01-076') {
-    const sanhuaSlotKey = (['leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '산화'
-    );
-    if (sanhuaSlotKey && player.slots[sanhuaSlotKey]) {
-      const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[sanhuaSlotKey]!;
-      player.slots[sanhuaSlotKey] = prevLeader;
-      newState = addLog(
-        newState,
-        `[매서운 가시 BP01-076 배틀 효과] 리더를 [${player.slots.leader.nameKr}](으)로 교체했습니다!`,
-        'ACTION',
-        playerIndex,
-        { cardArt: player.clashCard.artUrl, cardName: '매서운 가시', effectTag: '리더 교체' }
-      );
-    }
-  }
-
   // 양 플레이어 모두 카드를 세트했다면 자동 공개 및 판정!
   if (newState.players[0].clashCardReady && newState.players[1].clashCardReady) {
     newState = resolveClash(newState);
@@ -1498,9 +1205,320 @@ export function forceResolveClash(state: GameState): GameState {
   return resolveClash(newState);
 }
 
+// ==========================================
+// 배틀 스텝 (Battle Step 604.1.1) 캐릭터 & 카드 스킬 처리
+// (카드가 동시에 오픈된 직후 배틀에 돌입하여 발동)
+// ==========================================
+export function applyBattleStepSkills(state: GameState): GameState {
+  let newState = { ...state };
+  const p0 = { ...newState.players[0] };
+  const p1 = { ...newState.players[1] };
+  const players = [p0, p1] as [PlayerState, PlayerState];
+
+  // 양 플레이어 순회하며 공개된 대결 카드에 따른 배틀 스킬 처리
+  for (const playerIndex of [0, 1] as const) {
+    const player = players[playerIndex];
+    const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
+    const oppPlayer = players[oppIdx];
+    const clashCard = player.clashCard;
+    if (!clashCard) continue;
+
+    const leaderCards = getAllCardsInSlot(player.slots.leader);
+
+    // 1. 적색 배틀 시 스킬
+    if (clashCard.color === 'RED') {
+      // 1-A. 치샤 Lv.0 [BP01-027]: 적색 카드로 배틀 시 상대에게 1pt 피해
+      const hasChixia0 = leaderCards.some(
+        (c) => c.code === 'BP01-027' || (c.level === 0 && (c.characterName === '치샤' || c.nameKr.includes('치샤')))
+      );
+      if (hasChixia0) {
+        oppPlayer.hp = Math.max(0, oppPlayer.hp - 1);
+        newState.lastEffectEvent = {
+          id: `eff-${Date.now()}-chixia0-${playerIndex}`,
+          sourceCardName: '치샤 Lv.0',
+          sourceCardArt: player.slots.leader.artUrl,
+          effectType: 'DAMAGE',
+          title: '치샤 배틀 효과',
+          description: '적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!',
+          playerIndex,
+          timestamp: Date.now(),
+        };
+        newState = addLog(
+          newState,
+          `[치샤 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
+          'DAMAGE',
+          playerIndex,
+          { amount: 1, effectTag: '배틀 피해' }
+        );
+      }
+
+      // 1-B. 금희 Lv.0 [BP01-030]: 적색 카드로 배틀 시 상대에게 1pt 피해
+      const hasJinhsi0 = leaderCards.some(
+        (c) => c.code === 'BP01-030' || (c.level === 0 && (c.characterName === '금희' || c.nameKr.includes('금희')))
+      );
+      if (hasJinhsi0) {
+        oppPlayer.hp = Math.max(0, oppPlayer.hp - 1);
+        newState.lastEffectEvent = {
+          id: `eff-${Date.now()}-jinhsi0-${playerIndex}`,
+          sourceCardName: '금희 Lv.0',
+          sourceCardArt: player.slots.leader.artUrl,
+          effectType: 'DAMAGE',
+          title: '금희 배틀 효과',
+          description: '적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!',
+          playerIndex,
+          timestamp: Date.now(),
+        };
+        newState = addLog(
+          newState,
+          `[금희 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
+          'DAMAGE',
+          playerIndex,
+          { amount: 1, effectTag: '배틀 피해' }
+        );
+      }
+
+      // 1-C. 상대 양양 Lv.2 [SD01-003]: 상대가 적색 카드로 배틀 시 1 COST 지불 가능. 미지불 시 3pt 피해
+      const oppLeaderCards = getAllCardsInSlot(oppPlayer.slots.leader);
+      const oppHasYangyangLv2 = oppLeaderCards.some(
+        (c) => c.code === 'SD01-003' || (c.characterName === '양양' && c.level === 2)
+      );
+      if (oppHasYangyangLv2) {
+        if (player.concertoZone.length >= 1) {
+          const [spent] = player.concertoZone.splice(0, 1);
+          player.dropZone.push(spent);
+          newState = addLog(
+            newState,
+            `[상대 양양 Lv.2 배틀 효과] 상대 적색 배틀 견제로 1 COST를 지불했습니다.`,
+            'ACTION',
+            playerIndex
+          );
+        } else {
+          player.hp = Math.max(0, player.hp - 3);
+          newState = addLog(
+            newState,
+            `[상대 양양 Lv.2 배틀 효과] 1 COST를 지불할 수 없어 3pt 데미지를 받았습니다!`,
+            'DAMAGE',
+            oppIdx,
+            { amount: 3, effectTag: '배틀 피해' }
+          );
+        }
+      }
+    }
+
+    // 2. 녹색 배틀 시 스킬
+    if (clashCard.color === 'GREEN') {
+      // 2-A. 방랑자(여) [BP01-018] / 방랑자(남) [BP01-021] Lv.0 배틀 효과
+      const hasRover0 = leaderCards.some(
+        (c) =>
+          c.code === 'BP01-018' ||
+          c.code === 'BP01-021' ||
+          (c.level === 0 && (c.characterName?.includes('방랑자') || c.nameKr?.includes('방랑자')))
+      );
+      if (hasRover0) {
+        const revealed = player.actionDeck.splice(0, Math.min(2, player.actionDeck.length));
+        if (revealed.length > 0) {
+          if (player.isAi) {
+            player.hand.push(...revealed);
+            newState = addLog(
+              newState,
+              `[방랑자 Lv.0 배틀 효과] 녹색 카드 배틀 효과로 덱 위의 카드 ${revealed.length}장을 패에 추가했습니다.`,
+              'ACTION',
+              playerIndex
+            );
+          } else {
+            newState.deferredChoice = {
+              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              playerIndex,
+              title: '방랑자 배틀 효과',
+              sourceCardName: '방랑자 Lv.0',
+              sourceCardArt: player.slots.leader.artUrl,
+              description: '녹색 카드로 배틀하여 덱 위의 카드를 최대 2장까지 패에 추가할 수 있습니다 (0장~2장 선택).',
+              revealedCards: revealed,
+              minSelect: 0,
+              maxSelect: revealed.length,
+              onResolveType: 'ADD_TO_HAND',
+            };
+          }
+        }
+      }
+
+      // 2-B. 파수인 Lv.0 [BP01-010]: 녹색 카드로 배틀 시 덱 위 1장 패 추가 가능
+      const hasShorekeeper0 = leaderCards.some(
+        (c) => c.code === 'BP01-010' || (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))
+      );
+      if (hasShorekeeper0) {
+        const card = drawSingleCardFromDeck(player);
+        if (card) {
+          if (player.isAi) {
+            player.hand.push(card);
+            newState = addLog(
+              newState,
+              `[파수인 Lv.0 배틀 효과] 녹색 카드 배틀 효과로 덱에서 1장을 패에 추가했습니다.`,
+              'ACTION',
+              playerIndex
+            );
+          } else {
+            newState.deferredChoice = {
+              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              playerIndex,
+              title: '파수인 배틀 효과 (패 추가 선택)',
+              sourceCardName: '파수인 [BP01-010]',
+              sourceCardArt: player.slots.leader.artUrl,
+              description: '녹색 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 패에 추가하시겠습니까?',
+              revealedCards: [card],
+              minSelect: 0,
+              maxSelect: 1,
+              onResolveType: 'ADD_TO_HAND',
+            };
+          }
+        }
+      }
+    }
+
+    // 3. 청색 배틀 시 스킬
+    if (clashCard.color === 'BLUE') {
+      const hasYangyang0 = leaderCards.some(
+        (c) => c.code === 'BP01-024' || (c.level === 0 && (c.characterName === '양양' || c.nameKr.includes('양양')))
+      );
+      const hasSanhua0 = leaderCards.some(
+        (c) => c.code === 'BP01-033' || (c.level === 0 && (c.characterName === '산화' || c.nameKr.includes('산화')))
+      );
+      if (hasYangyang0 || hasSanhua0) {
+        const card = drawSingleCardFromDeck(player);
+        if (card) {
+          if (player.isAi) {
+            player.concertoZone.push(card);
+            newState = addLog(
+              newState,
+              `[${hasYangyang0 ? '양양' : '산화'} Lv.0 배틀 효과] 청색 카드 배틀 효과로 덱 위 1장을 협주 에리어에 충전했습니다!`,
+              'ACTION',
+              playerIndex
+            );
+          } else {
+            const charName = hasYangyang0 ? '양양' : '산화';
+            newState.deferredChoice = {
+              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              playerIndex,
+              title: `${charName} 배틀 효과 (협주 배치 선택)`,
+              sourceCardName: `${charName} Lv.0 [배틀 효과]`,
+              sourceCardArt: player.slots.leader.artUrl,
+              description: '청색 카드로 배틀에 돌입했습니다. 덱 위의 카드 1장을 협주 에리어에 배치하시겠습니까?',
+              revealedCards: [card],
+              minSelect: 0,
+              maxSelect: 1,
+              onResolveType: 'SET_CONCERTO',
+            };
+          }
+        }
+      }
+    }
+
+    // 4. 피어난 동백꽃 [BP01-048] 배틀 효과: 카멜리아 레벨업!
+    if (clashCard.code === 'BP01-048') {
+      const camSlotKey = (['leader', 'leftSupport', 'rightSupport'] as const).find(
+        (k) => player.slots[k]?.characterName === '카멜리아'
+      );
+      if (camSlotKey && player.slots[camSlotKey]) {
+        const currentCam = player.slots[camSlotKey]!;
+        const nextCam = findEvolutionCard(player.characterDeck, currentCam);
+        if (nextCam) {
+          player.characterDeck = player.characterDeck.filter((c) => c.id !== nextCam.id);
+          const prevUnderlying = currentCam.underlyingCards || [];
+          player.slots[camSlotKey] = {
+            ...nextCam,
+            underlyingCards: [...prevUnderlying, currentCam],
+          };
+          newState.lastUpgrade = {
+            id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            playerIndex,
+            playerName: player.name,
+            character: { ...nextCam },
+            previousLevel: currentCam.level as 0 | 1,
+            newLevel: nextCam.level as 1 | 2,
+            slotName: camSlotKey,
+          };
+          newState = addLog(
+            newState,
+            `[피어난 동백꽃 BP01-048 배틀 효과] [카멜리아]가 [${nextCam.nameKr}](Lv.${nextCam.level})(으)로 각성 레벨업했습니다!`,
+            'ACTION',
+            playerIndex,
+            { cardArt: nextCam.artUrl, cardName: nextCam.nameKr, effectTag: '배틀 레벨업' }
+          );
+        }
+      }
+    }
+
+    // 5. 그늘이의 대폭주 [BP01-062] 배틀 효과: 앙코를 Lv.2로 진화시키고 리더를 앙코로 교체!
+    if (clashCard.code === 'BP01-062') {
+      const ankeSlotKey = (['leader', 'leftSupport', 'rightSupport'] as const).find(
+        (k) => player.slots[k]?.characterName === '앙코'
+      );
+      if (ankeSlotKey && player.slots[ankeSlotKey]) {
+        const currentAnke = player.slots[ankeSlotKey]!;
+        const lv2Anke = findLv2Card(player.characterDeck, currentAnke);
+        if (lv2Anke) {
+          player.characterDeck = player.characterDeck.filter((c) => c.id !== lv2Anke.id);
+          const prevUnderlying = currentAnke.underlyingCards || [];
+          player.slots[ankeSlotKey] = {
+            ...lv2Anke,
+            underlyingCards: [...prevUnderlying, currentAnke],
+          };
+          newState.lastUpgrade = {
+            id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            playerIndex,
+            playerName: player.name,
+            character: { ...lv2Anke },
+            previousLevel: currentAnke.level as 0 | 1,
+            newLevel: 2,
+            slotName: ankeSlotKey,
+          };
+        }
+        if (ankeSlotKey !== 'leader') {
+          const prevLeader = player.slots.leader;
+          player.slots.leader = player.slots[ankeSlotKey]!;
+          player.slots[ankeSlotKey] = prevLeader;
+        }
+        newState = addLog(
+          newState,
+          `[그늘이의 대폭주 BP01-062 배틀 효과] 앙코를 Lv.2로 각성시키고 리더를 [앙코]로 교체했습니다!`,
+          'ACTION',
+          playerIndex,
+          { cardArt: clashCard.artUrl, cardName: '그늘이의 대폭주', effectTag: '리더 교체&진화' }
+        );
+      }
+    }
+
+    // 6. 매서운 가시 [BP01-076] 배틀 효과: 리더를 산화로 교체 가능
+    if (clashCard.code === 'BP01-076') {
+      const sanhuaSlotKey = (['leftSupport', 'rightSupport'] as const).find(
+        (k) => player.slots[k]?.characterName === '산화'
+      );
+      if (sanhuaSlotKey && player.slots[sanhuaSlotKey]) {
+        const prevLeader = player.slots.leader;
+        player.slots.leader = player.slots[sanhuaSlotKey]!;
+        player.slots[sanhuaSlotKey] = prevLeader;
+        newState = addLog(
+          newState,
+          `[매서운 가시 BP01-076 배틀 효과] 리더를 [${player.slots.leader.nameKr}](으)로 교체했습니다!`,
+          'ACTION',
+          playerIndex,
+          { cardArt: clashCard.artUrl, cardName: '매서운 가시', effectTag: '리더 교체' }
+        );
+      }
+    }
+  }
+
+  newState.players = players;
+  return newState;
+}
+
 // 판정 계산 로직
 export function resolveClash(state: GameState): GameState {
   let newState = { ...state, phase: 'CLASH_REVEAL' as GamePhase };
+
+  // 배틀 스텝 (Battle Step 604.1.1): 카드가 동시에 오픈된 직후 배틀에 돌입하여 배틀 스킬 발동!
+  newState = applyBattleStepSkills(newState);
+
   const p0 = { ...newState.players[0] };
   const p1 = { ...newState.players[1] };
   const activeIdx = newState.activePlayerIndex;

@@ -1164,7 +1164,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
                     {/* 상대 액션 에리어 (화면에 꽉 차는 대형 규격) */}
                     <div
-                      onMouseEnter={() => p1.clashCard && setPreviewCard(p1.clashCard)}
+                      onMouseEnter={() => {
+                        // 상대의 대결 카드는 공개(Reveal)된 상태이거나 내가 P2일 때만 미리보기 창에 표시
+                        const isP1ClashRevealed =
+                          controlledPlayerIndex === 1 ||
+                          gameState.phase === 'CLASH_REVEAL' ||
+                          gameState.phase === 'COMBO_STEP';
+                        if (isP1ClashRevealed && p1.clashCard) {
+                          setPreviewCard(p1.clashCard);
+                        }
+                      }}
                       className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
                     >
                       <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-cyan-500/70 uppercase tracking-widest z-10">
@@ -1172,7 +1181,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </span>
                       {p1.clashCard ? (
                         <div className="animate-card-slam max-h-full">
-                          <CardView card={p1.clashCard} size="md" isFacedown={!p1.clashCardReady || gameState.phase === 'CLASH_SET'} />
+                          <CardView
+                            card={p1.clashCard}
+                            size="md"
+                            isFacedown={
+                              controlledPlayerIndex !== 1 &&
+                              gameState.phase !== 'CLASH_REVEAL' &&
+                              gameState.phase !== 'COMBO_STEP'
+                            }
+                          />
                         </div>
                       ) : (
                         <div className="w-40 h-56 rounded-xl border-2 border-dashed border-cyan-500/30 bg-cyan-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
@@ -1187,10 +1204,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <div className="flex flex-col gap-2">
                     {/* 상대 협주 에리어 (슬림 컴팩트화) */}
                     <div
-                      onClick={() => openCardListModal('CONCERTO', 1)}
-                      onMouseEnter={() => p1.concertoZone.length > 0 && setPreviewCard(p1.concertoZone[p1.concertoZone.length - 1])}
-                      className="flex-1 rounded-2xl border border-cyan-500/50 hover:border-cyan-400 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg cursor-pointer transition group"
-                      title="상대 협주 에리어 (클릭 시 충전된 카드 목록 보기)"
+                      onClick={() => {
+                        if (controlledPlayerIndex === 1) {
+                          openCardListModal('CONCERTO', 1);
+                        }
+                      }}
+                      onMouseEnter={() => {
+                        if (controlledPlayerIndex === 1 && p1.concertoZone.length > 0) {
+                          setPreviewCard(p1.concertoZone[p1.concertoZone.length - 1]);
+                        }
+                      }}
+                      className={`flex-1 rounded-2xl border border-cyan-500/50 hover:border-cyan-400 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg transition group ${
+                        controlledPlayerIndex === 1 ? 'cursor-pointer' : 'cursor-default'
+                      }`}
+                      title={controlledPlayerIndex === 1 ? '상대 협주 에리어 (클릭 시 충전된 카드 목록 보기)' : '상대 협주 에리어 (비공개 자원)'}
                     >
                       <div className="flex items-center justify-between w-full px-0.5">
                         <span className="text-xs font-mono text-cyan-400 font-black">협주 게이지</span>
@@ -1200,19 +1227,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </div>
 
                       {p1.concertoZone.length > 0 ? (
-                        <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)] my-0.5 group-hover:scale-105 transition transform">
-                          <img
-                            src={(p1.concertoZone[p1.concertoZone.length - 1] as any).artUrl}
-                            alt="협주 에너지"
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1">
-                            <span className="text-[10px] sm:text-[11px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
-                              <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>{p1.concertoZone.length}</span>
-                            </span>
+                        controlledPlayerIndex === 1 ? (
+                          <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)] my-0.5 group-hover:scale-105 transition transform">
+                            <img
+                              src={(p1.concertoZone[p1.concertoZone.length - 1] as any).artUrl}
+                              alt="협주 에너지"
+                              className="w-full h-full object-cover"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1">
+                              <span className="text-[10px] sm:text-[11px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
+                                <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
+                                <span>{p1.concertoZone.length}</span>
+                              </span>
+                            </div>
                           </div>
-                        </div>
+                        ) : (
+                          <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-cyan-500/70 shadow-[0_0_15px_rgba(34,211,238,0.2)] my-0.5 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex flex-col items-center justify-center select-none">
+                            <div className="w-7 h-7 rounded-full border border-cyan-400/50 flex items-center justify-center bg-slate-900/80 shadow-inner">
+                              <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-cyan-300 mt-1">ENERGY</span>
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-0.5 text-center">
+                              <span className="text-[10px] font-mono font-black text-cyan-200">
+                                {p1.concertoZone.length}
+                              </span>
+                            </div>
+                          </div>
+                        )
                       ) : (
                         <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
                           <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
@@ -1421,7 +1462,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <div className="flex flex-col justify-between gap-3 flex-1">
                     {/* 내 액션 에리어 (화면에 꽉 차는 대형 규격) */}
                     <div
-                      onMouseEnter={() => p0.clashCard && setPreviewCard(p0.clashCard)}
+                      onMouseEnter={() => {
+                        const isP0ClashRevealed =
+                          controlledPlayerIndex === 0 ||
+                          gameState.phase === 'CLASH_REVEAL' ||
+                          gameState.phase === 'COMBO_STEP';
+                        if (isP0ClashRevealed && p0.clashCard) {
+                          setPreviewCard(p0.clashCard);
+                        }
+                      }}
                       className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
                     >
                       <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-amber-500/80 uppercase tracking-widest z-10">
@@ -1429,7 +1478,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </span>
                       {p0.clashCard ? (
                         <div className="animate-card-slam max-h-full">
-                          <CardView card={p0.clashCard} size="md" />
+                          <CardView
+                            card={p0.clashCard}
+                            size="md"
+                            isFacedown={
+                              controlledPlayerIndex === 1 &&
+                              gameState.phase !== 'CLASH_REVEAL' &&
+                              gameState.phase !== 'COMBO_STEP'
+                            }
+                          />
                         </div>
                       ) : (
                         <div className="w-40 h-56 rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
