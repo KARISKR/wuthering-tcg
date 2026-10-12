@@ -1117,41 +1117,38 @@ export function applyCharacterEvolutionSkills(
     }
   }
 
-  // 7. BP01-023 양양 Lv.1: 【등장】/【레벨업】자신의 덱 위의 카드 1장을 협주 에리어에 배치한다.
-  const yang1 = (upgradeCard.code === 'BP01-023' || (upgradeCard.level === 1 && (upgradeCard.characterName === '양양' || upgradeCard.nameKr?.includes('양양')) && upgradeCard.description?.includes('협주'))) ? upgradeCard : (currentSlotCard.code === 'BP01-023' || (currentSlotCard.level === 1 && (currentSlotCard.characterName === '양양' || currentSlotCard.nameKr?.includes('양양')) && currentSlotCard.description?.includes('협주'))) ? currentSlotCard : null;
-  if (yang1) {
-    const isEntry = yang1 === upgradeCard;
+  // 7. 양양 Lv.1 (BP01-023 등): 【등장】/【레벨업】자신의 덱 위의 카드 1장을 협주 에리어에 배치한다.
+  // 1) 0 -> 1 레벨업 시 (등장): upgradeCard가 양양 Lv.1일 때 덱 위 1장 즉시 협주 에리어에 자동 배치
+  // 2) 1 -> 2 레벨업 시 (레벨업): 밑에 깔린 currentSlotCard가 양양 Lv.1일 때 덱 위 1장 즉시 협주 에리어에 자동 배치
+  const isYangyangLv1 = (c: CharacterCard | undefined | null) =>
+    Boolean(c && (c.code === 'BP01-023' || (c.level === 1 && (c.characterName === '양양' || c.nameKr?.includes('양양')))));
+
+  const isYangEntry = isYangyangLv1(upgradeCard);
+  const isYangStack = isYangyangLv1(currentSlotCard);
+
+  if (isYangEntry || isYangStack) {
+    const yangCard = isYangEntry ? upgradeCard : currentSlotCard;
     const topCard = drawSingleCardFromDeck(player);
     if (topCard) {
-      if (player.isAi) {
-        player.concertoZone.push(topCard);
-        newState.players[playerIndex] = player;
-        newState = addLog(
-          newState,
-          `[양양 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] ${player.name}이(가) 덱 위의 카드 [${topCard.nameKr}]을(를) 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length})`,
-          'ACTION',
-          playerIndex,
-          { cardArt: yang1.artUrl, cardName: '양양 Lv.1', effectTag: '협주 충전' }
-        );
-      } else {
-        const choice: PendingChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          playerIndex,
-          title: `양양 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 (협주 배치)`,
-          sourceCardName: '양양 [BP01-023]',
-          sourceCardArt: yang1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'}】 효과로 자신의 덱 위의 카드 1장을 협주 에리어에 배치합니다.`,
-          revealedCards: [topCard],
-          minSelect: 0,
-          maxSelect: 1,
-          onResolveType: 'SET_CONCERTO',
-        };
-        if (isDeferred) {
-          newState.deferredChoice = choice;
-        } else {
-          newState.pendingChoice = choice;
-        }
-      }
+      player.concertoZone.push(topCard);
+      newState.players[playerIndex] = player;
+      newState.lastEffectEvent = {
+        id: `eff-${Date.now()}-yang1-${playerIndex}`,
+        sourceCardName: `${yangCard.nameKr} [${yangCard.code}]`,
+        sourceCardArt: yangCard.artUrl,
+        effectType: 'CHARGE',
+        title: `양양 Lv.1 ${isYangEntry ? '등장' : '레벨업'} 효과`,
+        description: `【${isYangEntry ? '등장' : '레벨업'}】 효과로 덱 위의 카드 1장을 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length})`,
+        playerIndex,
+        timestamp: Date.now(),
+      };
+      newState = addLog(
+        newState,
+        `[양양 Lv.1 ${isYangEntry ? '등장' : '레벨업'} 효과] ${player.name}이(가) 덱 위의 카드 [${topCard.nameKr}]을(를) 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length})`,
+        'ACTION',
+        playerIndex,
+        { cardArt: yangCard.artUrl, cardName: '양양 Lv.1', effectTag: '협주 충전' }
+      );
     }
   }
 
