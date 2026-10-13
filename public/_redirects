@@ -1,0 +1,5 @@
+# Cloudflare Pages Redirects & SPA Rewrite
+# https://developers.cloudflare.com/pages/configuration/redirects/
+
+# SPA 라우팅 지원: 모든 하위 URL 요청을 index.html로 200 상태 코드로 포워딩
+/*    /index.html   200
