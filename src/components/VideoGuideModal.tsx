@@ -49,49 +49,57 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
     }
   };
 
+  const handleFullScreen = () => {
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      }
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 w-screen h-screen bg-[#05070d] flex flex-col overflow-hidden text-slate-100 select-none animate-in fade-in duration-200">
       {/* ========================================================= */}
       {/* 1. 최상단 헤더 바 */}
       {/* ========================================================= */}
-      <header className="h-16 px-6 border-b border-slate-800 bg-slate-950/95 flex items-center justify-between shrink-0 z-20">
-        <div className="flex items-center gap-3.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-amber-500 flex items-center justify-center shadow-lg shadow-red-500/25 text-white font-black">
+      <header className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 bg-slate-950/95 flex items-center justify-between shrink-0 z-20">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-red-500 to-amber-500 flex items-center justify-center shadow-lg shadow-red-500/25 text-white font-black">
             <Film className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-base sm:text-lg font-black text-white tracking-wide">
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm sm:text-base md:text-lg font-black text-white tracking-wide">
                 공식 룰 동영상 가이드
               </h2>
               <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                1080p FULL HD OFFICIAL VIDEO TUTORIAL
+                1080p FHD
               </span>
             </div>
             <p className="text-xs text-slate-400 hidden sm:block">
-              『명조: 대결』 10분 완성 공식 플레이 시연 영상과 챕터별 타임스탬프로 규칙을 한눈에 익힐 수 있습니다.
+              『명조: 대결』 10분 완성 공식 플레이 시연 영상과 챕터별 타임스탬프
             </p>
           </div>
         </div>
 
         {/* 우측 액션 버튼 */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           {onOpenManual && (
             <button
               onClick={() => {
                 onClose();
                 onOpenManual();
               }}
-              className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition cursor-pointer"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition cursor-pointer"
             >
               <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-              <span>텍스트 공식 룰북 보기</span>
+              <span>텍스트 룰북</span>
             </button>
           )}
 
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition cursor-pointer text-xs font-bold"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition cursor-pointer text-xs font-bold"
             title="닫기"
           >
             <X className="w-4 h-4" />
@@ -105,43 +113,51 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
       {/* ========================================================= */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-black">
         {/* 좌측: 대형 시네마 영상 플레이어 영역 */}
-        <div className="flex-1 flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8 overflow-y-auto bg-gradient-to-b from-slate-950 via-[#070b16] to-black min-h-0">
-          <div className="w-full max-w-5xl space-y-4">
-            {/* 비디오 프레임 */}
-            <div className="relative aspect-video w-full rounded-3xl overflow-hidden border-2 border-amber-500/70 shadow-2xl bg-black shadow-amber-500/10">
+        <div className="flex-1 flex flex-col justify-center items-center p-2 sm:p-4 lg:p-6 overflow-y-auto bg-gradient-to-b from-slate-950 via-[#070b16] to-black min-h-0 custom-scrollbar">
+          <div className="w-full max-w-[1500px] flex flex-col items-center gap-3">
+            {/* 비디오 프레임 (대화면 확장) */}
+            <div className="relative aspect-video w-full max-h-[calc(100vh-160px)] rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-amber-500/70 shadow-2xl bg-black shadow-amber-500/10">
               <video
                 ref={videoRef}
                 src="https://github.com/KARISKR/wuthering-tcg/releases/download/v1.0-video/rules_tutorial_1080p_original.mp4"
                 controls
                 playsInline
-                preload="none"
+                preload="metadata"
                 className="w-full h-full object-contain"
               />
             </div>
 
             {/* 비디오 하단 메타 정보 바 */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-3">
+            <div className="w-full p-3 sm:p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-2.5">
               <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-black text-amber-400 bg-amber-500/20 border border-amber-500/40 px-2.5 py-0.5 rounded-full">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="text-[11px] font-black text-amber-400 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full">
                     공식 한국어 튜토리얼
                   </span>
-                  <span className="text-xs font-mono font-bold text-slate-400">
+                  <span className="text-[11px] font-mono font-bold text-slate-400">
                     1080p FHD · 총 10분 05초
                   </span>
                 </div>
-                <h3 className="text-base sm:text-lg font-black text-white">
+                <h3 className="text-sm sm:text-base font-black text-white">
                   『명조: 대결』 공식 배틀 TCG 룰 설명 & 플레이 시연
                 </h3>
               </div>
 
               <div className="flex items-center gap-2">
                 <button
+                  onClick={handleFullScreen}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border border-slate-700 shadow"
+                  title="전체화면"
+                >
+                  <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
+                  <span>전체화면</span>
+                </button>
+                <button
                   onClick={() => handleSeekVideo(0)}
-                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border border-slate-700 shadow"
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border border-slate-700 shadow"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>처음부터 다시 보기</span>
+                  <span>처음부터</span>
                 </button>
               </div>
             </div>
@@ -149,7 +165,7 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
         </div>
 
         {/* 우측 사이드바: 챕터별 타임스탬프 원클릭 바로가기 */}
-        <aside className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-slate-800 bg-slate-950/95 p-5 flex flex-col gap-3.5 overflow-y-auto shrink-0 custom-scrollbar">
+        <aside className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-slate-800 bg-slate-950/95 p-4 flex flex-col gap-3 overflow-y-auto shrink-0 custom-scrollbar">
           <div className="flex items-center justify-between">
             <div>
               <span className="text-xs font-black text-amber-400 tracking-wider uppercase block">
