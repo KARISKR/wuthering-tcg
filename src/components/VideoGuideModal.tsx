@@ -111,7 +111,7 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
             <div className="relative aspect-video w-full rounded-3xl overflow-hidden border-2 border-amber-500/70 shadow-2xl bg-black shadow-amber-500/10">
               <video
                 ref={videoRef}
-                src="/videos/rules_tutorial.mp4"
+                src="https://github.com/KARISKR/wuthering-tcg/releases/download/v1.0-video/rules_tutorial_1080p_original.mp4"
                 controls
                 playsInline
                 preload="none"
