@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Lobby } from './components/Lobby';
-import { GameBoard } from './components/GameBoard';
-import { DeckBuilder, CustomDeckConfig } from './components/DeckBuilder';
-import { BattleReplayStage } from './components/BattleReplayStage';
-import { BattleReplayData } from './utils/replayManager';
+import type { CustomDeckConfig } from './components/DeckBuilder';
+import type { BattleReplayData } from './utils/replayManager';
 import { FeedbackWidget } from './components/FeedbackWidget';
 import { bgmManager } from './utils/bgmManager';
+
+const GameBoard = lazy(() => import('./components/GameBoard').then((m) => ({ default: m.GameBoard })));
+const DeckBuilder = lazy(() => import('./components/DeckBuilder').then((m) => ({ default: m.DeckBuilder })));
+const BattleReplayStage = lazy(() => import('./components/BattleReplayStage').then((m) => ({ default: m.BattleReplayStage })));
 
 export function App() {
   const [currentView, setCurrentView] = useState<'LOBBY' | 'BATTLE' | 'DECK_BUILDER' | 'REPLAY_STAGE'>('LOBBY');
@@ -59,29 +61,38 @@ export function App() {
         />
       )}
 
-      {currentView === 'DECK_BUILDER' && (
-        <DeckBuilder
-          onBackToLobby={() => setCurrentView('LOBBY')}
-          onStartBattleWithDeck={handleStartBattleWithCustomDeck}
-        />
-      )}
+      <Suspense
+        fallback={
+          <div className="w-full min-h-screen bg-[#070a13] flex flex-col items-center justify-center text-amber-400 gap-3">
+            <div className="w-10 h-10 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+            <span className="text-xs font-bold tracking-widest text-slate-400 font-mono">LOADING SIMULATOR...</span>
+          </div>
+        }
+      >
+        {currentView === 'DECK_BUILDER' && (
+          <DeckBuilder
+            onBackToLobby={() => setCurrentView('LOBBY')}
+            onStartBattleWithDeck={handleStartBattleWithCustomDeck}
+          />
+        )}
 
-      {currentView === 'BATTLE' && (
-        <GameBoard
-          onExitToLobby={() => setCurrentView('LOBBY')}
-          initialMode={battleMode}
-          customDeck={customDeck}
-          opponentDeck={opponentDeck}
-          onPlayBattleReplay={handlePlayBattleReplay}
-        />
-      )}
+        {currentView === 'BATTLE' && (
+          <GameBoard
+            onExitToLobby={() => setCurrentView('LOBBY')}
+            initialMode={battleMode}
+            customDeck={customDeck}
+            opponentDeck={opponentDeck}
+            onPlayBattleReplay={handlePlayBattleReplay}
+          />
+        )}
 
-      {currentView === 'REPLAY_STAGE' && activeReplay && (
-        <BattleReplayStage
-          replay={activeReplay}
-          onExit={handleExitReplay}
-        />
-      )}
+        {currentView === 'REPLAY_STAGE' && activeReplay && (
+          <BattleReplayStage
+            replay={activeReplay}
+            onExit={handleExitReplay}
+          />
+        )}
+      </Suspense>
 
       {/* 메인 화면(로비) 전용 버그 제보 & 피드백 플로팅 위젯 */}
       {currentView === 'LOBBY' && <FeedbackWidget currentContextView="LOBBY" />}

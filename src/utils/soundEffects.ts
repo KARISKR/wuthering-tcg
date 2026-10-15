@@ -399,58 +399,26 @@ class SoundEffectsEngine {
   }
 
   /**
-   * 주요 카테고리 및 캐릭터 커스텀 사운드 사전 비동기 로드
+   * 주요 UI 핵심 사운드만 가볍게 사전 비동기 로드 (네트워크 폭주 및 메인스레드 랙 방지)
+   * 기타 캐릭터 및 상황별 사운드는 필요 시 온디맨드로 지연 로드됩니다.
    */
   public async preloadAllCustomSounds() {
-    const categories: string[] = [
-      'clash',
+    const coreUiCategories: string[] = [
+      'card',
       'clash_reveal',
-      'clash_impact',
-      'draw',
-      'damage',
-      'damage_light',
-      'damage_medium',
-      'damage_heavy',
-      'weapon_sword',
-      'weapon_broadblade',
-      'weapon_pistol',
-      'weapon_rectifier',
-      'phase',
       'phase_draw',
       'phase_action',
-      'phase_battle',
-      'phase_combo',
-      'phase_end',
-      'combo',
-      'combo_1',
-      'combo_2',
-      'combo_3',
-      'card',
       'turn',
-      'upgrade',
-      'victory',
-      'defeat',
-      'match_start',
-      'heal',
-      'low_hp',
     ];
 
-    // 캐릭터별 고유 레벨업, 코스트별 공격음, 승리 사운드, 오프닝 사운드 로드
-    SUPPORTED_CHARACTERS.forEach((char) => {
-      categories.push(`char_levelup_${char.id}`);
-      categories.push(`char_attack_${char.id}_cost0`);
-      categories.push(`char_attack_${char.id}_cost1`);
-      categories.push(`char_attack_${char.id}_cost2`);
-      categories.push(`char_victory_${char.id}`);
-      categories.push(`char_defeat_${char.id}`);
-      categories.push(`char_opening_${char.id}`);
-      categories.push(`char_hurt_${char.id}`);
-      categories.push(`char_idle_${char.id}`);
-      categories.push(`char_low_hp_${char.id}`);
-      categories.push(`char_switch_${char.id}`);
-    });
-
-    await Promise.allSettled(categories.map((cat) => this.loadCustomServerFile(cat)));
+    // 첫 인터랙션 직후의 버벅임 방지를 위해 300ms 후 가볍게 병렬 요청
+    setTimeout(async () => {
+      try {
+        await Promise.allSettled(coreUiCategories.map((cat) => this.loadCustomServerFile(cat)));
+      } catch {
+        // ignore
+      }
+    }, 300);
   }
 
   private getAudioContext(): AudioContext | null {

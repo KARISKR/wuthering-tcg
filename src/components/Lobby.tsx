@@ -1,17 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { BgmPlayer } from './BgmPlayer';
-import { OfficialManualModal } from './OfficialManualModal';
-import { CardCatalogModal } from './CardCatalogModal';
-import { DeckPresetModal } from './DeckPresetModal';
-import { VideoGuideModal } from './VideoGuideModal';
-import { PatchNotesModal } from './PatchNotesModal';
-import { SfxGuideModal } from './SfxGuideModal';
-import { CommunityDeckModal } from './CommunityDeckModal';
-import { BattleReplayModal } from './BattleReplayModal';
-import { FeedbackModal } from './FeedbackModal';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import { DeckSelectModal } from './DeckSelectModal';
+
+const OfficialManualModal = lazy(() => import('./OfficialManualModal').then((m) => ({ default: m.OfficialManualModal })));
+const CardCatalogModal = lazy(() => import('./CardCatalogModal').then((m) => ({ default: m.CardCatalogModal })));
+const DeckPresetModal = lazy(() => import('./DeckPresetModal').then((m) => ({ default: m.DeckPresetModal })));
+const VideoGuideModal = lazy(() => import('./VideoGuideModal').then((m) => ({ default: m.VideoGuideModal })));
+const PatchNotesModal = lazy(() => import('./PatchNotesModal').then((m) => ({ default: m.PatchNotesModal })));
+const SfxGuideModal = lazy(() => import('./SfxGuideModal').then((m) => ({ default: m.SfxGuideModal })));
+const CommunityDeckModal = lazy(() => import('./CommunityDeckModal').then((m) => ({ default: m.CommunityDeckModal })));
+const BattleReplayModal = lazy(() => import('./BattleReplayModal').then((m) => ({ default: m.BattleReplayModal })));
+const FeedbackModal = lazy(() => import('./FeedbackModal').then((m) => ({ default: m.FeedbackModal })));
 import {
   Swords,
   Layers,
@@ -504,110 +505,104 @@ export const Lobby: React.FC<LobbyProps> = ({
         }}
       />
 
-      {/* 공식 룰북 모달 */}
-      <OfficialManualModal
-        isOpen={isManualOpen}
-        onClose={() => setIsManualOpen(false)}
-        onOpenVideoGuide={() => setIsVideoOpen(true)}
-      />
+      {/* 비동기 지연 로드 모달 컴포넌트 풀 (Suspense) */}
+      <Suspense fallback={null}>
+        {/* 공식 룰북 모달 */}
+        {isManualOpen && (
+          <OfficialManualModal
+            isOpen={isManualOpen}
+            onClose={() => setIsManualOpen(false)}
+            onOpenVideoGuide={() => setIsVideoOpen(true)}
+          />
+        )}
 
-      {/* 공식 룰 동영상 가이드 전용 모달 (신설!) */}
-      <VideoGuideModal
-        isOpen={isVideoOpen}
-        onClose={() => setIsVideoOpen(false)}
-        onOpenManual={() => setIsManualOpen(true)}
-      />
+        {/* 공식 룰 동영상 가이드 전용 모달 */}
+        {isVideoOpen && (
+          <VideoGuideModal
+            isOpen={isVideoOpen}
+            onClose={() => setIsVideoOpen(false)}
+            onOpenManual={() => setIsManualOpen(true)}
+          />
+        )}
 
-      {/* 카드 도감 모달 */}
-      <CardCatalogModal
-        isOpen={isCatalogOpen}
-        onClose={() => setIsCatalogOpen(false)}
-      />
+        {/* 카드 도감 모달 */}
+        {isCatalogOpen && (
+          <CardCatalogModal
+            isOpen={isCatalogOpen}
+            onClose={() => setIsCatalogOpen(false)}
+          />
+        )}
 
-      {/* 덱 프리셋 & 코드 매니저 모달 */}
-      <DeckPresetModal
-        isOpen={isPresetOpen}
-        onClose={() => setIsPresetOpen(false)}
-        onSelectAndBattle={(deck) => {
-          if (onStartBattleWithCustomDeck) {
-            onStartBattleWithCustomDeck(deck);
-          } else {
-            onStartGame('AI');
-          }
-        }}
-        onSelectAndEdit={() => {
-          onOpenDeckBuilder();
-        }}
-      />
+        {/* 덱 프리셋 & 코드 매니저 모달 */}
+        {isPresetOpen && (
+          <DeckPresetModal
+            isOpen={isPresetOpen}
+            onClose={() => setIsPresetOpen(false)}
+            onSelectAndBattle={(deck) => {
+              if (onStartBattleWithCustomDeck) {
+                onStartBattleWithCustomDeck(deck);
+              } else {
+                onStartGame('AI');
+              }
+            }}
+            onSelectAndEdit={() => {
+              onOpenDeckBuilder();
+            }}
+          />
+        )}
 
-      {/* 커뮤니티 공유 덱 라운지 모달 (신설!) */}
-      <CommunityDeckModal
-        isOpen={isCommunityDeckOpen}
-        onClose={() => setIsCommunityDeckOpen(false)}
-        onSelectAndBattle={(deck) => {
-          if (onStartBattleWithCustomDeck) {
-            onStartBattleWithCustomDeck(deck);
-          } else {
-            onStartGame('AI', deck);
-          }
-        }}
-        onSelectAndEdit={() => {
-          onOpenDeckBuilder();
-        }}
-      />
+        {/* 커뮤니티 공유 덱 라운지 모달 */}
+        {isCommunityDeckOpen && (
+          <CommunityDeckModal
+            isOpen={isCommunityDeckOpen}
+            onClose={() => setIsCommunityDeckOpen(false)}
+            onSelectAndBattle={(deck) => {
+              if (onStartBattleWithCustomDeck) {
+                onStartBattleWithCustomDeck(deck);
+              } else {
+                onStartGame('AI', deck);
+              }
+            }}
+            onSelectAndEdit={() => {
+              onOpenDeckBuilder();
+            }}
+          />
+        )}
 
-      {/* ========================================================= */}
-      {/* 메인화면 우하단 플로팅 패치노트 위젯 & 버전 표시기 */}
-      {/* ========================================================= */}
-      <button
-        onClick={() => setIsPatchNotesOpen(true)}
-        className="fixed bottom-5 right-5 z-40 group flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-slate-900/95 hover:bg-slate-800 border-2 border-amber-500/50 hover:border-amber-400 text-slate-200 shadow-2xl shadow-black/90 hover:shadow-amber-500/25 backdrop-blur-md transition-all duration-300 hover:scale-105 cursor-pointer"
-        title="패치노트 및 업데이트 내역 확인"
-      >
-        <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center font-bold">
-          <ScrollText className="w-3.5 h-3.5" />
-        </div>
-        <div className="flex flex-col text-left">
-          <div className="flex items-center gap-1.5 leading-none">
-            <span className="font-mono font-black text-amber-300 text-xs">
-              {CURRENT_GAME_VERSION}
-            </span>
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          </div>
-          <span className="text-[10px] font-bold text-slate-300 group-hover:text-white mt-0.5">
-            패치노트
-          </span>
-        </div>
-        <span className="ml-1 px-1.5 py-0.5 rounded text-[9px] font-black bg-red-600 text-white tracking-wider animate-pulse">
-          NEW
-        </span>
-      </button>
+        {/* 패치노트 전용 모달 */}
+        {isPatchNotesOpen && (
+          <PatchNotesModal
+            isOpen={isPatchNotesOpen}
+            onClose={() => setIsPatchNotesOpen(false)}
+          />
+        )}
 
-      {/* 패치노트 전용 모달 */}
-      <PatchNotesModal
-        isOpen={isPatchNotesOpen}
-        onClose={() => setIsPatchNotesOpen(false)}
-      />
+        {/* 커스텀 효과음 가이드 모달 */}
+        {isSfxGuideOpen && (
+          <SfxGuideModal
+            isOpen={isSfxGuideOpen}
+            onClose={() => setIsSfxGuideOpen(false)}
+          />
+        )}
 
-      {/* 커스텀 효과음 가이드 모달 */}
-      <SfxGuideModal
-        isOpen={isSfxGuideOpen}
-        onClose={() => setIsSfxGuideOpen(false)}
-      />
+        {/* 대전 리플레이 & 복기 모달 */}
+        {isReplayOpen && (
+          <BattleReplayModal
+            isOpen={isReplayOpen}
+            onClose={() => setIsReplayOpen(false)}
+            onPlayBattleReplay={onPlayBattleReplay}
+          />
+        )}
 
-      {/* 대전 리플레이 & 복기 모달 */}
-      <BattleReplayModal
-        isOpen={isReplayOpen}
-        onClose={() => setIsReplayOpen(false)}
-        onPlayBattleReplay={onPlayBattleReplay}
-      />
-
-      {/* 버그 제보 & 피드백 모달 */}
-      <FeedbackModal
-        isOpen={isFeedbackOpen}
-        onClose={() => setIsFeedbackOpen(false)}
-        currentContextView="LOBBY"
-      />
+        {/* 버그 제보 & 피드백 모달 */}
+        {isFeedbackOpen && (
+          <FeedbackModal
+            isOpen={isFeedbackOpen}
+            onClose={() => setIsFeedbackOpen(false)}
+            currentContextView="LOBBY"
+          />
+        )}
+      </Suspense>
     </div>
   );
 };
