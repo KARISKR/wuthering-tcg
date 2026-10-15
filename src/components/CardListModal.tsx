@@ -158,21 +158,21 @@ export const CardListModal: React.FC<CardListModalProps> = ({
                 </span>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              <div className="flex flex-wrap items-stretch justify-center sm:justify-start gap-4">
                 {cards.map((card, idx) => (
                   <div
                     key={`${card.id}-${idx}`}
                     onClick={() => handleCardClick(card, idx)}
                     onMouseEnter={() => onSelectCard?.(card)}
-                    className="group relative flex flex-col items-center bg-slate-900/80 border border-slate-800 hover:border-amber-400/90 rounded-2xl p-2.5 transition transform hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-500/10 cursor-pointer"
+                    className="group relative flex flex-col items-center bg-slate-900/90 border border-slate-800 hover:border-amber-400/90 rounded-2xl p-3 transition transform hover:-translate-y-1 hover:shadow-xl hover:shadow-amber-500/10 cursor-pointer w-40 sm:w-44 shrink-0"
                     title="클릭하여 확대한 전체 일러스트 보기"
                   >
-                    {/* 카드 썸네일 & 줌 힌트 오버레이 */}
-                    <div className="w-full aspect-[16/10] rounded-xl overflow-hidden bg-slate-950 mb-2 border border-slate-700/60 shadow relative">
+                    {/* 카드 썸네일 & 줌 힌트 오버레이 - 온전한 세로 비율로 잘림 없이 표시 */}
+                    <div className="w-full aspect-[5/7] rounded-xl overflow-hidden bg-slate-950 mb-2.5 border border-slate-700/60 shadow-md relative flex items-center justify-center">
                       <img
                         src={card.artUrl}
                         alt={card.nameKr}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-200"
+                        className="w-full h-full object-contain group-hover:scale-105 transition duration-200"
                       />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 text-amber-300 font-bold text-xs backdrop-blur-[1px]">
                         <ZoomIn className="w-4 h-4 text-amber-400" />

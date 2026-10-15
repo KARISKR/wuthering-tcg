@@ -160,7 +160,7 @@ export function generateStarterActionDeck(deckPresetId: 'STARTER_ROVER' | 'START
     }
   }
 
-  return shuffleArray(deck);
+  return shuffleActionDeck(deck);
 }
 
 // 덱/캐릭터 프리셋 정의
@@ -235,3 +235,11 @@ export function shuffleArray<T>(array: T[]): T[] {
   }
   return newArr;
 }
+
+// 공식 TCG 표준 피셔-예이츠(Fisher-Yates) 덱 셔플 (완전 무작위 균등 분포 보장)
+export function shuffleActionDeck(deck: ActionCard[]): ActionCard[] {
+  let result = shuffleArray(deck);
+  // 추가 패스로 완벽한 난수 분산 보장 (인위적 확률 조작 배제)
+  return shuffleArray(result);
+}
+

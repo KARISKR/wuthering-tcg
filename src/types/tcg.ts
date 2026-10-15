@@ -170,6 +170,7 @@ export interface LogItem {
   cardName?: string; // 카드 이름
   amount?: number; // 데미지량 또는 회복 수치
   effectTag?: string; // '연격', '가드', '드로우', '회복', '충전' 등
+  drawnCards?: ActionCard[]; // 드로우된 카드 목록 (호버 시 공개 및 툴팁용)
 }
 
 // 전체 게임 상태
@@ -179,6 +180,7 @@ export interface ComboStrikeEffect {
   attackerName: string;
   card: ActionCard;
   damage: number;
+  comboCount?: number; // 1, 2, 3, 4, 5, 6... 콤보 단계
 }
 
 export interface UpgradeEffect {
@@ -202,7 +204,7 @@ export interface PendingChoice {
   revealedCards: ActionCard[]; // 공개된 덱 위 카드들
   minSelect: number; // 예: 0장 선택 가능
   maxSelect: number; // 예: 최대 2장 선택 가능
-  onResolveType: 'ADD_TO_HAND' | 'SET_CONCERTO' | 'RECOVER_FROM_DROP' | 'DISCARD_FOR_DAMAGE';
+  onResolveType: 'ADD_TO_HAND' | 'SET_CONCERTO' | 'RECOVER_FROM_DROP' | 'DISCARD_FOR_DAMAGE' | 'VIEW_ONLY';
 }
 
 export interface GameState {
@@ -215,12 +217,15 @@ export interface GameState {
   lastUpgrade?: UpgradeEffect | null;
   lastEffectEvent?: TriggeredEffectEvent | null; // 최근 발동된 효과 이벤트 (화면 토스트 연출용)
   pendingChoice?: PendingChoice | null;
+  pendingChoiceQueue?: PendingChoice[]; // 여러 효과 동시 발동 시 순차 처리 큐
   deferredChoice?: PendingChoice | null; // 전투 데미지 결과 후 발동할 보류 선택 효과
+  deferredChoices?: PendingChoice[]; // 전투 중 발생한 보류 선택 효과 큐
   deferredUpgrade?: UpgradeEffect | null; // 전투 데미지 결과 후 발동할 보류 레벨업 연출
   deferredEffectEvent?: TriggeredEffectEvent | null; // 전투 데미지 결과 후 발동할 보류 알림 이벤트
   winner: 0 | 1 | null;
   logs: LogItem[];
   gameMode: 'AI' | 'SOLO_DUAL'; // AI 대전 vs 1인 2역 듀얼
+  isOpponentHandScanned?: boolean; // 스캔 효과 등으로 상대의 손패가 필드에 공개된 상태
 }
 
 // 덱 구성 인터페이스

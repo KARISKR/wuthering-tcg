@@ -15,14 +15,23 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
   useEffect(() => {
     const attackerWeapon = getWeaponByCharacter(strike.attackerName);
 
-    // 참격 효과음 재생
-    soundEffects.playComboSlash();
+    const comboNum = strike.comboCount || 1;
 
-    // 250ms 후 임팩트 폭발 (티어별 데미지 + 공격자 무기 효과음)
+    // 참격 효과음 재생 (1콤보 / 2콤보 / 3콤보 이상 분리 사운드)
+    soundEffects.playComboSlash(comboNum);
+
+    // 260ms 후 임팩트 폭발 (공격자 보이스 + 타격 임팩트 크런치음)
     const tImpact = setTimeout(() => {
       setActiveStage('IMPACT');
-      soundEffects.playDamage(strike.damage, attackerWeapon);
-    }, 250);
+      soundEffects.playCharacterAttack(strike.attackerName, strike.card.cost, attackerWeapon);
+      if (strike.damage <= 2) {
+        soundEffects.playDamageLight();
+      } else if (strike.damage >= 6) {
+        soundEffects.playDamageHeavy(strike.damage);
+      } else {
+        soundEffects.playDamageMedium(strike.damage);
+      }
+    }, 260);
 
     // 1350ms 후 자동 퇴장 (연격 연출을 확실히 체감할 수 있도록 여유 부여)
     const tDismiss = setTimeout(() => {
@@ -34,6 +43,8 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
       clearTimeout(tDismiss);
     };
   }, [strike.id, onDismiss]);
+
+  const comboNum = strike.comboCount || 1;
 
   return (
     <div
@@ -50,11 +61,11 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
         <div className="mb-4 flex flex-col items-center animate-in zoom-in-90 duration-200">
           <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 border-2 border-red-500/80 text-amber-300 font-black text-sm uppercase tracking-widest shadow-2xl shadow-red-500/50 animate-flame-pulse">
             <Flame className="w-5 h-5 text-red-500 fill-red-500 animate-bounce" />
-            <span>🔥 COMBO STRIKE! (연격 공격) 🔥</span>
+            <span>🔥 {comboNum} COMBO STRIKE! (연격 공격) 🔥</span>
             <Swords className="w-4 h-4 text-amber-400" />
           </div>
           <div className="text-xs font-bold text-slate-300 mt-1 tracking-wide">
-            <span className="text-amber-400 font-extrabold">{strike.attackerName}</span>의 맹렬한 연속 참격!
+            <span className="text-amber-400 font-extrabold">{strike.attackerName}</span>의 {comboNum}연속 참격!
           </div>
         </div>
 

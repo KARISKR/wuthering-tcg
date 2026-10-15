@@ -1,13 +1,14 @@
 {
   "name": "wuthering-tcg",
   "private": true,
-  "version": "1.9.6",
+  "version": "1.0.0-beta",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
+    "sync-audio": "node scripts/sync_all_audio.cjs",
     "deploy:cf": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {

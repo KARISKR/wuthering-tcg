@@ -96,7 +96,7 @@ export const ConcertoSelectModal: React.FC<ConcertoSelectModalProps> = ({
               const isSelected = selectedIds.includes(card.id);
               return (
                 <div
-                  key={card.id}
+                  key={`${card.id}-${idx}`}
                   onClick={() => toggleSelect(card.id)}
                   className={`relative aspect-[5/7] rounded-xl overflow-hidden border-2 cursor-pointer transition transform hover:scale-105 group select-none ${
                     isSelected
@@ -107,7 +107,7 @@ export const ConcertoSelectModal: React.FC<ConcertoSelectModalProps> = ({
                   <img
                     src={card.artUrl}
                     alt={card.nameKr}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain bg-slate-950"
                   />
 
                   {/* 인덱스 뱃지 */}

@@ -16,6 +16,7 @@ import {
   STARTER_PRESETS,
   StarterDeckPreset,
   shuffleArray,
+  shuffleActionDeck,
   ALL_CHARACTERS,
 } from '../data/cards';
 import { OFFICIAL_CARDS } from '../data/officialCards';
@@ -222,18 +223,88 @@ export function canLeaderUseCard(
   return isCharacterMatching(char, card.characterExclusive);
 }
 
+// <일반 공격> 카드 판별 통합 헬퍼 (카멜리아 등 공식 룰 매칭)
+export function isNormalAttackCard(card: any): boolean {
+  if (!card || card.kind !== 'ACTION') return false;
+  const name = card.nameKr || '';
+  const feat = card.feature || '';
+  const desc = card.description || '';
+  const code = card.code || '';
 
-// 덱에서 카드 1장 추출 헬퍼 (덱 소진 시 드롭 존의 액션 카드를 자동으로 리셔플)
+  return (
+    name.includes('일반 공격') ||
+    name.includes('기본 공격') ||
+    name.includes('일반공격') ||
+    feat.includes('일반 공격') ||
+    feat.includes('기본 공격') ||
+    desc.includes('<일반 공격>') ||
+    code === 'BP01-044' || // 육성·일반 공격
+    code === 'SD01-007' || // 펑펑·일반 공격
+    code === 'SD01-012' || // 날카로운 바람·일반 공격
+    code === 'SD01-017' || // 소리의 변화·일반 공격
+    code === 'SD02-007' || // 달빛의 서리·일반 공격
+    code === 'SD02-012' || // 차가운 빛·일반 공격
+    code === 'SD02-017' || // 소리의 변화·일반 공격
+    code === 'BP01-052' || // 근원의 추구·일반 공격
+    code === 'BP01-059'    // 그늘이와 구름이 출격·일반 공격
+  );
+}
+
+// 덱에서 카드 1장 추출 헬퍼 (덱 소진 시 드롭 존의 액션 카드를 분산 리셔플)
 export function drawSingleCardFromDeck(player: PlayerState): ActionCard | null {
   if (player.actionDeck.length === 0 && player.dropZone.length > 0) {
     const actionDrops = player.dropZone.filter((c): c is ActionCard => c.kind === 'ACTION');
-    player.actionDeck = shuffleArray(actionDrops);
+    player.actionDeck = shuffleActionDeck(actionDrops);
     player.dropZone = player.dropZone.filter((c) => c.kind === 'CHARACTER');
   }
   if (player.actionDeck.length > 0) {
     return player.actionDeck.shift()!;
   }
   return null;
+}
+
+// 플레이어 상태 안전 깊은 복사 헬퍼 (React 불변성 보장 및 얕은 복사로 인한 참조 공유/중복 드로우 원천 차단)
+export function clonePlayer(p: PlayerState): PlayerState {
+  const cloneChar = (char: CharacterCard | null | undefined): any => {
+    if (!char) return char;
+    return {
+      ...char,
+      underlyingCards: char.underlyingCards ? [...char.underlyingCards] : undefined,
+    };
+  };
+
+  return {
+    ...p,
+    hand: [...p.hand],
+    actionDeck: [...p.actionDeck],
+    characterDeck: [...p.characterDeck],
+    concertoZone: [...p.concertoZone],
+    dropZone: [...p.dropZone],
+    actionArea: [...(p.actionArea || [])],
+    slots: {
+      leader: cloneChar(p.slots.leader),
+      leftSupport: cloneChar(p.slots.leftSupport),
+      rightSupport: cloneChar(p.slots.rightSupport),
+    },
+    actionFlags: { ...p.actionFlags },
+  };
+}
+
+// 손패 카드 추가 헬퍼 (고유 ID 중복 방지 및 인스턴스 격리 보장)
+export function addCardsToHand(player: PlayerState, cards: ActionCard[]): void {
+  const existingIds = new Set(player.hand.map((c) => c.id));
+  for (const card of cards) {
+    if (!card) continue;
+    let cardToAdd = card;
+    if (!cardToAdd.id || existingIds.has(cardToAdd.id)) {
+      cardToAdd = {
+        ...cardToAdd,
+        id: `card-${cardToAdd.code || 'action'}-${player.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      };
+    }
+    player.hand.push(cardToAdd);
+    existingIds.add(cardToAdd.id);
+  }
 }
 
 // 캐릭터 진화 카드 탐색 헬퍼 (다음 레벨 Lv+1)
@@ -321,7 +392,7 @@ function buildSideFromCustomDeck(custom: CustomDeckConfig): { deck: ActionCard[]
     });
 
     return {
-      deck: shuffleArray([...custom.actionCards]),
+      deck: shuffleActionDeck([...custom.actionCards]),
       preset: {
         id: 'STARTER_CUSTOM',
         nameKr: custom.name,
@@ -387,7 +458,7 @@ function buildSideFromCustomDeck(custom: CustomDeckConfig): { deck: ActionCard[]
     });
 
   return {
-    deck: shuffleArray([...custom.actionCards]),
+    deck: shuffleActionDeck([...custom.actionCards]),
     preset: {
       id: 'STARTER_ROVER',
       nameKr: custom.name,
@@ -422,6 +493,20 @@ export function createInitialGameState(
     p1Deck = built.deck;
     p1PresetObj = built.preset;
   }
+
+  // 모든 액션 카드에 배틀 인스턴스 전용 고유 ID 재부여 및 디클러스터링 셔플
+  p0Deck = shuffleActionDeck(
+    p0Deck.map((c, i) => ({
+      ...c,
+      id: `card-${c.code}-p0-${i}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    }))
+  );
+  p1Deck = shuffleActionDeck(
+    p1Deck.map((c, i) => ({
+      ...c,
+      id: `card-${c.code}-p1-${i}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    }))
+  );
 
   // 초기 5장 드로우
   const p0Hand = p0Deck.splice(0, 5);
@@ -597,7 +682,7 @@ function createPlayerState(
 }
 
 // 로그 헬퍼
-function addLog(
+export function addLog(
   state: GameState,
   text: string,
   type: LogItem['type'],
@@ -607,6 +692,7 @@ function addLog(
     cardName?: string;
     amount?: number;
     effectTag?: string;
+    drawnCards?: ActionCard[];
   }
 ): GameState {
   const newLog: LogItem = {
@@ -620,6 +706,7 @@ function addLog(
     cardName: meta?.cardName,
     amount: meta?.amount,
     effectTag: meta?.effectTag,
+    drawnCards: meta?.drawnCards,
   };
   return {
     ...state,
@@ -643,13 +730,14 @@ export function executeMulligan(
   if (p0DiscardIds.length > 0) {
     const kept = p0.hand.filter((c) => !p0DiscardIds.includes(c.id));
     const discarded = p0.hand.filter((c) => p0DiscardIds.includes(c.id));
-    // 덱 맨 아래로 넣고 새 카드 드로우
-    const deckAfter = [...p0.actionDeck, ...discarded];
+    // 덱 맨 아래로 넣고 새 카드 분산 드로우
+    const deckAfter = shuffleActionDeck([...p0.actionDeck, ...discarded]);
     const newDrawn = deckAfter.splice(0, p0DiscardIds.length);
     p0.hand = [...kept, ...newDrawn];
-    p0.actionDeck = shuffleArray(deckAfter);
+    p0.actionDeck = deckAfter;
     newState = addLog(newState, `${p0.name}이(가) ${p0DiscardIds.length}장의 카드를 교체했습니다.`, 'ACTION', 0);
   } else {
+    p0.actionDeck = shuffleActionDeck(p0.actionDeck);
     newState = addLog(newState, `${p0.name}이(가) 초기 패를 유지했습니다.`, 'ACTION', 0);
   }
 
@@ -658,12 +746,13 @@ export function executeMulligan(
   if (p1DiscardIds.length > 0) {
     const kept = p1.hand.filter((c) => !p1DiscardIds.includes(c.id));
     const discarded = p1.hand.filter((c) => p1DiscardIds.includes(c.id));
-    const deckAfter = [...p1.actionDeck, ...discarded];
+    const deckAfter = shuffleActionDeck([...p1.actionDeck, ...discarded]);
     const newDrawn = deckAfter.splice(0, p1DiscardIds.length);
     p1.hand = [...kept, ...newDrawn];
-    p1.actionDeck = shuffleArray(deckAfter);
+    p1.actionDeck = deckAfter;
     newState = addLog(newState, `${p1.name}이(가) ${p1DiscardIds.length}장의 카드를 교체했습니다.`, 'ACTION', 1);
   } else {
+    p1.actionDeck = shuffleActionDeck(p1.actionDeck);
     newState = addLog(newState, `${p1.name}이(가) 초기 패를 유지했습니다.`, 'ACTION', 1);
   }
 
@@ -678,14 +767,17 @@ export function executeMulligan(
 // ==========================================
 
 export function executeStartPhase(state: GameState): GameState {
+  const p0 = clonePlayer(state.players[0]);
+  const p1 = clonePlayer(state.players[1]);
   let newState: GameState = {
     ...state,
     phase: 'START_PHASE' as GamePhase,
     lastUpgrade: null,
     lastComboStrike: null,
+    players: [p0, p1],
   };
   const activeIdx = newState.activePlayerIndex;
-  const activePlayer = { ...newState.players[activeIdx] };
+  const activePlayer = newState.players[activeIdx];
 
   newState = addLog(
     newState,
@@ -700,7 +792,7 @@ export function executeStartPhase(state: GameState): GameState {
   if (hasRoverLv2) {
     const card = drawSingleCardFromDeck(activePlayer);
     if (card) {
-      activePlayer.hand = [...activePlayer.hand, card];
+      addCardsToHand(activePlayer, [card]);
       newState = addLog(newState, `[방랑자 Lv.2 패시브] ${activePlayer.name}이(가) 카드를 1장 추가 드로우했습니다.`, 'ACTION', activeIdx);
     }
   }
@@ -710,15 +802,22 @@ export function executeStartPhase(state: GameState): GameState {
   if (hasYangyangLv1 && activePlayer.concertoZone.length <= 1) {
     const card = drawSingleCardFromDeck(activePlayer);
     if (card) {
-      activePlayer.concertoZone = [...activePlayer.concertoZone, card];
+      activePlayer.concertoZone.push(card);
       newState = addLog(newState, `[양양 Lv.1 리더 효과] 협주 존에 카드를 1장 무료 충전했습니다.`, 'ACTION', activeIdx);
     }
   }
 
-  newState.players[activeIdx] = activePlayer;
+  // 행동 플래그 및 연격 카운트 초기화
+  activePlayer.actionFlags = {
+    upgraded: false,
+    switchedLeader: false,
+    chargedConcerto: false,
+  };
+  activePlayer.comboCount = 0;
 
-  // 바로 드로우 단계로 진행
-  return executeDrawPhase(newState);
+  // 드로우 단계(DRAW_PHASE)로 진입 (플레이어가 직접 덱을 클릭하거나 AI 턴 시 비동기 드로우 실행)
+  newState.phase = 'DRAW_PHASE';
+  return newState;
 }
 
 // ==========================================
@@ -726,14 +825,20 @@ export function executeStartPhase(state: GameState): GameState {
 // ==========================================
 
 export function executeDrawPhase(state: GameState): GameState {
-  let newState = { ...state, phase: 'DRAW_PHASE' as GamePhase };
+  const p0 = clonePlayer(state.players[0]);
+  const p1 = clonePlayer(state.players[1]);
+  let newState: GameState = {
+    ...state,
+    phase: 'DRAW_PHASE' as GamePhase,
+    players: [p0, p1],
+  };
   const activeIdx = newState.activePlayerIndex;
-  const player = { ...newState.players[activeIdx] };
+  const player = newState.players[activeIdx];
 
   // 선공(Turn 1)의 첫 턴 플레이어는 1장, 그 외에는 2장 드로우
   const drawCount = newState.turn === 1 && activeIdx === 0 ? 1 : 2;
 
-  let drawnCards: ActionCard[] = [];
+  const drawnCards: ActionCard[] = [];
   for (let i = 0; i < drawCount; i++) {
     const card = drawSingleCardFromDeck(player);
     if (card) {
@@ -741,7 +846,7 @@ export function executeDrawPhase(state: GameState): GameState {
     }
   }
 
-  player.hand = [...player.hand, ...drawnCards];
+  addCardsToHand(player, drawnCards);
 
   // 행동 플래그 리셋
   player.actionFlags = {
@@ -751,11 +856,17 @@ export function executeDrawPhase(state: GameState): GameState {
   };
   player.comboCount = 0;
 
-  newState.players[activeIdx] = player;
-  newState = addLog(newState, `${player.name}이(가) 카드 ${drawnCards.length}장을 드로우했습니다.`, 'ACTION', activeIdx);
+  newState = addLog(
+    newState,
+    `${player.name}이(가) 카드 ${drawnCards.length}장을 드로우했습니다.`,
+    'ACTION',
+    activeIdx,
+    {
+      drawnCards: activeIdx === 0 || state.gameMode === 'SOLO_DUAL' ? [...drawnCards] : undefined,
+      effectTag: '드로우',
+    }
+  );
 
-  // 액션 페이즈로 전환
-  newState.phase = 'ACTION_PHASE';
   return newState;
 }
 
@@ -771,7 +882,9 @@ export function upgradeCharacter(
   upgradeCardId: string,
   discardCardIds: string[]
 ): { success: boolean; newState: GameState; error?: string } {
-  const player = { ...state.players[playerIndex] };
+  const p0 = clonePlayer(state.players[0]);
+  const p1 = clonePlayer(state.players[1]);
+  const player = playerIndex === 0 ? p0 : p1;
 
   if (player.actionFlags.upgraded) {
     return { success: false, newState: state, error: '이번 턴에는 이미 캐릭터를 레벨업했습니다 (턴당 1회).' };
@@ -826,9 +939,15 @@ export function upgradeCharacter(
     };
   }
 
-  // 패에서 카드 버리기
-  const discarded = player.hand.filter((c) => discardCardIds.includes(c.id));
-  player.hand = player.hand.filter((c) => !discardCardIds.includes(c.id));
+  // 패에서 카드 버리기 (ID 중복 시에도 지정된 장수만큼 정확히 1:1로만 소모)
+  const discarded: ActionCard[] = [];
+  for (const id of discardCardIds) {
+    const idx = player.hand.findIndex((c) => c.id === id);
+    if (idx !== -1) {
+      const [c] = player.hand.splice(idx, 1);
+      discarded.push(c);
+    }
+  }
   player.dropZone = [...player.dropZone, ...discarded];
 
   // 캐릭터 덱에서 제거하고 슬롯에 배치 (기존 카드는 묘지로 가지 않고 하위 스택으로 누적 보존!)
@@ -846,8 +965,7 @@ export function upgradeCharacter(
   };
   player.actionFlags.upgraded = true;
 
-  let newState = { ...state };
-  newState.players[playerIndex] = player;
+  let newState: GameState = { ...state, players: [p0, p1] };
   newState.lastUpgrade = {
     id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     playerIndex,
@@ -877,6 +995,24 @@ export function upgradeCharacter(
   return { success: true, newState };
 }
 
+// 보류 선택 효과 큐잉 헬퍼 (중복 덮어쓰기 방지 및 순차 처리 보장)
+export function queueChoice(state: GameState, choice: PendingChoice, isDeferred = false): GameState {
+  let newState = { ...state };
+  if (isDeferred) {
+    if (!newState.deferredChoices) newState.deferredChoices = [];
+    newState.deferredChoices.push(choice);
+    newState.deferredChoice = choice;
+  } else {
+    if (!newState.pendingChoice) {
+      newState.pendingChoice = choice;
+    } else {
+      if (!newState.pendingChoiceQueue) newState.pendingChoiceQueue = [];
+      newState.pendingChoiceQueue.push(choice);
+    }
+  }
+  return newState;
+}
+
 // 등장 및 레벨업 스킬 공통 발동 헬퍼 (공식 Q&A Q6 기준)
 export function applyCharacterEvolutionSkills(
   state: GameState,
@@ -895,24 +1031,29 @@ export function applyCharacterEvolutionSkills(
   // 2) 1 -> 2 레벨업 시: 그 위에 2레벨 카드가 겹쳐지면서 밑에 깔린 1레벨 카드의 【레벨업】 효과 발동!
   // ==========================================
 
-  // 1. BP01-003 카멜리아 Lv.1: 트래시에서 일반 공격 1장 패에 추가 가능
-  const cam1 = upgradeCard.code === 'BP01-003' ? upgradeCard : currentSlotCard.code === 'BP01-003' ? currentSlotCard : null;
+  // 1. BP01-003 카멜리아 Lv.1: 트래시에서 <일반 공격> 1장 패에 추가 가능
+  const isCamellya1 = (c: CharacterCard | undefined) =>
+    Boolean(c && (c.code?.startsWith('BP01-003') || (c.level === 1 && (c.characterName === '카멜리아' || c.nameKr?.includes('카멜리아')))));
+
+  const cam1 = isCamellya1(upgradeCard) ? upgradeCard : isCamellya1(currentSlotCard) ? currentSlotCard : null;
   if (cam1) {
-    const isEntry = cam1 === upgradeCard;
-    const normalAttacks = player.dropZone.filter(
-      (c) => c.kind === 'ACTION' && (c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격'))
-    ) as ActionCard[];
+    const isEntry = isCamellya1(upgradeCard);
+    const normalAttacks = player.dropZone.filter(isNormalAttackCard) as ActionCard[];
     if (normalAttacks.length > 0) {
       if (player.isAi) {
-        const [reclaimed] = player.dropZone.splice(0, 1);
-        player.hand.push(reclaimed as ActionCard);
-        newState.players[playerIndex] = player;
-        newState = addLog(
-          newState,
-          `[카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
-          'ACTION',
-          playerIndex
-        );
+        const dropIdx = player.dropZone.findIndex(isNormalAttackCard);
+        if (dropIdx !== -1) {
+          const [reclaimed] = player.dropZone.splice(dropIdx, 1);
+          player.hand.push(reclaimed as ActionCard);
+          newState.players[playerIndex] = player;
+          newState = addLog(
+            newState,
+            `[카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`,
+            'ACTION',
+            playerIndex,
+            { cardArt: reclaimed.artUrl, cardName: reclaimed.nameKr, effectTag: '트래시 회수' }
+          );
+        }
       } else {
         const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -926,12 +1067,28 @@ export function applyCharacterEvolutionSkills(
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
         };
-        if (isDeferred) {
-          newState.deferredChoice = choice;
-        } else {
-          newState.pendingChoice = choice;
-        }
+        newState = queueChoice(newState, choice, isDeferred);
+        newState.players[playerIndex] = player;
       }
+    } else {
+      // 트래시에 일반 공격 카드가 없음을 명확한 안내 로그로 유저에게 피드백
+      newState = addLog(
+        newState,
+        `[카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시 에리어에 회수 가능한 <일반 공격> 카드가 없어 효과가 종료되었습니다.`,
+        'ACTION',
+        playerIndex,
+        { cardArt: cam1.artUrl, cardName: cam1.nameKr, effectTag: '효과 대상 없음' }
+      );
+      newState.lastEffectEvent = {
+        id: `eff-${Date.now()}-cam1-empty`,
+        sourceCardName: '카멜리아 [BP01-003]',
+        sourceCardArt: cam1.artUrl,
+        effectType: 'DRAW',
+        title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과`,
+        description: '트래시 에리어에 회수할 수 있는 <일반 공격> 카드가 없습니다.',
+        playerIndex,
+        timestamp: Date.now(),
+      };
     }
   }
 
@@ -942,15 +1099,18 @@ export function applyCharacterEvolutionSkills(
     const introSkills = player.dropZone.filter((c) => c.kind === 'ACTION' && c.nameKr.includes('변주 스킬')) as ActionCard[];
     if (introSkills.length > 0) {
       if (player.isAi) {
-        const [reclaimed] = player.dropZone.splice(0, 1);
-        player.hand.push(reclaimed as ActionCard);
-        newState.players[playerIndex] = player;
-        newState = addLog(
-          newState,
-          `[파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
-          'ACTION',
-          playerIndex
-        );
+        const dropIdx = player.dropZone.findIndex((c) => c.kind === 'ACTION' && c.nameKr.includes('변주 스킬'));
+        if (dropIdx !== -1) {
+          const [reclaimed] = player.dropZone.splice(dropIdx, 1);
+          player.hand.push(reclaimed as ActionCard);
+          newState.players[playerIndex] = player;
+          newState = addLog(
+            newState,
+            `[파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`,
+            'ACTION',
+            playerIndex
+          );
+        }
       } else {
         const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -964,11 +1124,8 @@ export function applyCharacterEvolutionSkills(
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
         };
-        if (isDeferred) {
-          newState.deferredChoice = choice;
-        } else {
-          newState.pendingChoice = choice;
-        }
+        newState = queueChoice(newState, choice, isDeferred);
+        newState.players[playerIndex] = player;
       }
     }
   }
@@ -982,15 +1139,20 @@ export function applyCharacterEvolutionSkills(
     ) as ActionCard[];
     if (ankeRed.length > 0) {
       if (player.isAi) {
-        const [reclaimed] = player.dropZone.splice(0, 1);
-        player.hand.push(reclaimed as ActionCard);
-        newState.players[playerIndex] = player;
-        newState = addLog(
-          newState,
-          `[앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
-          'ACTION',
-          playerIndex
+        const dropIdx = player.dropZone.findIndex(
+          (c) => c.kind === 'ACTION' && (c as ActionCard).color === 'RED' && c.characterExclusive?.includes('앙코')
         );
+        if (dropIdx !== -1) {
+          const [reclaimed] = player.dropZone.splice(dropIdx, 1);
+          player.hand.push(reclaimed as ActionCard);
+          newState.players[playerIndex] = player;
+          newState = addLog(
+            newState,
+            `[앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`,
+            'ACTION',
+            playerIndex
+          );
+        }
       } else {
         const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1004,11 +1166,8 @@ export function applyCharacterEvolutionSkills(
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
         };
-        if (isDeferred) {
-          newState.deferredChoice = choice;
-        } else {
-          newState.pendingChoice = choice;
-        }
+        newState = queueChoice(newState, choice, isDeferred);
+        newState.players[playerIndex] = player;
       }
     }
   }
@@ -1022,15 +1181,20 @@ export function applyCharacterEvolutionSkills(
     ) as ActionCard[];
     if (normalAttacks.length > 0) {
       if (player.isAi) {
-        const [reclaimed] = player.dropZone.splice(0, 1);
-        player.hand.push(reclaimed as ActionCard);
-        newState.players[playerIndex] = player;
-        newState = addLog(
-          newState,
-          `[치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${(reclaimed as ActionCard).nameKr}]을(를) 패에 추가했습니다.`,
-          'ACTION',
-          playerIndex
+        const dropIdx = player.dropZone.findIndex(
+          (c) => c.kind === 'ACTION' && (c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격'))
         );
+        if (dropIdx !== -1) {
+          const [reclaimed] = player.dropZone.splice(dropIdx, 1);
+          player.hand.push(reclaimed as ActionCard);
+          newState.players[playerIndex] = player;
+          newState = addLog(
+            newState,
+            `[치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`,
+            'ACTION',
+            playerIndex
+          );
+        }
       } else {
         const choice: PendingChoice = {
           id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -1044,11 +1208,8 @@ export function applyCharacterEvolutionSkills(
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
         };
-        if (isDeferred) {
-          newState.deferredChoice = choice;
-        } else {
-          newState.pendingChoice = choice;
-        }
+        newState = queueChoice(newState, choice, isDeferred);
+        newState.players[playerIndex] = player;
       }
     }
   }
@@ -1082,11 +1243,8 @@ export function applyCharacterEvolutionSkills(
           maxSelect: 1,
           onResolveType: 'SET_CONCERTO',
         };
-        if (isDeferred) {
-          newState.deferredChoice = choice;
-        } else {
-          newState.pendingChoice = choice;
-        }
+        newState = queueChoice(newState, choice, isDeferred);
+        newState.players[playerIndex] = player;
       }
     }
   }
@@ -1119,11 +1277,8 @@ export function applyCharacterEvolutionSkills(
           maxSelect: 1,
           onResolveType: 'ADD_TO_HAND',
         };
-        if (isDeferred) {
-          newState.deferredChoice = choice;
-        } else {
-          newState.pendingChoice = choice;
-        }
+        newState = queueChoice(newState, choice, isDeferred);
+        newState.players[playerIndex] = player;
       }
     }
   }
@@ -1180,6 +1335,7 @@ export function applyCharacterEvolutionSkills(
     );
   }
 
+  newState.players[playerIndex] = player;
   return newState;
 }
 
@@ -1257,6 +1413,9 @@ export function chargeConcerto(
 
 // 대결 진행 여부 선택 (Clash vs Pass)
 export function decideClash(state: GameState, startClash: boolean): GameState {
+  if (state.pendingChoice) {
+    return state; // 발동 중인 카드 효과 선택을 마칠 때까지 배틀 진입 차단
+  }
   const activeIdx = state.activePlayerIndex;
   let newState = { ...state };
 
@@ -1287,6 +1446,9 @@ export function setClashCard(
   cardId: string | null,
   spentConcertoIds?: string[]
 ): { success: boolean; newState: GameState; error?: string } {
+  if (state.pendingChoice) {
+    return { success: false, newState: state, error: '발동 중인 카드 효과 선택을 먼저 완료해야 합니다.' };
+  }
   const player = { ...state.players[playerIndex] };
 
   if (cardId === null) {
@@ -1505,7 +1667,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
               playerIndex
             );
           } else {
-            newState.deferredChoice = {
+            const roverChoice: PendingChoice = {
               id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
               playerIndex,
               title: '방랑자 배틀 효과',
@@ -1517,6 +1679,8 @@ export function applyBattleStepSkills(state: GameState): GameState {
               maxSelect: revealed.length,
               onResolveType: 'ADD_TO_HAND',
             };
+            newState = queueChoice(newState, roverChoice, false);
+            players[playerIndex] = player;
           }
         }
       }
@@ -1537,7 +1701,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
               playerIndex
             );
           } else {
-            newState.deferredChoice = {
+            const shoreChoice: PendingChoice = {
               id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
               playerIndex,
               title: '파수인 배틀 효과 (패 추가 선택)',
@@ -1549,6 +1713,8 @@ export function applyBattleStepSkills(state: GameState): GameState {
               maxSelect: 1,
               onResolveType: 'ADD_TO_HAND',
             };
+            newState = queueChoice(newState, shoreChoice, false);
+            players[playerIndex] = player;
           }
         }
       }
@@ -1575,7 +1741,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
             );
           } else {
             const charName = hasYangyang0 ? '양양' : '산화';
-            newState.deferredChoice = {
+            const concertoChoice: PendingChoice = {
               id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
               playerIndex,
               title: `${charName} 배틀 효과 (협주 배치 선택)`,
@@ -1587,6 +1753,8 @@ export function applyBattleStepSkills(state: GameState): GameState {
               maxSelect: 1,
               onResolveType: 'SET_CONCERTO',
             };
+            newState = queueChoice(newState, concertoChoice, false);
+            players[playerIndex] = player;
           }
         }
       }
@@ -1625,7 +1793,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
           );
           // 레벨업/등장 스킬 발동 연계
           newState.players = players;
-          newState = applyCharacterEvolutionSkills(newState, playerIndex, camSlotKey, nextCam, currentCam, true);
+          newState = applyCharacterEvolutionSkills(newState, playerIndex, camSlotKey, nextCam, currentCam, false);
           player = { ...newState.players[playerIndex] };
           players[playerIndex] = player;
         }
@@ -1672,7 +1840,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
         if (lv2Anke) {
           // 레벨업/등장 스킬 발동 연계
           newState.players = players;
-          newState = applyCharacterEvolutionSkills(newState, playerIndex, 'leader', lv2Anke, currentAnke, true);
+          newState = applyCharacterEvolutionSkills(newState, playerIndex, 'leader', lv2Anke, currentAnke, false);
           player = { ...newState.players[playerIndex] };
           players[playerIndex] = player;
         }
@@ -1703,15 +1871,33 @@ export function applyBattleStepSkills(state: GameState): GameState {
   return newState;
 }
 
-// 판정 계산 로직
+// 판정 계산 로직 (배틀 스텝 발동 -> 유저 선택 대기 -> 판정 스텝 순차 실행)
 export function resolveClash(state: GameState): GameState {
-  let newState = { ...state, phase: 'CLASH_REVEAL' as GamePhase };
+  const p0 = clonePlayer(state.players[0]);
+  const p1 = clonePlayer(state.players[1]);
+  let newState: GameState = {
+    ...state,
+    phase: 'CLASH_REVEAL' as GamePhase,
+    players: [p0, p1],
+  };
 
   // 배틀 스텝 (Battle Step 604.1.1): 카드가 동시에 오픈된 직후 배틀에 돌입하여 배틀 스킬 발동!
   newState = applyBattleStepSkills(newState);
 
-  const p0 = { ...newState.players[0] };
-  const p1 = { ...newState.players[1] };
+  // 배틀 스텝 발동 효과로 인해 유저 선택 팝업이 대기 중이면,
+  // 판정(Clash Judgment)과 데미지 계산을 절대 백그라운드에서 진행하지 않고 유저 선택이 완료될 때까지 대기!
+  if (newState.pendingChoice) {
+    return newState;
+  }
+
+  return finishClashJudgment(newState);
+}
+
+// 판정 스텝 (Clash Judgment Step): 배틀 스텝 효과 해결 후 최종 상성/속도 비교 및 데미지 적용
+export function finishClashJudgment(state: GameState): GameState {
+  let newState: GameState = { ...state };
+  const p0 = newState.players[0];
+  const p1 = newState.players[1];
   const activeIdx = newState.activePlayerIndex;
 
   const c0 = p0.clashCard;
@@ -1964,10 +2150,12 @@ export function resolveClash(state: GameState): GameState {
     ) {
       const needed = Math.max(0, 8 - winnerPlayer.hand.length);
       if (needed > 0) {
+        const drawnList: ActionCard[] = [];
         for (let i = 0; i < needed; i++) {
           const d = drawSingleCardFromDeck(winnerPlayer);
-          if (d) winnerPlayer.hand.push(d);
+          if (d) drawnList.push(d);
         }
+        addCardsToHand(winnerPlayer, drawnList);
         newState = addLog(
           newState,
           `[방랑자(여) Lv.2 판정 효과] 녹색 카드로 청색 카드에 승리하여 패가 8장이 될 때까지 드로우했습니다!`,
@@ -1979,12 +2167,12 @@ export function resolveClash(state: GameState): GameState {
 
     // BP01-005 카멜리아 리더 승리: 트래시에서 일반 공격 1장 패에 추가 가능
     if (winnerLeaderCards.some((c) => c.code === 'BP01-005' || (c.level === 0 && (c.characterName === '카멜리아' || c.nameKr.includes('카멜리아'))))) {
-      const normalAttacks = winnerPlayer.dropZone.filter((c) => c.kind === 'ACTION' && (c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격'))) as ActionCard[];
+      const normalAttacks = winnerPlayer.dropZone.filter(isNormalAttackCard) as ActionCard[];
       if (normalAttacks.length > 0) {
         if (winnerPlayer.isAi) {
           const reclaimed = normalAttacks[0];
           winnerPlayer.dropZone = winnerPlayer.dropZone.filter((c) => c.id !== reclaimed.id);
-          winnerPlayer.hand.push(reclaimed);
+          addCardsToHand(winnerPlayer, [reclaimed]);
           newState = addLog(
             newState,
             `[카멜리아 BP01-005 리더 효과] 판정 승리로 트래시에서 [${reclaimed.nameKr}]을(를) 패에 회수했습니다!`,
@@ -1993,19 +2181,27 @@ export function resolveClash(state: GameState): GameState {
             { cardArt: reclaimed.artUrl, cardName: reclaimed.nameKr, effectTag: '트래시 회수' }
           );
         } else {
-          newState.deferredChoice = {
+          const camChoice: PendingChoice = {
             id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             playerIndex: winnerIndex,
             title: '카멜리아 판정 효과 (트래시 회수)',
             sourceCardName: '카멜리아 [BP01-005]',
             sourceCardArt: winnerPlayer.slots.leader.artUrl,
-            description: '판정 승리 효과로 트래시 에리어의 일반 공격 카드 1장을 패에 추가할 수 있습니다.',
+            description: '판정 승리 효과로 트래시 에리어의 <일반 공격> 카드 1장을 패에 추가할 수 있습니다.',
             revealedCards: normalAttacks,
             minSelect: 0,
             maxSelect: 1,
             onResolveType: 'RECOVER_FROM_DROP',
           };
+          newState = queueChoice(newState, camChoice, true);
         }
+      } else {
+        newState = addLog(
+          newState,
+          `[카멜리아 BP01-005 리더 효과] 판정 승리했으나 트래시 에리어에 회수 가능한 <일반 공격> 카드가 없습니다.`,
+          'ACTION',
+          winnerIndex
+        );
       }
     }
 
@@ -2163,10 +2359,12 @@ export function resolveClash(state: GameState): GameState {
     }
 
     if (drawN > 0) {
+      const drawnCards: ActionCard[] = [];
       for (let i = 0; i < drawN; i++) {
         const card = drawSingleCardFromDeck(winnerPlayer);
-        if (card) winnerPlayer.hand.push(card);
+        if (card) drawnCards.push(card);
       }
+      addCardsToHand(winnerPlayer, drawnCards);
       triggeredEffects.push({
         id: `eff-${Date.now()}-draw`,
         sourceCardName: winCard.nameKr,
@@ -2188,6 +2386,35 @@ export function resolveClash(state: GameState): GameState {
           effectTag: '카드 드로우',
         }
       );
+    }
+
+    // 스캔 [SD01-020 / SD02-020]: 1장 드로우 후 상대의 패 확인
+    if (winCard.code === 'SD01-020' || winCard.code === 'SD02-020') {
+      const loserIndex = (winnerIndex === 0 ? 1 : 0) as 0 | 1;
+      const loserPlayer = loserIndex === 0 ? p0 : p1;
+      if (!winnerPlayer.isAi) {
+        const scanChoice: PendingChoice = {
+          id: `choice-${Date.now()}-scan`,
+          playerIndex: winnerIndex,
+          title: `${winCard.nameKr} [상대의 패 확인]`,
+          sourceCardName: winCard.nameKr,
+          sourceCardArt: winCard.artUrl,
+          description: `[${winCard.nameKr}] 효과로 상대방(${loserPlayer.name})의 패(${loserPlayer.hand.length}장)를 모두 확인합니다.`,
+          revealedCards: [...loserPlayer.hand],
+          minSelect: 0,
+          maxSelect: 0,
+          onResolveType: 'VIEW_ONLY',
+        };
+        newState = queueChoice(newState, scanChoice, true);
+      } else {
+        newState = addLog(
+          newState,
+          `[${winCard.nameKr} 효과] ${winnerPlayer.name}이(가) ${loserPlayer.name}의 패(${loserPlayer.hand.length}장)를 확인했습니다.`,
+          'ACTION',
+          winnerIndex,
+          { cardArt: winCard.artUrl, cardName: winCard.nameKr, effectTag: '상대 패 확인' }
+        );
+      }
     }
 
     // 소리의 변화·회피 [SD01-018 / SD02-018]: 승리 시 1장 드로우 후 패 1장 버리기
@@ -2413,7 +2640,7 @@ export function resolveClash(state: GameState): GameState {
             loserIndex
           );
         } else {
-          newState.deferredChoice = {
+          const defeatChoice: PendingChoice = {
             id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             playerIndex: loserIndex,
             title: `${loserPlayer.slots.leader.nameKr} 판정 패배 효과`,
@@ -2425,6 +2652,7 @@ export function resolveClash(state: GameState): GameState {
             maxSelect: 1,
             onResolveType: 'ADD_TO_HAND',
           };
+          newState = queueChoice(newState, defeatChoice, true);
         }
       }
     }
@@ -2494,7 +2722,7 @@ export function canPlayerExecuteCombo(player: PlayerState): boolean {
 
 // 대결 공개 후 연격 단계 또는 턴 종료 단계로 이동
 export function proceedAfterClashReveal(state: GameState): GameState {
-  let newState: GameState = { ...state, lastComboStrike: null };
+  let newState: GameState = { ...state, lastComboStrike: null, clashResult: null };
   const p0 = { ...newState.players[0] };
   const p1 = { ...newState.players[1] };
 
@@ -2507,7 +2735,13 @@ export function proceedAfterClashReveal(state: GameState): GameState {
   newState.players = [p0, p1];
 
   // 전투 데미지 결과 후 보류(deferred)되었던 효과 발동 화면들을 활성화!
-  if (newState.deferredChoice) {
+  if (newState.deferredChoices && newState.deferredChoices.length > 0) {
+    const [first, ...rest] = newState.deferredChoices;
+    newState.pendingChoice = first;
+    newState.pendingChoiceQueue = rest;
+    newState.deferredChoices = [];
+    newState.deferredChoice = null;
+  } else if (newState.deferredChoice) {
     newState.pendingChoice = newState.deferredChoice;
     newState.deferredChoice = null;
   }
@@ -2520,6 +2754,13 @@ export function proceedAfterClashReveal(state: GameState): GameState {
     newState.deferredEffectEvent = null;
   }
 
+  // ★ 중요: 플레이어가 효과 선택/확인(패 확인, 드로우, 버리기 등)을 마칠 때까지
+  // 연격 단계나 턴 종료 단계로 절대 백그라운드 진행하지 않고 여기서 멈춥니다!
+  // 선택 완료 시 resolvePendingChoice에서 다음 단계(COMBO_STEP 또는 checkHandOverflowOrEndTurn)로 안전하게 진행됩니다.
+  if (newState.pendingChoice) {
+    return newState;
+  }
+
   // 연격 권한이 있는 플레이어 확인 (적색 승리 무제한 또는 추격 카운트 보유)
   const p0HasComboPerm = Boolean(p0.comboUnlimited) || (p0.comboCount ?? 0) > 0;
   const p1HasComboPerm = Boolean(p1.comboUnlimited) || (p1.comboCount ?? 0) > 0;
@@ -2529,64 +2770,32 @@ export function proceedAfterClashReveal(state: GameState): GameState {
     const comboPlayer = newState.players[comboPlayerIdx];
 
     if (comboPlayer.isAi) {
-      if (canPlayerExecuteCombo(comboPlayer)) {
-        newState.phase = 'COMBO_STEP';
-        newState = addLog(
-          newState,
-          `⚡ ${comboPlayer.name}의 [연격 단계(Combo Step)]! ${
-            comboPlayer.comboUnlimited
-              ? '적색 승리: 연속 연격 무제한 가동'
-              : `남은 연격 횟수: ${comboPlayer.comboCount}회`
-          }`,
-          'ACTION',
-          comboPlayerIdx
-        );
-      } else {
-        // AI는 낼 수 있는 카드가 없으면 연격 종료
-        newState = addLog(
-          newState,
-          `[연격 단계] ${comboPlayer.name}의 연격 권한이 있으나 사용할 수 있는 적색 카드나 협주 에너지가 없어 연격을 종료합니다.`,
-          'SYSTEM',
-          comboPlayerIdx
-        );
-        p0.comboCount = 0;
-        p0.comboUnlimited = false;
-        p1.comboCount = 0;
-        p1.comboUnlimited = false;
-        newState.players = [p0, p1];
-        return checkHandOverflowOrEndTurn(newState);
-      }
+      newState.phase = 'COMBO_STEP';
+      newState = addLog(
+        newState,
+        `⚡ ${comboPlayer.name}의 [연격 단계(Combo Step)]! ${
+          comboPlayer.comboUnlimited
+            ? '적색 승리: 연속 연격 무제한 가동'
+            : `남은 연격 횟수: ${comboPlayer.comboCount}회`
+        }`,
+        'ACTION',
+        comboPlayerIdx
+      );
     } else {
       // Human 유저 플레이어:
-      // 손패에 적색 카드가 1장이라도 있으면(협주 에너지가 현재 부족하더라도) 유저가 상황을 인지하고 조작할 수 있도록 COMBO_STEP 진입!
-      const hasAnyRedCard = comboPlayer.hand.some((c) => c.color === 'RED');
-      if (hasAnyRedCard) {
-        newState.phase = 'COMBO_STEP';
-        newState = addLog(
-          newState,
-          `⚡ ${comboPlayer.name}의 [연격 단계(Combo Step)] 돌입! ${
-            comboPlayer.comboUnlimited
-              ? '적색 승리: 연속 연격 무제한 가능!'
-              : `남은 연격 횟수: ${comboPlayer.comboCount}회`
-          }`,
-          'ACTION',
-          comboPlayerIdx
-        );
-      } else {
-        // 손패에 적색 카드가 전혀 없는 경우
-        newState = addLog(
-          newState,
-          `[연격 단계] ${comboPlayer.name}이(가) 연격 권한을 얻었으나, 손패에 연격(적색) 카드가 없어 연격 단계를 건너뜁니다.`,
-          'SYSTEM',
-          comboPlayerIdx
-        );
-        p0.comboCount = 0;
-        p0.comboUnlimited = false;
-        p1.comboCount = 0;
-        p1.comboUnlimited = false;
-        newState.players = [p0, p1];
-        return checkHandOverflowOrEndTurn(newState);
-      }
+      // 손패에 사용 가능한 적색 카드가 있든 없든 반드시 COMBO_STEP에 진입하여
+      // 상황을 확인하고 안내 팝업("연격 카드가 없습니다 턴을 넘깁니다")을 표시하도록 함
+      newState.phase = 'COMBO_STEP';
+      newState = addLog(
+        newState,
+        `⚡ ${comboPlayer.name}의 [연격 단계(Combo Step)] 돌입! ${
+          comboPlayer.comboUnlimited
+            ? '적색 승리: 연속 연격 무제한 가능!'
+            : `남은 연격 횟수: ${comboPlayer.comboCount}회`
+        }`,
+        'ACTION',
+        comboPlayerIdx
+      );
     }
   } else {
     // 연격 권한 없음 -> 연격 플래그 리셋 후 패 초과 체크 및 턴 종료
@@ -2971,12 +3180,14 @@ export function executeComboAttack(
 
   newState.players[playerIndex] = player;
   newState.players[playerIndex === 0 ? 1 : 0] = opponent;
+  const currentComboCount = Math.max(1, (player.actionArea || []).length - 1);
   newState.lastComboStrike = {
     id: `combo-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     attackerIndex: playerIndex,
     attackerName: player.slots.leader.characterName || player.name,
     card,
     damage: dmg,
+    comboCount: currentComboCount,
   };
 
   newState = addLog(
@@ -3012,13 +3223,25 @@ export function executeComboAttack(
     });
 
   if (!canStillCombo) {
-    newState = addLog(
-      newState,
-      `[연격 단계 완료] ${player.name}이(가) 더 이상 사용할 수 있는 연격 카드가 없어 연격 단계를 종료합니다.`,
-      'ACTION',
-      playerIndex
-    );
-    newState = checkHandOverflowOrEndTurn(newState);
+    if (player.isAi) {
+      newState = addLog(
+        newState,
+        `[연격 단계 완료] ${player.name}이(가) 더 이상 사용할 수 있는 연격 카드가 없어 연격 단계를 종료합니다.`,
+        'ACTION',
+        playerIndex
+      );
+      newState = checkHandOverflowOrEndTurn(newState);
+    } else {
+      // Human 유저:
+      // 바로 checkHandOverflowOrEndTurn으로 턴을 넘겨버리지 않고 COMBO_STEP 상태를 유지하여
+      // 화면에 [연격 카드 없음] 알림 팝업 모달이 떠서 유저가 확인 또는 즉시 턴 넘기기를 누를 수 있도록 함
+      newState = addLog(
+        newState,
+        `[연격 단계 안내] ${player.name}의 패에 더 이상 사용할 수 있는 연격(적색) 카드가 없습니다.`,
+        'ACTION',
+        playerIndex
+      );
+    }
   }
 
   return { success: true, newState };
@@ -3083,8 +3306,14 @@ export function discardOverflowCards(
     };
   }
 
-  const discarded = player.hand.filter((c) => discardIds.includes(c.id));
-  player.hand = player.hand.filter((c) => !discardIds.includes(c.id));
+  const discarded: ActionCard[] = [];
+  for (const id of discardIds) {
+    const idx = player.hand.findIndex((c) => c.id === id);
+    if (idx !== -1) {
+      const [c] = player.hand.splice(idx, 1);
+      discarded.push(c);
+    }
+  }
   player.dropZone.push(...discarded);
 
   let newState = { ...state };
@@ -3132,13 +3361,16 @@ export function executeEndPhase(state: GameState): GameState {
 
     // 앙코 Lv.2 [BP01-012] 리더: 이번 턴에 상대가 데미지를 받은 경우 트래시에서 앙코 카드 1장 패 추가
     if (lCards.some((c) => c.code === 'BP01-012')) {
-      const ankeCard = pl.dropZone.find(
+      const dropIdx = pl.dropZone.findIndex(
         (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
-      ) as ActionCard | undefined;
-      if (ankeCard) {
-        pl.dropZone = pl.dropZone.filter((c) => c.id !== ankeCard.id);
-        pl.hand.push(ankeCard);
-        newState = addLog(newState, `[앙코 Lv.2 턴 종료 효과] 트래시에서 [${ankeCard.nameKr}]을(를) 패에 추가했습니다.`, 'ACTION', i as 0 | 1);
+      );
+      if (dropIdx !== -1) {
+        const [ankeCard] = pl.dropZone.splice(dropIdx, 1);
+        const reclaimed = ankeCard as ActionCard;
+        if (!pl.hand.some((h) => h.id === reclaimed.id)) {
+          pl.hand.push(reclaimed);
+        }
+        newState = addLog(newState, `[앙코 Lv.2 턴 종료 효과] 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`, 'ACTION', i as 0 | 1);
       }
     }
   }
@@ -3183,6 +3415,7 @@ export function finalizeEndPhase(state: GameState): GameState {
   p1.comboUnlimited = false;
   p1.clashCardReady = false;
 
+  newState.isOpponentHandScanned = false;
   newState.players = [p0, p1];
 
   // 턴 전환
@@ -3234,27 +3467,78 @@ export function resolvePendingChoice(
   if (!state.pendingChoice) return state;
 
   const { playerIndex, revealedCards, sourceCardName, onResolveType } = state.pendingChoice;
-  const player = { ...state.players[playerIndex] };
+  const p0 = clonePlayer(state.players[0]);
+  const p1 = clonePlayer(state.players[1]);
+  const player = playerIndex === 0 ? p0 : p1;
 
   let newState: GameState = {
     ...state,
     pendingChoice: null,
+    players: [p0, p1],
   };
 
-  const chosenCards = revealedCards.filter((c) => chosenCardIds.includes(c.id));
-  const unchosenCards = revealedCards.filter((c) => !chosenCardIds.includes(c.id));
+  const maxAllowed = state.pendingChoice.maxSelect ?? 1;
+  const chosenCards: ActionCard[] = [];
+  const remainingRevealed = [...revealedCards];
+  for (const id of chosenCardIds) {
+    if (chosenCards.length >= maxAllowed) break;
+    const idx = remainingRevealed.findIndex((c) => c.id === id);
+    if (idx !== -1) {
+      const [card] = remainingRevealed.splice(idx, 1);
+      chosenCards.push(card);
+    }
+  }
+  const unchosenCards = remainingRevealed;
 
-  if (onResolveType === 'SET_CONCERTO') {
+  if (onResolveType === 'VIEW_ONLY') {
+    // 0. 상대방 패 확인 효과 (스캔 등: 패와 덱을 변동시키지 않고, 턴 종료 시까지 상대 손패 전면 공개)
+    newState.isOpponentHandScanned = true;
+    newState = addLog(
+      newState,
+      `[${sourceCardName}] ${player.name}이(가) 상대방의 패(${revealedCards.length}장)를 모두 확인했습니다. (턴 종료 시까지 전장 공개)`,
+      'ACTION',
+      playerIndex,
+      { effectTag: '상대 패 확인' }
+    );
+  } else if (onResolveType === 'SET_CONCERTO') {
     // 1. 협주 에리어 배치 선택
+    // 출처가 트래시(dropZone, 예: 산화 Lv.1)인지 덱(actionDeck, 예: 양양/산화 배틀 효과)인지 명확히 판별
+    const isFromDropZone =
+      sourceCardName.includes('산화') ||
+      player.dropZone.some((c) => revealedCards.some((rc) => rc.id === c.id || rc.code === c.code));
+
     if (chosenCards.length > 0) {
+      for (const chosen of chosenCards) {
+        if (isFromDropZone) {
+          // dropZone에서 선택된 카드를 1:1로 정확히 제거
+          let dIdx = player.dropZone.findIndex((c) => c.id === chosen.id);
+          if (dIdx === -1) {
+            dIdx = player.dropZone.findIndex((c) => c.code === chosen.code);
+          }
+          if (dIdx !== -1) {
+            player.dropZone.splice(dIdx, 1);
+          }
+        } else {
+          // actionDeck에서 선택된 카드를 1:1로 정확히 제거
+          let aIdx = player.actionDeck.findIndex((c) => c.id === chosen.id);
+          if (aIdx === -1) {
+            aIdx = player.actionDeck.findIndex((c) => c.code === chosen.code);
+          }
+          if (aIdx !== -1) {
+            player.actionDeck.splice(aIdx, 1);
+          }
+        }
+      }
       player.concertoZone = [...player.concertoZone, ...chosenCards];
     }
-    // 미선택된 카드는 덱 맨 위에 유지 (덱 깎이지 않음!)
-    if (unchosenCards.length > 0) {
-      player.actionDeck = [...unchosenCards, ...player.actionDeck];
-    }
 
-    newState.players[playerIndex] = player;
+    if (!isFromDropZone) {
+      // 덱에서 공개되었으나 미선택된 카드는 덱 맨 위에 유지 (덱 깎이지 않음!)
+      if (unchosenCards.length > 0) {
+        player.actionDeck = [...unchosenCards, ...player.actionDeck];
+      }
+    }
+    // (트래시에서 공개된 미선택 카드는 dropZone에 그대로 유지되며, 덱에 절대 추가되지 않음!)
 
     if (chosenCards.length > 0) {
       newState.lastEffectEvent = {
@@ -3275,37 +3559,47 @@ export function resolvePendingChoice(
     } else {
       newState = addLog(
         newState,
-        `[${sourceCardName}] ${player.name}이(가) 협주 에리어 배치를 건너뛰었습니다 (덱 맨 위 유지).`,
+        `[${sourceCardName}] ${player.name}이(가) 협주 에리어 배치를 건너뛰었습니다 (${isFromDropZone ? '트래시 유지' : '덱 맨 위 유지'}).`,
         'ACTION',
         playerIndex
       );
     }
-    return newState;
-  }
-
-  if (onResolveType === 'RECOVER_FROM_DROP') {
-    // 2. 트래시 에리어 회수 선택
-    if (chosenCards.length > 0) {
-      const chosenIds = chosenCards.map((c) => c.id);
-      player.dropZone = player.dropZone.filter((c) => !chosenIds.includes(c.id));
-      player.hand = [...player.hand, ...chosenCards];
+  } else if (onResolveType === 'RECOVER_FROM_DROP') {
+    // 2. 트래시 에리어 회수 선택 (dropZone에서 1:1로 정확히 실물 카드를 추출하여 패로 이동, 절대 복제 불가)
+    const recoveredCards: ActionCard[] = [];
+    for (const chosen of chosenCards) {
+      if (recoveredCards.length >= maxAllowed) break;
+      // 1순위: 카드 고유 ID로 dropZone에서 정확히 1:1 추출
+      let dropIdx = player.dropZone.findIndex((c) => c.id === chosen.id);
+      if (dropIdx === -1) {
+        // 2순위: ID 불일치 시 동일 code 카드를 dropZone에서 1:1 추출
+        dropIdx = player.dropZone.findIndex((c) => c.code === chosen.code);
+      }
+      if (dropIdx !== -1) {
+        const [reclaimed] = player.dropZone.splice(dropIdx, 1);
+        recoveredCards.push(reclaimed as ActionCard);
+      } else {
+        recoveredCards.push(chosen);
+      }
     }
 
-    newState.players[playerIndex] = player;
+    if (recoveredCards.length > 0) {
+      addCardsToHand(player, recoveredCards);
+    }
 
-    if (chosenCards.length > 0) {
+    if (recoveredCards.length > 0) {
       newState.lastEffectEvent = {
         id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         sourceCardName,
         effectType: 'DRAW',
         title: '트래시 카드 회수 완료',
-        description: `[${sourceCardName}] 효과로 [${chosenCards.map((c) => c.nameKr).join(', ')}]을(를) 패에 회수했습니다!`,
+        description: `[${sourceCardName}] 효과로 [${recoveredCards.map((c) => c.nameKr).join(', ')}]을(를) 패에 회수했습니다!`,
         playerIndex,
         timestamp: Date.now(),
       };
       newState = addLog(
         newState,
-        `[${sourceCardName}] ${player.name}이(가) 트래시에서 [${chosenCards.map((c) => c.nameKr).join(', ')}]을(를) 패에 회수했습니다.`,
+        `[${sourceCardName}] ${player.name}이(가) 트래시에서 [${recoveredCards.map((c) => c.nameKr).join(', ')}]을(를) 패에 회수했습니다.`,
         'ACTION',
         playerIndex
       );
@@ -3317,46 +3611,99 @@ export function resolvePendingChoice(
         playerIndex
       );
     }
+  } else {
+    // 3. 패에 추가 (ADD_TO_HAND)
+    // 선택된 카드를 actionDeck에서 완전히 제거 (중복 드로우 원천 차단)
+    player.actionDeck = player.actionDeck.filter((c) => !chosenCards.some((ch) => ch.id === c.id));
+
+    // 손패 고유 ID 중복 방지 가드로 패에 안전 추가
+    addCardsToHand(player, chosenCards);
+
+    // 단일 공개 카드(파수인 BP01-010 또는 판정 패배 드로우)인 경우 미선택 시 덱 맨 위에 유지!
+    // 다중 공개(방랑자 BP01-018)인 경우 미선택 카드는 덱 맨 아래로
+    if (revealedCards.length <= 1) {
+      player.actionDeck = [...unchosenCards, ...player.actionDeck];
+    } else {
+      player.actionDeck = [...player.actionDeck, ...unchosenCards];
+    }
+
+    if (chosenCards.length > 0) {
+      newState.lastEffectEvent = {
+        id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        sourceCardName,
+        effectType: 'DRAW',
+        title: '카드 패 추가 완료',
+        description: `[${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 패에 추가했습니다!`,
+        playerIndex,
+        timestamp: Date.now(),
+      };
+    }
+
+    newState = addLog(
+      newState,
+      `${player.name}이(가) [${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 선택하여 패에 추가했습니다.${
+        unchosenCards.length > 0
+          ? revealedCards.length <= 1
+            ? ' (선택하지 않은 카드는 덱 맨 위 유지)'
+            : ` (선택하지 않은 ${unchosenCards.length}장은 덱 맨 아래로)`
+          : ''
+      }`,
+      'ACTION',
+      playerIndex
+    );
+  }
+
+  // 1. 큐에 대기 중인 다음 선택 발동 효과가 있다면 순차적으로 표출
+  if (newState.pendingChoiceQueue && newState.pendingChoiceQueue.length > 0) {
+    const [nextChoice, ...rest] = newState.pendingChoiceQueue;
+    newState.pendingChoice = nextChoice;
+    newState.pendingChoiceQueue = rest;
     return newState;
   }
 
-  // 3. 패에 추가 (ADD_TO_HAND)
-  player.hand = [...player.hand, ...chosenCards];
-
-  // 단일 공개 카드(파수인 BP01-010 또는 판정 패배 드로우)인 경우 미선택 시 덱 맨 위에 유지!
-  // 다중 공개(방랑자 BP01-018)인 경우 미선택 카드는 덱 맨 아래로
-  if (revealedCards.length <= 1) {
-    player.actionDeck = [...unchosenCards, ...player.actionDeck];
-  } else {
-    player.actionDeck = [...player.actionDeck, ...unchosenCards];
+  // 2. 배틀 스텝(Battle Step) 선택 발동 효과(양 플레이어가 카드를 세트하고 판정을 앞둔 상태)를 완료한 경우:
+  // 오직 양측 대결 카드가 세트되어 있을 때만 판정 스텝(finishClashJudgment)을 실행!
+  if (
+    newState.phase === 'CLASH_REVEAL' &&
+    !newState.clashResult &&
+    Boolean(newState.players[0].clashCard || newState.players[1].clashCard)
+  ) {
+    return finishClashJudgment(newState);
   }
 
-  newState.players[playerIndex] = player;
+  // 3. 전투 종료 후 보류되었던 효과(트래시 카드 회수, 패배 드로우 등)가 완료되었거나,
+  // 이미 clashResult 판정이 끝난 상태에서 CLASH_REVEAL인 경우:
+  // 절대로 finishClashJudgment를 다시 호출하지 않고, 연격 단계(COMBO_STEP) 또는 턴 종료 단계로 안전하게 진행!
+  if (newState.phase === 'CLASH_REVEAL') {
+    const p0State = newState.players[0];
+    const p1State = newState.players[1];
+    const p0HasComboPerm = Boolean(p0State.comboUnlimited) || (p0State.comboCount ?? 0) > 0;
+    const p1HasComboPerm = Boolean(p1State.comboUnlimited) || (p1State.comboCount ?? 0) > 0;
 
-  if (chosenCards.length > 0) {
-    newState.lastEffectEvent = {
-      id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      sourceCardName,
-      effectType: 'DRAW',
-      title: '카드 패 추가 완료',
-      description: `[${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 패에 추가했습니다!`,
-      playerIndex,
-      timestamp: Date.now(),
-    };
+    if (p0HasComboPerm || p1HasComboPerm) {
+      const comboPlayerIdx: 0 | 1 = p0HasComboPerm ? 0 : 1;
+      const comboPlayer = newState.players[comboPlayerIdx];
+
+      newState.phase = 'COMBO_STEP';
+      newState = addLog(
+        newState,
+        `⚡ ${comboPlayer.name}의 [연격 단계(Combo Step)] 돌입! ${
+          comboPlayer.comboUnlimited
+            ? '적색 승리: 연속 연격 무제한 가능!'
+            : `남은 연격 횟수: ${comboPlayer.comboCount}회`
+        }`,
+        'ACTION',
+        comboPlayerIdx
+      );
+      return newState;
+    } else {
+      p0State.comboCount = 0;
+      p0State.comboUnlimited = false;
+      p1State.comboCount = 0;
+      p1State.comboUnlimited = false;
+      return checkHandOverflowOrEndTurn(newState);
+    }
   }
-
-  newState = addLog(
-    newState,
-    `${player.name}이(가) [${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 선택하여 패에 추가했습니다.${
-      unchosenCards.length > 0
-        ? revealedCards.length <= 1
-          ? ' (선택하지 않은 카드는 덱 맨 위 유지)'
-          : ` (선택하지 않은 ${unchosenCards.length}장은 덱 맨 아래로)`
-        : ''
-    }`,
-    'ACTION',
-    playerIndex
-  );
 
   return newState;
 }

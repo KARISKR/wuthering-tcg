@@ -27,11 +27,11 @@ const SLOT_KEYS: SlotKey[] = ['leader', 'leftSupport', 'rightSupport'];
 
 // 튜닝 가능한 SMART AI 파라미터 (자동 시뮬레이션으로 보정됨)
 export const SMART_PARAMS = {
-  upgradeMinHandAfter: 7, // 레벨업 후 최소 남겨야 할 패 수
+  upgradeMinHandAfter: 2, // 레벨업 후 최소 남겨야 할 패 수
   costPenalty: 0.4, // 협주(코스트) 1 소모당 가치 손실
-  lossCost: { RED: 4.5, GREEN: 2.4, BLUE: 1.6 } as Record<CardColor, number>,
-  noise: 0.35, // 읽히지 않도록 EV 근접 시 섞는 랜덤 폭
-  comboMinDmgPerCost: 1.5, // 연격에서 코스트 대비 최소 효율
+  lossCost: { RED: 3.2, GREEN: 2.2, BLUE: 1.8 } as Record<CardColor, number>,
+  noise: 0.2, // 읽히지 않도록 EV 근접 시 섞는 랜덤 폭
+  comboMinDmgPerCost: 0.8, // 연격에서 코스트 대비 최소 효율
   concertoTarget: 2, // 협주 존 목표 장수
   mulliganKeepHeavy: 2, // 멀리건 시 보유할 코스트 2+ 카드 수
   mulliganMaxSwap: 3, // 멀리건 교체 최대 장수
@@ -90,6 +90,10 @@ function cardRawValue(c: ActionCard, leader: CharacterCard | undefined): number 
   if (slotHasCharacterSkill(leader, '금희', 0) && c.color === 'RED') dmg += 1;
   if (slotHasCharacterSkill(leader, '금희', 2) && c.color === 'RED') dmg += 1;
   let v = dmg;
+  const leaderName = leader?.characterName || leader?.nameKr || '';
+  if ((leaderName.includes('치샤') || leaderName.includes('금희')) && c.color === 'RED') v += 1.2;
+  if (leaderName.includes('산화') && c.color === 'BLUE') v += 1.2;
+  if (leaderName.includes('방랑자') && c.color === 'GREEN') v += 1.2;
   let combo = (c.color === 'RED' ? 1 : 0) + (c.pursuitCount ?? 0);
   if (slotHasCharacterSkill(leader, '치샤', 1)) combo += 1;
   if (c.code === 'SD02-010') { combo += 8; v += 4.5; } // 용을 타고 하늘로 향해 (추격 8 + 3드로우)
@@ -281,10 +285,12 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
       const hasYang2 = playerHasCharacterSkill(p, '양양', 2);
       if (hasYang2 && req > 1) req -= 1;
       if (p.hand.length - req < P.upgradeMinHandAfter) continue;
-      // 업그레이드 이득: 해당 캐릭터를 리더로 세웠을 때의 점수 상승 + 현재 리더 보너스
-      const gain = leaderScore(p, { ...ch, level: up.level } as CharacterCard, P.charBonusScale) - leaderScore(p, ch, P.charBonusScale) + 1.2;
-      const isLeader = k === 'leader' ? 0.8 : 0;
-      const score = gain + isLeader - req * 0.9;
+      // 업그레이드 이득: 리더는 전투력 직접 상승, 서포터는 패시브/버프 제공
+      const isLeader = k === 'leader';
+      const gain = isLeader
+        ? (leaderScore(p, { ...ch, level: up.level } as CharacterCard, P.charBonusScale) - leaderScore(p, ch, P.charBonusScale) + 1.8)
+        : 1.5;
+      const score = gain + (isLeader ? 1.0 : 0.4) - req * 0.7;
       if (score > bestScore) {
         bestScore = score;
         bestSlot = k;

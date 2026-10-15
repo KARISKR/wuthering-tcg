@@ -1,0 +1,72 @@
+{
+  "card": [
+    "/audio/sfx/card/1.mp3",
+    "/audio/sfx/card/カードをめくる.mp3"
+  ],
+  "clash": [
+    "/audio/sfx/clash/1.mp3",
+    "/audio/sfx/clash/clash.mp3"
+  ],
+  "combo": [
+    "/audio/sfx/combo/1.mp3",
+    "/audio/sfx/combo/剣で斬る1 (1).mp3"
+  ],
+  "combo_1": [
+    "/audio/sfx/combo_1/1.mp3",
+    "/audio/sfx/combo_1/剣で斬る1 (1).mp3"
+  ],
+  "combo_2": [
+    "/audio/sfx/combo_2/1.mp3",
+    "/audio/sfx/combo_2/剣で斬る4 (1).mp3"
+  ],
+  "combo_3": [
+    "/audio/sfx/combo_3/1.mp3",
+    "/audio/sfx/combo_3/剣で斬る5 (1).mp3"
+  ],
+  "damage": [
+    "/audio/sfx/damage/1.mp3"
+  ],
+  "damage_heavy": [
+    "/audio/sfx/damage_heavy/1.mp3"
+  ],
+  "damage_medium": [
+    "/audio/sfx/damage_medium/1.mp3"
+  ],
+  "draw": [
+    "/audio/sfx/draw/1.mp3",
+    "/audio/sfx/draw/u_fe12rqkbth-sword-clash-241729.mp3"
+  ],
+  "phase": [
+    "/audio/sfx/phase/1.mp3"
+  ],
+  "phase_action": [
+    "/audio/sfx/phase_action/1.mp3",
+    "/audio/sfx/phase_action/タイトル表示.mp3"
+  ],
+  "phase_battle": [
+    "/audio/sfx/phase_battle/1.mp3",
+    "/audio/sfx/phase_battle/金属タイトル表示1.mp3"
+  ],
+  "phase_combo": [
+    "/audio/sfx/phase_combo/1.mp3",
+    "/audio/sfx/phase_combo/金属タイトル表示2.mp3"
+  ],
+  "phase_draw": [
+    "/audio/sfx/phase_draw/1.mp3",
+    "/audio/sfx/phase_draw/ニュースタイトル表示4.mp3"
+  ],
+  "phase_end": [
+    "/audio/sfx/phase_end/1.mp3",
+    "/audio/sfx/phase_end/プレゼンタイトル表示1.mp3"
+  ],
+  "weapon_pistol": [
+    "/audio/sfx/weapon_pistol/1.mp3"
+  ],
+  "weapon_rectifier": [
+    "/audio/sfx/weapon_rectifier/1.mp3",
+    "/audio/sfx/weapon_rectifier/yodguard-fire-magic-4-378637_[cut_1sec].mp3"
+  ],
+  "weapon_sword": [
+    "/audio/sfx/weapon_sword/1.mp3"
+  ]
+}

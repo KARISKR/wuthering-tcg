@@ -9,7 +9,10 @@
 import {
   createInitialGameState,
   executeMulligan,
+  executeDrawPhase,
   setClashCard,
+  resolveClash,
+  resolvePendingChoice,
   proceedAfterClashReveal,
   executeEndPhase,
 } from '../src/engine/gameEngine';
@@ -37,6 +40,7 @@ interface MatchResult {
   winner: 0 | 1 | -1;
   turns: number;
   errors: string[];
+  upgrades: [number, number];
 }
 
 function playMatch(p0Preset: Preset, p1Preset: Preset, lv0: AiLevel, lv1: AiLevel): MatchResult {
@@ -59,7 +63,19 @@ function playMatch(p0Preset: Preset, p1Preset: Preset, lv0: AiLevel, lv1: AiLeve
       const p = state.players[i];
       if (Number.isNaN(p.hp) || p.hp < 0) errors.push(`invalid hp p${i}: ${p.hp}`);
     }
+    if (state.pendingChoice) {
+      const pc = state.pendingChoice;
+      const pick = pc.revealedCards.slice(0, pc.maxSelect ?? 1).map((c) => c.id);
+      state = resolvePendingChoice(state, pick);
+      continue;
+    }
+
     switch (state.phase) {
+      case 'DRAW_PHASE': {
+        const afterDraw = executeDrawPhase(state);
+        state = { ...afterDraw, phase: 'ACTION_PHASE' };
+        break;
+      }
       case 'ACTION_PHASE':
         state = runAiActionPhase(state, active, levels[active]);
         break;
@@ -72,6 +88,7 @@ function playMatch(p0Preset: Preset, p1Preset: Preset, lv0: AiLevel, lv1: AiLeve
         const r1 = setClashCard(state, 1, c1);
         if (!r1.success) errors.push(`p1 set failed: ${r1.error}`);
         state = r1.newState;
+        state = resolveClash(state);
         break;
       }
       case 'CLASH_REVEAL':
@@ -95,7 +112,9 @@ function playMatch(p0Preset: Preset, p1Preset: Preset, lv0: AiLevel, lv1: AiLeve
     if (errors.length > 5) break;
   }
   if (state.phase !== 'GAME_OVER') errors.push(`timeout (phase=${state.phase}, turn=${state.turn})`);
-  return { winner: (state.winner ?? -1) as 0 | 1 | -1, turns: state.turn, errors };
+  const u0 = (state.players[0].slots.leader?.level ?? 0) + (state.players[0].slots.leftSupport?.level ?? 0) + (state.players[0].slots.rightSupport?.level ?? 0);
+  const u1 = (state.players[1].slots.leader?.level ?? 0) + (state.players[1].slots.leftSupport?.level ?? 0) + (state.players[1].slots.rightSupport?.level ?? 0);
+  return { winner: (state.winner ?? -1) as 0 | 1 | -1, turns: state.turn, errors, upgrades: [u0, u1] };
 }
 
 // A/B 레벨 AI를 4개 시나리오(좌석 x 덱)에 균등 배분
@@ -111,6 +130,8 @@ let bWins = 0;
 let draws = 0;
 let totalErrors = 0;
 let totalTurns = 0;
+let aUpgrades = 0;
+let bUpgrades = 0;
 const bySc = scenarios.map(() => ({ a: 0, n: 0 }));
 // 덱 승률 (레벨 무관): SD01 vs SD02
 let sd01Wins = 0;
@@ -136,6 +157,11 @@ for (let g = 0; g < games; g++) {
     continue;
   }
   totalTurns += res.turns;
+  const aUp = sc.aSeat === 0 ? res.upgrades[0] : res.upgrades[1];
+  const bUp = sc.aSeat === 0 ? res.upgrades[1] : res.upgrades[0];
+  aUpgrades += aUp;
+  bUpgrades += bUp;
+
   if (res.winner === -1) draws++;
   else {
     const aWon = res.winner === sc.aSeat;
@@ -159,5 +185,6 @@ scenarios.forEach((sc, i) =>
 );
 console.log(`Deck winrate -> SD01 ${sd01Wins} : SD02 ${sd02Wins}   |  Seat winrate -> first(P0) ${seat0Wins} : second(P1) ${seat1Wins}`);
 console.log(`Avg turns: ${(totalTurns / Math.max(1, decided + draws)).toFixed(1)}`);
+console.log(`Avg character upgrades per game -> A(${levelA}): ${(aUpgrades / games).toFixed(2)}, B(${levelB}): ${(bUpgrades / games).toFixed(2)}`);
 if (totalErrors > 0) process.exit(1);
 

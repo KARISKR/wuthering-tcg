@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { PlayerState, getElementKr } from '../types/tcg';
-import { Trophy, Skull, RotateCcw, Home, Crown, Flame, Sparkles, Swords, Heart, Shield, Star, History } from 'lucide-react';
+import { Trophy, Skull, RotateCcw, Home, Crown, Flame, Sparkles, Swords, Heart, Shield, Star, History, Volume2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { soundEffects } from '../utils/soundEffects';
+import { getCharacterVictoryQuote, getCharacterDefeatQuote } from '../data/characterQuotes';
 
 interface GameOverModalProps {
   winner: 0 | 1;
@@ -11,27 +13,6 @@ interface GameOverModalProps {
   onExitToLobby?: () => void;
   onOpenReplay?: () => void;
 }
-
-// 승리 캐릭터별 전용 명대사
-const CHARACTER_VICTORY_QUOTES: Record<string, string> = {
-  '방랑자': '소리를 조율하고, 잔향을 잠재웠다. 우리의 호흡이 완벽했어.',
-  '방랑자(남)': '소리를 조율하고, 잔향을 잠재웠다. 다음 여정으로 나아가자.',
-  '방랑자(여)': '들려오는 음률을 따라 승리를 거두었어. 믿어줘서 고마워.',
-  '양양': '바람의 흐름이 이 승리를 인도해주었어요. 다치신 곳은 없으신가요?',
-  '치샤': '봤지? 황룡 정의의 영웅 치샤 님의 탄환은 절대로 빗나가지 않는다고!',
-  '금희': '명식의 인도와 수호 아래, 밝은 미래를 위한 승리를 얻었습니다.',
-  '음림': '후훗, 내 인형의 실타래 위에서 춤춘 기분이 어때? 꽤 짜릿했지?',
-  '기염': '야류 군단의 창 끝은 언제나 백성을 지킨다. 물러섬 없는 승리다!',
-  '산화': '눈꽃의 결빙처럼, 한 치의 흐트러짐도 없는 고요한 결착이군요.',
-  '벨리나': '작은 새싹이 피어나듯, 모두의 힘이 모여 따스한 승리가 되었어요!',
-  '단근': '선혈의 진동이... 잦아들었어. 나와 끝까지 함께 싸워줘서 다행이야.',
-  '모르테피': '흥, 내 계산과 고온의 불꽃을 감당할 수 있을 리 없지. 완벽한 데이터야.',
-  '알토': '정보상의 실력은 언제나 보장된다니까? 자, 승리의 보수는 톡톡히 챙겨줘!',
-  '카카루': '고스트 하운드의 사냥은 오차 없이 끝났다. 임무 완수다.',
-  '앙코': '와아~! 코스모스랑 앙코가 이겼다! 승리의 퐁퐁 축제를 시작하자~!',
-  '카멜리아': '후후, 얽히고설킨 덩굴 속에서 춤추는 기분은 어땠어? 네 숨결, 아주 아름다웠어.',
-  '파수인': '별바다의 좌표가 가리킨 결말대로군요. 잃어버린 데이터를 완벽히 복원했습니다.',
-};
 
 export const GameOverModal: React.FC<GameOverModalProps> = ({
   winner,
@@ -44,17 +25,22 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   const isPlayerWinner = winner === 0;
   const winnerPlayer = players[winner];
   const loserPlayer = players[winner === 0 ? 1 : 0];
-  const leaderCard = winnerPlayer.slots.leader;
+  // 승리/패배 주체 리더 카드
+  const activeLeaderCard = isPlayerWinner ? winnerPlayer.slots.leader : loserPlayer.slots.leader;
   const [animationStep, setAnimationStep] = useState(0);
 
-  // 캐릭터 승리 대사
-  const charName = leaderCard.characterName;
-  const victoryQuote =
-    CHARACTER_VICTORY_QUOTES[charName] ||
-    CHARACTER_VICTORY_QUOTES[leaderCard.nameKr] ||
-    `${charName}의 압도적인 조율로 전투에서 승리했습니다!`;
+  // 캐릭터 승리 / 패배 대사
+  const charName = activeLeaderCard.characterName || activeLeaderCard.nameKr;
+  const quote = isPlayerWinner ? getCharacterVictoryQuote(charName) : getCharacterDefeatQuote(charName);
 
   useEffect(() => {
+    // 승리/패배 사운드 연출 실행
+    if (isPlayerWinner) {
+      soundEffects.playVictory(charName);
+    } else {
+      soundEffects.playDefeat(charName);
+    }
+
     // 순차적 연출 타이머
     const timer1 = setTimeout(() => setAnimationStep(1), 200); // 텍스트 슬램
     const timer2 = setTimeout(() => setAnimationStep(2), 600); // 캐릭터 카드 등장
@@ -139,7 +125,9 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       )}
 
       {/* 메인 결과 팝업 카드 */}
-      <div className="relative w-full max-w-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-2 rounded-3xl p-6 sm:p-8 shadow-[0_0_80px_rgba(0,0,0,0.9)] flex flex-col items-center text-center text-slate-100 z-10 overflow-hidden border-amber-500/60 shadow-amber-500/20">
+      <div className={`relative w-full max-w-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-2 rounded-3xl p-6 sm:p-8 shadow-[0_0_80px_rgba(0,0,0,0.9)] flex flex-col items-center text-center text-slate-100 z-10 overflow-hidden ${
+        isPlayerWinner ? 'border-amber-500/60 shadow-amber-500/20' : 'border-rose-500/60 shadow-rose-500/20'
+      }`}>
         {/* 상단 장식 빛 */}
         <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1.5 rounded-full ${
           isPlayerWinner ? 'bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_20px_#f59e0b]' : 'bg-gradient-to-r from-transparent via-rose-500 to-transparent shadow-[0_0_20px_#f43f5e]'
@@ -176,47 +164,73 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           </p>
         </div>
 
-        {/* 2. 승리 리더 캐릭터 스포트라이트 카드 & 대사 */}
+        {/* 2. 리더 캐릭터 스포트라이트 카드 & 대사 */}
         <div
           className={`w-full max-w-lg mb-6 transition-all duration-500 transform ${
             animationStep >= 2 ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4'
           }`}
         >
-          <div className="relative rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/50 p-4 sm:p-5 flex items-center gap-4 sm:gap-6 shadow-2xl overflow-hidden group">
+          <div className={`relative rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border p-4 sm:p-5 flex items-center gap-4 sm:gap-6 shadow-2xl overflow-hidden group ${
+            isPlayerWinner ? 'border-amber-500/50' : 'border-rose-500/50'
+          }`}>
             {/* 배경 빛무리 */}
-            <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-[radial-gradient(ellipse_at_right,rgba(245,158,11,0.15),transparent_70%)] pointer-events-none" />
+            <div className={`absolute right-0 top-0 bottom-0 w-1/2 pointer-events-none ${
+              isPlayerWinner ? 'bg-[radial-gradient(ellipse_at_right,rgba(245,158,11,0.15),transparent_70%)]' : 'bg-[radial-gradient(ellipse_at_right,rgba(244,63,94,0.15),transparent_70%)]'
+            }`} />
 
-            {/* 리더 캐릭터 실물 카드 (대형화 & 골드 발광) */}
-            <div className="relative w-24 sm:w-28 aspect-[5/7] rounded-xl overflow-hidden bg-slate-950 border-2 border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.5)] shrink-0 group-hover:scale-105 transition-transform">
+            {/* 리더 캐릭터 실물 카드 */}
+            <div className={`relative w-24 sm:w-28 aspect-[5/7] rounded-xl overflow-hidden bg-slate-950 border-2 shrink-0 group-hover:scale-105 transition-transform ${
+              isPlayerWinner ? 'border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.5)]' : 'border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.4)]'
+            }`}>
               <img
-                src={(leaderCard as any).artUrl}
-                alt={leaderCard.nameKr}
-                className="w-full h-full object-contain"
+                src={(activeLeaderCard as any).artUrl}
+                alt={activeLeaderCard.nameKr}
+                className={`w-full h-full object-contain ${!isPlayerWinner ? 'grayscale-[20%]' : ''}`}
               />
-              <div className="absolute bottom-1 left-1 right-1 bg-slate-950/80 px-1 py-0.5 rounded text-[10px] font-black text-amber-300 text-center font-mono">
-                MVP 리더
+              <div className={`absolute bottom-1 left-1 right-1 bg-slate-950/80 px-1 py-0.5 rounded text-[10px] font-black text-center font-mono ${
+                isPlayerWinner ? 'text-amber-300' : 'text-rose-300'
+              }`}>
+                {isPlayerWinner ? 'MVP 리더' : '패배 리더'}
               </div>
             </div>
 
-            {/* 리더 캐릭터 정보 및 승리 대사 */}
+            {/* 리더 캐릭터 정보 및 승리/패배 대사 */}
             <div className="flex-1 text-left">
               <div className="flex items-center gap-2 mb-1">
-                <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 text-xs font-black">
-                  Lv.{leaderCard.level}
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
+                  isPlayerWinner ? 'bg-amber-500 text-slate-950' : 'bg-rose-500 text-white'
+                }`}>
+                  Lv.{activeLeaderCard.level}
                 </span>
                 <span className="text-sm sm:text-base font-black text-white">
-                  {leaderCard.nameKr}
+                  {activeLeaderCard.nameKr}
                 </span>
                 <span className="text-xs font-mono text-cyan-400 font-bold ml-auto">
-                  {getElementKr(leaderCard.element)}
+                  {getElementKr(activeLeaderCard.element)}
                 </span>
               </div>
 
-              {/* 전용 승리 대사 말풍선 */}
-              <div className="relative bg-slate-950/80 rounded-xl p-3 border border-slate-800 text-xs sm:text-sm text-amber-200/90 font-medium leading-relaxed italic shadow-inner">
-                <span className="text-amber-400 font-bold mr-1">“</span>
-                {victoryQuote}
-                <span className="text-amber-400 font-bold ml-1">”</span>
+              {/* 전용 대사 말풍선 & 사운드 재생 버튼 */}
+              <div className={`relative bg-slate-950/80 rounded-xl p-3 border text-xs sm:text-sm font-medium leading-relaxed italic shadow-inner flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 ${
+                isPlayerWinner ? 'border-slate-800 text-amber-200/90' : 'border-rose-950 text-rose-200/90'
+              }`}>
+                <div>
+                  <span className={`${isPlayerWinner ? 'text-amber-400' : 'text-rose-400'} font-bold mr-1`}>“</span>
+                  {quote}
+                  <span className={`${isPlayerWinner ? 'text-amber-400' : 'text-rose-400'} font-bold ml-1`}>”</span>
+                </div>
+                <button
+                  onClick={() => isPlayerWinner ? soundEffects.playVictory(charName) : soundEffects.playDefeat(charName)}
+                  className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold not-italic transition cursor-pointer self-end sm:self-auto ${
+                    isPlayerWinner
+                      ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
+                      : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border-rose-500/40'
+                  }`}
+                  title={isPlayerWinner ? "승리 사운드 및 보이스 다시 듣기" : "패배 사운드 및 보이스 다시 듣기"}
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                  <span>{isPlayerWinner ? '승리 보이스' : '패배 보이스'}</span>
+                </button>
               </div>
             </div>
           </div>

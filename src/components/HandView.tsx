@@ -168,7 +168,7 @@ export const HandView: React.FC<HandViewProps> = ({
         {hand.length === 0 ? (
           <div className="py-8 text-slate-500 text-sm font-medium">패에 카드가 없습니다.</div>
         ) : (
-          hand.map((card) => {
+          hand.map((card, idx) => {
             const { canPlayClash, canCombo, reason } = checkCardUsable(card);
             const isSelected = selectedCardId === card.id || selectedOverflowCardIds.includes(card.id);
             const isHighlighted = (canSetClashCard && canPlayClash) || (isComboStep && canCombo);
@@ -186,7 +186,7 @@ export const HandView: React.FC<HandViewProps> = ({
 
             return (
               <div
-                key={card.id}
+                key={`${card.id}-${idx}`}
                 onMouseEnter={() => {
                   setHoveredCardId(card.id);
                   onHover?.(card);

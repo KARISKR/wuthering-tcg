@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { UpgradeEffect } from '../types/tcg';
-import { Sparkles, ArrowUpCircle, Crown, Shield, Zap } from 'lucide-react';
+import { Sparkles, ArrowUpCircle, Crown } from 'lucide-react';
 import { soundEffects } from '../utils/soundEffects';
 
 interface UpgradeEffectOverlayProps {
@@ -8,21 +8,38 @@ interface UpgradeEffectOverlayProps {
   onDismiss: () => void;
 }
 
-export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = ({
+export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = React.memo(({
   effect,
   onDismiss,
 }) => {
+  const hasPlayedRef = useRef<string | null>(null);
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
+
   useEffect(() => {
-    // 레벨업 효과음 재생
-    soundEffects.playUpgrade();
+    // 이미 동일한 레벨업 연출 ID로 사운드를 재생했다면 중복 실행 차단 (React StrictMode 및 리렌더링 중복 방지)
+    if (hasPlayedRef.current !== effect.id) {
+      hasPlayedRef.current = effect.id;
+      soundEffects.playUpgrade(effect.character.characterName || effect.character.nameKr, effect.newLevel);
+    }
 
-    // 1600ms 후 자동 퇴장 (연출 충분히 감상할 수 있는 타이밍)
+    // 5초 후 자동 퇴장 (또는 클릭/키보드로 즉시 닫기)
     const timer = setTimeout(() => {
-      onDismiss();
-    }, 1600);
+      onDismissRef.current();
+    }, 5000);
 
-    return () => clearTimeout(timer);
-  }, [effect.id, onDismiss]);
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+        onDismissRef.current();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [effect.id]);
 
   const { character, playerName, previousLevel, newLevel, slotName } = effect;
   const slotLabel =
@@ -30,7 +47,7 @@ export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = ({
 
   return (
     <div
-      onClick={onDismiss}
+      onClick={() => onDismissRef.current()}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md cursor-pointer select-none animate-in fade-in duration-200 overflow-hidden"
     >
       {/* 황금빛/공명 파티클 앰비언트 글로우 */}
@@ -99,10 +116,16 @@ export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = ({
           </span>
         </div>
 
-        <div className="mt-4 text-[11px] text-slate-500 font-medium">
-          (화면을 클릭하면 즉시 계속 진행됩니다)
+        {/* 5초 진행 바 & 안내 */}
+        <div className="w-full max-w-xs mt-4 flex flex-col items-center gap-1.5">
+          <div className="w-full bg-slate-950/80 rounded-full h-1.5 overflow-hidden border border-amber-500/30">
+            <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 animate-progress-5s" />
+          </div>
+          <div className="text-[11px] text-amber-300/80 font-medium">
+            (5초 후 자동으로 닫히거나, 화면 또는 키[Space/ESC]를 눌러 즉시 닫기)
+          </div>
         </div>
       </div>
     </div>
   );
-};
+});

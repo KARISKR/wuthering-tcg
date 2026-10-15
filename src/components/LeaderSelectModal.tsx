@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { PlayerState, CharacterCard, getElementKr } from '../types/tcg';
 import { CardView } from './CardView';
-import { Crown, Sparkles, Swords, CheckCircle2, Shield, User, ArrowRight } from 'lucide-react';
+import { Crown, Sparkles, Swords, CheckCircle2, Shield, User, ArrowRight, MessageSquareQuote } from 'lucide-react';
 import { soundEffects } from '../utils/soundEffects';
+import { getCharacterOpeningQuote } from '../data/characterQuotes';
 
 interface LeaderSelectModalProps {
   isOpen: boolean;
@@ -44,7 +45,7 @@ export const LeaderSelectModal: React.FC<LeaderSelectModalProps> = ({
   };
 
   const handleConfirmClick = () => {
-    soundEffects.playUpgrade();
+    soundEffects.playCardPlace();
     onConfirm(selectedCharName);
   };
 
@@ -122,6 +123,21 @@ export const LeaderSelectModal: React.FC<LeaderSelectModalProps> = ({
                       {char.description}
                     </p>
                   )}
+
+                  {/* 출격 오프닝 대사 멘트 */}
+                  <div className={`mt-2.5 p-2 rounded-xl text-left border transition-all ${
+                    isSelected
+                      ? 'bg-amber-950/40 border-amber-500/40 text-amber-200'
+                      : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                  }`}>
+                    <div className="flex items-center gap-1 text-[10px] font-black text-amber-400 uppercase tracking-wider mb-0.5">
+                      <MessageSquareQuote className="w-3 h-3 text-amber-400" />
+                      <span>출격 대사</span>
+                    </div>
+                    <p className="text-[11px] font-medium leading-snug italic">
+                      "{getCharacterOpeningQuote(charIdentifier)}"
+                    </p>
+                  </div>
                 </div>
               </div>
             );

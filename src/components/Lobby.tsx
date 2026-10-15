@@ -73,8 +73,11 @@ export const Lobby: React.FC<LobbyProps> = ({
             鳴
           </div>
           <div>
-            <h1 className="text-base font-black tracking-widest text-white uppercase">
-              WUTHERING WAVES : BATTLE
+            <h1 className="text-base font-black tracking-widest text-white uppercase flex items-center gap-2">
+              <span>WUTHERING WAVES : BATTLE</span>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black tracking-normal shadow">
+                BETA 1.0
+              </span>
             </h1>
             <span className="text-[10px] text-amber-400 font-mono tracking-wider">
               OFFICIAL TRADING CARD GAME SIMULATOR

@@ -9,7 +9,10 @@
 import {
   createInitialGameState,
   executeMulligan,
+  executeDrawPhase,
   setClashCard,
+  resolveClash,
+  resolvePendingChoice,
   proceedAfterClashReveal,
   executeEndPhase,
 } from '../src/engine/gameEngine';
@@ -66,7 +69,19 @@ function playMatch(d0: CustomDeckConfig, d1: CustomDeckConfig, lv0: AiLevel, lv1
       const p = state.players[i];
       if (Number.isNaN(p.hp) || p.hp < 0) errors.push(`invalid hp p${i}: ${p.hp}`);
     }
+    if (state.pendingChoice) {
+      const pc = state.pendingChoice;
+      const pick = pc.revealedCards.slice(0, pc.maxSelect ?? 1).map((c) => c.id);
+      state = resolvePendingChoice(state, pick);
+      continue;
+    }
+
     switch (state.phase) {
+      case 'DRAW_PHASE': {
+        const afterDraw = executeDrawPhase(state);
+        state = { ...afterDraw, phase: 'ACTION_PHASE' };
+        break;
+      }
       case 'ACTION_PHASE':
         state = runAiActionPhase(state, active, levels[active]);
         break;
@@ -79,6 +94,7 @@ function playMatch(d0: CustomDeckConfig, d1: CustomDeckConfig, lv0: AiLevel, lv1
         const r1 = setClashCard(state, 1, c1);
         if (!r1.success) errors.push(`p1 set failed: ${r1.error}`);
         state = r1.newState;
+        state = resolveClash(state);
         break;
       }
       case 'CLASH_REVEAL':

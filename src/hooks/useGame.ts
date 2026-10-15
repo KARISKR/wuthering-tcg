@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { GameState } from '../types/tcg';
 import {
   createInitialGameState,
   executeMulligan,
+  executeDrawPhase,
   selectStartingLeader,
   upgradeCharacter,
   switchLeader,
@@ -18,6 +19,7 @@ import {
   resolveClash,
   resolvePendingChoice,
   canPlayerExecuteCombo,
+  addLog,
   CustomDeckConfig,
 } from '../engine/gameEngine';
 import {
@@ -40,12 +42,16 @@ export function useGame(
   );
 
   const [isAiThinking, setIsAiThinking] = useState(false);
+  const [isDrawFlightActive, setIsDrawFlightActive] = useState(false);
+  const isDrawingInProgress = useRef(false);
 
   // 새 게임 시작
   const restartGame = useCallback(
     (newP0Preset = p0PresetKey, newP1Preset = p1PresetKey, newMode = gameState.gameMode) => {
       setGameState(createInitialGameState(newP0Preset, newP1Preset, newMode, customDeck, p1CustomDeck));
       setIsAiThinking(false);
+      setIsDrawFlightActive(false);
+      isDrawingInProgress.current = false;
     },
     [p0PresetKey, p1PresetKey, gameState.gameMode, customDeck, p1CustomDeck]
   );
@@ -123,6 +129,23 @@ export function useGame(
     []
   );
 
+  // 1.5. 카드 드로우 실행 (수동 클릭 및 AI 자동 드로우 공용)
+  const handleDrawCards = useCallback(
+    (playerIndex?: 0 | 1) => {
+      setGameState((prev) => {
+        if (prev.phase !== 'DRAW_PHASE') return prev;
+        const targetIdx = playerIndex ?? (prev.activePlayerIndex as 0 | 1);
+        if (prev.activePlayerIndex !== targetIdx) return prev;
+
+        const afterDraw = executeDrawPhase(prev);
+        return {
+          ...afterDraw,
+          phase: 'ACTION_PHASE',
+        };
+      });
+    },
+    []
+  );
 
   // 2. 캐릭터 레벨업
   const handleUpgrade = useCallback(
@@ -216,6 +239,40 @@ export function useGame(
     setGameState((prev) => (prev.lastUpgrade ? { ...prev, lastUpgrade: null } : prev));
   }, []);
 
+  // 효과 발동 팝업 닫힘 시 lastEffectEvent 초기화
+  const clearLastEffectEvent = useCallback(() => {
+    setGameState((prev) => (prev.lastEffectEvent ? { ...prev, lastEffectEvent: null } : prev));
+  }, []);
+
+  // ==========================================
+  // 드로우 단계 (DRAW_PHASE) 관리
+  // - 플레이어 턴: 사용자가 덱을 직접 클릭할 때까지 DRAW_PHASE 유지
+  // - AI 턴: 750ms 후 자동으로 AI 드로우 트리거
+  // ==========================================
+  useEffect(() => {
+    if (gameState.phase !== 'DRAW_PHASE') {
+      isDrawingInProgress.current = false;
+      setIsDrawFlightActive(false);
+    }
+  }, [gameState.phase]);
+
+  useEffect(() => {
+    if (
+      gameState.phase === 'DRAW_PHASE' &&
+      gameState.activePlayerIndex === 1 &&
+      gameState.players[1].isAi &&
+      !isDrawingInProgress.current &&
+      !gameState.pendingChoice
+    ) {
+      // CenterDrawOverlay가 800ms에 자동 연출을 트리거하고 카드를 패로 보낸 뒤 드로우를 완료합니다.
+      // 본 타이머는 혹시 모를 오버레이 미작동 시의 안전 폴백(Watchdog)으로 4000ms로 설정합니다.
+      const timer = setTimeout(() => {
+        handleDrawCards(1);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.phase, gameState.activePlayerIndex, gameState.players, gameState.pendingChoice, handleDrawCards]);
+
   // ==========================================
   // AI 봇 비동기 턴 처리 (레이스 컨디션 및 멈춤 방지)
   // ==========================================
@@ -223,7 +280,8 @@ export function useGame(
     const isAiTurn = gameState.activePlayerIndex === 1 && gameState.players[1].isAi;
     const isGameOver = gameState.phase === 'GAME_OVER' || gameState.phase === 'MULLIGAN';
 
-    if (isGameOver) {
+    // 플레이어가 효과 선택 발동 팝업(스캔, 드로우, 버리기 등)을 진행 중일 때는 모든 AI 행동과 턴 진행을 일시 정지!
+    if (isGameOver || Boolean(gameState.pendingChoice)) {
       setIsAiThinking(false);
       return;
     }
@@ -270,10 +328,21 @@ export function useGame(
     }
 
     // 2-B) 양 플레이어 카드 세트 완료 후 전장 대치 연출 (900ms 대치 후 자동 오픈 및 판정)
-    if (gameState.phase === 'CLASH_SET' && gameState.players[0].clashCardReady && gameState.players[1].clashCardReady) {
+    // 플레이어가 효과 선택 팝업 중이면 대결 판정을 백그라운드에서 절대 진행하지 않음!
+    if (
+      gameState.phase === 'CLASH_SET' &&
+      gameState.players[0].clashCardReady &&
+      gameState.players[1].clashCardReady &&
+      !gameState.pendingChoice
+    ) {
       const timer = setTimeout(() => {
         setGameState((prev) => {
-          if (prev.phase === 'CLASH_SET' && prev.players[0].clashCardReady && prev.players[1].clashCardReady) {
+          if (
+            prev.phase === 'CLASH_SET' &&
+            prev.players[0].clashCardReady &&
+            prev.players[1].clashCardReady &&
+            !prev.pendingChoice
+          ) {
             return resolveClash(prev);
           }
           return prev;
@@ -284,13 +353,23 @@ export function useGame(
       };
     }
 
-    // 3) AI 연격 단계 (AI인 플레이어 1에게 연격 권한이 있을 때만 가동)
-    const p1HasCombo =
+    // 3) AI 연격 단계 (AI인 플레이어 1에게 연격 차례일 때)
+    const isAiComboTurn =
       gameState.players[1].isAi &&
-      (Boolean(gameState.players[1].comboUnlimited) || (gameState.players[1].comboCount ?? 0) > 0);
+      (gameState.clashResult?.winnerIndex === 1 ||
+        gameState.lastComboStrike?.attackerIndex === 1 ||
+        Boolean(gameState.players[1].comboUnlimited) ||
+        (gameState.players[1].comboCount ?? 0) > 0);
 
-    if (gameState.phase === 'COMBO_STEP' && p1HasCombo) {
-      const p1CanCombo = canPlayerExecuteCombo(gameState.players[1]);
+    const isUserComboTurn =
+      !gameState.players[0].isAi &&
+      (Boolean(gameState.players[0].comboUnlimited) || (gameState.players[0].comboCount ?? 0) > 0);
+
+    if (gameState.phase === 'COMBO_STEP' && isAiComboTurn && !isUserComboTurn) {
+      const p1HasCombo =
+        Boolean(gameState.players[1].comboUnlimited) || (gameState.players[1].comboCount ?? 0) > 0;
+      const p1CanCombo = p1HasCombo && canPlayerExecuteCombo(gameState.players[1]);
+
       if (p1CanCombo) {
         setIsAiThinking(true);
         const timer = setTimeout(() => {
@@ -313,7 +392,7 @@ export function useGame(
           setIsAiThinking(false);
         };
       } else {
-        // AI에게 연격 권한은 있으나 낼 수 있는 적색 카드나 코스트가 부족할 때만 AI 연격 종료
+        // AI에게 남은 연격이 없거나 낼 수 있는 적색 카드가 없을 때 -> 연격 정상 종료!
         setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
@@ -323,7 +402,7 @@ export function useGame(
             return prev;
           });
           setIsAiThinking(false);
-        }, 800);
+        }, 1400);
         return () => {
           clearTimeout(timer);
           setIsAiThinking(false);
@@ -362,6 +441,7 @@ export function useGame(
     gameState.players[0].hand.length,
     gameState.players[1].actionArea?.length,
     gameState.lastComboStrike?.id,
+    gameState.pendingChoice?.id,
   ]);
 
   return {
@@ -372,6 +452,8 @@ export function useGame(
     handleSetInitiative,
     handleSelectStartingLeader,
     handleMulligan,
+    handleDrawCards,
+    isDrawFlightActive,
     handleUpgrade,
     handleSwitchLeader,
     handleChargeConcerto,
@@ -385,5 +467,6 @@ export function useGame(
     handleEndTurn,
     handleForceResolveClash,
     clearLastUpgrade,
+    clearLastEffectEvent,
   };
 }

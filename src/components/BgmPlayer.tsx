@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { bgmManager, BGM_TRACKS } from '../utils/bgmManager';
+import { bgmManager, BgmMode } from '../utils/bgmManager';
 import {
   Volume2,
   Volume1,
@@ -14,17 +14,22 @@ import {
   Check,
   Repeat,
   Shuffle,
+  Coffee,
+  Swords,
 } from 'lucide-react';
 
 export const BgmPlayer: React.FC = () => {
   const [bgmState, setBgmState] = useState(() => bgmManager.getState());
   const [showPlaylist, setShowPlaylist] = useState(false);
+  const [activeTab, setActiveTab] = useState<BgmMode>(() => bgmManager.getMode());
   const playlistRef = useRef<HTMLDivElement | null>(null);
 
   // 글로벌 BGM 상태 구독
   useEffect(() => {
     return bgmManager.subscribe(() => {
-      setBgmState({ ...bgmManager.getState() });
+      const state = bgmManager.getState();
+      setBgmState({ ...state });
+      setActiveTab(state.mode);
     });
   }, []);
 
@@ -59,20 +64,30 @@ export const BgmPlayer: React.FC = () => {
     isLooping,
     isShuffle,
     volume,
+    mode,
     currentTrackIdx,
     activeTitle,
-    activeSubtitle,
     isCustom,
+    tracks,
+    lobbyTracks,
+    battleTracks,
   } = bgmState;
 
-  const currentDisplayVol = Math.round((isMuted ? 0 : volume) * 100);
+  const isBattle = mode === 'battle';
+  const effectiveVol = bgmState.effectiveVolume ?? (isBattle ? volume * 0.8 : volume);
+  const currentDisplayVol = Math.round((isMuted ? 0 : effectiveVol) * 100);
+  const displayedTracks = activeTab === 'battle' ? battleTracks : lobbyTracks;
 
   return (
     <div className="relative flex items-center gap-1.5 sm:gap-2 bg-slate-900/90 border border-slate-700/80 rounded-2xl px-2.5 sm:px-3 py-1 shadow-xl text-xs backdrop-blur-md select-none">
       {/* 회전하는 LP 디스크 아이콘 */}
       <div
         className={`p-1 rounded-full transition-colors ${
-          isPlaying ? 'text-amber-400 animate-spin' : 'text-slate-500'
+          isPlaying
+            ? isBattle
+              ? 'text-rose-400 animate-spin'
+              : 'text-amber-400 animate-spin'
+            : 'text-slate-500'
         }`}
       >
         <Disc className="w-3.5 h-3.5" />
@@ -80,21 +95,34 @@ export const BgmPlayer: React.FC = () => {
 
       {/* 현재 곡 정보 (클릭 시 플레이리스트 토글) */}
       <button
-        onClick={() => setShowPlaylist(!showPlaylist)}
-        className="flex flex-col text-left max-w-[100px] sm:max-w-[145px] truncate cursor-pointer group"
-        title="트랙 목록 열기"
+        onClick={() => {
+          setActiveTab(mode);
+          setShowPlaylist(!showPlaylist);
+        }}
+        className="flex flex-col text-left max-w-[105px] sm:max-w-[155px] truncate cursor-pointer group"
+        title="트랙 및 플레이리스트 목록 열기"
       >
         <div className="flex items-center gap-1">
+          {/* 모드 배지 (대기실 vs 전투) */}
+          <span
+            className={`text-[8px] font-black px-1 rounded border uppercase ${
+              isBattle
+                ? 'bg-rose-950/80 text-rose-300 border-rose-500/40'
+                : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40'
+            }`}
+          >
+            {isBattle ? '전투' : '대기실'}
+          </span>
           <span className="text-[9px] font-mono text-amber-400 leading-none">
-            BGM {isCustom ? 'CUSTOM' : `0${currentTrackIdx + 1}/0${BGM_TRACKS.length}`}
+            {isCustom ? 'CUSTOM' : `0${currentTrackIdx + 1}/0${tracks.length}`}
           </span>
           {isLooping ? (
             <span className="text-[8px] font-bold text-emerald-400 bg-emerald-950/80 px-1 rounded border border-emerald-500/30">
-              한곡반복
+              반복
             </span>
           ) : isShuffle ? (
             <span className="text-[8px] font-bold text-amber-400 bg-amber-950/80 px-1 rounded border border-amber-500/30">
-              랜덤재생
+              랜덤
             </span>
           ) : null}
         </div>
@@ -117,8 +145,12 @@ export const BgmPlayer: React.FC = () => {
         {/* 재생 / 일시정지 */}
         <button
           onClick={() => bgmManager.togglePlay()}
-          className="p-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black transition cursor-pointer shadow"
-          title={isPlaying ? '일시정지' : 'BGM 재생 (작은 볼륨)'}
+          className={`p-1.5 rounded-lg font-black transition cursor-pointer shadow ${
+            isBattle
+              ? 'bg-rose-500 hover:bg-rose-400 text-slate-950'
+              : 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+          }`}
+          title={isPlaying ? '일시정지' : 'BGM 재생 (은은한 볼륨)'}
         >
           {isPlaying ? <Pause className="w-3 h-3 fill-slate-950" /> : <Play className="w-3 h-3 fill-slate-950" />}
         </button>
@@ -184,7 +216,11 @@ export const BgmPlayer: React.FC = () => {
             if (isMuted) bgmManager.toggleMute();
           }}
           className="w-12 md:w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-400"
-          title={`볼륨: ${currentDisplayVol}% (은은한 작은 소리)`}
+          title={
+            isBattle
+              ? `전투 BGM 볼륨: ${currentDisplayVol}% (전투 시 기본 20% 인하 적용)`
+              : `대기실 BGM 볼륨: ${currentDisplayVol}% (은은한 작은 소리)`
+          }
         />
         <span className="text-[10px] font-mono text-slate-400 w-6 text-right">
           {currentDisplayVol}%
@@ -193,46 +229,86 @@ export const BgmPlayer: React.FC = () => {
 
       {/* 플레이리스트 메뉴 토글 버튼 */}
       <button
-        onClick={() => setShowPlaylist(!showPlaylist)}
+        onClick={() => {
+          setActiveTab(mode);
+          setShowPlaylist(!showPlaylist);
+        }}
         className={`p-1 rounded-lg transition cursor-pointer ${
           showPlaylist ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-white'
         }`}
-        title="곡 목록 선택"
+        title="플레이리스트 선택"
       >
         <ListMusic className="w-3.5 h-3.5" />
       </button>
 
       {/* ========================================================= */}
-      {/* 플로팅 플레이리스트 드롭다운 팝업 */}
+      {/* 플로팅 플레이리스트 드롭다운 팝업 (대기실 / 전투 탭 분리) */}
       {/* ========================================================= */}
       {showPlaylist && (
         <div
           ref={playlistRef}
-          className="absolute right-0 top-full mt-2 w-72 bg-slate-900/95 border-2 border-amber-500/50 rounded-2xl p-2.5 shadow-2xl shadow-black/90 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 top-full mt-2 w-80 bg-slate-900/98 border-2 border-amber-500/50 rounded-2xl p-3 shadow-2xl shadow-black/95 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
         >
-          <div className="flex items-center justify-between pb-2 mb-1.5 border-b border-slate-800 px-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-black text-amber-400">
-              <Disc className="w-3.5 h-3.5" />
-              <span>명조 공식 OST BGM ({BGM_TRACKS.length}곡)</span>
-            </div>
-            <span className="text-[10px] font-mono text-slate-400">
-              {isLooping ? '한곡반복 중' : isShuffle ? '랜덤재생 중' : '순차재생'}
+          {/* 상단 모드 분리 탭 버튼 */}
+          <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950/80 rounded-xl mb-2.5 border border-slate-800">
+            <button
+              onClick={() => {
+                setActiveTab('lobby');
+                if (mode !== 'lobby') bgmManager.setMode('lobby');
+              }}
+              className={`py-1.5 px-2 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                activeTab === 'lobby'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Coffee className="w-3.5 h-3.5" />
+              <span>대기실 음악 ({lobbyTracks.length})</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('battle');
+                if (mode !== 'battle') bgmManager.setMode('battle');
+              }}
+              className={`py-1.5 px-2 rounded-lg text-xs font-black flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                activeTab === 'battle'
+                  ? 'bg-rose-500 text-slate-950 shadow-md shadow-rose-500/30'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Swords className="w-3.5 h-3.5" />
+              <span>전투 음악 ({battleTracks.length})</span>
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between pb-1.5 mb-1 px-1 text-[10px] text-slate-400 border-b border-slate-800">
+            <span>
+              {activeTab === 'lobby' ? '☕ 평온한 대기실 OST' : '⚔️ 긴장감 넘치는 전투 OST'}
+            </span>
+            <span className="font-mono">
+              {isLooping ? '한곡반복' : isShuffle ? '랜덤재생' : '순차재생'}
             </span>
           </div>
 
-          <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
-            {BGM_TRACKS.map((track, idx) => {
-              const isSelected = !isCustom && currentTrackIdx === idx;
+          {/* 트랙 목록 */}
+          <div className="space-y-1 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+            {displayedTracks.map((track, idx) => {
+              const isSelected = !isCustom && mode === activeTab && currentTrackIdx === idx;
               return (
                 <button
                   key={track.id}
                   onClick={() => {
+                    if (mode !== activeTab) {
+                      bgmManager.setMode(activeTab);
+                    }
                     bgmManager.selectTrack(idx);
                     setShowPlaylist(false);
                   }}
                   className={`w-full p-2 rounded-xl text-left flex items-center justify-between transition cursor-pointer ${
                     isSelected
-                      ? 'bg-amber-500/20 border border-amber-400/60 text-amber-300 shadow'
+                      ? activeTab === 'battle'
+                        ? 'bg-rose-500/20 border border-rose-400/60 text-rose-300 shadow'
+                        : 'bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 shadow'
                       : 'hover:bg-slate-800 text-slate-300'
                   }`}
                 >
@@ -246,17 +322,23 @@ export const BgmPlayer: React.FC = () => {
                       {track.subtitle}
                     </span>
                   </div>
-                  {isSelected && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                  {isSelected && (
+                    <Check
+                      className={`w-3.5 h-3.5 shrink-0 ${
+                        activeTab === 'battle' ? 'text-rose-400' : 'text-emerald-400'
+                      }`}
+                    />
+                  )}
                 </button>
               );
             })}
           </div>
 
-          {/* 커스텀 음원 파일 업로드 */}
-          <div className="pt-2 mt-2 border-t border-slate-800/80">
-            <label className="w-full py-1.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 text-xs font-semibold cursor-pointer transition flex items-center justify-center gap-1.5">
+          {/* 커스텀 음원 파일 업로드 & 폴더 안내 */}
+          <div className="pt-2 mt-2 border-t border-slate-800/80 flex items-center gap-2">
+            <label className="flex-1 py-1.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-300 text-xs font-semibold cursor-pointer transition flex items-center justify-center gap-1.5">
               <Upload className="w-3 h-3" />
-              <span>내 MP3 파일 불러오기</span>
+              <span>내 MP3 불러오기</span>
               <input
                 type="file"
                 accept="audio/*"
@@ -264,6 +346,9 @@ export const BgmPlayer: React.FC = () => {
                 className="hidden"
               />
             </label>
+          </div>
+          <div className="mt-1.5 text-[9px] text-slate-500 font-mono text-center">
+            📁 public/audio/bgm/{activeTab}/1.mp3 형태로 넣어도 자동 등록
           </div>
         </div>
       )}

@@ -445,7 +445,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       alert('동일한 카드는 덱에 최대 3장까지만 투입할 수 있습니다.');
       return;
     }
-    setActionDeck([...actionDeck, { ...best, id: `deck-${best.code}-${Date.now()}` }]);
+    setActionDeck([...actionDeck, { ...best, id: `deck-${best.code}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}` }]);
   };
 
   // 카드 제거 (1장)

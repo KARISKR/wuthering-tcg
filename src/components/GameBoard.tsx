@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useGame } from '../hooks/useGame';
 import { CardView } from './CardView';
 import { CharacterSlot } from './CharacterSlot';
@@ -11,6 +11,8 @@ import { ClashAnimationOverlay } from './ClashAnimationOverlay';
 import { ComboStrikeOverlay } from './ComboStrikeOverlay';
 import { UpgradeEffectOverlay } from './UpgradeEffectOverlay';
 import { PhaseBannerOverlay } from './PhaseBannerOverlay';
+import { CardDrawFlightOverlay } from './CardDrawFlightOverlay';
+import { CenterDrawOverlay } from './CenterDrawOverlay';
 import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
 import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
@@ -23,9 +25,13 @@ import { EffectChoiceModal } from './EffectChoiceModal';
 import { EffectNotificationToast } from './EffectNotificationToast';
 import { CenterActionHUD } from './CenterActionHUD';
 import { EvolutionTreeModal } from './EvolutionTreeModal';
+import { ZoneCardStack } from './ZoneCardStack';
+import { DeckStack } from './DeckStack';
+import { MatchOpeningOverlay } from './MatchOpeningOverlay';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect, getElementKr } from '../types/tcg';
-import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill, findAllUpgradableCards } from '../engine/gameEngine';
+import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill, findAllUpgradableCards, canPlayerExecuteCombo } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
+import { getCharacterIdleQuote, getCharacterLowHpQuote } from '../data/characterQuotes';
 import {
   Swords,
   Shield,
@@ -52,6 +58,8 @@ import {
   Crown,
   Trash2,
   ExternalLink,
+  AlertTriangle,
+  AlertCircle,
 } from 'lucide-react';
 
 import { BgmPlayer } from './BgmPlayer';
@@ -79,6 +87,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleSetInitiative,
     handleSelectStartingLeader,
     handleMulligan,
+    handleDrawCards,
+    isDrawFlightActive,
     handleUpgrade,
     handleSwitchLeader,
     handleChargeConcerto,
@@ -92,7 +102,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleEndTurn,
     handleForceResolveClash,
     clearLastUpgrade,
+    clearLastEffectEvent,
   } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
+
+  // 드로우 페이즈 연출 및 카드 매수 계산
+  const currentTurnDrawCount = gameState.turn === 1 && gameState.activePlayerIndex === 0 ? 1 : 2;
+  const canP0Draw =
+    gameState.phase === 'DRAW_PHASE' &&
+    gameState.activePlayerIndex === 0 &&
+    !isDrawFlightActive;
+  const canP1Draw =
+    gameState.phase === 'DRAW_PHASE' &&
+    gameState.activePlayerIndex === 1 &&
+    !gameState.players[1].isAi &&
+    !isDrawFlightActive;
 
   // 선공 결정 주사위 연출 상태 (게임 시작 시 LEADER_SELECT 단계에서 활성화)
   const [isInitiativeRolling, setIsInitiativeRolling] = useState(true);
@@ -134,6 +157,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
     prevP1DeckLen.current = gameState.players[1].actionDeck.length;
   }, [gameState.players[1].actionDeck.length]);
+
+  // 드로우 비행 연출 시 덱 펄스 이펙트 활성화
+  useEffect(() => {
+    if (isDrawFlightActive) {
+      if (gameState.activePlayerIndex === 0) {
+        setP0DeckDrawing(true);
+        const t = setTimeout(() => setP0DeckDrawing(false), 1000);
+        return () => clearTimeout(t);
+      } else {
+        setP1DeckDrawing(true);
+        const t = setTimeout(() => setP1DeckDrawing(false), 1000);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [isDrawFlightActive, gameState.activePlayerIndex]);
 
   // 협주 소모 카드 직접 선택 모달 상태
   const [concertoModalState, setConcertoModalState] = useState<{
@@ -272,8 +310,168 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [gameState.lastUpgrade?.id, gameState.phase]);
 
+  const handleDismissUpgrade = useCallback(() => {
+    setActiveUpgrade(null);
+    clearLastUpgrade();
+  }, [clearLastUpgrade]);
+
   // 1인 2역 (SOLO_DUAL) 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
   const [controlledPlayerIndex, setControlledPlayerIndex] = useState<0 | 1>(0);
+
+  // 매치 개시 양측 리더 컷인 및 출격 오프닝 대사 멘트 오버레이 상태
+  const [showMatchOpening, setShowMatchOpening] = useState(false);
+  const hasShownMatchOpeningRef = useRef(false);
+
+  useEffect(() => {
+    // 턴 1이 본격적으로 시작되고, 선공 주사위 및 시작 리더 선택, 멀리건이 모두 완료된 시점에 1회 표출
+    if (
+      gameState.turn === 1 &&
+      gameState.phase !== 'LEADER_SELECT' &&
+      gameState.phase !== 'MULLIGAN' &&
+      !isInitiativeRolling &&
+      !hasShownMatchOpeningRef.current
+    ) {
+      hasShownMatchOpeningRef.current = true;
+      setShowMatchOpening(true);
+    } else if (gameState.phase === 'LEADER_SELECT') {
+      hasShownMatchOpeningRef.current = false;
+    }
+  }, [gameState.turn, gameState.phase, isInitiativeRolling]);
+
+  const handleDismissMatchOpening = React.useCallback(() => {
+    setShowMatchOpening(false);
+  }, []);
+
+  // 게임 진행 중 나가기 확인 팝업 모달 상태 및 핸들러
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
+  const handleRestartBattle = () => {
+    setIsInitiativeRolling(true);
+    hasShownMatchOpeningRef.current = false;
+    setShowMatchOpening(false);
+    hasTriggeredP0LowHpRef.current = false;
+    hasTriggeredP1LowHpRef.current = false;
+    restartGame();
+  };
+
+  const handleExitClick = () => {
+    if (gameState.phase !== 'GAME_OVER' && gameState.winner === null) {
+      setShowExitConfirm(true);
+    } else if (onExitToLobby) {
+      onExitToLobby();
+    }
+  };
+
+  // 백(서포터)에서 리더로 교체 시 Join Team 고유 보이스 재생 래퍼
+  const onSwitchLeaderWithSound = (playerIndex: 0 | 1, slotName: 'leftSupport' | 'rightSupport') => {
+    const targetCard = gameState.players[playerIndex].slots[slotName];
+    if (targetCard) {
+      const charName = targetCard.characterName || targetCard.nameKr;
+      soundEffects.playLeaderSwitch(charName);
+    }
+    handleSwitchLeader(playerIndex, slotName);
+  };
+
+  // 장시간 미조작(고민/방치) 이스터에그 보이스 및 말풍선 상태
+  const [idleSpeech, setIdleSpeech] = useState<{ text: string; visible: boolean }>({
+    text: '',
+    visible: false,
+  });
+  const lastUserActionTimeRef = useRef<number>(Date.now());
+  const lastIdleTriggerTimeRef = useRef<number>(0);
+
+  // 사용자 마우스/터치/키보드 입력 감지 시 타이머 갱신 및 말풍선 자동 숨김
+  useEffect(() => {
+    const handleUserInteraction = () => {
+      lastUserActionTimeRef.current = Date.now();
+      if (idleSpeech.visible) {
+        setIdleSpeech((prev) => (prev.visible ? { ...prev, visible: false } : prev));
+      }
+    };
+
+    window.addEventListener('pointerdown', handleUserInteraction);
+    window.addEventListener('keydown', handleUserInteraction);
+    window.addEventListener('touchstart', handleUserInteraction);
+
+    return () => {
+      window.removeEventListener('pointerdown', handleUserInteraction);
+      window.removeEventListener('keydown', handleUserInteraction);
+      window.removeEventListener('touchstart', handleUserInteraction);
+    };
+  }, [idleSpeech.visible]);
+
+  // 플레이어 턴에 장시간 고민/미조작(15초) 시 이스터에그 트리거
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // 1. 게임 진행 중이며 플레이어 0(인간 플레이어)이 행동해야 하는 타이밍인지 확인
+      const isPlayablePhase =
+        (gameState.phase === 'ACTION_PHASE' && gameState.activePlayerIndex === 0) ||
+        (gameState.phase === 'CLASH_SET' && !gameState.players[0].clashCardReady) ||
+        (gameState.phase === 'COMBO_STEP' && gameState.activePlayerIndex === 0);
+
+      // 2. 다른 모달/오버레이가 띄워져 있지 않은지 확인
+      const isModalOrOverlayActive =
+        isRulesOpen ||
+        isCatalogOpen ||
+        isReplayOpen ||
+        showMatchOpening ||
+        showExitConfirm ||
+        isInitiativeRolling ||
+        Boolean(evolutionModalChar) ||
+        Boolean(cardListModalState?.isOpen) ||
+        concertoModalState.isOpen ||
+        Boolean(activeComboStrike) ||
+        Boolean(activeUpgrade) ||
+        gameState.phase === 'GAME_OVER' ||
+        gameState.phase === 'LEADER_SELECT' ||
+        gameState.phase === 'MULLIGAN';
+
+      if (isPlayablePhase && !isModalOrOverlayActive) {
+        const now = Date.now();
+        const idleDuration = now - lastUserActionTimeRef.current;
+        const cooldownDuration = now - lastIdleTriggerTimeRef.current;
+
+        // 15초 이상 아무 입력이 없고, 마지막 이스터에그 발동 후 30초 이상 경과 시
+        if (idleDuration >= 15000 && cooldownDuration >= 30000) {
+          lastIdleTriggerTimeRef.current = now;
+          const leaderCard = gameState.players[0].slots.leader;
+          if (leaderCard) {
+            const charName = leaderCard.characterName || leaderCard.nameKr;
+            const quote = getCharacterIdleQuote(charName);
+            soundEffects.playLeaderIdle(charName);
+            setIdleSpeech({ text: quote, visible: true });
+          }
+        }
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [
+    gameState.phase,
+    gameState.activePlayerIndex,
+    gameState.players,
+    isRulesOpen,
+    isCatalogOpen,
+    isReplayOpen,
+    showMatchOpening,
+    showExitConfirm,
+    isInitiativeRolling,
+    evolutionModalChar,
+    cardListModalState,
+    concertoModalState.isOpen,
+    activeComboStrike,
+    activeUpgrade,
+  ]);
+
+  // 말풍선 4.5초 후 자동 숨김
+  useEffect(() => {
+    if (idleSpeech.visible) {
+      const timer = setTimeout(() => {
+        setIdleSpeech((prev) => ({ ...prev, visible: false }));
+      }, 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [idleSpeech.visible]);
 
   // 좌측 마스터 듀얼식 카드 상세 미리보기 상태
   const [previewCard, _setPreviewCard] = useState<AnyCard | null>(() => gameState.players[0].slots.leader);
@@ -400,47 +598,106 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 좌측 패널 탭 (카드 상세 정보 vs 실시간 대전 기록 타임라인)
   const [leftPanelTab, setLeftPanelTab] = useState<'PREVIEW' | 'LOG'>('PREVIEW');
 
-  // 대미지 트랜지션 애니메이션 상태 (20 -> 14 등 실시간 피격 팝업)
+  // 대미지 및 회복 트랜지션 애니메이션 상태 (실시간 피격 및 회복 팝업)
   const [p0DamageAlert, setP0DamageAlert] = useState<{ prev: number; curr: number; diff: number } | null>(null);
   const [p1DamageAlert, setP1DamageAlert] = useState<{ prev: number; curr: number; diff: number } | null>(null);
+  const [p0HealAlert, setP0HealAlert] = useState<{ prev: number; curr: number; diff: number } | null>(null);
+  const [p1HealAlert, setP1HealAlert] = useState<{ prev: number; curr: number; diff: number } | null>(null);
 
-  // 피격/대미지 효과음 및 시각적 배지 자동 감지
+  // 피격/대미지 및 체력 회복 효과음 & 시각적 배지 자동 감지
   const prevP0Hp = useRef(p0.hp);
   const prevP1Hp = useRef(p1.hp);
+
+  // 체력 5 이하 위기 효과음 게임당 최초 1회 발동 플래그
+  const hasTriggeredP0LowHpRef = useRef(false);
+  const hasTriggeredP1LowHpRef = useRef(false);
+
+  useEffect(() => {
+    if (gameState.phase === 'LEADER_SELECT' || gameState.phase === 'MULLIGAN' || (gameState.turn === 1 && gameState.phase === 'START_PHASE')) {
+      hasTriggeredP0LowHpRef.current = false;
+      hasTriggeredP1LowHpRef.current = false;
+    }
+  }, [gameState.phase, gameState.turn]);
 
   useEffect(() => {
     if (p0.hp < prevP0Hp.current) {
       const diff = prevP0Hp.current - p0.hp;
-      setP0DamageAlert({ prev: prevP0Hp.current, curr: p0.hp, diff });
+      const wasAbove5 = prevP0Hp.current > 5;
+      prevP0Hp.current = p0.hp;
+      setP0DamageAlert({ prev: prevP0Hp.current + diff, curr: p0.hp, diff });
       const timer = setTimeout(() => setP0DamageAlert(null), 2500);
 
-      // 대결 연출 중에는 ClashAnimationOverlay가 참격 타이밍(1.5초)에 직접 효과음을 내므로 중복 방지
-      if (gameState.phase !== 'CLASH_REVEAL') {
+      const victimLeader = p0.slots.leader;
+      const victimName = victimLeader ? (victimLeader.characterName || victimLeader.nameKr) : undefined;
+
+      // 대결 연출 및 연격 연출 중에는 각 전용 오버레이가 참격 타이밍에 직접 사운드를 내므로 중복 방지
+      if (gameState.phase !== 'CLASH_REVEAL' && gameState.phase !== 'COMBO_STEP') {
         const attackerLeader = p1.slots.leader;
         const weapon = attackerLeader ? getWeaponByCharacter(attackerLeader.characterName || attackerLeader.nameKr) : undefined;
-        soundEffects.playDamage(diff, weapon);
+        soundEffects.playDamage(diff, weapon, victimName);
       }
+
+      // 게임당 처음으로 체력이 5 이하로 떨어졌을 때 리더 고유 위기 효과음/보이스 1회 재생
+      if (p0.hp <= 5 && p0.hp > 0 && wasAbove5 && !hasTriggeredP0LowHpRef.current) {
+        hasTriggeredP0LowHpRef.current = true;
+        setTimeout(() => {
+          soundEffects.playLeaderLowHp(victimName);
+          if (victimName) {
+            const quote = getCharacterLowHpQuote(victimName);
+            setIdleSpeech({ text: quote, visible: true });
+          }
+        }, 350);
+      }
+
+      return () => clearTimeout(timer);
+    } else if (p0.hp > prevP0Hp.current) {
+      const diff = p0.hp - prevP0Hp.current;
+      prevP0Hp.current = p0.hp;
+      setP0HealAlert({ prev: prevP0Hp.current - diff, curr: p0.hp, diff });
+      const timer = setTimeout(() => setP0HealAlert(null), 2500);
+      soundEffects.playHeal(diff);
       return () => clearTimeout(timer);
     }
     prevP0Hp.current = p0.hp;
-  }, [p0.hp, gameState.phase, p1.slots.leader]);
+  }, [p0.hp]);
 
   useEffect(() => {
     if (p1.hp < prevP1Hp.current) {
       const diff = prevP1Hp.current - p1.hp;
-      setP1DamageAlert({ prev: prevP1Hp.current, curr: p1.hp, diff });
+      const wasAbove5 = prevP1Hp.current > 5;
+      prevP1Hp.current = p1.hp;
+      setP1DamageAlert({ prev: prevP1Hp.current + diff, curr: p1.hp, diff });
       const timer = setTimeout(() => setP1DamageAlert(null), 2500);
 
-      // 대결 연출 중에는 ClashAnimationOverlay가 참격 타이밍(1.5초)에 직접 효과음을 내므로 중복 방지
-      if (gameState.phase !== 'CLASH_REVEAL') {
+      const victimLeader = p1.slots.leader;
+      const victimName = victimLeader ? (victimLeader.characterName || victimLeader.nameKr) : undefined;
+
+      // 대결 연출 및 연격 연출 중에는 각 전용 오버레이가 참격 타이밍에 직접 사운드를 내므로 중복 방지
+      if (gameState.phase !== 'CLASH_REVEAL' && gameState.phase !== 'COMBO_STEP') {
         const attackerLeader = p0.slots.leader;
         const weapon = attackerLeader ? getWeaponByCharacter(attackerLeader.characterName || attackerLeader.nameKr) : undefined;
-        soundEffects.playDamage(diff, weapon);
+        soundEffects.playDamage(diff, weapon, victimName);
       }
+
+      // 상대 플레이어 체력 5 이하 위기 효과음/보이스 1회 재생
+      if (p1.hp <= 5 && p1.hp > 0 && wasAbove5 && !hasTriggeredP1LowHpRef.current) {
+        hasTriggeredP1LowHpRef.current = true;
+        setTimeout(() => {
+          soundEffects.playLeaderLowHp(victimName);
+        }, 350);
+      }
+
+      return () => clearTimeout(timer);
+    } else if (p1.hp > prevP1Hp.current) {
+      const diff = p1.hp - prevP1Hp.current;
+      prevP1Hp.current = p1.hp;
+      setP1HealAlert({ prev: prevP1Hp.current - diff, curr: p1.hp, diff });
+      const timer = setTimeout(() => setP1HealAlert(null), 2500);
+      soundEffects.playHeal(diff);
       return () => clearTimeout(timer);
     }
     prevP1Hp.current = p1.hp;
-  }, [p1.hp, gameState.phase, p0.slots.leader]);
+  }, [p1.hp]);
 
   // 호버 시 프리뷰 탭 자동 활성화
   useEffect(() => {
@@ -491,6 +748,65 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 현재 조종 중인 플레이어 상태
   const activeControlledPlayer = gameState.players[controlledPlayerIndex];
   const isCurrentControlledTurn = gameState.activePlayerIndex === controlledPlayerIndex;
+
+  // COMBO_STEP에서 사용 가능한 연격 카드가 없을 때 알림 팝업 및 자동 턴 넘김 카운트다운
+  const [noComboCountdown, setNoComboCountdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    const playerHasComboPerm =
+      !activeControlledPlayer.isAi &&
+      (Boolean(activeControlledPlayer.comboUnlimited) || (activeControlledPlayer.comboCount ?? 0) > 0);
+
+    // COMBO_STEP이 아니거나 플레이어에게 연격 권한이 없거나,
+    // 연격 애니메이션(activeComboStrike), 레벨업(activeUpgrade), 효과 선택(pendingChoice) 진행 중이면 카운트다운 대기
+    if (
+      gameState.phase !== 'COMBO_STEP' ||
+      !playerHasComboPerm ||
+      Boolean(activeComboStrike) ||
+      Boolean(activeUpgrade) ||
+      Boolean(gameState.pendingChoice)
+    ) {
+      setNoComboCountdown(null);
+      return;
+    }
+
+    const canCombo = canPlayerExecuteCombo(activeControlledPlayer);
+    if (!canCombo) {
+      setNoComboCountdown(5);
+      const interval = setInterval(() => {
+        setNoComboCountdown((prev) => {
+          if (prev === null || prev <= 1) {
+            clearInterval(interval);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => {
+        clearInterval(interval);
+      };
+    } else {
+      setNoComboCountdown(null);
+    }
+  }, [
+    gameState.phase,
+    activeControlledPlayer.isAi,
+    activeControlledPlayer.hand.length,
+    activeControlledPlayer.concertoZone.length,
+    activeControlledPlayer.comboCount,
+    activeControlledPlayer.comboUnlimited,
+    Boolean(activeComboStrike),
+    Boolean(activeUpgrade),
+    Boolean(gameState.pendingChoice),
+  ]);
+
+  useEffect(() => {
+    if (noComboCountdown === 0 && gameState.phase === 'COMBO_STEP') {
+      handleFinishCombo(controlledPlayerIndex);
+      setNoComboCountdown(null);
+    }
+  }, [noComboCountdown, gameState.phase, controlledPlayerIndex, handleFinishCombo]);
 
   // 레벨업 버튼 클릭 시 가능한 진화 후보 계산 (공식 룰 603.1.2.2: 동일 레벨 또는 +1 레벨의 동명 카드)
   const openUpgradeModal = (slotName: 'leader' | 'leftSupport' | 'rightSupport', playerIdx: 0 | 1 = 0) => {
@@ -567,7 +883,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <div className="flex items-center gap-3">
           {onExitToLobby && (
             <button
-              onClick={onExitToLobby}
+              onClick={handleExitClick}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer"
               title="대기실(메인 메뉴)로 나가기"
             >
@@ -788,9 +1104,44 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           className="w-8 h-11 rounded object-cover border border-slate-700 shrink-0 shadow mt-0.5"
                         />
                       )}
-                      <p className="flex-1 text-slate-200 break-words font-medium">
-                        {log.text}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-slate-200 break-words font-medium">
+                          {log.text}
+                        </p>
+                        {/* 내 드로우 카드 목록 (마우스 호버 시 카드 색상 및 효과 미리보기) */}
+                        {log.drawnCards && log.drawnCards.length > 0 && (
+                          <div className="mt-1.5 pt-1.5 border-t border-slate-800/80 flex flex-col gap-1">
+                            <div className="text-[10px] text-amber-300 font-bold flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-amber-400" />
+                              <span>획득 카드 (마우스 오버 시 미리보기):</span>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {log.drawnCards.map((card, cIdx) => (
+                                <span
+                                  key={card.id || cIdx}
+                                  onMouseEnter={() => setPreviewCard(card as any)}
+                                  className={`cursor-pointer px-2 py-0.5 rounded text-[11px] font-bold border transition hover:scale-105 shadow-sm flex items-center gap-1 ${
+                                    card.color === 'RED'
+                                      ? 'bg-red-950/80 text-red-300 border-red-500/60 hover:bg-red-900'
+                                      : card.color === 'BLUE'
+                                      ? 'bg-blue-950/80 text-blue-300 border-blue-500/60 hover:bg-blue-900'
+                                      : 'bg-emerald-950/80 text-emerald-300 border-emerald-500/60 hover:bg-emerald-900'
+                                  }`}
+                                  title={`${card.nameKr} [${card.color === 'RED' ? '적색' : card.color === 'BLUE' ? '청색' : '녹색'}] (비용: ${card.cost}, 공격력: ${card.damage})`}
+                                >
+                                  <span className={`w-1.5 h-1.5 rounded-full ${
+                                    card.color === 'RED' ? 'bg-red-400' : card.color === 'BLUE' ? 'bg-blue-400' : 'bg-emerald-400'
+                                  }`} />
+                                  <span className={card.color === 'RED' ? 'text-red-300 font-black' : card.color === 'BLUE' ? 'text-blue-300 font-black' : 'text-emerald-300 font-black'}>
+                                    {card.nameKr}
+                                  </span>
+                                  <span className="text-[9px] font-mono text-amber-300 font-semibold">(코스트 {card.cost})</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -932,7 +1283,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         {/* 상속된 이전 레벨 스킬 카드 목록 */}
                         {previewCard.underlyingCards.map((underCard, idx) => (
                           <div
-                            key={underCard.id || idx}
+                            key={underCard.id ? `${underCard.id}-${idx}` : `under-${idx}`}
                             onClick={() => setPreviewCard({ ...underCard, underlyingCards: previewCard.underlyingCards })}
                             className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-700 hover:border-amber-400 transition cursor-pointer group"
                             title="클릭하여 이 카드의 대형 일러스트와 원문 스탯 보기"
@@ -991,7 +1342,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(6,182,212,0.08),transparent)] pointer-events-none" />
 
                 {/* 상대방 상태 바 (HP & 스탯 대형화) */}
-                <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-800/80">
+                <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-800/80 flex-wrap gap-2">
                   <div className="flex items-center gap-3">
                     <div className="flex items-center gap-2 font-black text-lg sm:text-xl text-cyan-300">
                       {gameState.gameMode === 'AI' ? <Bot className="w-5 h-5 text-cyan-400" /> : <User className="w-5 h-5 text-cyan-400" />}
@@ -999,13 +1350,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                     {/* HP 바 */}
                     <div className={`flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border transition-all duration-300 shadow-inner ${
-                      p1DamageAlert ? 'border-red-500 ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'border-slate-800'
+                      p1DamageAlert
+                        ? 'border-red-500 ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+                        : p1HealAlert
+                        ? 'border-emerald-400 ring-2 ring-emerald-400/80 shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                        : 'border-slate-800'
                     }`}>
-                      <Heart className={`w-5 h-5 text-red-400 fill-red-400 ${p1DamageAlert ? 'animate-bounce text-red-500' : ''}`} />
-                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p1.hp} / 20</span>
+                      <Heart className={`w-5 h-5 ${p1HealAlert ? 'animate-bounce text-emerald-400 fill-emerald-400' : p1DamageAlert ? 'animate-bounce text-red-500 fill-red-500' : 'text-red-400 fill-red-400'}`} />
+                      <span className={`font-black text-lg sm:text-xl font-mono tracking-wider ${p1HealAlert ? 'text-emerald-400' : 'text-red-400'}`}>{p1.hp} / 20</span>
                       <div className="w-28 sm:w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
-                          className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
+                          className={`h-full transition-all duration-300 ${p1HealAlert ? 'bg-gradient-to-r from-emerald-500 to-teal-300' : 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-400'}`}
                           style={{ width: `${(p1.hp / 20) * 100}%` }}
                         />
                       </div>
@@ -1013,6 +1368,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white font-mono font-black text-xs animate-bounce shadow-lg shadow-red-500/50 flex items-center gap-1 border border-red-400 ml-1 shrink-0">
                           <span>{p1DamageAlert.prev} → {p1DamageAlert.curr}</span>
                           <span className="text-red-200">(-{p1DamageAlert.diff})</span>
+                        </span>
+                      )}
+                      {p1HealAlert && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-mono font-black text-xs animate-bounce shadow-lg shadow-emerald-500/50 flex items-center gap-1 border border-emerald-400 ml-1 shrink-0">
+                          <span>{p1HealAlert.prev} → {p1HealAlert.curr}</span>
+                          <span className="text-emerald-200">(+{p1HealAlert.diff})</span>
                         </span>
                       )}
                     </div>
@@ -1038,7 +1399,67 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </div>
                     )}
 
-                    <span>패 <strong className="text-white text-base sm:text-lg font-black">{p1.hand.length}장</strong></span>
+                    {/* 상대방 손패: 카드 뒷면 시각화 (스캔 발동 시 앞면 전면 공개) + 실시간 매수 카운트 */}
+                    <div className={`flex items-center gap-2 bg-slate-950/90 px-3 py-1 rounded-2xl border transition-all ${
+                      gameState.isOpponentHandScanned
+                        ? 'border-amber-400/80 shadow-[0_0_15px_rgba(251,191,36,0.3)] ring-1 ring-amber-400/40'
+                        : 'border-cyan-500/40 shadow-inner'
+                    }`}>
+                      <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-300">
+                        <Layers className={`w-4 h-4 shrink-0 ${gameState.isOpponentHandScanned ? 'text-amber-400 animate-pulse' : 'text-cyan-400'}`} />
+                        <span className={`${gameState.isOpponentHandScanned ? 'text-amber-300' : 'text-cyan-300'} hidden md:inline`}>
+                          상대 패
+                        </span>
+                        {gameState.isOpponentHandScanned && (
+                          <span className="text-[10px] font-black text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded-full border border-amber-500/50 animate-pulse hidden sm:inline">
+                            👁️ 스캔 공개
+                          </span>
+                        )}
+                        <strong className="text-white text-sm sm:text-base font-black font-mono">
+                          {p1.hand.length}장
+                        </strong>
+                      </div>
+
+                      {/* 카드 뒷면 나열 (스캔 발동 시 고화질 일러스트 앞면 공개 & 호버 확대 & 툴팁 지원) */}
+                      <div className="flex items-center -space-x-3.5 sm:-space-x-4 py-0.5 pl-1 overflow-visible">
+                        {p1.hand.length === 0 ? (
+                          <span className="text-[11px] text-slate-500 italic px-1">0장</span>
+                        ) : (
+                          p1.hand.map((c, i) => (
+                            <div
+                              key={c.id || i}
+                              style={{ zIndex: i + 1 }}
+                              onMouseEnter={() => {
+                                if (gameState.isOpponentHandScanned) {
+                                  setPreviewCard(c);
+                                }
+                              }}
+                              className={`relative w-6 sm:w-7 md:w-8 aspect-[588/1024] rounded-sm sm:rounded overflow-hidden border transition-all duration-150 shrink-0 bg-slate-900 group ${
+                                gameState.isOpponentHandScanned
+                                  ? 'border-amber-400/90 shadow-lg shadow-amber-500/30 hover:-translate-y-3 hover:z-30 hover:scale-125 hover:border-amber-300 ring-1 ring-amber-400/50 cursor-pointer'
+                                  : 'border-cyan-400/60 shadow-md shadow-black/80 hover:-translate-y-2 hover:z-30 hover:scale-110 hover:border-cyan-300 cursor-default'
+                              }`}
+                              title={
+                                gameState.isOpponentHandScanned
+                                  ? `[스캔 공개] ${c.nameKr} (${c.color})`
+                                  : `상대방 보유 손패 (${i + 1}/${p1.hand.length}장)`
+                              }
+                            >
+                              <img
+                                src={gameState.isOpponentHandScanned ? (c.artUrl || '/cards/card_back_action.png') : '/cards/card_back_action.png'}
+                                alt={gameState.isOpponentHandScanned ? c.nameKr : `상대 손패 ${i + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className={`absolute inset-0 bg-gradient-to-tr ${
+                                gameState.isOpponentHandScanned
+                                  ? 'from-amber-500/20 via-transparent to-white/20'
+                                  : 'from-cyan-500/20 via-transparent to-white/10'
+                              } pointer-events-none group-hover:opacity-100 opacity-60 transition`} />
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
 
                     {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
                     <div className="flex items-center gap-1.5 bg-slate-950 px-2.5 py-1 rounded-full border border-cyan-500/40 shadow-inner">
@@ -1064,62 +1485,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 </div>
 
                 {/* 상대 공식 플레이매트 3열 구조: 좌우 슬림화 & 중앙 초대형화 */}
-                <div className="grid grid-cols-[130px_1fr_130px] sm:grid-cols-[145px_1fr_145px] md:grid-cols-[155px_1fr_155px] gap-3 sm:gap-4 items-stretch">
-                  {/* [상대 좌측] 액션 덱 에리어 (상단) + 트래시 에리어 (하단 슬림화) */}
+                <div className="grid grid-cols-[135px_1fr_135px] sm:grid-cols-[150px_1fr_150px] md:grid-cols-[165px_1fr_165px] gap-3 sm:gap-4 items-stretch">
+                  {/* [상대 좌측] 액션 덱 에리어 (상단) + 트래시 에리어 (하단 90도 회전 스택) */}
                   <div className="flex flex-col gap-2">
-                    <div className={`h-24 sm:h-26 rounded-2xl border bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow transition-all duration-300 ${
-                      p1DeckDrawing
-                        ? 'border-cyan-400 ring-2 ring-cyan-400/80 shadow-cyan-500/40 -translate-y-1'
-                        : 'border-slate-800'
-                    }`}>
-                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">액션 덱</span>
-                      <div className={`w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow transition-transform ${
-                        p1DeckDrawing ? 'scale-105 border-cyan-400 animate-pulse' : ''
-                      }`}>
-                        <Sparkles className={`w-4 h-4 ${p1DeckDrawing ? 'text-cyan-300 animate-spin' : 'text-cyan-400/60'}`} />
-                      </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-slate-200">{p1.actionDeck.length}장</span>
-                    </div>
+                    <DeckStack
+                      type="ACTION"
+                      count={p1.actionDeck.length}
+                      isDrawing={p1DeckDrawing}
+                      canDraw={canP1Draw}
+                      drawCount={currentTurnDrawCount}
+                      onClick={canP1Draw ? () => handleDrawCards(1) : undefined}
+                      playerTheme="p1"
+                    />
 
-                    {/* 상대 트래시 에리어 (슬림 컴팩트화) */}
-                    <div
-                      onClick={() => openCardListModal('TRASH', 1)}
-                      onMouseEnter={() => p1.dropZone.length > 0 && setPreviewCard(p1.dropZone[p1.dropZone.length - 1])}
-                      className="flex-1 rounded-2xl border border-slate-700 hover:border-amber-400/70 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg cursor-pointer transition group"
-                      title="상대 트래시 에리어 (클릭 시 전체 카드 목록 보기)"
-                    >
-                      <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-xs font-mono text-slate-400 font-black">트래시</span>
-                        <span className="text-[11px] sm:text-xs font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
-                          {p1.dropZone.length}장
-                        </span>
-                      </div>
-
-                      {p1.dropZone.length > 0 ? (
-                        <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-slate-600 shadow-md my-0.5 group-hover:scale-105 transition transform">
-                          {p1.dropZone.length > 1 && (
-                            <div className="absolute -top-1 -right-1 w-full h-full rounded-lg border border-slate-600/50 bg-slate-800 -z-10" />
-                          )}
-                          <img
-                            src={(p1.dropZone[p1.dropZone.length - 1] as any).artUrl}
-                            alt="트래시"
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-0.5 text-[10px] sm:text-[11px] font-black text-amber-300 truncate">
-                            {p1.dropZone[p1.dropZone.length - 1].nameKr}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-0.5">
-                          <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
-                          <span className="text-xs font-bold">비어있음</span>
-                        </div>
-                      )}
-
-                      <span className="text-[11px] text-slate-400 font-semibold group-hover:text-amber-300 transition">
-                        목록 보기
-                      </span>
-                    </div>
+                    {/* 상대 트래시 에리어 (90도 회전 겹침 스택) */}
+                    <ZoneCardStack
+                      cards={p1.dropZone}
+                      zoneType="TRASH"
+                      onOpenModal={() => openCardListModal('TRASH', 1)}
+                      onHoverCard={(c) => setPreviewCard(c)}
+                    />
                   </div>
 
                   {/* [상대 중앙] 캐릭터 3인 진형 (상단: 백 / 리더 / 백) + 액션 에리어 (하단 대형화) */}
@@ -1135,7 +1520,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canUpgrade={gameState.gameMode === 'SOLO_DUAL' ? checkCanUpgradeSlot('leftSupport', 1) : false}
                           canSwitch={gameState.gameMode === 'SOLO_DUAL' && !p1.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && !isP0Turn}
                           onUpgradeClick={() => openUpgradeModal('leftSupport', 1)}
-                          onSwitchClick={() => handleSwitchLeader(1, 'leftSupport')}
+                          onSwitchClick={() => onSwitchLeaderWithSound(1, 'leftSupport')}
                           onMouseEnter={() => p1.slots.leftSupport && setPreviewCard(p1.slots.leftSupport)}
                           onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                           onHoverUnderlyingCard={(c) => setPreviewCard(c)}
@@ -1170,7 +1555,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           canUpgrade={gameState.gameMode === 'SOLO_DUAL' ? checkCanUpgradeSlot('rightSupport', 1) : false}
                           canSwitch={gameState.gameMode === 'SOLO_DUAL' && !p1.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && !isP0Turn}
                           onUpgradeClick={() => openUpgradeModal('rightSupport', 1)}
-                          onSwitchClick={() => handleSwitchLeader(1, 'rightSupport')}
+                          onSwitchClick={() => onSwitchLeaderWithSound(1, 'rightSupport')}
                           onMouseEnter={() => p1.slots.rightSupport && setPreviewCard(p1.slots.rightSupport)}
                           onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                           onHoverUnderlyingCard={(c) => setPreviewCard(c)}
@@ -1218,7 +1603,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
                             return (
                               <div
-                                key={card.id || `p1-action-${idx}`}
+                                key={card.id ? `${card.id}-${idx}` : `p1-action-${idx}`}
                                 onMouseEnter={() => {
                                   if (!isFacedown) setPreviewCard(card);
                                 }}
@@ -1262,77 +1647,28 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
                   {/* [상대 우측] 협주 에리어 (상단) + 캐릭터 덱 에리어 (하단 슬림화) */}
                   <div className="flex flex-col gap-2">
-                    {/* 상대 협주 에리어 (슬림 컴팩트화) */}
-                    <div
-                      onClick={() => {
+                    {/* 상대 협주 에리어 (90도 회전 겹침 스택) */}
+                    <ZoneCardStack
+                      cards={p1.concertoZone}
+                      zoneType="CONCERTO"
+                      isSecret={controlledPlayerIndex !== 1}
+                      onOpenModal={() => {
                         if (controlledPlayerIndex === 1) {
                           openCardListModal('CONCERTO', 1);
                         }
                       }}
-                      onMouseEnter={() => {
-                        if (controlledPlayerIndex === 1 && p1.concertoZone.length > 0) {
-                          setPreviewCard(p1.concertoZone[p1.concertoZone.length - 1]);
+                      onHoverCard={(c) => {
+                        if (controlledPlayerIndex === 1) {
+                          setPreviewCard(c);
                         }
                       }}
-                      className={`flex-1 rounded-2xl border border-cyan-500/50 hover:border-cyan-400 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg transition group ${
-                        controlledPlayerIndex === 1 ? 'cursor-pointer' : 'cursor-default'
-                      }`}
-                      title={controlledPlayerIndex === 1 ? '상대 협주 에리어 (클릭 시 충전된 카드 목록 보기)' : '상대 협주 에리어 (비공개 자원)'}
-                    >
-                      <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-xs font-mono text-cyan-400 font-black">협주 게이지</span>
-                        <span className="text-[11px] sm:text-xs font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
-                          {p1.concertoZone.length} / 10
-                        </span>
-                      </div>
+                    />
 
-                      {p1.concertoZone.length > 0 ? (
-                        controlledPlayerIndex === 1 ? (
-                          <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)] my-0.5 group-hover:scale-105 transition transform">
-                            <img
-                              src={(p1.concertoZone[p1.concertoZone.length - 1] as any).artUrl}
-                              alt="협주 에너지"
-                              className="w-full h-full object-cover"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1">
-                              <span className="text-[10px] sm:text-[11px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
-                                <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                                <span>{p1.concertoZone.length}</span>
-                              </span>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-cyan-500/70 shadow-[0_0_15px_rgba(34,211,238,0.2)] my-0.5 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex flex-col items-center justify-center select-none">
-                            <div className="w-7 h-7 rounded-full border border-cyan-400/50 flex items-center justify-center bg-slate-900/80 shadow-inner">
-                              <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-                            </div>
-                            <span className="text-[9px] font-mono font-bold text-cyan-300 mt-1">ENERGY</span>
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 to-transparent p-0.5 text-center">
-                              <span className="text-[10px] font-mono font-black text-cyan-200">
-                                {p1.concertoZone.length}
-                              </span>
-                            </div>
-                          </div>
-                        )
-                      ) : (
-                        <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
-                          <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
-                          <span className="text-xs font-bold text-slate-500">0</span>
-                        </div>
-                      )}
-
-                      <span className="text-[11px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
-                        목록 보기
-                      </span>
-                    </div>
-
-                    <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">캐릭터 덱</span>
-                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/50 to-slate-900 border border-amber-500/30 flex items-center justify-center shadow">
-                        <Crown className="w-4 h-4 text-amber-400/70" />
-                      </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-amber-300">{p1.characterDeck.length}장</span>
-                    </div>
+                    <DeckStack
+                      type="CHARACTER"
+                      count={p1.characterDeck.length}
+                      playerTheme="p1"
+                    />
                   </div>
                 </div>
               </div>
@@ -1369,7 +1705,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     {gameState.phase === 'COMBO_STEP' && `BATTLE ARENA • COMBO STRIKE (${activeControlledPlayer.comboUnlimited ? '무제한 연격 진행 중' : `추격: ${activeControlledPlayer.comboCount}회`})`}
                     {gameState.phase === 'DISCARD_OVERFLOW' && 'BATTLE ARENA • END PHASE'}
                     {gameState.phase === 'START_PHASE' && 'BATTLE ARENA • START'}
-                    {gameState.phase === 'DRAW_PHASE' && 'BATTLE ARENA • DRAW'}
+                    {gameState.phase === 'DRAW_PHASE' &&
+                      (canP0Draw || canP1Draw
+                        ? `🎴 덱을 클릭하여 카드를 드로우하세요! (${currentTurnDrawCount}장)`
+                        : isDrawFlightActive
+                        ? '카드가 패로 이동 중...'
+                        : 'BATTLE ARENA • DRAW')}
                     {gameState.phase === 'GAME_OVER' && 'BATTLE ARENA • FINISH'}
                   </span>
                   <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
@@ -1402,13 +1743,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                     {/* HP 바 */}
                     <div className={`flex items-center gap-2.5 bg-slate-950 px-3.5 py-1.5 rounded-full border transition-all duration-300 shadow-inner ${
-                      p0DamageAlert ? 'border-red-500 ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]' : 'border-slate-800'
+                      p0DamageAlert
+                        ? 'border-red-500 ring-2 ring-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+                        : p0HealAlert
+                        ? 'border-emerald-400 ring-2 ring-emerald-400/80 shadow-[0_0_15px_rgba(16,185,129,0.5)]'
+                        : 'border-slate-800'
                     }`}>
-                      <Heart className={`w-5 h-5 text-red-400 fill-red-400 ${p0DamageAlert ? 'animate-bounce text-red-500' : ''}`} />
-                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p0.hp} / 20</span>
+                      <Heart className={`w-5 h-5 ${p0HealAlert ? 'animate-bounce text-emerald-400 fill-emerald-400' : p0DamageAlert ? 'animate-bounce text-red-500 fill-red-500' : 'text-red-400 fill-red-400'}`} />
+                      <span className={`font-black text-lg sm:text-xl font-mono tracking-wider ${p0HealAlert ? 'text-emerald-400' : 'text-red-400'}`}>{p0.hp} / 20</span>
                       <div className="w-28 sm:w-36 bg-slate-800 h-2.5 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
-                          className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
+                          className={`h-full transition-all duration-300 ${p0HealAlert ? 'bg-gradient-to-r from-emerald-500 to-teal-300' : 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-400'}`}
                           style={{ width: `${(p0.hp / 20) * 100}%` }}
                         />
                       </div>
@@ -1416,6 +1761,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         <span className="px-2.5 py-0.5 rounded-full bg-red-600 text-white font-mono font-black text-xs animate-bounce shadow-lg shadow-red-500/50 flex items-center gap-1 border border-red-400 ml-1 shrink-0">
                           <span>{p0DamageAlert.prev} → {p0DamageAlert.curr}</span>
                           <span className="text-red-200">(-{p0DamageAlert.diff})</span>
+                        </span>
+                      )}
+                      {p0HealAlert && (
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-mono font-black text-xs animate-bounce shadow-lg shadow-emerald-500/50 flex items-center gap-1 border border-emerald-400 ml-1 shrink-0">
+                          <span>{p0HealAlert.prev} → {p0HealAlert.curr}</span>
+                          <span className="text-emerald-200">(+{p0HealAlert.diff})</span>
                         </span>
                       )}
                     </div>
@@ -1467,57 +1818,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 </div>
 
                 {/* 플레이어 공식 플레이매트 3열 구조: 좌우 슬림화 & 중앙 초대형화 */}
-                <div className="grid grid-cols-[130px_1fr_130px] sm:grid-cols-[145px_1fr_145px] md:grid-cols-[155px_1fr_155px] gap-3 sm:gap-4 items-stretch">
-                  {/* [내 좌측] 협주 에리어 (상단) + 캐릭터 덱 에리어 (하단 슬림화) */}
+                <div className="grid grid-cols-[135px_1fr_135px] sm:grid-cols-[150px_1fr_150px] md:grid-cols-[165px_1fr_165px] gap-3 sm:gap-4 items-stretch">
+                  {/* [내 좌측] 협주 에리어 (상단 90도 회전 스택) + 캐릭터 덱 에리어 (하단) */}
                   <div className="flex flex-col gap-2">
-                    {/* 내 협주 에리어 (슬림 컴팩트화) */}
-                    <div
-                      onClick={() => openCardListModal('CONCERTO', 0)}
-                      onMouseEnter={() => p0.concertoZone.length > 0 && setPreviewCard(p0.concertoZone[p0.concertoZone.length - 1])}
-                      className="flex-1 rounded-2xl border border-cyan-500/50 hover:border-cyan-400 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg cursor-pointer transition group"
-                      title="내 협주 에리어 (클릭 시 충전된 카드 목록 보기)"
-                    >
-                      <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-xs font-mono text-cyan-400 font-black">협주 게이지</span>
-                        <span className="text-[11px] sm:text-xs font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
-                          {p0.concertoZone.length} / 10
-                        </span>
-                      </div>
-
-                      {p0.concertoZone.length > 0 ? (
-                        <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.3)] my-0.5 group-hover:scale-105 transition transform">
-                          <img
-                            src={(p0.concertoZone[p0.concertoZone.length - 1] as any).artUrl}
-                            alt="협주 에너지"
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-cyan-950/95 via-cyan-950/40 to-transparent flex flex-col justify-end p-1">
-                            <span className="text-[10px] sm:text-[11px] font-black text-cyan-200 flex items-center justify-center gap-0.5 drop-shadow">
-                              <BatteryCharging className="w-3.5 h-3.5 text-cyan-400" />
-                              <span>{p0.concertoZone.length}</span>
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
-                          <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
-                          <span className="text-xs font-bold text-slate-500">0</span>
-                        </div>
-                      )}
-
-                      <span className="text-[11px] text-cyan-400/80 font-semibold group-hover:text-cyan-300 transition">
-                        목록 보기
-                      </span>
-                    </div>
+                    {/* 내 협주 에리어 (90도 회전 겹침 스택) */}
+                    <ZoneCardStack
+                      cards={p0.concertoZone}
+                      zoneType="CONCERTO"
+                      onOpenModal={() => openCardListModal('CONCERTO', 0)}
+                      onHoverCard={(c) => setPreviewCard(c)}
+                    />
 
                     {/* 캐릭터 덱 에리어 */}
-                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs sm:text-sm font-mono text-amber-400/80 font-black">캐릭터 덱</span>
-                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-500/40 flex items-center justify-center shadow">
-                        <Crown className="w-4 h-4 text-amber-400" />
-                      </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-amber-300">{p0.characterDeck.length}장</span>
-                    </div>
+                    <DeckStack
+                      type="CHARACTER"
+                      count={p0.characterDeck.length}
+                      playerTheme="p0"
+                    />
                   </div>
 
                   {/* [내 중앙] 액션 에리어 (상단 대형화) + 캐릭터 3인 진형 [백 / 리더 / 백] (하단) */}
@@ -1560,7 +1877,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
                             return (
                               <div
-                                key={card.id || `p0-action-${idx}`}
+                                key={card.id ? `${card.id}-${idx}` : `p0-action-${idx}`}
                                 onMouseEnter={() => {
                                   if (!isFacedown) setPreviewCard(card);
                                 }}
@@ -1619,7 +1936,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                               setEvolutionModalChar(p0.slots.leftSupport);
                             }
                           }}
-                          onSwitchClick={() => handleSwitchLeader(0, 'leftSupport')}
+                          onSwitchClick={() => onSwitchLeaderWithSound(0, 'leftSupport')}
                           onMouseEnter={() => p0.slots.leftSupport && setPreviewCard(p0.slots.leftSupport)}
                           onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                           onHoverUnderlyingCard={(c) => setPreviewCard(c)}
@@ -1629,7 +1946,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </div>
 
                       {/* 리더 (LEADER) */}
-                      <div className="flex flex-col items-center">
+                      <div className="flex flex-col items-center relative">
+                        {/* 장시간 방치/고민 이스터에그 생각 말풍선 */}
+                        {idleSpeech.visible && (
+                          <div className="absolute -top-20 sm:-top-24 left-1/2 -translate-x-1/2 z-40 w-52 sm:w-60 pointer-events-none transition-all duration-300 animate-in fade-in zoom-in-95">
+                            <div className="relative bg-slate-900/95 border-2 border-amber-400/90 text-amber-100 px-3.5 py-2.5 rounded-2xl shadow-2xl shadow-amber-500/30 text-center backdrop-blur-md">
+                              <div className="flex items-center justify-center gap-1.5 text-[11px] text-amber-300 font-black mb-0.5">
+                                <span className="animate-pulse">💭</span>
+                                <span>{(p0.slots.leader?.characterName || p0.slots.leader?.nameKr) || '리더'}의 생각</span>
+                              </div>
+                              <div className="text-xs text-slate-100 font-medium leading-snug break-keep">
+                                “{idleSpeech.text}”
+                              </div>
+                              {/* 말풍선 꼬리 */}
+                              <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-slate-900 border-r-2 border-b-2 border-amber-400 rotate-45" />
+                            </div>
+                          </div>
+                        )}
+
                         <CharacterSlot
                           card={p0.slots.leader}
                           role="leader"
@@ -1668,7 +2002,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                               setEvolutionModalChar(p0.slots.rightSupport);
                             }
                           }}
-                          onSwitchClick={() => handleSwitchLeader(0, 'rightSupport')}
+                          onSwitchClick={() => onSwitchLeaderWithSound(0, 'rightSupport')}
                           onMouseEnter={() => p0.slots.rightSupport && setPreviewCard(p0.slots.rightSupport)}
                           onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                           onHoverUnderlyingCard={(c) => setPreviewCard(c)}
@@ -1679,62 +2013,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   </div>
 
-                  {/* [내 우측] 트래시 에리어 (상단) + 액션 덱 에리어 (하단 슬림화) */}
+                  {/* [내 우측] 트래시 에리어 (상단 90도 회전 스택) + 액션 덱 에리어 (하단 슬림화) */}
                   <div className="flex flex-col gap-2">
-                    {/* 내 트래시 에리어 (슬림 컴팩트화) */}
-                    <div
-                      onClick={() => openCardListModal('TRASH', 0)}
-                      onMouseEnter={() => p0.dropZone.length > 0 && setPreviewCard(p0.dropZone[p0.dropZone.length - 1])}
-                      className="flex-1 rounded-2xl border border-slate-700 hover:border-amber-400/70 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg cursor-pointer transition group"
-                      title="내 트래시 에리어 (클릭 시 전체 카드 목록 보기)"
-                    >
-                      <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-xs font-mono text-slate-400 font-black">트래시</span>
-                        <span className="text-[11px] sm:text-xs font-mono font-bold text-amber-300 bg-slate-900 px-1 py-0.2 rounded border border-slate-700">
-                          {p0.dropZone.length}장
-                        </span>
-                      </div>
-
-                      {p0.dropZone.length > 0 ? (
-                        <div className="relative w-16 h-22 sm:w-18 sm:h-24 rounded-lg overflow-hidden border border-slate-600 shadow-md my-0.5 group-hover:scale-105 transition transform">
-                          {p0.dropZone.length > 1 && (
-                            <div className="absolute -top-1 -right-1 w-full h-full rounded-lg border border-slate-600/50 bg-slate-800 -z-10" />
-                          )}
-                          <img
-                            src={(p0.dropZone[p0.dropZone.length - 1] as any).artUrl}
-                            alt="트래시"
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent p-0.5 text-[10px] sm:text-[11px] font-black text-amber-300 truncate">
-                            {p0.dropZone[p0.dropZone.length - 1].nameKr}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-0.5">
-                          <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
-                          <span className="text-xs font-bold">비어있음</span>
-                        </div>
-                      )}
-
-                      <span className="text-[11px] text-slate-400 font-semibold group-hover:text-amber-300 transition">
-                        목록 보기
-                      </span>
-                    </div>
+                    {/* 내 트래시 에리어 (90도 회전 겹침 스택) */}
+                    <ZoneCardStack
+                      cards={p0.dropZone}
+                      zoneType="TRASH"
+                      onOpenModal={() => openCardListModal('TRASH', 0)}
+                      onHoverCard={(c) => setPreviewCard(c)}
+                    />
 
                     {/* 액션 덱 에리어 */}
-                    <div className={`h-24 sm:h-26 rounded-2xl border bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow transition-all duration-300 ${
-                      p0DeckDrawing
-                        ? 'border-amber-400 ring-2 ring-amber-400/80 shadow-amber-500/40 -translate-y-1'
-                        : 'border-amber-500/30'
-                    }`}>
-                      <span className="text-xs sm:text-sm font-mono text-slate-400 font-black">액션 덱</span>
-                      <div className={`w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow transition-transform ${
-                        p0DeckDrawing ? 'scale-105 border-amber-400 animate-pulse' : ''
-                      }`}>
-                        <Sparkles className={`w-4 h-4 ${p0DeckDrawing ? 'text-amber-300 animate-spin' : 'text-amber-400/70'}`} />
-                      </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-slate-200">{p0.actionDeck.length}장</span>
-                    </div>
+                    <DeckStack
+                      type="ACTION"
+                      count={p0.actionDeck.length}
+                      isDrawing={p0DeckDrawing}
+                      canDraw={canP0Draw}
+                      drawCount={currentTurnDrawCount}
+                      onClick={canP0Draw ? () => handleDrawCards(0) : undefined}
+                      playerTheme="p0"
+                    />
                   </div>
                 </div>
               </div>
@@ -1883,6 +2181,32 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 </div>
               )}
 
+              {/* 0. 드로우 페이즈 전용 안내 배너 (중앙 덱 드로우 유도) */}
+              {gameState.phase === 'DRAW_PHASE' && (
+                <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-amber-950/70 via-slate-900 to-amber-950/70 border border-amber-500/40 shadow-xl space-y-2.5 animate-fade-in">
+                  <div className="flex items-center justify-between text-xs sm:text-sm font-black text-amber-300">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
+                      <span>드로우 페이즈</span>
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black">
+                      {currentTurnDrawCount}장 드로우
+                    </span>
+                  </div>
+
+                  <div className="text-center text-xs text-amber-200/90 py-2 px-3 font-bold flex items-center justify-center gap-2 bg-amber-500/10 rounded-xl border border-amber-500/20">
+                    {isCurrentControlledTurn && (canP0Draw || canP1Draw) ? (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+                        <span>화면 중앙의 덱을 클릭하여 드로우하세요!</span>
+                      </>
+                    ) : (
+                      <span>상대가 카드를 드로우하고 있습니다...</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* 1. 메인 페이즈 (행동 단계) 액션 버튼 */}
               {gameState.phase === 'ACTION_PHASE' && !isAiThinking && (
                 <>
@@ -1951,17 +2275,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       })()}
 
                       <button
+                        disabled={Boolean(gameState.pendingChoice)}
                         onClick={() => handleDecideClash(true)}
-                        className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/30 transition transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer animate-pulse flex items-center justify-center gap-2 border border-amber-300"
-                        title="배틀 페이즈로 전환하고 대결을 선언합니다"
+                        className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm shadow-xl transition transform flex items-center justify-center gap-2 border ${
+                          gameState.pendingChoice
+                            ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                            : 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 border-amber-300 shadow-amber-500/30 hover:scale-[1.02] active:scale-[0.98] cursor-pointer animate-pulse'
+                        }`}
+                        title={gameState.pendingChoice ? "효과 선택을 먼저 완료해야 합니다" : "배틀 페이즈로 전환하고 대결을 선언합니다"}
                       >
-                        <Swords className="w-4 h-4 fill-slate-950" />
+                        <Swords className={`w-4 h-4 ${gameState.pendingChoice ? 'text-slate-500' : 'fill-slate-950'}`} />
                         <span>배틀 페이즈 (대결 선언!)</span>
                       </button>
                       <button
+                        disabled={Boolean(gameState.pendingChoice)}
                         onClick={() => handleDecideClash(false)}
-                        className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition cursor-pointer border border-slate-700 flex items-center justify-center gap-2"
-                        title="대결 없이 엔드 페이즈(턴 종료)로 넘어갑니다"
+                        className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs transition border flex items-center justify-center gap-2 ${
+                          gameState.pendingChoice
+                            ? 'bg-slate-900 text-slate-600 border-slate-800 cursor-not-allowed'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700 cursor-pointer'
+                        }`}
+                        title={gameState.pendingChoice ? "효과 선택을 먼저 완료해야 합니다" : "대결 없이 엔드 페이즈(턴 종료)로 넘어갑니다"}
                       >
                         <SkipForward className="w-4 h-4 text-slate-400" />
                         <span>엔드 페이즈 (대결 없이 턴 종료)</span>
@@ -2023,23 +2357,34 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </>
                   )}
 
-                  {/* 마스터 듀얼식 [대결 즉시 오픈 & 판정] 강제 진행 버튼 */}
-                  <button
-                    onClick={handleForceResolveClash}
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/40 border border-amber-300 transition transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer animate-pulse flex items-center justify-center gap-2"
-                    title="즉시 대결 판정을 오픈합니다"
-                  >
-                    <Zap className="w-4 h-4 fill-slate-950" />
-                    <span>대결 오픈 & 판정</span>
-                  </button>
-
-                  {/* 패스하기 버튼 */}
-                  {!activeControlledPlayer.clashCardReady && (
+                  {/* 플레이어가 아직 대결 카드를 세트하지 않은 경우 손패 선택 안내 */}
+                  {!activeControlledPlayer.clashCardReady ? (
+                    <>
+                      <div className="p-3 rounded-2xl bg-gradient-to-r from-amber-500/15 via-yellow-500/20 to-amber-500/15 border border-amber-500/40 text-amber-300 text-xs text-center font-black flex items-center justify-center gap-2 animate-pulse shadow">
+                        <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                        <span>하단 손패에서 대결 카드를 선택하세요!</span>
+                      </div>
+                      <button
+                        onClick={() => handleSetClashCard(controlledPlayerIndex, null)}
+                        className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer border border-slate-700 flex items-center justify-center gap-1.5"
+                      >
+                        <span>카드 없이 패스 (대결 포기)</span>
+                      </button>
+                    </>
+                  ) : (
+                    /* 카드 세트 완료 시: 즉시 대결 오픈 버튼 제공 */
                     <button
-                      onClick={() => handleSetClashCard(controlledPlayerIndex, null)}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer border border-slate-700 flex items-center justify-center gap-1.5"
+                      disabled={Boolean(gameState.pendingChoice)}
+                      onClick={handleForceResolveClash}
+                      className={`w-full py-3 px-4 rounded-xl font-black text-xs sm:text-sm shadow-xl border transition transform flex items-center justify-center gap-2 ${
+                        gameState.pendingChoice
+                          ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 border-amber-300 shadow-amber-500/40 hover:scale-[1.02] active:scale-[0.98] cursor-pointer animate-pulse'
+                      }`}
+                      title={gameState.pendingChoice ? "효과 선택을 먼저 완료해야 합니다" : "대결 판정을 즉시 오픈합니다"}
                     >
-                      <span>카드 없이 패스 (대결 포기)</span>
+                      <Zap className={`w-4 h-4 ${gameState.pendingChoice ? 'text-slate-500' : 'fill-slate-950'}`} />
+                      <span>대결 즉시 오픈 & 판정</span>
                     </button>
                   )}
                 </div>
@@ -2049,31 +2394,52 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {gameState.phase === 'COMBO_STEP' &&
                 (Boolean(activeControlledPlayer.comboUnlimited) || activeControlledPlayer.comboCount > 0) && (
                 <div className="flex flex-col gap-2">
-                  <div className="p-3 rounded-2xl bg-gradient-to-r from-red-950/95 via-orange-950/90 to-red-950/95 border-2 border-red-500 text-red-200 font-black text-xs flex items-center justify-between shadow-xl shadow-red-500/30 animate-pulse">
-                    <div className="flex items-center gap-2.5">
-                      <Flame className="w-5 h-5 text-orange-400 fill-orange-400 animate-bounce" />
-                      <div>
-                        <div className="text-xs font-black text-white flex items-center gap-1.5">
-                          <span>{activeControlledPlayer.comboUnlimited ? '무제한 연격 진행 중!' : '추격 게이지 가동 중!'}</span>
-                          <span className="text-[10px] bg-red-800 text-red-100 px-1.5 py-0.2 rounded font-mono">연격 연속 공격</span>
+                  {canPlayerExecuteCombo(activeControlledPlayer) ? (
+                    <div className="p-3 rounded-2xl bg-gradient-to-r from-red-950/95 via-orange-950/90 to-red-950/95 border-2 border-red-500 text-red-200 font-black text-xs flex items-center justify-between shadow-xl shadow-red-500/30 animate-pulse">
+                      <div className="flex items-center gap-2.5">
+                        <Flame className="w-5 h-5 text-orange-400 fill-orange-400 animate-bounce" />
+                        <div>
+                          <div className="text-xs font-black text-white flex items-center gap-1.5">
+                            <span>{activeControlledPlayer.comboUnlimited ? '무제한 연격 진행 중!' : '추격 게이지 가동 중!'}</span>
+                            <span className="text-[10px] bg-red-800 text-red-100 px-1.5 py-0.2 rounded font-mono">연격 연속 공격</span>
+                          </div>
+                          <div className="text-[10px] text-orange-300 mt-0.5">손패의 [RED] 카드로 연속 공격 가능</div>
                         </div>
-                        <div className="text-[10px] text-orange-300 mt-0.5">손패의 [RED] 카드로 연속 공격 가능</div>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[10px] text-orange-400 font-bold">
+                          {activeControlledPlayer.comboUnlimited ? '연격 모드' : '남은 추격 카운트'}
+                        </span>
+                        <span className="font-mono text-base font-black text-amber-300 bg-red-900/90 px-3 py-0.5 rounded-lg border border-red-500/60 shadow-inner">
+                          {activeControlledPlayer.comboUnlimited ? '무제한 (∞)' : `${activeControlledPlayer.comboCount}회`}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-[10px] text-orange-400 font-bold">
-                        {activeControlledPlayer.comboUnlimited ? '연격 모드' : '남은 추격 카운트'}
-                      </span>
-                      <span className="font-mono text-base font-black text-amber-300 bg-red-900/90 px-3 py-0.5 rounded-lg border border-red-500/60 shadow-inner">
-                        {activeControlledPlayer.comboUnlimited ? '무제한 (∞)' : `${activeControlledPlayer.comboCount}회`}
-                      </span>
+                  ) : (
+                    <div className="p-3.5 rounded-2xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-100 flex flex-col gap-2 shadow-xl shadow-amber-500/20 animate-in fade-in">
+                      <div className="flex items-center gap-2 text-amber-300 font-black text-xs">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 animate-bounce" />
+                        <span>사용 가능한 연격(적색) 카드가 없습니다!</span>
+                      </div>
+                      <p className="text-[11px] text-amber-200/90 leading-tight">
+                        추가 공격할 수 있는 카드나 협주 에너지가 없어 턴을 넘깁니다.
+                      </p>
                     </div>
-                  </div>
+                  )}
                   <button
-                    onClick={() => handleFinishCombo(controlledPlayerIndex)}
-                    className="w-full py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition cursor-pointer border border-slate-700"
+                    onClick={() => {
+                      setNoComboCountdown(null);
+                      handleFinishCombo(controlledPlayerIndex);
+                    }}
+                    className={`w-full py-2.5 px-4 rounded-xl font-bold text-xs transition cursor-pointer border flex items-center justify-center gap-1.5 ${
+                      !canPlayerExecuteCombo(activeControlledPlayer)
+                        ? 'bg-amber-600 hover:bg-amber-500 text-white border-amber-400 shadow-lg shadow-amber-500/20'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                    }`}
                   >
-                    연격 종료 (턴 종료)
+                    {!canPlayerExecuteCombo(activeControlledPlayer)
+                      ? (noComboCountdown !== null ? `즉시 턴 넘기기 (${noComboCountdown}초 후 자동 넘김)` : '즉시 턴 넘기기')
+                      : '연격 종료 (턴 종료)'}
                   </button>
                 </div>
               )}
@@ -2270,6 +2636,51 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                                     return <span key={pIdx}>{part}</span>;
                                   })}
                                 </p>
+                                {/* 내 드로우 카드 목록 (마우스 호버 시 카드 색상 및 효과 미리보기) */}
+                                {log.drawnCards && log.drawnCards.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-slate-800/80 flex flex-col gap-1.5">
+                                    <div className="text-xs text-amber-300 font-black flex items-center gap-1.5">
+                                      <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                                      <span>드로우 획득 카드 (마우스 호버 시 상세 미리보기):</span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {log.drawnCards.map((card, cIdx) => (
+                                        <div
+                                          key={card.id || cIdx}
+                                          onMouseEnter={() => setPreviewCard(card as any)}
+                                          className={`cursor-pointer px-2.5 py-1 rounded-lg text-xs font-bold border transition duration-150 hover:scale-105 shadow-md flex items-center gap-1.5 ${
+                                            card.color === 'RED'
+                                              ? 'bg-red-950/90 text-red-300 border-red-500 hover:border-red-400 hover:bg-red-900 shadow-red-950/30'
+                                              : card.color === 'BLUE'
+                                              ? 'bg-blue-950/90 text-blue-300 border-blue-500 hover:border-blue-400 hover:bg-blue-900 shadow-blue-950/30'
+                                              : 'bg-emerald-950/90 text-emerald-300 border-emerald-500 hover:border-emerald-400 hover:bg-emerald-900 shadow-emerald-950/30'
+                                          }`}
+                                          title={`${card.nameKr} [${card.color === 'RED' ? '적색' : card.color === 'BLUE' ? '청색' : '녹색'}] - 코스트: ${card.cost}, 공격력: ${card.damage}\n${card.description}`}
+                                        >
+                                          <span className={`w-2 h-2 rounded-full ${
+                                            card.color === 'RED'
+                                              ? 'bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.8)]'
+                                              : card.color === 'BLUE'
+                                              ? 'bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.8)]'
+                                              : 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
+                                          }`} />
+                                          <span className={`font-black tracking-wide ${
+                                            card.color === 'RED'
+                                              ? 'text-red-200'
+                                              : card.color === 'BLUE'
+                                              ? 'text-blue-200'
+                                              : 'text-emerald-200'
+                                          }`}>
+                                            [{card.color === 'RED' ? '적색' : card.color === 'BLUE' ? '청색' : '녹색'}] {card.nameKr}
+                                          </span>
+                                          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-black/60 text-amber-300 border border-amber-500/30 font-bold">
+                                            코스트 {card.cost} / 위력 {card.damage}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -2299,12 +2710,30 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* 4. 모달 오버레이들 */}
       {/* ========================================================= */}
 
-      {/* 페이즈 전환 연출 애니메이션 배너 (Draw Phase!, Battle Phase! 등) */}
+      {/* 페이즈 전환 연출 애니메이션 배너 (매치 오프닝 오버레이 진행 중에는 disabled로 숨김 처리) */}
       <PhaseBannerOverlay
         phase={gameState.phase}
         turn={gameState.turn}
         activePlayerIndex={gameState.activePlayerIndex}
         isAiTurn={gameState.activePlayerIndex === 1 && gameState.players[1].isAi}
+        disabled={showMatchOpening}
+      />
+
+      {/* 액션 덱 -> 손패 카드 드로우 비행 연출 오버레이 */}
+      <CardDrawFlightOverlay
+        isDrawing={isDrawFlightActive}
+        playerIndex={gameState.activePlayerIndex}
+        drawCount={currentTurnDrawCount}
+      />
+
+      {/* 중앙 3D 덱 드로우 & 카드 공개 연출 오버레이 (유희왕 마스터 듀얼 스타일) */}
+      <CenterDrawOverlay
+        isOpen={gameState.phase === 'DRAW_PHASE' && !showMatchOpening}
+        activePlayerIndex={gameState.activePlayerIndex}
+        controlledPlayerIndex={controlledPlayerIndex}
+        activePlayer={gameState.players[gameState.activePlayerIndex]}
+        drawCount={currentTurnDrawCount}
+        onExecuteDraw={(pIdx) => handleDrawCards(pIdx)}
       />
 
       {/* 선공 결정 주사위 모달 (양측 주사위 투척 연출) */}
@@ -2343,7 +2772,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {gameState.phase === 'MULLIGAN' && !isInitiativeRolling && (
         <MulliganModal
           hand={p0.hand}
+          deck={p0.actionDeck}
           onConfirm={handleMulligan}
+        />
+      )}
+
+      {/* 매치 개시 양측 리더 컷인 및 출격 오프닝 대사 멘트 & 사운드 오버레이 */}
+      {showMatchOpening && (
+        <MatchOpeningOverlay
+          p0Leader={p0.slots.leader}
+          p1Leader={p1.slots.leader}
+          p0Name={p0.name}
+          p1Name={p1.name}
+          onDismiss={handleDismissMatchOpening}
         />
       )}
 
@@ -2385,10 +2826,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {activeUpgrade && (
         <UpgradeEffectOverlay
           effect={activeUpgrade}
-          onDismiss={() => {
-            setActiveUpgrade(null);
-            clearLastUpgrade();
-          }}
+          onDismiss={handleDismissUpgrade}
         />
       )}
 
@@ -2424,13 +2862,65 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           winner={gameState.winner as 0 | 1}
           players={gameState.players}
           turn={gameState.turn}
-          onRestart={() => {
-            setIsInitiativeRolling(true);
-            restartGame();
-          }}
+          onRestart={handleRestartBattle}
           onExitToLobby={onExitToLobby}
           onOpenReplay={() => setIsReplayOpen(true)}
         />
+      )}
+
+      {/* 게임 진행 중 나가기 확인 팝업 모달 */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in duration-200 select-none">
+          <div className="relative w-full max-w-md bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border-2 border-amber-500/60 rounded-3xl p-6 shadow-2xl shadow-black/90 text-slate-100 flex flex-col items-center text-center">
+            {/* 상단 장식 빛 */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 rounded-full bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_15px_#f59e0b]" />
+
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/40 mb-3 shadow-lg shadow-amber-500/20">
+              <AlertTriangle className="w-7 h-7" />
+            </div>
+
+            <h3 className="text-xl font-black text-white mb-2 tracking-wide">
+              게임 진행 중
+            </h3>
+
+            <p className="text-sm font-bold text-amber-200 mb-1">
+              게임이 진행 중입니다. 나가시겠습니까?
+            </p>
+
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              지금 나가시면 현재 배틀 진행 데이터가 저장되지 않고 메인 대기실로 이동합니다.
+            </p>
+
+            <div className="w-full flex flex-col sm:flex-row items-center gap-2.5">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="w-full sm:flex-1 py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm transition cursor-pointer border border-slate-700"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  handleRestartBattle();
+                }}
+                className="w-full sm:flex-1 py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-amber-900/40 flex items-center justify-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>게임 다시시작</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  if (onExitToLobby) onExitToLobby();
+                }}
+                className="w-full sm:flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-rose-900/40 flex items-center justify-center gap-1.5"
+              >
+                <Home className="w-3.5 h-3.5" />
+                <span>나가기</span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 대전 복기 리플레이 모달 */}
@@ -2457,9 +2947,59 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }}
       />
 
-      {/* 선택 발동 효과 모달 (전투 데미지 결과가 완전히 나온 뒤(CLASH_REVEAL 이후) 및 레벨업 연출 완료 후 표출) */}
+      {/* 연격 카드 없음 알림 팝업 모달 */}
+      {!activeComboStrike &&
+        !activeUpgrade &&
+        !gameState.pendingChoice &&
+        gameState.phase === 'COMBO_STEP' &&
+        !activeControlledPlayer.isAi &&
+        (Boolean(activeControlledPlayer.comboUnlimited) || (activeControlledPlayer.comboCount ?? 0) > 0) &&
+        !canPlayerExecuteCombo(activeControlledPlayer) && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 select-none">
+            <div className="relative max-w-md w-full bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-2 border-amber-500/80 rounded-3xl p-6 shadow-[0_0_60px_rgba(245,158,11,0.35)] text-center flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border-2 border-amber-400/50 flex items-center justify-center text-amber-300 shadow-lg">
+                <AlertCircle className="w-9 h-9 animate-bounce" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="text-xl font-black text-white flex items-center justify-center gap-2">
+                  <span>연격 카드가 없습니다</span>
+                </h3>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  손패에 사용할 수 있는 <strong className="text-amber-400">적색(RED) 연격 카드</strong>나 협주 에너지가 없습니다.<br />
+                  <span className="text-xs text-amber-300/90 mt-1 block font-medium">연격을 종료하고 턴을 넘깁니다. (5초 후 자동 전환 또는 버튼 클릭)</span>
+                </p>
+              </div>
+
+              {/* 5초 진행 바 */}
+              <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-amber-500/30">
+                <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 animate-progress-5s" />
+              </div>
+
+              <div className="w-full bg-slate-900/90 rounded-2xl p-3 border border-slate-800 flex items-center justify-between px-4">
+                <span className="text-xs font-bold text-slate-400">자동 턴 넘김 대기</span>
+                <span className="text-sm font-black font-mono text-amber-300 bg-amber-500/20 border border-amber-500/30 px-3 py-1 rounded-xl">
+                  {noComboCountdown !== null && noComboCountdown > 0 ? `${noComboCountdown}초 후 넘김` : '전환 중...'}
+                </span>
+              </div>
+
+              <button
+                onClick={() => {
+                  setNoComboCountdown(null);
+                  handleFinishCombo(controlledPlayerIndex);
+                }}
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-sm transition-all duration-200 cursor-pointer shadow-lg shadow-amber-500/20 active:scale-95 flex items-center justify-center gap-2"
+              >
+                <span>즉시 턴 넘기기</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+      {/* 선택 발동 효과 모달 (레벨업 연출 완료 후 표출) */}
       <EffectChoiceModal
-        choice={gameState.phase !== 'CLASH_REVEAL' && !activeUpgrade ? gameState.pendingChoice : null}
+        choice={!activeUpgrade ? gameState.pendingChoice : null}
         onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
       />
 
@@ -2474,7 +3014,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       <EffectNotificationToast event={gameState.phase !== 'CLASH_REVEAL' ? gameState.lastEffectEvent : null} />
 
       {/* 중앙 시네마틱 카드 액션 알림 HUD */}
-      <CenterActionHUD event={gameState.phase !== 'CLASH_REVEAL' ? gameState.lastEffectEvent : null} />
+      <CenterActionHUD
+        event={gameState.phase !== 'CLASH_REVEAL' ? gameState.lastEffectEvent : null}
+        onDismiss={clearLastEffectEvent}
+      />
     </div>
   );
 };

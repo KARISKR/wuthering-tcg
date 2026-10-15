@@ -13,8 +13,9 @@ import {
 
 interface CardViewProps {
   card?: AnyCard | null;
+  cardBackType?: 'CHARACTER' | 'ACTION';
   isFacedown?: boolean;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   isSelected?: boolean;
   isDisabled?: boolean;
   isPlayable?: boolean;
@@ -26,6 +27,7 @@ interface CardViewProps {
 
 export const CardView: React.FC<CardViewProps> = ({
   card,
+  cardBackType,
   isFacedown = false,
   size = 'md',
   isSelected = false,
@@ -43,25 +45,39 @@ export const CardView: React.FC<CardViewProps> = ({
     sm: 'w-24 h-36 text-xs',
     md: 'w-36 h-52 text-xs',
     lg: 'w-48 h-72 text-sm',
+    xl: 'w-56 h-80 sm:w-64 sm:h-92 md:w-72 md:h-100 text-base',
   }[size];
 
   // 뒷면 카드 렌더링
   if (isFacedown || !card) {
+    const isCharacter = cardBackType
+      ? cardBackType === 'CHARACTER'
+      : card?.kind === 'CHARACTER';
+    const backImage = isCharacter
+      ? '/cards/card_back_character.png'
+      : '/cards/card_back_action.png';
+
     return (
       <div
         onClick={!isDisabled ? onClick : undefined}
-        className={`relative ${sizeStyles} rounded-xl border-2 border-amber-500/40 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 shadow-lg flex flex-col items-center justify-center p-2 cursor-pointer transition-all duration-200 select-none overflow-hidden ${
+        className={`relative ${sizeStyles} rounded-xl shadow-lg flex items-center justify-center cursor-pointer transition-all duration-200 select-none overflow-hidden group ${
           isSelected ? 'ring-4 ring-amber-400 scale-105 shadow-amber-500/50' : ''
         } ${className}`}
+        title={isCharacter ? '캐릭터 카드 (뒷면)' : '액션 카드 (뒷면)'}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(217,119,6,0.15)_0%,transparent_70%)]" />
-        <div className="w-10 h-10 rounded-full border border-amber-400/50 flex items-center justify-center bg-slate-900/80 shadow-inner">
-          <Sparkles className="w-5 h-5 text-amber-400 animate-pulse" />
-        </div>
-        <div className="mt-2 text-[10px] tracking-widest text-amber-300 font-mono font-semibold uppercase">
-          WUTHERING
-        </div>
-        <div className="text-[8px] text-slate-400 font-mono tracking-wider">BATTLE TCG</div>
+        <img
+          src={backImage}
+          alt={isCharacter ? '캐릭터 카드 뒷면' : '액션 카드 뒷면'}
+          className="w-full h-full object-cover rounded-xl transition-transform duration-300 group-hover:scale-105 pointer-events-none"
+          loading="lazy"
+        />
+        {/* 카드 표면 미세 반사 하이라이트 */}
+        <div className="absolute inset-0 bg-gradient-to-tr from-black/25 via-transparent to-white/15 pointer-events-none rounded-xl" />
+        {badge && (
+          <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/90 text-slate-950 shadow z-10">
+            {badge}
+          </div>
+        )}
       </div>
     );
   }
@@ -121,7 +137,7 @@ export const CardView: React.FC<CardViewProps> = ({
 // ------------------------------------------
 const ActionCardView: React.FC<{
   card: ActionCard;
-  size: 'sm' | 'md' | 'lg';
+  size: 'sm' | 'md' | 'lg' | 'xl';
   sizeStyles: string;
   isSelected?: boolean;
   isDisabled?: boolean;
@@ -248,7 +264,7 @@ const ActionCardView: React.FC<{
 // ------------------------------------------
 const CharacterCardView: React.FC<{
   card: CharacterCard;
-  size: 'sm' | 'md' | 'lg';
+  size: 'sm' | 'md' | 'lg' | 'xl';
   sizeStyles: string;
   isSelected?: boolean;
   isDisabled?: boolean;

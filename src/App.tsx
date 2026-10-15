@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lobby } from './components/Lobby';
 import { GameBoard } from './components/GameBoard';
 import { DeckBuilder, CustomDeckConfig } from './components/DeckBuilder';
 import { BattleReplayStage } from './components/BattleReplayStage';
 import { BattleReplayData } from './utils/replayManager';
 import { FeedbackWidget } from './components/FeedbackWidget';
+import { bgmManager } from './utils/bgmManager';
 
 export function App() {
   const [currentView, setCurrentView] = useState<'LOBBY' | 'BATTLE' | 'DECK_BUILDER' | 'REPLAY_STAGE'>('LOBBY');
@@ -13,6 +14,15 @@ export function App() {
   const [customDeck, setCustomDeck] = useState<CustomDeckConfig | null>(null);
   const [opponentDeck, setOpponentDeck] = useState<CustomDeckConfig | null>(null);
   const [activeReplay, setActiveReplay] = useState<BattleReplayData | null>(null);
+
+  // 뷰 전환에 따라 대기실 BGM vs 배틀 BGM 자동 전환
+  useEffect(() => {
+    if (currentView === 'BATTLE' || currentView === 'REPLAY_STAGE') {
+      bgmManager.setMode('battle');
+    } else {
+      bgmManager.setMode('lobby');
+    }
+  }, [currentView]);
 
   const handleStartGame = (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, oppDeck?: CustomDeckConfig) => {
     setCustomDeck(myDeck ?? null);

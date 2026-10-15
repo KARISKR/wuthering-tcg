@@ -188,7 +188,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           </div>
 
           <div className="flex items-stretch gap-3 sm:gap-3.5 overflow-x-auto pb-3 custom-scrollbar min-h-[220px]">
-            {hand.map((card) => {
+            {hand.map((card, idx) => {
               const isSelected = selectedDiscardIds.includes(card.id);
               const colorClass =
                 card.color === 'RED'
@@ -199,7 +199,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
 
               return (
                 <div
-                  key={card.id}
+                  key={`${card.id}-${idx}`}
                   onClick={() => toggleDiscardCard(card.id)}
                   className={`w-36 sm:w-40 md:w-44 shrink-0 flex flex-col justify-between rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border-2 p-2 transition-all duration-200 cursor-pointer select-none group shadow-lg ${
                     isSelected

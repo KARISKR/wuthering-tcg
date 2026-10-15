@@ -3,6 +3,7 @@ import {
   DEDUPED_LV0_CHARACTERS,
   ACTION_CARD_TEMPLATES,
   generateStarterActionDeck,
+  shuffleActionDeck,
   ALL_CHARACTERS,
 } from '../data/cards';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
@@ -193,7 +194,7 @@ export function decodeDeckCode(codeStr: string): CustomDeckConfig | null {
         for (let i = 0; i < qty; i++) {
           actionCards.push({
             ...template,
-            id: `deck-${template.code}-${Date.now()}-${actionCards.length}`,
+            id: `deck-${template.code}-${Date.now()}-${actionCards.length}-${Math.random().toString(36).substring(2, 7)}`,
           });
         }
       }
@@ -381,7 +382,7 @@ export function presetToCustomDeck(preset: DeckPreset): CustomDeckConfig {
       for (let i = 0; i < qty; i++) {
         actionCards.push({
           ...template,
-          id: `deck-${template.code}-${Date.now()}-${actionCards.length}`,
+          id: `deck-${template.code}-${Date.now()}-${actionCards.length}-${Math.random().toString(36).substring(2, 7)}`,
         });
       }
     }
@@ -412,7 +413,7 @@ export function presetToCustomDeck(preset: DeckPreset): CustomDeckConfig {
     leftSupport,
     rightSupport,
     characterDeck: characterDeck.length > 0 ? characterDeck : undefined,
-    actionCards,
+    actionCards: shuffleActionDeck(actionCards),
   };
 }
 
@@ -681,7 +682,7 @@ export function sldarkRawToCustomDeck(
       for (let i = 0; i < qty; i++) {
         actionCards.push({
           ...template,
-          id: `deck-${template.code}-${Date.now()}-${actionCards.length}`,
+          id: `deck-${template.code}-${Date.now()}-${actionCards.length}-${Math.random().toString(36).substring(2, 7)}`,
         });
       }
     }

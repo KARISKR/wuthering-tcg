@@ -19,12 +19,12 @@ export const EffectNotificationToast: React.FC<EffectNotificationToastProps> = (
         setIsLeaving(true);
         setTimeout(() => {
           setVisibleEvent(null);
-        }, 400); // fade out 애니메이션 시간
-      }, 3500);
+        }, 300); // fade out 애니메이션 시간
+      }, 5000);
 
       return () => clearTimeout(timer);
     }
-  }, [event?.id]);
+  }, [event?.id, event?.timestamp]);
 
   if (!visibleEvent) return null;
 
@@ -68,11 +68,13 @@ export const EffectNotificationToast: React.FC<EffectNotificationToastProps> = (
 
   return (
     <div
-      className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-auto transition-all duration-300 ${
+      onClick={() => setIsLeaving(true)}
+      className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-auto cursor-pointer select-none transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
         isLeaving
-          ? 'opacity-0 -translate-y-4 scale-95'
+          ? 'opacity-0 -translate-y-4 scale-95 pointer-events-none'
           : 'opacity-100 translate-y-0 scale-100 animate-in slide-in-from-top-4 fade-in duration-300'
       }`}
+      title="클릭하여 즉시 닫기"
     >
       <div className={`p-[2px] rounded-2xl bg-gradient-to-r ${getBorderGradient(visibleEvent.effectType)} shadow-[0_0_30px_rgba(0,0,0,0.8)]`}>
         <div className="bg-slate-950/95 backdrop-blur-xl rounded-2xl px-4 py-3 flex items-center gap-3.5 max-w-lg shadow-2xl relative overflow-hidden">

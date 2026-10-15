@@ -1,7 +1,8 @@
 import React from 'react';
 import { CharacterCard } from '../types/tcg';
 import { CardView } from './CardView';
-import { ArrowLeftRight, ChevronUp, Crown, UserCheck, Layers } from 'lucide-react';
+import { ArrowLeftRight, ChevronUp, Crown, UserCheck, Layers, MessageSquareQuote } from 'lucide-react';
+import { getCharacterOpeningQuote } from '../data/characterQuotes';
 
 interface CharacterSlotProps {
   card: CharacterCard | null;
@@ -34,11 +35,14 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
 }) => {
   const isLeader = role === 'leader';
   const cardSizeClass = isLeader ? 'w-48 h-72' : 'w-36 h-52';
+  const charIdentifier = card?.characterName || card?.nameKr;
+  const openingQuote = isLeader && card ? getCharacterOpeningQuote(charIdentifier) : undefined;
 
   return (
     <div
       onMouseEnter={onMouseEnter}
       onClick={onCardClick}
+      title={openingQuote ? `[${card?.nameKr} 출격 대사] "${openingQuote}"` : undefined}
       className={`relative flex flex-col items-center rounded-2xl p-1.5 transition-all duration-200 cursor-pointer group/slot ${
         isLeader
           ? 'bg-slate-950/90 border-2 border-amber-400/90 shadow-[0_0_25px_rgba(245,158,11,0.25)]'

@@ -1,0 +1,128 @@
+구분,캐릭터/시스템,사운드 분류,코스트,권장 폴더 및 파일 경로 (1.mp3 / 2.mp3 등),지원 포맷,권장 길이,설명,현재 상태
+안내,공통,랜덤 재생 안내,-,"전용 폴더 안에 1.mp3, 2.mp3, 3.mp3 ... 숫자로 넣기 지원",mp3 / wav / ogg,-,파일 이름을 하나하나 바꿀 필요 없이 각 폴더에 1.mp3 2.mp3 3.mp3 형태로 넣으면 자동으로 1개가 무작위 랜덤 재생됩니다,다중 랜덤 재생 완벽 지원
+시스템 공통,대전 개시 / 출격,-,public/audio/sfx/match_start/1.mp3,mp3 / wav / ogg,0.8초 ~ 2.0초,대전 시작 시 전장 개시를 알리는 웅장한 출격 및 긴장감 사운드 (1.mp3 2.mp3 지원),내장 합성음 자동 폴백
+시스템 공통,승리 팡파르 (공통),-,public/audio/sfx/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,매치 승리 시 찬란한 승리 팡파르 및 축포 환호 사운드 (1.mp3 2.mp3 지원),내장 합성음 자동 폴백
+시스템 공통,패배 알림음 (공통),-,public/audio/sfx/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 2.5초,매치 패배 시 저음의 아쉬운 하강 사운드 (1.mp3 2.mp3 지원),내장 합성음 자동 폴백
+시스템 공통,HP 회복 / 치유 (공통),-,public/audio/sfx/heal/1.mp3,mp3 / wav / ogg,0.4초 ~ 1.0초,체력 회복 시 따스하고 신비로운 공명 치유 차임 (1.mp3 2.mp3 지원),내장 합성음 자동 폴백
+시스템 공통,체력 5 이하 위기 (공통),-,public/audio/sfx/low_hp/1.mp3,mp3 / wav / ogg,0.8초 ~ 2.0초,체력 5 이하 첫 도달 시 긴박한 심장 박동 및 위기 알림음 (1.mp3 2.mp3 지원),내장 합성음 자동 폴백
+시스템 공통,카드 오픈 (플립),-,public/audio/sfx/clash_reveal/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,대결 시작 시 양 플레이어 카드가 3D 회전하며 앞면으로 뒤집힐 때의 촤악- 소리,내장 합성음 자동 폴백
+시스템 공통,카드 격돌 (충돌),-,public/audio/sfx/clash_impact/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,양 카드가 정면 충돌할 때의 폭발적인 격돌 사운드,내장 합성음 자동 폴백
+시스템 공통,대결 무승부 (비김),-,public/audio/sfx/draw/1.mp3,mp3 / wav / ogg,0.4초 ~ 1.0초,대결에서 양측 카드 코스트/스피드가 동일하여 무승부 발생 시 챙-! 튕겨나가는 패링/튕김음,내장 물리 합성음 자동 폴백
+시스템 공통,HP 피격 / 대미지 (기본 통합),-,public/audio/sfx/damage/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.6초,생명력 감소 시 공통 타격음 (세부 티어 파일이 없을 때 폴백),내장 물리 합성음 자동 폴백
+시스템 공통,대미지 1~2 (경타 / 스침),-,public/audio/sfx/damage_light/1.mp3,mp3 / wav / ogg,0.15초 ~ 0.35초,가벼운 견제타 및 스침 피격음 (경쾌한 스냅/잽 타격),내장 물리 합성음 자동 폴백
+시스템 공통,대미지 3~5 (중타 / 크런치),-,public/audio/sfx/damage_medium/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.6초,일반 유효타 피격음 (묵직한 크런치 & 서브 베이스 펀치),내장 물리 합성음 자동 폴백
+시스템 공통,대미지 6 이상 (치명타 / 슬램),-,public/audio/sfx/damage_heavy/1.mp3,mp3 / wav / ogg,0.6초 ~ 1.2초,치명적 대량 피해 피격음 (서브 베이스 럼블 & 균열 파쇄음),내장 물리 합성음 자동 폴백
+시스템 공통,카드 세트 (배치),-,public/audio/sfx/card/1.mp3,mp3 / wav / ogg,0.1초 ~ 0.3초,카드를 필드에 얹을 때의 스냅/착 소리,내장 합성음 자동 폴백
+시스템 공통,1콤보 연격 참격,-,public/audio/sfx/combo_1/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.4초,"1번째 연격 발동 시 가볍고 날렵한 시동 참격음 (1.mp3, 2.mp3 등 랜덤 재생)",내장 물리 합성음 자동 폴백
+시스템 공통,2콤보 연격 참격,-,public/audio/sfx/combo_2/1.mp3,mp3 / wav / ogg,0.25초 ~ 0.45초,"2번째 연속 연격 시 한층 고조되는 2단 참격음 (1.mp3, 2.mp3 등 랜덤 재생)",내장 물리 합성음 자동 폴백
+시스템 공통,3콤보 이상 최대 연격,-,public/audio/sfx/combo_3/1.mp3,mp3 / wav / ogg,0.35초 ~ 0.6초,"3콤보부터 4, 5, 6... 연속 공격 시 폭발하는 최고조 피니시 참격음 (1.mp3, 2.mp3 등 랜덤 재생)",내장 물리 합성음 자동 폴백
+시스템 공통,페이즈 전환 (통합 폴백),-,public/audio/sfx/phase/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,공통 페이즈 전환 효과음 (세부 페이즈 파일 부재 시 폴백),내장 합성음 자동 폴백
+시스템 공통,페이즈 - 드로우 / 시작,-,public/audio/sfx/phase_draw/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,턴 시작 및 카드 드로우 시 울리는 청아하고 상쾌한 개시 효과음,내장 물리 합성음 자동 폴백
+시스템 공통,페이즈 - 메인 액션,-,public/audio/sfx/phase_action/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.7초,레벨업/스왑/협주 충전 등 메인 작전 준비 집중 공명음,내장 물리 합성음 자동 폴백
+시스템 공통,페이즈 - 배틀 대결,-,public/audio/sfx/phase_battle/1.mp3,mp3 / wav / ogg,0.5초 ~ 1.2초,대결 세트 및 전투 돌입 긴장감 브라스 호른 & 서브 붐,내장 물리 합성음 자동 폴백
+시스템 공통,페이즈 - 연격 돌입,-,public/audio/sfx/phase_combo/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.6초,대결 승리 후 연속 공격 기회 획득 시 타오르는 불꽃 질주음,내장 물리 합성음 자동 폴백
+시스템 공통,페이즈 - 턴 종료,-,public/audio/sfx/phase_end/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.6초,턴을 마치고 공수를 교대할 때의 부드러운 전환 차임,내장 물리 합성음 자동 폴백
+시스템 공통,턴 교대,-,public/audio/sfx/turn/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.6초,내 턴 / 상대 턴 전환 알림음,내장 합성음 자동 폴백
+무기군 직검,직검 타격음,-,public/audio/sfx/weapon_sword/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.4초,날카로운 메탈릭 슬래시 챙! (볼륨 20% 인하 적용),내장 합성음 자동 폴백
+무기군 대검,대검 타격음,-,public/audio/sfx/weapon_broadblade/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.6초,묵직한 대검 베어가르기 파쇄 쾅! (볼륨 20% 인하 적용),내장 합성음 자동 폴백
+무기군 권총,권총 타격음,-,public/audio/sfx/weapon_pistol/1.mp3,mp3 / wav / ogg,0.1초 ~ 0.3초,화약 폭발 및 탄환 격발 탕! (볼륨 20% 인하 적용),내장 합성음 자동 폴백
+무기군 증폭기,증폭기 타격음,-,public/audio/sfx/weapon_rectifier/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.5초,에테르 마법 공명 파동 슈웅-콰앙! (볼륨 20% 인하 적용),내장 합성음 자동 폴백
+캐릭터 방랑자(여),출격 오프닝 대사 (시작),-,public/audio/sfx/characters/rover_female/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(여) 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 방랑자(여),승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/rover_female/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"방랑자(여) 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 방랑자(여),패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/rover_female/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(여) 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 방랑자(여),피격 / 대미지 보이스,-,public/audio/sfx/characters/rover_female/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"방랑자(여) 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 방랑자(여),레벨업 (공명 진화),-,public/audio/sfx/characters/rover_female/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"방랑자(여) Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 방랑자(여),장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/rover_female/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(여) 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 방랑자(여),체력 5 이하 위기 보이스,-,public/audio/sfx/characters/rover_female/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(여) 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 방랑자(여),리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/rover_female/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(여) 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 방랑자(여),일반 공격,0코,public/audio/sfx/characters/rover_female/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"방랑자(여) 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 방랑자(여),스킬 공격,1코,public/audio/sfx/characters/rover_female/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"방랑자(여) 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 방랑자(여),공명 해방,2코,public/audio/sfx/characters/rover_female/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"방랑자(여) 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 방랑자(남),출격 오프닝 대사 (시작),-,public/audio/sfx/characters/rover_male/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(남) 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 방랑자(남),승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/rover_male/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"방랑자(남) 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 방랑자(남),패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/rover_male/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(남) 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 방랑자(남),피격 / 대미지 보이스,-,public/audio/sfx/characters/rover_male/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"방랑자(남) 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 방랑자(남),레벨업 (공명 진화),-,public/audio/sfx/characters/rover_male/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"방랑자(남) Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 방랑자(남),장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/rover_male/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(남) 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 방랑자(남),체력 5 이하 위기 보이스,-,public/audio/sfx/characters/rover_male/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(남) 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 방랑자(남),리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/rover_male/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"방랑자(남) 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 방랑자(남),일반 공격,0코,public/audio/sfx/characters/rover_male/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"방랑자(남) 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 방랑자(남),스킬 공격,1코,public/audio/sfx/characters/rover_male/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"방랑자(남) 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 방랑자(남),공명 해방,2코,public/audio/sfx/characters/rover_male/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"방랑자(남) 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 금희,출격 오프닝 대사 (시작),-,public/audio/sfx/characters/jinhsi/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"금희 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 금희,승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/jinhsi/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"금희 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 금희,패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/jinhsi/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"금희 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 금희,피격 / 대미지 보이스,-,public/audio/sfx/characters/jinhsi/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"금희 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 금희,레벨업 (공명 진화),-,public/audio/sfx/characters/jinhsi/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"금희 Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 금희,장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/jinhsi/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"금희 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 금희,체력 5 이하 위기 보이스,-,public/audio/sfx/characters/jinhsi/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"금희 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 금희,리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/jinhsi/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"금희 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 금희,일반 공격,0코,public/audio/sfx/characters/jinhsi/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"금희 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",대검 타격음 자동 폴백
+캐릭터 금희,스킬 공격,1코,public/audio/sfx/characters/jinhsi/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"금희 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",대검 타격음 자동 폴백
+캐릭터 금희,공명 해방,2코,public/audio/sfx/characters/jinhsi/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"금희 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",대검 타격음 자동 폴백
+캐릭터 카멜리아,출격 오프닝 대사 (시작),-,public/audio/sfx/characters/camellya/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"카멜리아 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 카멜리아,승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/camellya/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"카멜리아 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 카멜리아,패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/camellya/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"카멜리아 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 카멜리아,피격 / 대미지 보이스,-,public/audio/sfx/characters/camellya/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"카멜리아 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 카멜리아,레벨업 (공명 진화),-,public/audio/sfx/characters/camellya/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"카멜리아 Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 카멜리아,장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/camellya/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"카멜리아 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 카멜리아,체력 5 이하 위기 보이스,-,public/audio/sfx/characters/camellya/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"카멜리아 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 카멜리아,리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/camellya/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"카멜리아 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 카멜리아,일반 공격,0코,public/audio/sfx/characters/camellya/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"카멜리아 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 카멜리아,스킬 공격,1코,public/audio/sfx/characters/camellya/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"카멜리아 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 카멜리아,공명 해방,2코,public/audio/sfx/characters/camellya/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"카멜리아 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 산화,출격 오프닝 대사 (시작),-,public/audio/sfx/characters/sanhua/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"산화 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 산화,승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/sanhua/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"산화 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 산화,패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/sanhua/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"산화 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 산화,피격 / 대미지 보이스,-,public/audio/sfx/characters/sanhua/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"산화 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 산화,레벨업 (공명 진화),-,public/audio/sfx/characters/sanhua/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"산화 Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 산화,장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/sanhua/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"산화 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 산화,체력 5 이하 위기 보이스,-,public/audio/sfx/characters/sanhua/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"산화 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 산화,리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/sanhua/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"산화 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 산화,일반 공격,0코,public/audio/sfx/characters/sanhua/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"산화 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 산화,스킬 공격,1코,public/audio/sfx/characters/sanhua/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"산화 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 산화,공명 해방,2코,public/audio/sfx/characters/sanhua/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"산화 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 양양,출격 오프닝 대사 (시작),-,public/audio/sfx/characters/yangyang/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"양양 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 양양,승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/yangyang/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"양양 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 양양,패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/yangyang/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"양양 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 양양,피격 / 대미지 보이스,-,public/audio/sfx/characters/yangyang/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"양양 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 양양,레벨업 (공명 진화),-,public/audio/sfx/characters/yangyang/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"양양 Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 양양,장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/yangyang/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"양양 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 양양,체력 5 이하 위기 보이스,-,public/audio/sfx/characters/yangyang/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"양양 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 양양,리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/yangyang/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"양양 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 양양,일반 공격,0코,public/audio/sfx/characters/yangyang/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"양양 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 양양,스킬 공격,1코,public/audio/sfx/characters/yangyang/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"양양 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 양양,공명 해방,2코,public/audio/sfx/characters/yangyang/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"양양 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",직검 타격음 자동 폴백
+캐릭터 치샤,출격 오프닝 대사 (시작),-,public/audio/sfx/characters/chixia/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"치샤 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 치샤,승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/chixia/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"치샤 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 치샤,패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/chixia/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"치샤 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 치샤,피격 / 대미지 보이스,-,public/audio/sfx/characters/chixia/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"치샤 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 치샤,레벨업 (공명 진화),-,public/audio/sfx/characters/chixia/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"치샤 Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 치샤,장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/chixia/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"치샤 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 치샤,체력 5 이하 위기 보이스,-,public/audio/sfx/characters/chixia/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"치샤 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 치샤,리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/chixia/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"치샤 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 치샤,일반 공격,0코,public/audio/sfx/characters/chixia/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"치샤 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",권총 타격음 자동 폴백
+캐릭터 치샤,스킬 공격,1코,public/audio/sfx/characters/chixia/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"치샤 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",권총 타격음 자동 폴백
+캐릭터 치샤,공명 해방,2코,public/audio/sfx/characters/chixia/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"치샤 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",권총 타격음 자동 폴백
+캐릭터 앙코,출격 오프닝 대사 (시작),-,public/audio/sfx/characters/encore/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"앙코 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 앙코,승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/encore/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"앙코 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 앙코,패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/encore/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"앙코 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 앙코,피격 / 대미지 보이스,-,public/audio/sfx/characters/encore/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"앙코 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 앙코,레벨업 (공명 진화),-,public/audio/sfx/characters/encore/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"앙코 Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 앙코,장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/encore/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"앙코 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 앙코,체력 5 이하 위기 보이스,-,public/audio/sfx/characters/encore/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"앙코 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 앙코,리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/encore/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"앙코 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 앙코,일반 공격,0코,public/audio/sfx/characters/encore/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"앙코 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",증폭기 타격음 자동 폴백
+캐릭터 앙코,스킬 공격,1코,public/audio/sfx/characters/encore/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"앙코 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",증폭기 타격음 자동 폴백
+캐릭터 앙코,공명 해방,2코,public/audio/sfx/characters/encore/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"앙코 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",증폭기 타격음 자동 폴백
+캐릭터 파수인,출격 오프닝 대사 (시작),-,public/audio/sfx/characters/shorekeeper/opening/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"파수인 대전 개시 출격 오프닝 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 개시음 자동 폴백
+캐릭터 파수인,승리 대사 / 보이스 (결착),-,public/audio/sfx/characters/shorekeeper/victory/1.mp3,mp3 / wav / ogg,1.5초 ~ 4.0초,"파수인 매치 승리 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 승리음 자동 폴백
+캐릭터 파수인,패배 대사 / 보이스 (결착),-,public/audio/sfx/characters/shorekeeper/defeat/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"파수인 매치 패배 시 고유 명대사/보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 패배음 자동 폴백
+캐릭터 파수인,피격 / 대미지 보이스,-,public/audio/sfx/characters/shorekeeper/hurt/1.mp3,mp3 / wav / ogg,0.3초 ~ 0.8초,"파수인 피격 시 신음/대미지 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",무기/충돌음 자동 폴백
+캐릭터 파수인,레벨업 (공명 진화),-,public/audio/sfx/characters/shorekeeper/levelup/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"파수인 Lv.1/Lv.2 진화 고유 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 레벨업음 자동 폴백
+캐릭터 파수인,장시간 고민/방치 이스터에그,-,public/audio/sfx/characters/shorekeeper/idle/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"파수인 장시간 미조작 시 생각/재촉 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",맑은 공명음 자동 폴백
+캐릭터 파수인,체력 5 이하 위기 보이스,-,public/audio/sfx/characters/shorekeeper/low_hp/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"파수인 체력 5 이하 첫 도달 시 위기/비장 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",공통 위기음 자동 폴백
+캐릭터 파수인,리더 교체 보이스 (Join Team),-,public/audio/sfx/characters/shorekeeper/switch/1.mp3,mp3 / wav / ogg,1.0초 ~ 3.0초,"파수인 백에서 리더로 교체 시 Join Team 보이스 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",교대음 자동 폴백
+캐릭터 파수인,일반 공격,0코,public/audio/sfx/characters/shorekeeper/attack_cost0/1.mp3,mp3 / wav / ogg,0.2초 ~ 0.5초,"파수인 0코스트 일반 공격 고유 타격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",증폭기 타격음 자동 폴백
+캐릭터 파수인,스킬 공격,1코,public/audio/sfx/characters/shorekeeper/attack_cost1/1.mp3,mp3 / wav / ogg,0.4초 ~ 0.8초,"파수인 1코스트 스킬 공격 고유 효과음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",증폭기 타격음 자동 폴백
+캐릭터 파수인,공명 해방,2코,public/audio/sfx/characters/shorekeeper/attack_cost2/1.mp3,mp3 / wav / ogg,0.8초 ~ 1.5초,"파수인 2코스트 필살기 공명 해방 공격음 (폴더에 1.mp3, 2.mp3 넣으면 랜덤 재생)",증폭기 타격음 자동 폴백

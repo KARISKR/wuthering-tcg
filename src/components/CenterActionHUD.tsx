@@ -21,22 +21,35 @@ export const CenterActionHUD: React.FC<CenterActionHUDProps> = ({ event, onDismi
         setTimeout(() => {
           setCurrentEvent(null);
           onDismiss?.();
-        }, 250);
-      }, 1800);
+        }, 200);
+      }, 5000); // 5초 후 자동 종료
 
       return () => clearTimeout(timer);
     }
   }, [event?.id, event?.timestamp]);
 
-  if (!currentEvent) return null;
-
   const handleClose = () => {
+    if (isExiting) return;
     setIsExiting(true);
     setTimeout(() => {
       setCurrentEvent(null);
       onDismiss?.();
     }, 150);
   };
+
+  // 키보드(Space, Enter, Escape) 입력 시 즉시 닫기
+  useEffect(() => {
+    if (!currentEvent) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentEvent]);
+
+  if (!currentEvent) return null;
 
   const getEffectTheme = (type: TriggeredEffectEvent['effectType']) => {
     switch (type) {
@@ -104,21 +117,24 @@ export const CenterActionHUD: React.FC<CenterActionHUDProps> = ({ event, onDismi
   return (
     <div
       onClick={handleClose}
-      className={`fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none cursor-pointer transition-all duration-200 ${
-        isExiting ? 'opacity-0 scale-95' : 'opacity-100 scale-100 animate-in zoom-in-95 fade-in duration-150'
+      className={`fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none cursor-pointer transition-all duration-200 ${
+        isExiting ? 'opacity-0 scale-95 pointer-events-none' : 'opacity-100 scale-100 animate-in zoom-in-95 fade-in duration-150'
       }`}
     >
       {/* 중앙 HUD 다이얼로그 카드 */}
       <div
-        className={`relative w-full max-w-md sm:max-w-lg rounded-3xl bg-slate-950/95 border-2 ${theme.borderColor} p-5 sm:p-6 shadow-2xl flex flex-col items-center text-center overflow-hidden`}
-        onClick={(e) => e.stopPropagation()}
+        className={`relative w-full max-w-md sm:max-w-lg rounded-3xl bg-slate-950/95 border-2 ${theme.borderColor} p-5 sm:p-6 shadow-2xl flex flex-col items-center text-center overflow-hidden cursor-pointer hover:border-amber-400/80 active:scale-[0.99] transition-all`}
+        onClick={handleClose}
       >
         {/* 상단 앰비언트 방사형 빛 */}
         <div className={`absolute -top-16 inset-x-0 h-40 bg-gradient-to-b ${theme.glow} pointer-events-none rounded-t-3xl`} />
 
         {/* 닫기 버튼 */}
         <button
-          onClick={handleClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClose();
+          }}
           className="absolute top-3 right-3 p-1 rounded-full text-slate-400 hover:text-white hover:bg-slate-800/80 transition"
           title="닫기 (Space/클릭)"
         >
@@ -155,11 +171,28 @@ export const CenterActionHUD: React.FC<CenterActionHUDProps> = ({ event, onDismi
           {currentEvent.description}
         </p>
 
-        {/* 하단 확인 안내 힌트 */}
-        <div className="mt-4 text-[10px] text-slate-500 font-mono tracking-widest uppercase flex items-center gap-1">
-          <span>클릭하여 넘기기</span>
-          <span className="text-slate-600">·</span>
-          <span>1.8초 후 자동 진행</span>
+        {/* 확인 / 닫기 버튼 */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClose();
+          }}
+          className="mt-4 w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 text-slate-950 font-black text-xs sm:text-sm shadow-md hover:brightness-110 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+        >
+          <span>확인 (클릭하여 닫기)</span>
+        </button>
+
+        {/* 5초 진행 게이지 바 및 카운트다운 안내 */}
+        <div className="w-full mt-2.5 flex flex-col items-center gap-1.5 pointer-events-none">
+          <div className="w-full h-1 bg-slate-800/80 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-400 to-yellow-300 rounded-full animate-progress-5s"
+            />
+          </div>
+          <div className="text-[11px] text-slate-400 font-mono tracking-wide flex items-center justify-between w-full px-0.5">
+            <span>화면 아무 곳이나 누르면 즉시 닫힘</span>
+            <span>5초 후 자동 진행</span>
+          </div>
         </div>
       </div>
     </div>
