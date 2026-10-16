@@ -89,7 +89,13 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-black text-white">{choice.title}</h2>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold">
-                {isUpgradeChoice ? '레벨업 대상 수동 선택' : '선택 발동'}
+                {isUpgradeChoice
+                  ? '레벨업 대상 수동 선택'
+                  : choice.onResolveType === 'SWAP_LEADER'
+                  ? '리더 교체 선택'
+                  : choice.onResolveType === 'RECOVER_BP01_069'
+                  ? '배틀 페이즈 종료 효과'
+                  : '선택 발동'}
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5 font-medium">
@@ -107,6 +113,10 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                 ? `상대의 패 ${choice.revealedCards.length}장이 확인되었습니다.`
                 : choice.onResolveType === 'SELECT_EFFECT_UPGRADE'
                 ? `캐릭터 덱에서 중첩 레벨업 가능한 대상 카드 ${choice.revealedCards.length}장 확인`
+                : choice.onResolveType === 'SWAP_LEADER'
+                ? `교체 가능한 서포터 캐릭터 ${choice.revealedCards.length}명 확인`
+                : choice.onResolveType === 'RECOVER_BP01_069'
+                ? `1 COST를 지불하여 패로 회수 가능한 카드`
                 : choice.onResolveType === 'SET_CONCERTO'
                 ? `덱 위의 카드 ${choice.revealedCards.length}장이 확인되었습니다 (협주 에리어 배치 선택)`
                 : choice.onResolveType === 'RECOVER_FROM_DROP'
@@ -126,6 +136,10 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
               <span className="text-slate-400 font-bold">
                 {choice.onResolveType === 'SELECT_EFFECT_UPGRADE'
                   ? '중첩할 레벨업 캐릭터 카드 선택:'
+                  : choice.onResolveType === 'SWAP_LEADER'
+                  ? '새로운 리더로 세울 서포터 캐릭터 선택:'
+                  : choice.onResolveType === 'RECOVER_BP01_069'
+                  ? '패로 회수할 카드 선택:'
                   : choice.onResolveType === 'SET_CONCERTO'
                   ? '협주 에리어에 배치할 카드:'
                   : choice.onResolveType === 'RECOVER_FROM_DROP'
@@ -207,6 +221,10 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                       ? `상대 패 #${idx + 1}`
                       : choice.onResolveType === 'SELECT_EFFECT_UPGRADE'
                       ? `${card.code}`
+                      : choice.onResolveType === 'SWAP_LEADER'
+                      ? '서포터'
+                      : choice.onResolveType === 'RECOVER_BP01_069'
+                      ? '1 COST 회수'
                       : choice.onResolveType === 'RECOVER_FROM_DROP'
                       ? '트래시'
                       : `공개 #${idx + 1}`}

@@ -2636,8 +2636,57 @@ export function finishClashJudgment(state: GameState): GameState {
       officialPursuit += 3;
     }
     // 산화 Lv.2 [BP01-031] 리더 판정: 자신이 청색 카드로 승리했을 경우 【추격 3】 및 리더 교체 가능
-    if (winnerLeaderCards.some((c) => c.code === 'BP01-031') && winCard.color === 'BLUE') {
+    const isSanhuaLv2Leader = winnerLeaderCards.some((c) => c.code === 'BP01-031');
+    if (isSanhuaLv2Leader && winCard.color === 'BLUE') {
       officialPursuit += 3;
+    }
+
+    // BP01-077 얼음 파편 판정: 자신이 승리하고 협주 에리어에 [산화]가 있을 경우 리더 교체 가능
+    const isIceShardWin = winCard.code === 'BP01-077';
+    const hasSanhuaInConcerto = winnerPlayer.concertoZone.some(
+      (c) => c.characterExclusive?.includes('산화') || (c as any).characterName === '산화' || c.nameKr?.includes('산화')
+    );
+
+    const canSanhuaSwitchLeader =
+      (isSanhuaLv2Leader && winCard.color === 'BLUE') ||
+      (isIceShardWin && hasSanhuaInConcerto);
+
+    if (canSanhuaSwitchLeader) {
+      const availableSupports = [winnerPlayer.slots.leftSupport, winnerPlayer.slots.rightSupport].filter(
+        Boolean
+      ) as CharacterCard[];
+
+      if (availableSupports.length > 0) {
+        if (winnerPlayer.isAi) {
+          const supportKey: 'leftSupport' | 'rightSupport' = winnerPlayer.slots.leftSupport
+            ? 'leftSupport'
+            : 'rightSupport';
+          const prevLeader = winnerPlayer.slots.leader;
+          winnerPlayer.slots.leader = winnerPlayer.slots[supportKey]!;
+          winnerPlayer.slots[supportKey] = prevLeader;
+          newState = addLog(
+            newState,
+            `[${isSanhuaLv2Leader ? '산화 Lv.2 BP01-031' : '얼음 파편 BP01-077'} 판정 효과] ${winnerPlayer.name}이(가) 리더를 [${prevLeader.nameKr}]에서 [${winnerPlayer.slots.leader.nameKr}](으)로 교체했습니다!`,
+            'ACTION',
+            winnerIndex,
+            { cardName: winnerPlayer.slots.leader.nameKr, cardArt: winnerPlayer.slots.leader.artUrl, effectTag: '리더 교체' }
+          );
+        } else {
+          const choice: PendingChoice = {
+            id: `choice-${Date.now()}-sanhua-swap`,
+            playerIndex: winnerIndex,
+            title: `${isSanhuaLv2Leader ? '산화 Lv.2' : '얼음 파편'} — 리더 교체 선택`,
+            sourceCardName: isSanhuaLv2Leader ? '산화 Lv.2 [BP01-031]' : '얼음 파편 [BP01-077]',
+            sourceCardArt: winCard.artUrl,
+            description: '【판정 효과】리더를 교체할 서포터 캐릭터를 1명 선택하세요 (교체를 원치 않으면 건너뛰기를 누르세요).',
+            revealedCards: availableSupports,
+            minSelect: 0,
+            maxSelect: 1,
+            onResolveType: 'SWAP_LEADER',
+          };
+          newState = queueChoice(newState, choice, true);
+        }
+      }
     }
 
     if (officialPursuit > 0) {
@@ -2673,8 +2722,6 @@ export function finishClashJudgment(state: GameState): GameState {
       winnerPlayer.comboUnlimited = false;
       newState = addLog(newState, `[해금 BP01-058 우세 효과] 상대 파수인의 효과로 연격이 봉쇄되었습니다!`, 'SYSTEM', winnerIndex);
     }
-
-    winnerPlayer.comboCount = comboGranted;
 
     winnerPlayer.comboCount = comboGranted;
   }
@@ -2899,13 +2946,13 @@ export function proceedAfterClashReveal(state: GameState): GameState {
       );
     }
   } else {
-    // 연격 권한 없음 -> 연격 플래그 리셋 후 패 초과 체크 및 턴 종료
+    // 연격 권한 없음 -> 연격 플래그 리셋 후 배틀 페이즈 종료 스텝 실행
     p0.comboCount = 0;
     p0.comboUnlimited = false;
     p1.comboCount = 0;
     p1.comboUnlimited = false;
     newState.players = [p0, p1];
-    return checkHandOverflowOrEndTurn(newState);
+    return executeBattlePhaseEndStep(newState);
   }
 
   return newState;
@@ -3317,6 +3364,21 @@ export function executeComboAttack(
     }
   );
 
+  // BP01-060 그늘이와 구름이 출격·강공격: 상대에게 데미지를 입힐 시, 자신의 리더가 「앙코」인 경우 카드 1장을 뽑는다.
+  if (card.code === 'BP01-060' && slotHasCharacterSkill(player.slots.leader, '앙코') && dmg > 0) {
+    const drawn = drawSingleCardFromDeck(player);
+    if (drawn) {
+      addCardsToHand(player, [drawn]);
+      newState = addLog(
+        newState,
+        `[그늘이와 구름이 출격·강공격 BP01-060 효과] 상대에게 연격 피해를 입혀 덱에서 카드 1장을 드로우했습니다!`,
+        'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '카드 드로우' }
+      );
+    }
+  }
+
   // 승패 확인
   if (opponent.hp <= 0) {
     return { success: true, newState: checkGameOver(newState) };
@@ -3342,7 +3404,7 @@ export function executeComboAttack(
         'ACTION',
         playerIndex
       );
-      newState = checkHandOverflowOrEndTurn(newState);
+      newState = executeBattlePhaseEndStep(newState);
     } else {
       // Human 유저:
       // 바로 checkHandOverflowOrEndTurn으로 턴을 넘겨버리지 않고 COMBO_STEP 상태를 유지하여
@@ -3359,39 +3421,108 @@ export function executeComboAttack(
   return { success: true, newState };
 }
 
+// ==========================================
+// 7.5. 배틀 페이즈 종료 스텝 (Battle Phase End Step - 공식 룰 604.1.4)
+// ==========================================
+export function executeBattlePhaseEndStep(state: GameState): GameState {
+  let newState: GameState = { ...state };
+
+  // 1. 치샤 Lv.2 [BP01-025] 리더 배틀 종료 효과: 액션 에리어에 기본 공격 2장 이상 시 상대에게 3pt 피해
+  for (let i = 0; i < 2; i++) {
+    const pIdx = i as 0 | 1;
+    const oppIdx = (i === 0 ? 1 : 0) as 0 | 1;
+    const p = newState.players[pIdx];
+    const opp = newState.players[oppIdx];
+
+    const hasChixiaBp01025 = getAllCardsInSlot(p.slots.leader).some((c) => c.code === 'BP01-025');
+    const normalAttacksInAction = (p.actionArea || []).filter(
+      (c) => c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격')
+    ).length;
+
+    if (hasChixiaBp01025 && normalAttacksInAction >= 2) {
+      opp.hp = Math.max(0, opp.hp - 3);
+      newState.players[oppIdx] = opp;
+      newState = addLog(
+        newState,
+        `[치샤 Lv.2 BP01-025 배틀 종료 효과] 액션 에리어에 기본 공격 카드가 ${normalAttacksInAction}장 있어 상대에게 3pt 추가 피해를 입혔습니다!`,
+        'DAMAGE',
+        pIdx,
+        { amount: 3, effectTag: '배틀 종료 피해' }
+      );
+      if (opp.hp <= 0) {
+        return checkGameOver(newState);
+      }
+    }
+  }
+
+  // 2. 날개의 뜻·회피 [BP01-069] 배틀 페이즈 종료 효과:
+  // 공식 텍스트: "【각 배틀 페이즈 종료 시】자신의 리더가 「양양」인 경우, 1 COST를 지불하여 이 카드를 패에 추가 가능."
+  for (let i = 0; i < 2; i++) {
+    const pIdx = i as 0 | 1;
+    const p = newState.players[pIdx];
+    const hasYangyangLeader = slotHasCharacterSkill(p.slots.leader, '양양');
+    p.actionArea = p.actionArea || [];
+    const wingCard =
+      p.actionArea.find((c) => c.code === 'BP01-069') ||
+      (p.dropZone.find((c) => c.code === 'BP01-069') as ActionCard | undefined);
+
+    if (hasYangyangLeader && wingCard && p.concertoZone.length >= 1) {
+      if (p.isAi) {
+        // AI: 1 COST 지불하고 패로 회수
+        const [spent] = p.concertoZone.splice(0, 1);
+        p.dropZone.push(spent);
+        const aIdx = p.actionArea.findIndex((c) => c.id === wingCard.id || c.code === 'BP01-069');
+        if (aIdx !== -1) {
+          p.actionArea.splice(aIdx, 1);
+        } else {
+          const dIdx = p.dropZone.findIndex((c) => c.id === wingCard.id || c.code === 'BP01-069');
+          if (dIdx !== -1) p.dropZone.splice(dIdx, 1);
+        }
+        addCardsToHand(p, [wingCard as ActionCard]);
+        newState = addLog(
+          newState,
+          `[날개의 뜻·회피 BP01-069 배틀 페이즈 종료 효과] 1 COST를 지불하고 [날개의 뜻·회피]를 패로 회수했습니다!`,
+          'ACTION',
+          pIdx,
+          { cardName: wingCard.nameKr, cardArt: wingCard.artUrl, effectTag: '패 회수' }
+        );
+      } else {
+        // Human 유저: 선택 모달 띄우기
+        const choice: PendingChoice = {
+          id: `choice-${Date.now()}-wing-recover-${pIdx}`,
+          playerIndex: pIdx,
+          title: '날개의 뜻·회피 — 패 회수 선택',
+          sourceCardName: '날개의 뜻·회피 [BP01-069]',
+          sourceCardArt: wingCard.artUrl,
+          description: '【배틀 페이즈 종료 효과】1 COST(협주 에너지 1장)를 지불하고 [날개의 뜻·회피]를 패로 회수하시겠습니까?',
+          revealedCards: [wingCard],
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'RECOVER_BP01_069',
+        };
+        newState = queueChoice(newState, choice, false);
+      }
+    }
+  }
+
+  // 만약 선택 효과(날개의 뜻 회수 등)가 대기 중이라면 해당 선택 완료 후 턴 종료로 넘어가도록 대기
+  if (newState.pendingChoice) {
+    return newState;
+  }
+
+  return checkHandOverflowOrEndTurn(newState);
+}
+
 export function finishComboStep(state: GameState, playerIndex: 0 | 1): GameState {
   let newState: GameState = { ...state, lastComboStrike: null };
   const p = { ...newState.players[playerIndex] };
-  const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
-  const opp = { ...newState.players[oppIdx] };
-
-  // 치샤 Lv.2 [BP01-025] 리더 배틀 종료 효과: 액션 에리어에 기본 공격 2장 이상 시 상대에게 3pt 피해
-  const hasChixiaBp01025 = getAllCardsInSlot(p.slots.leader).some((c) => c.code === 'BP01-025');
-  const normalAttacksInAction = (p.actionArea || []).filter(
-    (c) => c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격')
-  ).length;
-  if (hasChixiaBp01025 && normalAttacksInAction >= 2) {
-    opp.hp = Math.max(0, opp.hp - 3);
-    newState.players[oppIdx] = opp;
-    newState = addLog(
-      newState,
-      `[치샤 Lv.2 BP01-025 배틀 종료 효과] 액션 에리어에 기본 공격 카드가 ${normalAttacksInAction}장 있어 상대에게 3pt 추가 피해를 입혔습니다!`,
-      'DAMAGE',
-      playerIndex,
-      { amount: 3, effectTag: '배틀 종료 피해' }
-    );
-  }
 
   p.comboCount = 0;
   p.comboUnlimited = false;
   newState.players[playerIndex] = p;
   newState = addLog(newState, `${p.name}이(가) 연격 단계를 마쳤습니다.`, 'ACTION', playerIndex);
 
-  if (opp.hp <= 0) {
-    return checkGameOver(newState);
-  }
-
-  return checkHandOverflowOrEndTurn(newState);
+  return executeBattlePhaseEndStep(newState);
 }
 
 // ==========================================
@@ -3789,8 +3920,103 @@ export function resolvePendingChoice(
         playerIndex
       );
     }
+  } else if (onResolveType === 'SWAP_LEADER') {
+    // 3. 산화 Lv.2 (BP01-031) 또는 얼음 파편 (BP01-077)에 의한 리더 교체 선택
+    const chosenChar = chosenCards[0] as CharacterCard | undefined;
+    if (chosenChar) {
+      let targetSlot: 'leftSupport' | 'rightSupport' | null = null;
+      if (
+        player.slots.leftSupport &&
+        (player.slots.leftSupport.id === chosenChar.id || player.slots.leftSupport.code === chosenChar.code)
+      ) {
+        targetSlot = 'leftSupport';
+      } else if (
+        player.slots.rightSupport &&
+        (player.slots.rightSupport.id === chosenChar.id || player.slots.rightSupport.code === chosenChar.code)
+      ) {
+        targetSlot = 'rightSupport';
+      }
+
+      if (targetSlot && player.slots[targetSlot]) {
+        const prevLeader = player.slots.leader;
+        player.slots.leader = player.slots[targetSlot]!;
+        player.slots[targetSlot] = prevLeader;
+
+        newState.lastEffectEvent = {
+          id: `eff-swap-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          sourceCardName,
+          effectType: 'BUFF',
+          title: '리더 교체 완료',
+          description: `[${sourceCardName}] 효과로 리더를 [${prevLeader.nameKr}]에서 [${player.slots.leader.nameKr}](으)로 교체했습니다!`,
+          playerIndex,
+          timestamp: Date.now(),
+        };
+
+        newState = addLog(
+          newState,
+          `[${sourceCardName}] ${player.name}이(가) 리더를 [${prevLeader.nameKr}]에서 [${player.slots.leader.nameKr}](으)로 교체했습니다!`,
+          'ACTION',
+          playerIndex,
+          { cardName: player.slots.leader.nameKr, cardArt: player.slots.leader.artUrl, effectTag: '리더 교체' }
+        );
+      }
+    } else {
+      newState = addLog(
+        newState,
+        `[${sourceCardName}] ${player.name}이(가) 리더 교체를 건너뛰었습니다.`,
+        'ACTION',
+        playerIndex
+      );
+    }
+  } else if (onResolveType === 'RECOVER_BP01_069') {
+    // 4. 날개의 뜻·회피 [BP01-069] 배틀 페이즈 종료 효과: 1 COST 지불하고 패로 회수
+    const chosenAction = chosenCards[0] as ActionCard | undefined;
+    if (chosenAction && player.concertoZone.length >= 1) {
+      const [spent] = player.concertoZone.splice(0, 1);
+      player.dropZone.push(spent);
+
+      player.actionArea = player.actionArea || [];
+      const aIdx = player.actionArea.findIndex(
+        (c) => c.id === chosenAction.id || c.code === 'BP01-069'
+      );
+      if (aIdx !== -1) {
+        player.actionArea.splice(aIdx, 1);
+      } else {
+        const dIdx = player.dropZone.findIndex(
+          (c) => c.id === chosenAction.id || c.code === 'BP01-069'
+        );
+        if (dIdx !== -1) player.dropZone.splice(dIdx, 1);
+      }
+
+      addCardsToHand(player, [chosenAction]);
+
+      newState.lastEffectEvent = {
+        id: `eff-recover-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        sourceCardName: '날개의 뜻·회피 [BP01-069]',
+        effectType: 'DRAW',
+        title: '날개의 뜻 패 회수 완료',
+        description: `1 COST를 지불하고 [날개의 뜻·회피]를 패로 회수했습니다!`,
+        playerIndex,
+        timestamp: Date.now(),
+      };
+
+      newState = addLog(
+        newState,
+        `[날개의 뜻·회피 BP01-069 배틀 페이즈 종료 효과] ${player.name}이(가) 1 COST를 지불하고 [날개의 뜻·회피]를 패로 회수했습니다!`,
+        'ACTION',
+        playerIndex,
+        { cardName: chosenAction.nameKr, cardArt: chosenAction.artUrl, effectTag: '패 회수' }
+      );
+    } else {
+      newState = addLog(
+        newState,
+        `[날개의 뜻·회피 BP01-069] ${player.name}이(가) 패 회수를 건너뛰었습니다.`,
+        'ACTION',
+        playerIndex
+      );
+    }
   } else {
-    // 3. 패에 추가 (ADD_TO_HAND)
+    // 5. 패에 추가 (ADD_TO_HAND)
     // 선택된 카드를 actionDeck에서 완전히 제거 (중복 드로우 원천 차단)
     player.actionDeck = player.actionDeck.filter((c) => !chosenActionCards.some((ch) => ch.id === c.id));
 
@@ -3844,6 +4070,11 @@ export function resolvePendingChoice(
     return newState;
   }
 
+  // 배틀 페이즈 종료 시점의 회수 효과(RECOVER_BP01_069) 처리 완료 시 턴 종료로 직행
+  if (onResolveType === 'RECOVER_BP01_069') {
+    return checkHandOverflowOrEndTurn(newState);
+  }
+
   // 2. 배틀 스텝(Battle Step) 선택 발동 효과(양 플레이어가 카드를 세트하고 판정을 앞둔 상태)를 완료한 경우:
   // 오직 양측 대결 카드가 세트되어 있을 때만 판정 스텝(finishClashJudgment)을 실행!
   if (
@@ -3884,7 +4115,8 @@ export function resolvePendingChoice(
       p0State.comboUnlimited = false;
       p1State.comboCount = 0;
       p1State.comboUnlimited = false;
-      return checkHandOverflowOrEndTurn(newState);
+      newState.players = [p0State, p1State];
+      return executeBattlePhaseEndStep(newState);
     }
   }
 

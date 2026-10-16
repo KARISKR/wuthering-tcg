@@ -210,7 +210,9 @@ export interface PendingChoice {
     | 'RECOVER_FROM_DROP'
     | 'DISCARD_FOR_DAMAGE'
     | 'VIEW_ONLY'
-    | 'SELECT_EFFECT_UPGRADE';
+    | 'SELECT_EFFECT_UPGRADE'
+    | 'SWAP_LEADER'
+    | 'RECOVER_BP01_069';
   targetSlot?: 'leader' | 'leftSupport' | 'rightSupport';
 }
 
