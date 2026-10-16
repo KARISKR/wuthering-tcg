@@ -50,11 +50,19 @@ interface BattleReplayStageProps {
 // ReplaySlotSnapshot을 CharacterCard 객체로 변환 (하위 레벨 카드 스택 자동 복원)
 function toCharacterCard(slot?: ReplaySlotSnapshot): CharacterCard | null {
   if (!slot) return null;
-  const official = OFFICIAL_CARDS.find(
-    (c) => c.kind === 'CHARACTER' && (c.nameKr === slot.nameKr || c.characterName === slot.nameKr) && c.level === slot.level
-  ) || OFFICIAL_CARDS.find(
-    (c) => c.kind === 'CHARACTER' && (c.nameKr === slot.nameKr || c.characterName === slot.nameKr)
-  );
+  const official =
+    OFFICIAL_CARDS.find(
+      (c) => c.kind === 'CHARACTER' && (c.nameKr === slot.nameKr || c.characterName === slot.nameKr) && c.level === slot.level
+    ) ||
+    OFFICIAL_CARDS.find(
+      (c) =>
+        c.kind === 'CHARACTER' &&
+        (c.nameKr.includes(slot.nameKr) || slot.nameKr.includes(c.nameKr) || (c.characterName && slot.nameKr.includes(c.characterName))) &&
+        c.level === slot.level
+    ) ||
+    OFFICIAL_CARDS.find(
+      (c) => c.kind === 'CHARACTER' && (c.nameKr === slot.nameKr || c.characterName === slot.nameKr)
+    );
 
   // 하위 레벨 카드 스택 복원 (스킬 상속 열람용)
   const charName = official?.characterName || slot.nameKr;
@@ -80,6 +88,9 @@ function toCharacterCard(slot?: ReplaySlotSnapshot): CharacterCard | null {
     }
   }
 
+  // 공식 카드의 현재 레벨에 일치하는 아트를 최우선 적용하여 시작 시 최고 레벨 아트로 보이는 현상 방지
+  const resolvedArtUrl = official?.artUrl || slot.artUrl || '/cards/card_images/BP01-001_방랑자(남)_1985.webp';
+
   return {
     id: `char-${slot.nameKr}-${slot.level}`,
     code: official?.code || 'SD01-001',
@@ -87,7 +98,7 @@ function toCharacterCard(slot?: ReplaySlotSnapshot): CharacterCard | null {
     characterName: official?.characterName || slot.nameKr,
     level: slot.level as 0 | 1 | 2,
     element: (slot.element as any) || 'SPECTRO',
-    artUrl: slot.artUrl || official?.artUrl || '/cards/card_images/BP01-001_방랑자(남)_1985.webp',
+    artUrl: resolvedArtUrl,
     description: official?.description || '',
     kind: 'CHARACTER',
     underlyingCards: underlyingCards.length > 0 ? underlyingCards : undefined,

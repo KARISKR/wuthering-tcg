@@ -61,9 +61,13 @@ export function getSavedReplays(): BattleReplayData[] {
     }
     const list: BattleReplayData[] = JSON.parse(raw);
     if (!Array.isArray(list) || list.length === 0) {
-      return [];
+      return [...SAMPLE_BATTLE_REPLAYS];
     }
-    return list.sort((a, b) => b.timestamp - a.timestamp);
+    // 샘플 리플레이는 최신 수정 데이터로 항상 갱신하고, 사용자가 저장한 리플레이와 합병
+    const sampleIds = new Set(SAMPLE_BATTLE_REPLAYS.map((s) => s.id));
+    const userReplays = list.filter((r) => !sampleIds.has(r.id));
+    const merged = [...SAMPLE_BATTLE_REPLAYS, ...userReplays];
+    return merged.sort((a, b) => b.timestamp - a.timestamp);
   } catch (e) {
     console.error('Failed to parse saved replays:', e);
     return [...SAMPLE_BATTLE_REPLAYS];
@@ -103,14 +107,14 @@ export function createBattleReplayData(
     winner,
     p0Leader: {
       nameKr: p0Leader.nameKr || p0Leader.characterName,
-      artUrl: p0Leader.artUrl,
-      level: p0Leader.level ?? 0,
+      artUrl: p0Leader.underlyingCards?.[0]?.artUrl || p0Leader.artUrl,
+      level: 0,
       element: p0Leader.element,
     },
     p1Leader: {
       nameKr: p1Leader.nameKr || p1Leader.characterName,
-      artUrl: p1Leader.artUrl,
-      level: p1Leader.level ?? 0,
+      artUrl: p1Leader.underlyingCards?.[0]?.artUrl || p1Leader.artUrl,
+      level: 0,
       element: p1Leader.element,
     },
     p0Hp: players[0].hp,

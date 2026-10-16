@@ -67,13 +67,37 @@ function parseClashCards(text: string): { p0Card?: OfficialCardData; p1Card?: Of
   return {};
 }
 
-// 캐릭터 기본 이미지 매칭 보조
-function getCharacterArt(nameKr?: string): string {
-  if (!nameKr) return '/cards/card_images/BP01-001_방랑자(남)_1985.webp';
-  const found = OFFICIAL_CARDS.find(
-    (c) => c.kind === 'CHARACTER' && (c.nameKr.includes(nameKr) || c.characterName.includes(nameKr))
+// 캐릭터 레벨별 공식 카드 검색 보조 (기본값: 레벨 0 시작 카드)
+export function getCharacterCardByLevel(nameKr?: string, level: number = 0): OfficialCardData | undefined {
+  if (!nameKr) return undefined;
+  // 1. 이름이 정확히 일치하고 레벨이 일치하는 카드
+  let found = OFFICIAL_CARDS.find(
+    (c) => c.kind === 'CHARACTER' && (c.nameKr === nameKr || c.characterName === nameKr) && c.level === level
   );
-  return found?.artUrl || '/cards/card_images/BP01-001_방랑자(남)_1985.webp';
+  if (found) return found;
+
+  // 2. 포함 관계 검색 및 레벨 일치
+  found = OFFICIAL_CARDS.find(
+    (c) =>
+      c.kind === 'CHARACTER' &&
+      (c.nameKr.includes(nameKr) || nameKr.includes(c.nameKr) || (c.characterName && nameKr.includes(c.characterName))) &&
+      c.level === level
+  );
+  if (found) return found;
+
+  // 3. 해당 레벨이 없으면 가장 낮은 레벨 순으로 정렬하여 첫 번째 카드 반환
+  const candidates = OFFICIAL_CARDS.filter(
+    (c) => c.kind === 'CHARACTER' && (c.nameKr.includes(nameKr) || nameKr.includes(c.nameKr) || (c.characterName && nameKr.includes(c.characterName)))
+  ).sort((a, b) => (a.level ?? 0) - (b.level ?? 0));
+
+  return candidates[0];
+}
+
+// 캐릭터 기본 이미지 매칭 보조 (기본값 레벨 0)
+export function getCharacterArt(nameKr?: string, level: number = 0): string {
+  if (!nameKr) return '/cards/card_images/BP01-001_방랑자(남)_1985.webp';
+  const card = getCharacterCardByLevel(nameKr, level);
+  return card?.artUrl || '/cards/card_images/BP01-001_방랑자(남)_1985.webp';
 }
 
 function getCharacterElement(nameKr?: string): string {
@@ -122,18 +146,22 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
   const p0LeaderName = replay.p0Leader.nameKr;
   const p1LeaderName = replay.p1Leader.nameKr;
 
+  // 공식 룰: 모든 캐릭터는 배틀 시작 시 무조건 Lv.0으로 시작
+  const p0InitialCard = getCharacterCardByLevel(p0LeaderName, 0);
+  const p1InitialCard = getCharacterCardByLevel(p1LeaderName, 0);
+
   const p0InitialLeader: ReplaySlotSnapshot = {
-    nameKr: p0LeaderName,
-    artUrl: replay.p0Leader.artUrl || getCharacterArt(p0LeaderName),
+    nameKr: p0InitialCard?.nameKr || p0LeaderName,
+    artUrl: p0InitialCard?.artUrl || getCharacterArt(p0LeaderName, 0),
     level: 0,
-    element: replay.p0Leader.element || getCharacterElement(p0LeaderName),
+    element: p0InitialCard?.element || replay.p0Leader.element || getCharacterElement(p0LeaderName),
   };
 
   const p1InitialLeader: ReplaySlotSnapshot = {
-    nameKr: p1LeaderName,
-    artUrl: replay.p1Leader.artUrl || getCharacterArt(p1LeaderName),
+    nameKr: p1InitialCard?.nameKr || p1LeaderName,
+    artUrl: p1InitialCard?.artUrl || getCharacterArt(p1LeaderName, 0),
     level: 0,
-    element: replay.p1Leader.element || getCharacterElement(p1LeaderName),
+    element: p1InitialCard?.element || replay.p1Leader.element || getCharacterElement(p1LeaderName),
   };
 
   const p0LeftName = replay.p0DeckSummary?.leftSupportName;
@@ -141,39 +169,44 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
   const p1LeftName = replay.p1DeckSummary?.leftSupportName;
   const p1RightName = replay.p1DeckSummary?.rightSupportName;
 
+  const p0LeftCard = getCharacterCardByLevel(p0LeftName, 0);
+  const p0RightCard = getCharacterCardByLevel(p0RightName, 0);
+  const p1LeftCard = getCharacterCardByLevel(p1LeftName, 0);
+  const p1RightCard = getCharacterCardByLevel(p1RightName, 0);
+
   const p0Left: ReplaySlotSnapshot | undefined = p0LeftName
     ? {
-        nameKr: p0LeftName,
-        artUrl: getCharacterArt(p0LeftName),
+        nameKr: p0LeftCard?.nameKr || p0LeftName,
+        artUrl: p0LeftCard?.artUrl || getCharacterArt(p0LeftName, 0),
         level: 0,
-        element: getCharacterElement(p0LeftName),
+        element: p0LeftCard?.element || getCharacterElement(p0LeftName),
       }
     : undefined;
 
   const p0Right: ReplaySlotSnapshot | undefined = p0RightName
     ? {
-        nameKr: p0RightName,
-        artUrl: getCharacterArt(p0RightName),
+        nameKr: p0RightCard?.nameKr || p0RightName,
+        artUrl: p0RightCard?.artUrl || getCharacterArt(p0RightName, 0),
         level: 0,
-        element: getCharacterElement(p0RightName),
+        element: p0RightCard?.element || getCharacterElement(p0RightName),
       }
     : undefined;
 
   const p1Left: ReplaySlotSnapshot | undefined = p1LeftName
     ? {
-        nameKr: p1LeftName,
-        artUrl: getCharacterArt(p1LeftName),
+        nameKr: p1LeftCard?.nameKr || p1LeftName,
+        artUrl: p1LeftCard?.artUrl || getCharacterArt(p1LeftName, 0),
         level: 0,
-        element: getCharacterElement(p1LeftName),
+        element: p1LeftCard?.element || getCharacterElement(p1LeftName),
       }
     : undefined;
 
   const p1Right: ReplaySlotSnapshot | undefined = p1RightName
     ? {
-        nameKr: p1RightName,
-        artUrl: getCharacterArt(p1RightName),
+        nameKr: p1RightCard?.nameKr || p1RightName,
+        artUrl: p1RightCard?.artUrl || getCharacterArt(p1RightName, 0),
         level: 0,
-        element: getCharacterElement(p1RightName),
+        element: p1RightCard?.element || getCharacterElement(p1RightName),
       }
     : undefined;
 
@@ -313,28 +346,75 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
       phaseDesc += `${activePlayer === 0 ? p0State.name : p1State.name}의 협주 에너지 충전`;
     }
 
-    // 4. 레벨업 각성 감지
-    if (log.text.includes('레벨 2') || log.text.includes('각성') || log.text.includes('레벨업')) {
-      const targetCharName = log.text.includes(p1LeaderName) ? p1LeaderName : p0LeaderName;
-      const targetPIndex = targetCharName === p1LeaderName ? 1 : 0;
-      if (targetPIndex === 0) {
-        p0State = {
-          ...p0State,
-          leader: { ...p0State.leader, level: 2 },
-        };
-      } else {
-        p1State = {
-          ...p1State,
-          leader: { ...p1State.leader, level: 2 },
-        };
+    // 4. 레벨업 각성 감지 (공식 룰: 캐릭터 덱에서 Lv.1 or Lv.2로 진화)
+    const isEvolutionLog =
+      log.text.includes('레벨 2') ||
+      log.text.includes('레벨 1') ||
+      log.text.includes('각성') ||
+      log.text.includes('레벨업') ||
+      log.text.includes('진화') ||
+      (log.effectTag && (log.effectTag.includes('진화') || log.effectTag.includes('레벨업')));
+
+    if (isEvolutionLog) {
+      let newLevel: 1 | 2 = 2;
+      if (log.text.includes('Lv.1') || log.text.includes('레벨 1') || log.effectTag?.includes('Lv.1')) {
+        newLevel = 1;
+      } else if (log.text.includes('Lv.2') || log.text.includes('레벨 2') || log.effectTag?.includes('Lv.2')) {
+        newLevel = 2;
       }
-      upgradeVisual = {
-        playerIndex: targetPIndex,
-        characterName: targetCharName,
-        newLevel: 2,
-      };
-      soundTrigger = 'upgrade';
-      phaseDesc += `🌟 [각성] ${targetCharName} 레벨 2 진화 달성!`;
+
+      // 대상 플레이어 판별
+      let targetPIndex: 0 | 1 = activePlayer;
+      if (log.playerIndex !== undefined) {
+        targetPIndex = log.playerIndex;
+      } else if (log.text.includes(p0State.name)) {
+        targetPIndex = 0;
+      } else if (log.text.includes(p1State.name)) {
+        targetPIndex = 1;
+      }
+
+      const targetPlayerState = targetPIndex === 0 ? p0State : p1State;
+      let slotKey: 'leader' | 'leftSupport' | 'rightSupport' = 'leader';
+
+      // 서포터 카드가 진화한 경우 슬롯 매칭
+      if (
+        targetPlayerState.leftSupport &&
+        (log.text.includes(targetPlayerState.leftSupport.nameKr) ||
+          (log.cardName && log.cardName.includes(targetPlayerState.leftSupport.nameKr)))
+      ) {
+        slotKey = 'leftSupport';
+      } else if (
+        targetPlayerState.rightSupport &&
+        (log.text.includes(targetPlayerState.rightSupport.nameKr) ||
+          (log.cardName && log.cardName.includes(targetPlayerState.rightSupport.nameKr)))
+      ) {
+        slotKey = 'rightSupport';
+      }
+
+      const currentSlot = targetPlayerState[slotKey];
+      if (currentSlot) {
+        const charName = currentSlot.nameKr;
+        const evolvedCard = getCharacterCardByLevel(charName, newLevel);
+        const updatedSlot: ReplaySlotSnapshot = {
+          ...currentSlot,
+          level: newLevel,
+          artUrl: evolvedCard?.artUrl || log.cardArt || getCharacterArt(charName, newLevel),
+        };
+
+        if (targetPIndex === 0) {
+          p0State = { ...p0State, [slotKey]: updatedSlot };
+        } else {
+          p1State = { ...p1State, [slotKey]: updatedSlot };
+        }
+
+        upgradeVisual = {
+          playerIndex: targetPIndex,
+          characterName: charName,
+          newLevel,
+        };
+        soundTrigger = 'upgrade';
+        phaseDesc += `🌟 [진화] ${charName} Lv.${newLevel} 진화 달성!`;
+      }
     }
 
     // 5. 대결 (Clash) 감지: 양측 카드를 모두 파싱하여 아레나에 동시 대치
@@ -487,7 +567,10 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
         handCards: [...p0Hand],
         leader: {
           ...p0State.leader,
-          level: replay.p0Leader.level,
+          level: Math.max(p0State.leader.level, replay.p0Leader.level || 0),
+          artUrl:
+            getCharacterCardByLevel(p0State.leader.nameKr, Math.max(p0State.leader.level, replay.p0Leader.level || 0))?.artUrl ||
+            p0State.leader.artUrl,
         },
       },
       p1: {
@@ -496,7 +579,10 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
         handCards: [...p1Hand],
         leader: {
           ...p1State.leader,
-          level: replay.p1Leader.level,
+          level: Math.max(p1State.leader.level, replay.p1Leader.level || 0),
+          artUrl:
+            getCharacterCardByLevel(p1State.leader.nameKr, Math.max(p1State.leader.level, replay.p1Leader.level || 0))?.artUrl ||
+            p1State.leader.artUrl,
         },
       },
       p0ActionCard: p0ActiveArenaCard,
