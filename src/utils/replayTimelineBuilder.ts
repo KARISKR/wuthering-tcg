@@ -1,5 +1,5 @@
 import { BattleReplayData } from './replayManager';
-import { ReplaySnapshot, ReplayPlayerSnapshot, ReplaySlotSnapshot, ReplayActionCardVisual } from '../types/replayTimeline';
+import { ReplaySnapshot, ReplayPlayerSnapshot, ReplaySlotSnapshot, ReplayActionCardVisual, ReplayClashVisual } from '../types/replayTimeline';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 import { getWeaponByCharacter } from './soundEffects';
 
@@ -16,9 +16,16 @@ function findCardByNameOrText(text: string, cardName?: string): OfficialCardData
   const bracketMatches = text.match(/\[(.*?)\]/g);
   if (bracketMatches) {
     for (const match of bracketMatches) {
-      const clean = match.replace(/[\[\]]/g, '').trim();
+      let clean = match.replace(/[\[\]]/g, '').trim();
+      // "RED: 붉은 가시" 또는 "GREEN: 가벼운 발걸음" 등 컬러 접두사 제거
+      clean = clean.replace(/^(RED|GREEN|BLUE)\s*:\s*/i, '').trim();
+      // "BP01-071" 등의 코드 접두/접미사 분리
+      clean = clean.replace(/BP\d+-\d+/gi, '').replace(/SD\d+-\d+/gi, '').trim();
+      // 일반 시스템 텍스트 건너뛰기
+      if (clean.includes('판정') || clean.includes('대결') || clean.includes('선공') || clean.includes('턴') || clean.includes('승리') || clean.length < 2) continue;
+
       const found = OFFICIAL_CARDS.find(
-        (c) => c.nameKr === clean || c.nameKr.includes(clean) || clean.includes(c.nameKr)
+        (c) => c.kind === 'ACTION' && (c.nameKr === clean || c.nameKr.includes(clean) || clean.includes(c.nameKr))
       );
       if (found) return found;
     }
@@ -26,12 +33,38 @@ function findCardByNameOrText(text: string, cardName?: string): OfficialCardData
 
   // 전체 카드 중 텍스트에 이름이 포함된 첫 카드 검색
   for (const card of OFFICIAL_CARDS) {
-    if (card.nameKr.length >= 3 && text.includes(card.nameKr)) {
+    if (card.kind === 'ACTION' && card.nameKr.length >= 3 && text.includes(card.nameKr)) {
       return card;
     }
   }
 
   return undefined;
+}
+
+// 공식 카드를 ReplayActionCardVisual로 변환
+function toVisualCard(c: OfficialCardData): ReplayActionCardVisual {
+  return {
+    nameKr: c.nameKr,
+    artUrl: c.artUrl,
+    code: c.code,
+    cost: c.cost,
+    color: c.color ?? undefined,
+    speed: c.speed,
+    damage: c.damage,
+    description: c.description,
+    characterExclusive: c.characterExclusive,
+  };
+}
+
+// 대결 로그(vs)에서 P0 카드와 P1 카드를 양측 분리 추출
+function parseClashCards(text: string): { p0Card?: OfficialCardData; p1Card?: OfficialCardData } {
+  const vsParts = text.split(/vs|\s+VS\s+/i);
+  if (vsParts.length >= 2) {
+    const c0 = findCardByNameOrText(vsParts[0]);
+    const c1 = findCardByNameOrText(vsParts[1]);
+    return { p0Card: c0, p1Card: c1 };
+  }
+  return {};
 }
 
 // 캐릭터 기본 이미지 매칭 보조
@@ -49,6 +82,37 @@ function getCharacterElement(nameKr?: string): string {
     (c) => c.kind === 'CHARACTER' && (c.nameKr.includes(nameKr) || c.characterName.includes(nameKr))
   );
   return found?.element || 'SPECTRO';
+}
+
+// 덱 구성에 맞는 초기 손패 5장 생성
+function buildDeckHand(leaderName?: string, support1?: string, support2?: string): ReplayActionCardVisual[] {
+  const leaderCards = OFFICIAL_CARDS.filter(
+    (c) => c.kind === 'ACTION' && (c.characterExclusive === leaderName || c.characterExclusive?.includes(leaderName || ''))
+  );
+  const supportCards = OFFICIAL_CARDS.filter(
+    (c) =>
+      c.kind === 'ACTION' &&
+      ((support1 && c.characterExclusive?.includes(support1)) || (support2 && c.characterExclusive?.includes(support2)))
+  );
+  const genericCards = OFFICIAL_CARDS.filter((c) => c.kind === 'ACTION' && !c.characterExclusive);
+
+  const pool = [...leaderCards, ...supportCards, ...genericCards];
+  const selected: OfficialCardData[] = [];
+  for (const card of pool) {
+    if (!selected.some((s) => s.code === card.code)) {
+      selected.push(card);
+    }
+    if (selected.length >= 5) break;
+  }
+  if (selected.length < 5) {
+    for (const card of genericCards) {
+      if (!selected.some((s) => s.code === card.code)) {
+        selected.push(card);
+      }
+      if (selected.length >= 5) break;
+    }
+  }
+  return selected.map(toVisualCard);
 }
 
 /**
@@ -113,6 +177,10 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
       }
     : undefined;
 
+  // 동적 손패(Hand) 컬렉션 초기화
+  let p0Hand = buildDeckHand(p0LeaderName, p0LeftName, p0RightName);
+  let p1Hand = buildDeckHand(p1LeaderName, p1LeftName, p1RightName);
+
   // 현재 상태 트래커
   let p0State: ReplayPlayerSnapshot = {
     name: replay.p0Name || '플레이어 1',
@@ -122,9 +190,10 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
     leader: { ...p0InitialLeader },
     leftSupport: p0Left ? { ...p0Left } : undefined,
     rightSupport: p0Right ? { ...p0Right } : undefined,
-    handCount: 5,
+    handCount: p0Hand.length,
     deckCount: replay.p0DeckSummary?.actionCardCount || 40,
     dropCount: 0,
+    handCards: [...p0Hand],
   };
 
   let p1State: ReplayPlayerSnapshot = {
@@ -135,9 +204,10 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
     leader: { ...p1InitialLeader },
     leftSupport: p1Left ? { ...p1Left } : undefined,
     rightSupport: p1Right ? { ...p1Right } : undefined,
-    handCount: 5,
+    handCount: p1Hand.length,
     deckCount: replay.p1DeckSummary?.actionCardCount || 40,
     dropCount: 0,
+    handCards: [...p1Hand],
   };
 
   // 시간순 오름차순 정렬 (과거 -> 현재)
@@ -151,8 +221,8 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
     turn: 1,
     phaseText: '⚔️ 대전 시작 준비 완료 (멀리건 및 선공 결정)',
     activePlayerIndex: 0,
-    p0: { ...p0State },
-    p1: { ...p1State },
+    p0: { ...p0State, handCards: [...p0Hand] },
+    p1: { ...p1State, handCards: [...p1Hand] },
     logText: '대전이 시작되었습니다.',
     logType: 'SYSTEM',
     soundTrigger: 'phase',
@@ -160,6 +230,10 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
 
   let currentTurn = 1;
   let activePlayer: 0 | 1 = 0;
+
+  // 전투 아레나에 상시 유지될 양측 활성 액션 카드 (턴 변경 시 초기화)
+  let p0ActiveArenaCard: ReplayActionCardVisual | undefined = undefined;
+  let p1ActiveArenaCard: ReplayActionCardVisual | undefined = undefined;
 
   for (let i = 0; i < sortedLogs.length; i++) {
     const log = sortedLogs[i];
@@ -173,7 +247,7 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
 
     let phaseDesc = `[턴 ${currentTurn}] `;
     let actionCardVisual: ReplayActionCardVisual | undefined = undefined;
-    let clashVisual: any = undefined;
+    let clashVisual: ReplayClashVisual | undefined = undefined;
     let damageVisual: any = undefined;
     let healVisual: any = undefined;
     let upgradeVisual: any = undefined;
@@ -183,6 +257,9 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
     if (log.type === 'PHASE') {
       soundTrigger = 'phase';
       if (log.text.includes('턴 시작')) {
+        // 새 턴 시작 시 이전 턴의 아레나 대결 카드 정리
+        p0ActiveArenaCard = undefined;
+        p1ActiveArenaCard = undefined;
         phaseDesc += log.text.includes(p0State.name) || log.text.includes('플레이어 (당신)')
           ? `${p0State.name}의 턴 시작`
           : `${p1State.name}의 턴 시작`;
@@ -194,17 +271,7 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
     // 2. 카드 발동 / 액션 감지
     const matchedCard = findCardByNameOrText(log.text, log.cardName);
     if (matchedCard) {
-      actionCardVisual = {
-        nameKr: matchedCard.nameKr,
-        artUrl: matchedCard.artUrl,
-        code: matchedCard.code,
-        cost: matchedCard.cost,
-        color: matchedCard.color ?? undefined,
-        speed: matchedCard.speed,
-        damage: matchedCard.damage,
-        description: matchedCard.description,
-        characterExclusive: matchedCard.characterExclusive,
-      };
+      actionCardVisual = toVisualCard(matchedCard);
       soundTrigger = 'card';
     } else if (log.cardName) {
       actionCardVisual = {
@@ -213,6 +280,27 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
         damage: log.amount,
       };
       soundTrigger = 'card';
+    }
+
+    // 카드가 사용된 경우, 해당 플레이어의 손패에서 차감 및 아레나 카드 갱신
+    if (actionCardVisual) {
+      if (log.playerIndex === 0 || (log.playerIndex === undefined && activePlayer === 0)) {
+        p0ActiveArenaCard = actionCardVisual;
+        const hIdx = p0Hand.findIndex(
+          (c) => (actionCardVisual!.code && c.code === actionCardVisual!.code) || c.nameKr === actionCardVisual!.nameKr
+        );
+        if (hIdx !== -1) {
+          p0Hand.splice(hIdx, 1);
+        }
+      } else {
+        p1ActiveArenaCard = actionCardVisual;
+        const hIdx = p1Hand.findIndex(
+          (c) => (actionCardVisual!.code && c.code === actionCardVisual!.code) || c.nameKr === actionCardVisual!.nameKr
+        );
+        if (hIdx !== -1) {
+          p1Hand.splice(hIdx, 1);
+        }
+      }
     }
 
     // 3. 협주 충전 감지
@@ -249,19 +337,33 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
       phaseDesc += `🌟 [각성] ${targetCharName} 레벨 2 진화 달성!`;
     }
 
-    // 5. 대결 (Clash) 감지
-    if (log.type === 'CLASH' || log.text.includes('대결 오픈') || log.text.includes('상성')) {
+    // 5. 대결 (Clash) 감지: 양측 카드를 모두 파싱하여 아레나에 동시 대치
+    if (log.type === 'CLASH' || log.text.includes('대결 오픈') || log.text.includes('상성') || log.text.includes('결전 판정')) {
       soundTrigger = 'clash';
       const isP0Win = log.text.includes('승리') && (log.playerIndex === 0 || log.text.includes(p0State.name));
       const isP1Win = log.text.includes('승리') && (log.playerIndex === 1 || log.text.includes(p1State.name));
       const clashWinner = isP0Win ? 0 : isP1Win ? 1 : 'DRAW';
 
+      const { p0Card, p1Card } = parseClashCards(log.text);
+      if (p0Card) {
+        p0ActiveArenaCard = toVisualCard(p0Card);
+      } else if (!p0ActiveArenaCard && p0Hand.length > 0) {
+        p0ActiveArenaCard = p0Hand[0];
+      }
+
+      if (p1Card) {
+        p1ActiveArenaCard = toVisualCard(p1Card);
+      } else if (!p1ActiveArenaCard && p1Hand.length > 0) {
+        p1ActiveArenaCard = p1Hand[0];
+      }
+
       clashVisual = {
-        p0CardName: log.cardName || '대결 카드',
-        p0CardArt: log.cardArt || actionCardVisual?.artUrl,
-        p0Color: 'RED',
-        p1CardName: '상대 대결 카드',
-        p1Color: 'GREEN',
+        p0CardName: p0ActiveArenaCard?.nameKr || '대결 카드',
+        p0CardArt: p0ActiveArenaCard?.artUrl,
+        p0Color: p0ActiveArenaCard?.color || 'RED',
+        p1CardName: p1ActiveArenaCard?.nameKr || '대결 카드',
+        p1CardArt: p1ActiveArenaCard?.artUrl,
+        p1Color: p1ActiveArenaCard?.color || 'GREEN',
         winner: clashWinner,
         resultText: log.text,
       };
@@ -325,7 +427,27 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
       phaseDesc += `💚 [회복] HP ${healAmt} 회복`;
     }
 
-    // 8. 연격(Combo) 감지
+    // 8. 드로우 감지
+    if (log.text.includes('드로우') || log.text.includes('패에 추가') || log.text.includes('패로 회수')) {
+      const drawnCard = matchedCard ? toVisualCard(matchedCard) : undefined;
+      if (log.playerIndex === 0 || activePlayer === 0) {
+        if (drawnCard && !p0Hand.some((c) => c.code === drawnCard.code)) {
+          p0Hand.push(drawnCard);
+        } else if (p0Hand.length < 5) {
+          const extra = OFFICIAL_CARDS.find((c) => c.kind === 'ACTION' && !p0Hand.some((h) => h.code === c.code));
+          if (extra) p0Hand.push(toVisualCard(extra));
+        }
+      } else {
+        if (drawnCard && !p1Hand.some((c) => c.code === drawnCard.code)) {
+          p1Hand.push(drawnCard);
+        } else if (p1Hand.length < 5) {
+          const extra = OFFICIAL_CARDS.find((c) => c.kind === 'ACTION' && !p1Hand.some((h) => h.code === c.code));
+          if (extra) p1Hand.push(toVisualCard(extra));
+        }
+      }
+    }
+
+    // 9. 연격(Combo) 감지
     if (log.effectTag === '연격' || log.text.includes('연격')) {
       soundTrigger = 'combo';
       phaseDesc += '⚡ [연격] 콤보 스트라이크 발동!';
@@ -336,9 +458,11 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
       turn: currentTurn,
       phaseText: phaseDesc,
       activePlayerIndex: activePlayer,
-      p0: { ...p0State },
-      p1: { ...p1State },
-      actionCard: actionCardVisual,
+      p0: { ...p0State, handCards: [...p0Hand], handCount: p0Hand.length },
+      p1: { ...p1State, handCards: [...p1Hand], handCount: p1Hand.length },
+      actionCard: actionCardVisual || (activePlayer === 0 ? p0ActiveArenaCard : p1ActiveArenaCard),
+      p0ActionCard: p0ActiveArenaCard,
+      p1ActionCard: p1ActiveArenaCard,
       clash: clashVisual,
       damageEvent: damageVisual,
       healEvent: healVisual,
@@ -360,6 +484,7 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
       p0: {
         ...p0State,
         hp: replay.p0Hp,
+        handCards: [...p0Hand],
         leader: {
           ...p0State.leader,
           level: replay.p0Leader.level,
@@ -368,11 +493,14 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
       p1: {
         ...p1State,
         hp: replay.p1Hp,
+        handCards: [...p1Hand],
         leader: {
           ...p1State.leader,
           level: replay.p1Leader.level,
         },
       },
+      p0ActionCard: p0ActiveArenaCard,
+      p1ActionCard: p1ActiveArenaCard,
       logText: `경기 종료! ${replay.winner === 0 ? p0State.name : p1State.name}의 승리입니다.`,
       logType: 'SYSTEM',
       soundTrigger: 'phase',

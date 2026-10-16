@@ -35,6 +35,7 @@ import {
   Bot,
   User,
   Home,
+  Eye,
 } from 'lucide-react';
 
 interface BattleReplayStageProps {
@@ -90,13 +91,13 @@ function toCharacterCard(slot?: ReplaySlotSnapshot): CharacterCard | null {
 }
 
 // ReplayActionCardVisual을 ActionCard 객체로 변환
-function toActionCard(visual?: ReplayActionCardVisual): ActionCard | null {
-  if (!visual) return null;
+function toActionCard(visual?: ReplayActionCardVisual | null, idSuffix: string = ''): ActionCard | null {
+  if (!visual || !visual.nameKr) return null;
   const official = visual.code
     ? getOfficialCardByCode(visual.code)
     : OFFICIAL_CARDS.find((c) => c.nameKr === visual.nameKr);
   return {
-    id: `action-${visual.nameKr}`,
+    id: `action-${official?.code || visual.code || visual.nameKr}${idSuffix ? `-${idSuffix}` : ''}`,
     code: official?.code || visual.code || 'BP01-044',
     nameKr: visual.nameKr,
     color: (official?.color || visual.color || 'RED') as any,
@@ -120,6 +121,9 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.2); // 0.8, 1.2, 2.0
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+
+  // 손패 검증 뷰어 대상 플레이어 (0: 1P, 1: 2P)
+  const [selectedHandPlayer, setSelectedHandPlayer] = useState<0 | 1>(0);
 
   // 카드 미리보기 상태 (기본적으로 현재 사용된 카드 또는 리더)
   const [previewCard, setPreviewCard] = useState<AnyCard | null>(null);
@@ -158,6 +162,10 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
     // 프리뷰 카드 동기화 (발동된 카드가 있으면 우선 표시)
     if (snap.actionCard) {
       setPreviewCard(toActionCard(snap.actionCard));
+    } else if (snap.p0ActionCard) {
+      setPreviewCard(toActionCard(snap.p0ActionCard));
+    } else if (snap.p1ActionCard) {
+      setPreviewCard(toActionCard(snap.p1ActionCard));
     } else {
       const activeChar = snap.activePlayerIndex === 0 ? snap.p0.leader : snap.p1.leader;
       setPreviewCard(toCharacterCard(activeChar));
@@ -224,29 +232,43 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
   const p1RightChar = toCharacterCard(p1.rightSupport);
 
   // 액션 에리어 대결 카드
-  const currentActionCardObj = toActionCard(activeSnapshot.actionCard);
+  const currentActionCardObj = toActionCard(activeSnapshot.actionCard, 'active');
 
-  // P0 / P1 대결 존에 올릴 카드
-  const p0ClashCard = isP0Turn
-    ? currentActionCardObj
-    : activeSnapshot.clash?.p0CardName
-    ? toActionCard({ nameKr: activeSnapshot.clash.p0CardName, artUrl: activeSnapshot.clash.p0CardArt })
-    : null;
+  // P0 / P1 대결 존에 올릴 카드 (동시 대결 연출 및 상태 반영)
+  const p0ClashCard = toActionCard(
+    activeSnapshot.p0ActionCard ||
+    (activeSnapshot.clash?.p0CardName ? { nameKr: activeSnapshot.clash.p0CardName, artUrl: activeSnapshot.clash.p0CardArt } : null) ||
+    (isP0Turn ? activeSnapshot.actionCard : null),
+    'p0-clash'
+  );
 
-  const p1ClashCard = !isP0Turn
-    ? currentActionCardObj
-    : activeSnapshot.clash?.p1CardName
-    ? toActionCard({ nameKr: activeSnapshot.clash.p1CardName, artUrl: activeSnapshot.clash.p1CardArt })
-    : null;
+  const p1ClashCard = toActionCard(
+    activeSnapshot.p1ActionCard ||
+    (activeSnapshot.clash?.p1CardName ? { nameKr: activeSnapshot.clash.p1CardName, artUrl: activeSnapshot.clash.p1CardArt } : null) ||
+    (!isP0Turn ? activeSnapshot.actionCard : null),
+    'p1-clash'
+  );
 
-  // 손패(Hand) 가상 데이터 (해당 플레이어의 리더 전용 카드 및 공식 액션 카드들 매핑)
-  const virtualHandCards = useMemo(() => {
+  // 손패(Hand) 실제 타임라인 스냅샷 기반 데이터 (1P & 2P)
+  const p0HandCards: ActionCard[] = useMemo(() => {
+    if (activeSnapshot.p0.handCards && activeSnapshot.p0.handCards.length > 0) {
+      return activeSnapshot.p0.handCards.map((c, idx) => toActionCard(c, `p0-${idx}`)!).filter(Boolean);
+    }
     const charName = p0.leader.nameKr;
-    const matches = OFFICIAL_CARDS.filter(
+    return OFFICIAL_CARDS.filter(
       (c) => c.kind === 'ACTION' && (c.characterExclusive === charName || !c.characterExclusive)
-    ).slice(0, 5);
-    return matches.map((m) => toActionCard({ nameKr: m.nameKr, artUrl: m.artUrl, code: m.code })!);
-  }, [p0.leader.nameKr]);
+    ).slice(0, Math.max(1, p0.handCount || 5)).map((m, idx) => toActionCard({ nameKr: m.nameKr, artUrl: m.artUrl, code: m.code }, `p0-fallback-${idx}`)!);
+  }, [activeSnapshot.p0.handCards, p0.leader.nameKr, p0.handCount]);
+
+  const p1HandCards: ActionCard[] = useMemo(() => {
+    if (activeSnapshot.p1.handCards && activeSnapshot.p1.handCards.length > 0) {
+      return activeSnapshot.p1.handCards.map((c, idx) => toActionCard(c, `p1-${idx}`)!).filter(Boolean);
+    }
+    const charName = p1.leader.nameKr;
+    return OFFICIAL_CARDS.filter(
+      (c) => c.kind === 'ACTION' && (c.characterExclusive === charName || !c.characterExclusive)
+    ).slice(0, Math.max(1, p1.handCount || 5)).map((m, idx) => toActionCard({ nameKr: m.nameKr, artUrl: m.artUrl, code: m.code }, `p1-fallback-${idx}`)!);
+  }, [activeSnapshot.p1.handCards, p1.leader.nameKr, p1.handCount]);
 
   const officialPreview = previewCard ? getOfficialCardByCode(previewCard.code) : null;
 
@@ -604,8 +626,21 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3.5 text-sm sm:text-base text-slate-200 font-bold">
-                    <span>패 <strong className="text-white text-base sm:text-lg font-black">{p1.handCount}장</strong></span>
+                  <div className="flex items-center gap-3 text-sm sm:text-base text-slate-200 font-bold">
+                    {/* 상대 손패 검증 버튼 */}
+                    <button
+                      onClick={() => setSelectedHandPlayer(1)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border shadow ${
+                        selectedHandPlayer === 1
+                          ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400 ring-2 ring-cyan-400/40'
+                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                      }`}
+                      title="하단 손패 뷰어에서 상대방(2P) 손패 확인하기"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>패 <strong className="text-white text-sm font-black">{p1HandCards.length}장</strong> (클릭하여 패 보기)</span>
+                    </button>
+
                     {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
                     <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-full border border-cyan-500/40 shadow-inner">
                       <BatteryCharging className="w-4 h-4 text-cyan-400" />
@@ -626,6 +661,31 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                         {p1.concerto} / 10
                       </strong>
                     </div>
+                  </div>
+                </div>
+
+                {/* 상대방(P1) 오픈 핸드 미니 스트립 */}
+                <div className="mb-3 px-3 py-1.5 rounded-2xl bg-slate-950/80 border border-cyan-500/30 flex items-center justify-between gap-2 overflow-x-auto shadow-inner">
+                  <div className="flex items-center gap-1.5 text-xs text-cyan-300 font-black shrink-0">
+                    <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>상대({p1.name}) 손패 오픈:</span>
+                  </div>
+                  <div className="flex items-center gap-2 overflow-x-auto py-0.5 custom-scrollbar">
+                    {p1HandCards.map((card, idx) => (
+                      <button
+                        key={card.id || idx}
+                        onMouseEnter={() => setPreviewCard(card)}
+                        onClick={() => {
+                          setPreviewCard(card);
+                          setSelectedHandPlayer(1);
+                        }}
+                        className="group flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 hover:bg-cyan-950/40 transition shrink-0 cursor-pointer shadow text-left"
+                      >
+                        <span className={`w-2 h-2 rounded-full shrink-0 ${card.color === 'RED' ? 'bg-red-400' : card.color === 'GREEN' ? 'bg-emerald-400' : 'bg-cyan-400'}`} />
+                        <span className="text-xs font-bold text-slate-200 group-hover:text-cyan-200 max-w-[110px] truncate">{card.nameKr}</span>
+                        <span className="text-[10px] font-mono text-slate-400 shrink-0">({card.color})</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -704,12 +764,29 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                       onMouseEnter={() => p1ClashCard && setPreviewCard(p1ClashCard)}
                       className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
                     >
-                      <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-cyan-500/70 uppercase tracking-widest z-10">
-                        액션 에리어 (상대)
+                      <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-cyan-400/80 uppercase tracking-widest z-10 flex items-center gap-1.5">
+                        <Swords className="w-3.5 h-3.5" />
+                        액션 에리어 (상대 {p1.name})
                       </span>
                       {p1ClashCard ? (
-                        <div className="animate-card-slam max-h-full">
+                        <div className={`animate-card-slam max-h-full relative transition-all duration-300 ${
+                          activeSnapshot.clash?.winner === 1
+                            ? 'ring-4 ring-amber-400 rounded-xl shadow-[0_0_25px_rgba(251,191,36,0.8)] scale-105'
+                            : activeSnapshot.clash?.winner === 0
+                            ? 'opacity-65 scale-95 grayscale-[20%]'
+                            : ''
+                        }`}>
                           <CardView card={p1ClashCard} size="md" />
+                          {activeSnapshot.clash?.winner === 1 && (
+                            <div className="absolute -top-3 right-1 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 text-xs font-black px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-20 animate-bounce">
+                              <Sparkles className="w-3 h-3 fill-slate-950" /> 대결 승리!
+                            </div>
+                          )}
+                          {activeSnapshot.clash?.winner === 0 && (
+                            <div className="absolute -top-3 right-1 bg-slate-900/90 text-red-400 border border-red-500/50 text-[11px] font-bold px-2 py-0.5 rounded-full shadow z-20">
+                              대결 패배
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="w-40 h-56 rounded-xl border-2 border-dashed border-cyan-500/30 bg-cyan-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
@@ -764,7 +841,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                   <span className="text-xs font-black text-amber-300 tracking-wider">
-                    REPLAY ARENA • {activeSnapshot.phaseText}
+                    {activeSnapshot.clash ? '⚔️ 동시 액션 대결 (CLASH) 진행 중' : `REPLAY ARENA • ${activeSnapshot.phaseText}`}
                   </span>
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
                 </div>
@@ -806,8 +883,20 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3.5 text-sm sm:text-base text-slate-200 font-bold">
-                    <span>패 <strong className="text-white text-base sm:text-lg font-black">{p0.handCount}장</strong></span>
+                  <div className="flex items-center gap-3 text-sm sm:text-base text-slate-200 font-bold">
+                    <button
+                      onClick={() => setSelectedHandPlayer(0)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border shadow ${
+                        selectedHandPlayer === 0
+                          ? 'bg-amber-500/25 text-amber-200 border-amber-400 ring-2 ring-amber-400/40'
+                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
+                      }`}
+                      title="하단 손패 뷰어에서 내(1P) 손패 확인하기"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-amber-400" />
+                      <span>패 <strong className="text-white text-sm font-black">{p0HandCards.length}장</strong> (클릭하여 패 보기)</span>
+                    </button>
+
                     {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
                     <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-full border border-cyan-500/40 shadow-inner">
                       <BatteryCharging className="w-4 h-4 text-cyan-400" />
@@ -865,12 +954,29 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                       onMouseEnter={() => p0ClashCard && setPreviewCard(p0ClashCard)}
                       className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
                     >
-                      <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-amber-500/80 uppercase tracking-widest z-10">
-                        액션 에리어 (내 대결 존)
+                      <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-amber-400/80 uppercase tracking-widest z-10 flex items-center gap-1.5">
+                        <Swords className="w-3.5 h-3.5" />
+                        액션 에리어 ({p0.name} 대결 존)
                       </span>
                       {p0ClashCard ? (
-                        <div className="animate-card-slam max-h-full">
+                        <div className={`animate-card-slam max-h-full relative transition-all duration-300 ${
+                          activeSnapshot.clash?.winner === 0
+                            ? 'ring-4 ring-amber-400 rounded-xl shadow-[0_0_25px_rgba(251,191,36,0.8)] scale-105'
+                            : activeSnapshot.clash?.winner === 1
+                            ? 'opacity-65 scale-95 grayscale-[20%]'
+                            : ''
+                        }`}>
                           <CardView card={p0ClashCard} size="md" />
+                          {activeSnapshot.clash?.winner === 0 && (
+                            <div className="absolute -top-3 right-1 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 text-xs font-black px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-20 animate-bounce">
+                              <Sparkles className="w-3 h-3 fill-slate-950" /> 대결 승리!
+                            </div>
+                          )}
+                          {activeSnapshot.clash?.winner === 1 && (
+                            <div className="absolute -top-3 right-1 bg-slate-900/90 text-red-400 border border-red-500/50 text-[11px] font-bold px-2 py-0.5 rounded-full shadow z-20">
+                              대결 패배
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="w-40 h-56 rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
@@ -952,21 +1058,67 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
             </div>
           </div>
 
-          {/* 중앙 컬럼 하단: 손패 (HandView - 실제 배틀과 100% 동일 배치) */}
+          {/* 중앙 컬럼 하단: 손패 (HandView - 실제 배틀과 100% 동일 배치 + 1P / 2P 토글 탭) */}
           <div className="w-full shrink-0 z-20 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+            {/* 1P / 2P 손패 전환 탭 바 */}
+            <div className="flex items-center justify-between px-4 pt-2 pb-1 border-b border-slate-800/60 bg-slate-950/60">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-slate-400 uppercase tracking-wider mr-1">
+                  손패 검증 뷰어:
+                </span>
+                <button
+                  onClick={() => setSelectedHandPlayer(0)}
+                  className={`flex items-center gap-2 px-3 py-1 rounded-xl font-bold text-xs transition cursor-pointer border ${
+                    selectedHandPlayer === 0
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5 text-amber-400" />
+                  <span>1P {p0.name}의 패 ({p0HandCards.length}장)</span>
+                  {isP0Turn && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="현재 턴 플레이어" />}
+                </button>
+
+                <button
+                  onClick={() => setSelectedHandPlayer(1)}
+                  className={`flex items-center gap-2 px-3 py-1 rounded-xl font-bold text-xs transition cursor-pointer border ${
+                    selectedHandPlayer === 1
+                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-md shadow-cyan-500/20 ring-1 ring-cyan-400'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  {replay.gameMode === 'AI' ? <Bot className="w-3.5 h-3.5 text-cyan-400" /> : <User className="w-3.5 h-3.5 text-cyan-400" />}
+                  <span>2P {p1.name}의 패 ({p1HandCards.length}장)</span>
+                  {!isP0Turn && <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" title="현재 턴 플레이어" />}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <span className="hidden sm:inline">카드에 마우스를 올리면 좌측에서 전체 일러스트와 효과를 확인합니다</span>
+              </div>
+            </div>
+
             <HandView
-              hand={virtualHandCards}
-              concertoCount={p0.concerto}
-              leaderName={p0.leader.nameKr}
-              leaderCard={p0LeaderChar || undefined}
-              supportCards={[p0LeftChar, p0RightChar].filter(Boolean) as any}
+              hand={selectedHandPlayer === 0 ? p0HandCards : p1HandCards}
+              concertoCount={selectedHandPlayer === 0 ? p0.concerto : p1.concerto}
+              leaderName={selectedHandPlayer === 0 ? p0.leader.nameKr : p1.leader.nameKr}
+              leaderCard={selectedHandPlayer === 0 ? (p0LeaderChar || undefined) : (p1LeaderChar || undefined)}
+              supportCards={
+                selectedHandPlayer === 0
+                  ? ([p0LeftChar, p0RightChar].filter(Boolean) as any)
+                  : ([p1LeftChar, p1RightChar].filter(Boolean) as any)
+              }
               playerSlots={
-                p0LeaderChar
-                  ? { leader: p0LeaderChar, leftSupport: p0LeftChar || null, rightSupport: p0RightChar || null }
+                selectedHandPlayer === 0
+                  ? p0LeaderChar
+                    ? { leader: p0LeaderChar, leftSupport: p0LeftChar || null, rightSupport: p0RightChar || null }
+                    : undefined
+                  : p1LeaderChar
+                  ? { leader: p1LeaderChar, leftSupport: p1LeftChar || null, rightSupport: p1RightChar || null }
                   : undefined
               }
               phase="ACTION_PHASE"
-              isTurnPlayer={isP0Turn}
+              isTurnPlayer={selectedHandPlayer === 0 ? isP0Turn : !isP0Turn}
               canChargeConcerto={false}
               canSetClashCard={false}
               isComboStep={false}
