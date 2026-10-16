@@ -25,6 +25,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
   // -> RESULT (4400ms+ 최종 판정 배너 & 연격 해금)
   const [stage, setStage] = useState<'SET_WAIT' | 'REVEAL' | 'COLLIDE' | 'SLASH' | 'RESULT'>('SET_WAIT');
   const timersRef = useRef<number[]>([]);
+  const hasPlayedSlashRef = useRef<boolean>(false);
 
   const p0 = players[0];
   const p1 = players[1];
@@ -52,18 +53,25 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
       soundEffects.playClashImpact();
     }, 2400);
 
-    // 3단계: 3400ms 후 승리자의 참격 및 대미지 슬램 (캐릭터/코스트별 공격 사운드 + 대미지 피격음)
+    // 3단계: 3400ms 후 승리자의 참격 및 대미지 슬램 (공격 음성/모션 -> 180ms 후 피격 대미지 크런치 순차 발동)
     const tSlash = window.setTimeout(() => {
       setStage('SLASH');
+      hasPlayedSlashRef.current = true;
       if (clashResult.damageDealt > 0) {
         const winnerCard = clashResult.winnerIndex === 0 ? p0.clashCard : p1.clashCard;
         const winnerCost = winnerCard ? winnerCard.cost : 0;
         const winnerLeaderName = winnerLeader?.characterName || winnerLeader?.nameKr;
-        const loserLeader = clashResult.winnerIndex === 0 ? p1.slots.leader : p0.slots.leader;
-        const loserLeaderName = loserLeader?.characterName || loserLeader?.nameKr;
 
+        // 1. 공격자 참격 및 기합 보이스 우선 재생
         soundEffects.playCharacterAttack(winnerLeaderName, winnerCost, winnerWeapon);
-        soundEffects.playDamage(clashResult.damageDealt, winnerWeapon, loserLeaderName);
+
+        // 2. 180ms 후 피격자 타격 크런치 및 피격 보이스 순차 재생 (음성 뭉개짐/상쇄 방지)
+        const tImpact = window.setTimeout(() => {
+          const loserLeader = clashResult.winnerIndex === 0 ? p1.slots.leader : p0.slots.leader;
+          const loserLeaderName = loserLeader?.characterName || loserLeader?.nameKr;
+          soundEffects.playDamage(clashResult.damageDealt, undefined, loserLeaderName);
+        }, 180);
+        timersRef.current.push(tImpact);
       } else {
         soundEffects.playClashDraw();
       }
@@ -87,7 +95,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
     };
-  }, [clashResult, winnerWeapon]);
+  }, [clashResult, winnerWeapon, p0, p1, winnerLeader]);
 
   // 클릭 또는 스페이스바/Enter 입력 시: 진행 중이면 즉시 결과로 스킵, 결과 상태면 닫기
   const handleFastForwardOrDismiss = useCallback(() => {
@@ -95,6 +103,19 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
       setStage('RESULT');
+
+      // 스킵 시에도 결정타 효과음이 누락되지 않도록 1회 재생 보장
+      if (!hasPlayedSlashRef.current) {
+        hasPlayedSlashRef.current = true;
+        if (clashResult.damageDealt > 0) {
+          const loserLeader = clashResult.winnerIndex === 0 ? p1.slots.leader : p0.slots.leader;
+          const loserLeaderName = loserLeader?.characterName || loserLeader?.nameKr;
+          soundEffects.playDamage(clashResult.damageDealt, winnerWeapon, loserLeaderName);
+        } else {
+          soundEffects.playClashDraw();
+        }
+      }
+
       if (clashResult.winnerIndex === 0) {
         confetti({
           particleCount: 50,
@@ -105,7 +126,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
     } else {
       onDismiss();
     }
-  }, [stage, clashResult, onDismiss]);
+  }, [stage, clashResult, onDismiss, p0, p1, winnerWeapon]);
 
   // 키보드 Space/Enter 키 핸들러
   useEffect(() => {

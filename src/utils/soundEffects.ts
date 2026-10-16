@@ -59,8 +59,8 @@ export const SUPPORTED_CHARACTERS: CharacterSfxInfo[] = [
   { id: 'shorekeeper', nameKr: '파수인', weapon: '증폭기', folderPath: '/audio/sfx/characters/shorekeeper/' },
 ];
 
-export function getCharacterKey(nameOrCharacter?: string): string {
-  if (!nameOrCharacter) return 'rover_female';
+export function getCharacterKey(nameOrCharacter?: string): string | null {
+  if (!nameOrCharacter) return null;
   const name = nameOrCharacter.replace(/\s+/g, '');
   if (name.includes('금희')) return 'jinhsi';
   if (name.includes('카멜리아')) return 'camellya';
@@ -72,7 +72,7 @@ export function getCharacterKey(nameOrCharacter?: string): string {
   if (name.includes('rover_male') || name.includes('방랑자(남)') || name.includes('남방랑자')) return 'rover_male';
   if (name.includes('rover_female') || name.includes('방랑자(여)') || name.includes('여방랑자')) return 'rover_female';
   if (name.includes('방랑자')) return 'rover_female';
-  return 'rover_female';
+  return null;
 }
 
 export const SFX_SPECIFICATIONS: Record<string, SfxSpec> = {
@@ -375,6 +375,8 @@ class SoundEffectsEngine {
   private customAudioBuffers: Map<string, AudioBuffer[]> = new Map();
   // 파일 유무 확인 시도 여부
   private checkedCustomFiles: Set<string> = new Set();
+  // 동시 중복 다운로드/디코딩 방지를 위한 비동기 로딩 프로미스 캐시
+  private loadingPromises: Map<string, Promise<AudioBuffer[] | null>> = new Map();
 
   constructor() {
     try {
@@ -399,26 +401,86 @@ class SoundEffectsEngine {
   }
 
   /**
-   * 주요 UI 핵심 사운드만 가볍게 사전 비동기 로드 (네트워크 폭주 및 메인스레드 랙 방지)
-   * 기타 캐릭터 및 상황별 사운드는 필요 시 온디맨드로 지연 로드됩니다.
+   * 게임 내 모든 필수 시스템 사운드 (총 1.3MB) 사전 비동기 로드
+   * 대결(격돌/대미지/무기/페이즈/연격) 시 끊김이나 합성음 폴백 없이 고음질 오디오 즉시 재생
    */
   public async preloadAllCustomSounds() {
-    const coreUiCategories: string[] = [
+    const coreCategories: string[] = [
       'card',
+      'clash',
       'clash_reveal',
+      'clash_impact',
+      'draw',
+      'damage',
+      'damage_light',
+      'damage_medium',
+      'damage_heavy',
+      'weapon_sword',
+      'weapon_broadblade',
+      'weapon_pistol',
+      'weapon_rectifier',
+      'phase',
       'phase_draw',
       'phase_action',
+      'phase_battle',
+      'phase_combo',
+      'phase_end',
+      'combo',
+      'combo_1',
+      'combo_2',
+      'combo_3',
       'turn',
+      'upgrade',
+      'victory',
+      'defeat',
+      'match_start',
+      'heal',
+      'low_hp',
     ];
 
-    // 첫 인터랙션 직후의 버벅임 방지를 위해 300ms 후 가볍게 병렬 요청
-    setTimeout(async () => {
-      try {
-        await Promise.allSettled(coreUiCategories.map((cat) => this.loadCustomServerFile(cat)));
-      } catch {
-        // ignore
-      }
-    }, 300);
+    try {
+      await Promise.allSettled(coreCategories.map((cat) => this.loadCustomServerFile(cat)));
+    } catch {
+      // ignore
+    }
+  }
+
+  /**
+   * 현재 매치에 참여 중인 캐릭터들의 보이스 음원만 선별 사전 로드
+   */
+  public async preloadCharacters(characterNames: (string | undefined)[]) {
+    const charKeys = Array.from(
+      new Set(
+        characterNames
+          .map((n) => getCharacterKey(n))
+          .filter((k): k is string => Boolean(k))
+      )
+    );
+
+    if (charKeys.length === 0) return;
+
+    const categories: string[] = [];
+    for (const charId of charKeys) {
+      categories.push(
+        `char_opening_${charId}`,
+        `char_attack_${charId}_cost0`,
+        `char_attack_${charId}_cost1`,
+        `char_attack_${charId}_cost2`,
+        `char_hurt_${charId}`,
+        `char_levelup_${charId}`,
+        `char_switch_${charId}`,
+        `char_victory_${charId}`,
+        `char_defeat_${charId}`,
+        `char_low_hp_${charId}`,
+        `char_idle_${charId}`
+      );
+    }
+
+    try {
+      await Promise.allSettled(categories.map((cat) => this.loadCustomServerFile(cat)));
+    } catch {
+      // ignore
+    }
   }
 
   private getAudioContext(): AudioContext | null {
@@ -482,6 +544,7 @@ class SoundEffectsEngine {
   public resetCustomSound(key: string) {
     this.customAudioBuffers.delete(key);
     this.checkedCustomFiles.delete(key);
+    this.loadingPromises.delete(key);
   }
 
   /**
@@ -491,258 +554,255 @@ class SoundEffectsEngine {
     if (this.checkedCustomFiles.has(key)) {
       return this.customAudioBuffers.get(key) ?? null;
     }
-    this.checkedCustomFiles.add(key);
-
-    const ctx = this.getAudioContext();
-    if (!ctx) return null;
-
-    const formats = ['mp3', 'wav', 'ogg', 'webm'];
-    const folderDirs: string[] = [];
-    const directFileBases: string[] = [];
-
-    // 1. 캐릭터 레벨업 키 (예: char_levelup_jinhsi)
-    if (key.startsWith('char_levelup_')) {
-      const charId = key.replace('char_levelup_', '');
-      folderDirs.push(`/audio/sfx/characters/${charId}/levelup`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/upgrade`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/levelup`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/upgrade`);
+    if (this.loadingPromises.has(key)) {
+      return this.loadingPromises.get(key)!;
     }
-    // 2. 캐릭터 공격 키 (예: char_attack_jinhsi_cost0, char_attack_rover_female_cost0)
-    else if (key.startsWith('char_attack_')) {
-      const match = key.match(/^char_attack_(.+)_(cost\d+)$/);
-      const charId = match ? match[1] : '';
-      const costStr = match ? match[2] : '';
-      if (charId && costStr) {
-        folderDirs.push(`/audio/sfx/characters/${charId}/attack_${costStr}`);
-        folderDirs.push(`/audio/sfx/characters/${charId}/${costStr}`);
-        directFileBases.push(`/audio/sfx/characters/${charId}/attack_${costStr}`);
-        directFileBases.push(`/audio/sfx/characters/${charId}/${costStr}`);
-        if (costStr === 'cost0') {
-          folderDirs.push(`/audio/sfx/characters/${charId}/attack`);
-          directFileBases.push(`/audio/sfx/characters/${charId}/attack`);
+
+    const loadPromise = (async () => {
+      this.checkedCustomFiles.add(key);
+
+      const ctx = this.getAudioContext();
+      if (!ctx) return null;
+
+      const formats = ['mp3', 'wav', 'ogg', 'webm'];
+      const folderDirs: string[] = [];
+      const directFileBases: string[] = [];
+
+      // 1. 캐릭터 레벨업 키 (예: char_levelup_jinhsi)
+      if (key.startsWith('char_levelup_')) {
+        const charId = key.replace('char_levelup_', '');
+        folderDirs.push(`/audio/sfx/characters/${charId}/levelup`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/upgrade`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/levelup`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/upgrade`);
+      }
+      // 2. 캐릭터 공격 키 (예: char_attack_jinhsi_cost0, char_attack_rover_female_cost0)
+      else if (key.startsWith('char_attack_')) {
+        const match = key.match(/^char_attack_(.+)_(cost\d+)$/);
+        const charId = match ? match[1] : '';
+        const costStr = match ? match[2] : '';
+        if (charId && costStr) {
+          folderDirs.push(`/audio/sfx/characters/${charId}/attack_${costStr}`);
+          folderDirs.push(`/audio/sfx/characters/${charId}/${costStr}`);
+          directFileBases.push(`/audio/sfx/characters/${charId}/attack_${costStr}`);
+          directFileBases.push(`/audio/sfx/characters/${charId}/${costStr}`);
+          if (costStr === 'cost0') {
+            folderDirs.push(`/audio/sfx/characters/${charId}/attack`);
+            directFileBases.push(`/audio/sfx/characters/${charId}/attack`);
+          }
         }
       }
-    }
-    // 3. 캐릭터 승리 사운드/대사 (예: char_victory_jinhsi)
-    else if (key.startsWith('char_victory_')) {
-      const charId = key.replace('char_victory_', '');
-      folderDirs.push(`/audio/sfx/characters/${charId}/victory`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/win`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/victory`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/win`);
-    }
-    // 3.5 캐릭터 패배 사운드/대사 (예: char_defeat_jinhsi)
-    else if (key.startsWith('char_defeat_')) {
-      const charId = key.replace('char_defeat_', '');
-      folderDirs.push(`/audio/sfx/characters/${charId}/defeat`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/lose`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/defeat`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/lose`);
-    }
-    // 4. 캐릭터 오프닝/출격 대사 (예: char_opening_jinhsi)
-    else if (key.startsWith('char_opening_')) {
-      const charId = key.replace('char_opening_', '');
-      folderDirs.push(`/audio/sfx/characters/${charId}/opening`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/intro`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/start`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/opening`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/start`);
-    }
-    // 5. 캐릭터 피격/대미지 보이스 (예: char_hurt_jinhsi)
-    else if (key.startsWith('char_hurt_')) {
-      const charId = key.replace('char_hurt_', '');
-      folderDirs.push(`/audio/sfx/characters/${charId}/hurt`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/hit`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/damage`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/hurt`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/hit`);
-    }
-    // 5.5 캐릭터 고민/방치 이스터에그 보이스 (예: char_idle_jinhsi)
-    else if (key.startsWith('char_idle_')) {
-      const charId = key.replace('char_idle_', '');
-      folderDirs.push(`/audio/sfx/characters/${charId}/idle`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/thinking`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/idle`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/thinking`);
-    }
-    // 5.6 캐릭터 체력 5 이하 위기/빈사 보이스 (예: char_low_hp_jinhsi)
-    else if (key.startsWith('char_low_hp_')) {
-      const charId = key.replace('char_low_hp_', '');
-      folderDirs.push(`/audio/sfx/characters/${charId}/low_hp`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/crisis`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/pinch`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/low_hp`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/crisis`);
-    }
-    // 5.7 캐릭터 백 -> 리더 교체(Join Team) 보이스 (예: char_switch_jinhsi)
-    else if (key.startsWith('char_switch_')) {
-      const charId = key.replace('char_switch_', '');
-      folderDirs.push(`/audio/sfx/characters/${charId}/switch`);
-      folderDirs.push(`/audio/sfx/characters/${charId}/join_team`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/switch`);
-      directFileBases.push(`/audio/sfx/characters/${charId}/join_team`);
-    }
-    // 6. 카드 오픈 (clash_reveal)
-    else if (key === 'clash_reveal') {
-      folderDirs.push('/audio/sfx/clash_reveal');
-      directFileBases.push('/audio/sfx/clash_reveal/reveal', '/audio/sfx/clash_reveal/flip', '/audio/sfx/clash_reveal/clash_reveal');
-    }
-    // 7. 카드 격돌 (clash_impact)
-    else if (key === 'clash_impact') {
-      folderDirs.push('/audio/sfx/clash_impact', '/audio/sfx/clash');
-      directFileBases.push('/audio/sfx/clash_impact/impact', '/audio/sfx/clash_impact/clash_impact', '/audio/sfx/clash/clash');
-    }
-    // 8. 대전 개시 (match_start)
-    else if (key === 'match_start') {
-      folderDirs.push('/audio/sfx/match_start');
-      directFileBases.push('/audio/sfx/match_start/match_start', '/audio/sfx/match_start/start', '/audio/sfx/match_start/intro');
-    }
-    // 9. 승리 공통 (victory)
-    else if (key === 'victory') {
-      folderDirs.push('/audio/sfx/victory');
-      directFileBases.push('/audio/sfx/victory/victory', '/audio/sfx/victory/win');
-    }
-    // 10. 패배 공통 (defeat)
-    else if (key === 'defeat') {
-      folderDirs.push('/audio/sfx/defeat');
-      directFileBases.push('/audio/sfx/defeat/defeat', '/audio/sfx/defeat/lose');
-    }
-    // 11. HP 회복 / 치유 (heal)
-    else if (key === 'heal') {
-      folderDirs.push('/audio/sfx/heal');
-      directFileBases.push('/audio/sfx/heal/heal', '/audio/sfx/heal/recovery', '/audio/sfx/heal/cure');
-    }
-    // 11.5 체력 5 이하 위기/심장 박동 공통 (low_hp)
-    else if (key === 'low_hp') {
-      folderDirs.push('/audio/sfx/low_hp');
-      directFileBases.push('/audio/sfx/low_hp/low_hp', '/audio/sfx/low_hp/crisis', '/audio/sfx/low_hp/heartbeat');
-    }
-    // 12. 일반 시스템 카테고리
-    else {
-      folderDirs.push(`/audio/sfx/${key}`);
-      directFileBases.push(`/audio/sfx/${key}/${key}`, `/audio/sfx/${key}/sound`, `/audio/sfx/${key}/audio`);
-    }
-
-    // 0. 매니페스트에 등록된 정확한 음원 목록이 있다면 우선 추출
-    const manifestData = characterAudioManifest as Record<string, Record<string, string[]>>;
-    let manifestUrls: string[] | undefined;
-
-    if (key.startsWith('char_levelup_')) {
-      const charId = key.replace('char_levelup_', '');
-      manifestUrls = manifestData[charId]?.['levelup'];
-    } else if (key.startsWith('char_attack_')) {
-      const match = key.match(/^char_attack_(.+)_(cost\d+)$/);
-      const charId = match ? match[1] : '';
-      const costStr = match ? match[2] : '';
-      if (charId && costStr) {
-        manifestUrls = manifestData[charId]?.[`attack_${costStr}`] || manifestData[charId]?.[costStr];
+      // 3. 캐릭터 승리 사운드/대사 (예: char_victory_jinhsi)
+      else if (key.startsWith('char_victory_')) {
+        const charId = key.replace('char_victory_', '');
+        folderDirs.push(`/audio/sfx/characters/${charId}/victory`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/win`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/victory`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/win`);
       }
-    } else if (key.startsWith('char_victory_')) {
-      const charId = key.replace('char_victory_', '');
-      manifestUrls = manifestData[charId]?.['victory'];
-    } else if (key.startsWith('char_defeat_')) {
-      const charId = key.replace('char_defeat_', '');
-      manifestUrls = manifestData[charId]?.['defeat'];
-    } else if (key.startsWith('char_opening_')) {
-      const charId = key.replace('char_opening_', '');
-      manifestUrls = manifestData[charId]?.['opening'];
-    } else if (key.startsWith('char_hurt_')) {
-      const charId = key.replace('char_hurt_', '');
-      manifestUrls = manifestData[charId]?.['hurt'];
-    } else if (key.startsWith('char_idle_')) {
-      const charId = key.replace('char_idle_', '');
-      manifestUrls = manifestData[charId]?.['idle'];
-    } else if (key.startsWith('char_low_hp_')) {
-      const charId = key.replace('char_low_hp_', '');
-      manifestUrls = manifestData[charId]?.['low_hp'];
-    } else if (key.startsWith('char_switch_')) {
-      const charId = key.replace('char_switch_', '');
-      manifestUrls = manifestData[charId]?.['switch'];
-    } else {
-      // 시스템 카테고리 매니페스트 확인
-      const sysData = systemAudioManifest as Record<string, string[]>;
-      manifestUrls = sysData[key];
-    }
+      // 3.5 캐릭터 패배 사운드/대사 (예: char_defeat_jinhsi)
+      else if (key.startsWith('char_defeat_')) {
+        const charId = key.replace('char_defeat_', '');
+        folderDirs.push(`/audio/sfx/characters/${charId}/defeat`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/lose`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/defeat`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/lose`);
+      }
+      // 4. 캐릭터 오프닝/출격 대사 (예: char_opening_jinhsi)
+      else if (key.startsWith('char_opening_')) {
+        const charId = key.replace('char_opening_', '');
+        folderDirs.push(`/audio/sfx/characters/${charId}/opening`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/intro`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/start`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/opening`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/start`);
+      }
+      // 5. 캐릭터 피격/대미지 보이스 (예: char_hurt_jinhsi)
+      else if (key.startsWith('char_hurt_')) {
+        const charId = key.replace('char_hurt_', '');
+        folderDirs.push(`/audio/sfx/characters/${charId}/hurt`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/hit`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/damage`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/hurt`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/hit`);
+      }
+      // 5.5 캐릭터 고민/방치 이스터에그 보이스 (예: char_idle_jinhsi)
+      else if (key.startsWith('char_idle_')) {
+        const charId = key.replace('char_idle_', '');
+        folderDirs.push(`/audio/sfx/characters/${charId}/idle`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/thinking`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/idle`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/thinking`);
+      }
+      // 5.6 캐릭터 체력 5 이하 위기/빈사 보이스 (예: char_low_hp_jinhsi)
+      else if (key.startsWith('char_low_hp_')) {
+        const charId = key.replace('char_low_hp_', '');
+        folderDirs.push(`/audio/sfx/characters/${charId}/low_hp`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/crisis`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/pinch`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/low_hp`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/crisis`);
+      }
+      // 5.7 캐릭터 백 -> 리더 교체(Join Team) 보이스 (예: char_switch_jinhsi)
+      else if (key.startsWith('char_switch_')) {
+        const charId = key.replace('char_switch_', '');
+        folderDirs.push(`/audio/sfx/characters/${charId}/switch`);
+        folderDirs.push(`/audio/sfx/characters/${charId}/join_team`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/switch`);
+        directFileBases.push(`/audio/sfx/characters/${charId}/join_team`);
+      }
+      // 6. 카드 오픈 (clash_reveal)
+      else if (key === 'clash_reveal') {
+        folderDirs.push('/audio/sfx/clash_reveal');
+        directFileBases.push('/audio/sfx/clash_reveal/reveal', '/audio/sfx/clash_reveal/flip', '/audio/sfx/clash_reveal/clash_reveal');
+      }
+      // 7. 카드 격돌 (clash_impact)
+      else if (key === 'clash_impact') {
+        folderDirs.push('/audio/sfx/clash_impact', '/audio/sfx/clash');
+        directFileBases.push('/audio/sfx/clash_impact/impact', '/audio/sfx/clash_impact/clash_impact', '/audio/sfx/clash/clash');
+      }
+      // 8. 대전 개시 (match_start)
+      else if (key === 'match_start') {
+        folderDirs.push('/audio/sfx/match_start');
+        directFileBases.push('/audio/sfx/match_start/match_start', '/audio/sfx/match_start/start', '/audio/sfx/match_start/intro');
+      }
+      // 9. 승리 공통 (victory)
+      else if (key === 'victory') {
+        folderDirs.push('/audio/sfx/victory');
+        directFileBases.push('/audio/sfx/victory/victory', '/audio/sfx/victory/win');
+      }
+      // 10. 패배 공통 (defeat)
+      else if (key === 'defeat') {
+        folderDirs.push('/audio/sfx/defeat');
+        directFileBases.push('/audio/sfx/defeat/defeat', '/audio/sfx/defeat/lose');
+      }
+      // 11. HP 회복 / 치유 (heal)
+      else if (key === 'heal') {
+        folderDirs.push('/audio/sfx/heal');
+        directFileBases.push('/audio/sfx/heal/heal', '/audio/sfx/heal/recovery', '/audio/sfx/heal/cure');
+      }
+      // 11.5 체력 5 이하 위기/심장 박동 공통 (low_hp)
+      else if (key === 'low_hp') {
+        folderDirs.push('/audio/sfx/low_hp');
+        directFileBases.push('/audio/sfx/low_hp/low_hp', '/audio/sfx/low_hp/crisis', '/audio/sfx/low_hp/heartbeat');
+      }
+      // 12. 일반 시스템 카테고리
+      else {
+        folderDirs.push(`/audio/sfx/${key}`);
+        directFileBases.push(`/audio/sfx/${key}/${key}`, `/audio/sfx/${key}/sound`, `/audio/sfx/${key}/audio`);
+      }
 
-    let candidateUrls: string[] = [];
+      // 0. 매니페스트에 등록된 정확한 음원 목록이 있다면 우선 추출
+      const manifestData = characterAudioManifest as Record<string, Record<string, string[]>>;
+      let manifestUrls: string[] | undefined;
 
-    // 매니페스트에 등록된 정확한 음원이 있다면 해당 파일들만 즉각 로드 (불필요한 404 대량 호출 방지)
-    if (manifestUrls && manifestUrls.length > 0) {
-      candidateUrls = [...manifestUrls];
-    } else {
-      // 매니페스트가 없는 경우에만 폴더 내 기본 파일명(1~5, sound, audio) 가볍게 탐색
-      const folderFileNames = ['1', '2', '3', '4', '5', 'sound', 'audio', 'default'];
-      folderDirs.forEach((dir) => {
-        const folderName = dir.split('/').pop() || '';
-        const namesInFolder = [...folderFileNames, folderName];
-        namesInFolder.forEach((fname) => {
-          formats.forEach((ext) => {
-            candidateUrls.push(`${dir}/${fname}.${ext}`);
+      if (key.startsWith('char_levelup_')) {
+        const charId = key.replace('char_levelup_', '');
+        manifestUrls = manifestData[charId]?.['levelup'];
+      } else if (key.startsWith('char_attack_')) {
+        const match = key.match(/^char_attack_(.+)_(cost\d+)$/);
+        const charId = match ? match[1] : '';
+        const costStr = match ? match[2] : '';
+        if (charId && costStr) {
+          manifestUrls = manifestData[charId]?.[`attack_${costStr}`] || manifestData[charId]?.[costStr];
+        }
+      } else if (key.startsWith('char_victory_')) {
+        const charId = key.replace('char_victory_', '');
+        manifestUrls = manifestData[charId]?.['victory'];
+      } else if (key.startsWith('char_defeat_')) {
+        const charId = key.replace('char_defeat_', '');
+        manifestUrls = manifestData[charId]?.['defeat'];
+      } else if (key.startsWith('char_opening_')) {
+        const charId = key.replace('char_opening_', '');
+        manifestUrls = manifestData[charId]?.['opening'];
+      } else if (key.startsWith('char_hurt_')) {
+        const charId = key.replace('char_hurt_', '');
+        manifestUrls = manifestData[charId]?.['hurt'];
+      } else if (key.startsWith('char_idle_')) {
+        const charId = key.replace('char_idle_', '');
+        manifestUrls = manifestData[charId]?.['idle'];
+      } else if (key.startsWith('char_low_hp_')) {
+        const charId = key.replace('char_low_hp_', '');
+        manifestUrls = manifestData[charId]?.['low_hp'];
+      } else if (key.startsWith('char_switch_')) {
+        const charId = key.replace('char_switch_', '');
+        manifestUrls = manifestData[charId]?.['switch'];
+      } else {
+        // 시스템 카테고리 매니페스트 확인
+        const sysData = systemAudioManifest as Record<string, string[]>;
+        manifestUrls = sysData[key];
+      }
+
+      let candidateUrls: string[] = [];
+
+      // 매니페스트에 등록된 정확한 음원이 있다면 최대 3개 변형만 선별 로드하여 메모리/네트워크 절약
+      if (manifestUrls && manifestUrls.length > 0) {
+        candidateUrls = manifestUrls.slice(0, 3);
+      } else {
+        // 매니페스트가 없는 경우에만 폴더 내 기본 파일명(1~3, sound, audio) 가볍게 탐색
+        const folderFileNames = ['1', '2', '3', 'sound', 'audio', 'default'];
+        folderDirs.forEach((dir) => {
+          const folderName = dir.split('/').pop() || '';
+          const namesInFolder = [...folderFileNames, folderName];
+          namesInFolder.forEach((fname) => {
+            formats.forEach((ext) => {
+              candidateUrls.push(`${dir}/${fname}.${ext}`);
+            });
           });
         });
-      });
 
-      directFileBases.forEach((base) => {
-        formats.forEach((ext) => {
-          candidateUrls.push(`${base}.${ext}`);
+        directFileBases.forEach((base) => {
+          formats.forEach((ext) => {
+            candidateUrls.push(`${base}.${ext}`);
+          });
         });
-      });
-    }
+      }
 
-    const uniqueUrls = Array.from(new Set(candidateUrls));
-    const loadedBuffers: AudioBuffer[] = [];
+      const uniqueUrls = Array.from(new Set(candidateUrls));
+      const loadedBuffers: AudioBuffer[] = [];
 
-    // 유효한 모든 음원 파일 병렬 로드 시도
-    await Promise.allSettled(
-      uniqueUrls.map(async (url) => {
-        try {
-          const resp = await fetch(encodeURI(url), { method: 'GET' });
-          if (resp.ok) {
-            const contentType = resp.headers.get('content-type') || '';
-            if (contentType.includes('text/html')) return;
+      // 유효한 모든 음원 파일 병렬 로드 시도
+      await Promise.allSettled(
+        uniqueUrls.map(async (url) => {
+          try {
+            const resp = await fetch(encodeURI(url), { method: 'GET' });
+            if (resp.ok) {
+              const contentType = resp.headers.get('content-type') || '';
+              if (contentType.includes('text/html')) return;
 
-            const arrayBuffer = await resp.arrayBuffer();
-            const decoded = await ctx.decodeAudioData(arrayBuffer);
-            loadedBuffers.push(decoded);
+              const arrayBuffer = await resp.arrayBuffer();
+              const decoded = await ctx.decodeAudioData(arrayBuffer);
+              loadedBuffers.push(decoded);
+            }
+          } catch {
+            // 탐색 실패 무시
           }
-        } catch {
-          // 탐색 실패 무시
-        }
-      })
-    );
+        })
+      );
 
-    if (loadedBuffers.length > 0) {
-      this.customAudioBuffers.set(key, loadedBuffers);
-      return loadedBuffers;
-    }
+      if (loadedBuffers.length > 0) {
+        this.customAudioBuffers.set(key, loadedBuffers);
+        return loadedBuffers;
+      }
 
-    this.customAudioBuffers.set(key, []);
-    return null;
+      this.customAudioBuffers.set(key, []);
+      return null;
+    })();
+
+    this.loadingPromises.set(key, loadPromise);
+    return loadPromise;
   }
 
   /**
-   * 커스텀 AudioBuffer 재생 시도 (음원이 여러 개일 경우 무작위 랜덤 1개 선택 재생)
+   * 디코딩된 AudioBuffer 재생 도우미
    */
-  private playCustomBuffer(key: string, volumeMultiplier: number = 1.0): boolean {
-    const buffers = this.customAudioBuffers.get(key);
-    if (!buffers || buffers.length === 0) {
-      if (!this.checkedCustomFiles.has(key)) {
-        this.loadCustomServerFile(key).catch(() => {});
-      }
-      return false;
-    }
-
+  private playDecodedBuffer(buffer: AudioBuffer, key: string, volumeMultiplier: number = 1.0): boolean {
     const ctx = this.getAudioContext();
-    if (!ctx) return false;
+    if (!ctx || this.isMuted) return false;
 
     try {
-      // 다중 음원 중 1개 무작위(랜덤) 선택
-      const randomIndex = Math.floor(Math.random() * buffers.length);
-      const selectedBuffer = buffers[randomIndex];
-
       const source = ctx.createBufferSource();
-      source.buffer = selectedBuffer;
+      source.buffer = buffer;
 
       // 캐릭터 보이스(char_*) 음원일 경우 가청성 향상을 위해 10% 볼륨 업(1.1x) 적용
       const isVoice = key.startsWith('char_');
@@ -758,6 +818,35 @@ class SoundEffectsEngine {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * 커스텀 AudioBuffer 재생 시도 (음원이 여러 개일 경우 무작위 랜덤 1개 선택 재생)
+   */
+  private playCustomBuffer(key: string, volumeMultiplier: number = 1.0): boolean {
+    if (this.isMuted) return false;
+    const buffers = this.customAudioBuffers.get(key);
+    if (buffers && buffers.length > 0) {
+      const randomIndex = Math.floor(Math.random() * buffers.length);
+      return this.playDecodedBuffer(buffers[randomIndex], key, volumeMultiplier);
+    }
+
+    // 아직 로드되지 않았거나 로딩 중인 경우 백그라운드 로드 촉발
+    const pending = this.loadingPromises.get(key) || (!this.checkedCustomFiles.has(key) ? this.loadCustomServerFile(key) : null);
+    if (pending) {
+      // 캐릭터 보이스 등 합성음 폴백이 없는 키의 경우, 로드 완료 직후 자동 재생 복구
+      const isVoice = key.startsWith('char_');
+      if (isVoice) {
+        pending.then((loaded) => {
+          if (loaded && loaded.length > 0 && !this.isMuted) {
+            const randomIndex = Math.floor(Math.random() * loaded.length);
+            this.playDecodedBuffer(loaded[randomIndex], key, volumeMultiplier);
+          }
+        }).catch(() => {});
+      }
+    }
+
+    return false;
   }
 
   /**
@@ -865,11 +954,13 @@ class SoundEffectsEngine {
 
     const charKey = getCharacterKey(characterName);
     const safeCost = Math.min(2, Math.max(0, cost));
-    const customKey = `char_attack_${charKey}_cost${safeCost}`;
 
     // 1. 해당 캐릭터의 코스트별 고유 공격 사운드가 있으면 우선 재생
-    if (this.playCustomBuffer(customKey)) {
-      return;
+    if (charKey) {
+      const customKey = `char_attack_${charKey}_cost${safeCost}`;
+      if (this.playCustomBuffer(customKey)) {
+        return;
+      }
     }
 
     // 2. 없으면 캐릭터 무기군 타격음으로 자동 폴백 (20% 인하된 볼륨)
@@ -883,6 +974,7 @@ class SoundEffectsEngine {
   public playCharacterHurt(characterName?: string, _amount: number = 2): boolean {
     if (this.isMuted || !characterName) return false;
     const charKey = getCharacterKey(characterName);
+    if (!charKey) return false;
     return this.playCustomBuffer(`char_hurt_${charKey}`);
   }
 
@@ -1659,15 +1751,16 @@ class SoundEffectsEngine {
 
     // 중복 방지: 동일 대상 또는 연속 레벨업 사운드가 800ms 이내에 중복 호출되는 현상 방지
     const nowMs = Date.now();
-    const charKey = characterName ? getCharacterKey(characterName) : 'common';
-    if (nowMs - this.lastUpgradeTime < 800 && (this.lastUpgradeKey === charKey || !characterName)) {
+    const charKey = characterName ? getCharacterKey(characterName) : null;
+    const upgradeKey = charKey || 'common';
+    if (nowMs - this.lastUpgradeTime < 800 && (this.lastUpgradeKey === upgradeKey || !characterName)) {
       return;
     }
     this.lastUpgradeTime = nowMs;
-    this.lastUpgradeKey = charKey;
+    this.lastUpgradeKey = upgradeKey;
 
     // 1. 캐릭터 고유 레벨업 사운드 확인 (예: char_levelup_jinhsi)
-    if (characterName) {
+    if (charKey) {
       if (this.playCustomBuffer(`char_levelup_${charKey}`)) {
         return;
       }
@@ -1800,7 +1893,7 @@ class SoundEffectsEngine {
     // 1. 캐릭터 고유 승리 사운드/대사 확인 (예: char_victory_jinhsi)
     if (characterName) {
       const charKey = getCharacterKey(characterName);
-      if (this.playCustomBuffer(`char_victory_${charKey}`)) {
+      if (charKey && this.playCustomBuffer(`char_victory_${charKey}`)) {
         return;
       }
     }
@@ -1847,7 +1940,7 @@ class SoundEffectsEngine {
     // 1. 캐릭터 고유 패배 사운드/대사 확인 (예: char_defeat_jinhsi)
     if (characterName) {
       const charKey = getCharacterKey(characterName);
-      if (this.playCustomBuffer(`char_defeat_${charKey}`)) {
+      if (charKey && this.playCustomBuffer(`char_defeat_${charKey}`)) {
         return;
       }
     }
@@ -1897,7 +1990,7 @@ class SoundEffectsEngine {
     // 1. 캐릭터 고유 오프닝 대사/보이스 확인 (예: char_opening_jinhsi)
     if (characterName) {
       const charKey = getCharacterKey(characterName);
-      if (this.playCustomBuffer(`char_opening_${charKey}`)) {
+      if (charKey && this.playCustomBuffer(`char_opening_${charKey}`)) {
         return;
       }
     }
@@ -1992,7 +2085,7 @@ class SoundEffectsEngine {
     // 1. 캐릭터 고유 고민/방치 이스터에그 보이스 확인 (예: char_idle_jinhsi)
     if (characterName) {
       const charKey = getCharacterKey(characterName);
-      if (this.playCustomBuffer(`char_idle_${charKey}`)) {
+      if (charKey && this.playCustomBuffer(`char_idle_${charKey}`)) {
         return;
       }
     }
@@ -2028,7 +2121,7 @@ class SoundEffectsEngine {
     // 1. 캐릭터 고유 위기/빈사 보이스 확인 (예: char_low_hp_jinhsi)
     if (characterName) {
       const charKey = getCharacterKey(characterName);
-      if (this.playCustomBuffer(`char_low_hp_${charKey}`)) {
+      if (charKey && this.playCustomBuffer(`char_low_hp_${charKey}`)) {
         return;
       }
     }
@@ -2100,7 +2193,7 @@ class SoundEffectsEngine {
     // 1. 캐릭터 고유 교체(Join Team) 보이스 확인 (예: char_switch_jinhsi)
     if (characterName) {
       const charKey = getCharacterKey(characterName);
-      if (this.playCustomBuffer(`char_switch_${charKey}`)) {
+      if (charKey && this.playCustomBuffer(`char_switch_${charKey}`)) {
         return;
       }
     }

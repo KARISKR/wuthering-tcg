@@ -348,6 +348,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 1인 2역 (SOLO_DUAL) 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
   const [controlledPlayerIndex, setControlledPlayerIndex] = useState<0 | 1>(0);
 
+  // 현재 매치에 참여 중인 모든 캐릭터(리더, 서포터, 캐릭터 덱) 보이스 및 효과음 사전 비동기 로드
+  useEffect(() => {
+    const chars: string[] = [];
+    gameState.players.forEach((p) => {
+      [p.slots.leader, p.slots.leftSupport, p.slots.rightSupport, ...(p.characterDeck || [])].forEach((c) => {
+        const name = c?.characterName || c?.nameKr;
+        if (name) chars.push(name);
+      });
+    });
+    if (chars.length > 0) {
+      soundEffects.preloadCharacters(chars);
+    }
+  }, [gameState.players]);
+
   // 매치 개시 양측 리더 컷인 및 출격 오프닝 대사 멘트 오버레이 상태
   const [showMatchOpening, setShowMatchOpening] = useState(false);
   const hasShownMatchOpeningRef = useRef(false);
