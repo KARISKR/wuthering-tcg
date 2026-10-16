@@ -116,6 +116,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleEndTurn,
     handleForceResolveClash,
     clearLastUpgrade,
+    clearLastComboStrike,
     clearLastEffectEvent,
   } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
 
@@ -342,6 +343,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     setActiveUpgrade(null);
     clearLastUpgrade();
   }, [clearLastUpgrade]);
+
+  const handleDismissComboStrike = useCallback(() => {
+    setActiveComboStrike(null);
+    clearLastComboStrike();
+    soundEffects.stopComboSounds();
+  }, [clearLastComboStrike]);
 
   // 1인 2역 (SOLO_DUAL) 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
   const [controlledPlayerIndex, setControlledPlayerIndex] = useState<0 | 1>(0);
@@ -724,7 +731,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       const victimName = victimLeader ? (victimLeader.characterName || victimLeader.nameKr) : undefined;
 
       // 대결 연출 및 연격 연출 중에는 각 전용 오버레이가 참격 타이밍에 직접 사운드를 내므로 중복 방지
-      if (gameState.phase !== 'CLASH_REVEAL' && gameState.phase !== 'COMBO_STEP') {
+      if (
+        gameState.phase !== 'CLASH_REVEAL' &&
+        gameState.phase !== 'COMBO_STEP' &&
+        !activeComboStrike &&
+        !gameState.lastComboStrike
+      ) {
         const attackerLeader = p1.slots.leader;
         const weapon = attackerLeader ? getWeaponByCharacter(attackerLeader.characterName || attackerLeader.nameKr) : undefined;
         soundEffects.playDamage(diff, weapon, victimName);
@@ -766,7 +778,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       const victimName = victimLeader ? (victimLeader.characterName || victimLeader.nameKr) : undefined;
 
       // 대결 연출 및 연격 연출 중에는 각 전용 오버레이가 참격 타이밍에 직접 사운드를 내므로 중복 방지
-      if (gameState.phase !== 'CLASH_REVEAL' && gameState.phase !== 'COMBO_STEP') {
+      if (
+        gameState.phase !== 'CLASH_REVEAL' &&
+        gameState.phase !== 'COMBO_STEP' &&
+        !activeComboStrike &&
+        !gameState.lastComboStrike
+      ) {
         const attackerLeader = p0.slots.leader;
         const weapon = attackerLeader ? getWeaponByCharacter(attackerLeader.characterName || attackerLeader.nameKr) : undefined;
         soundEffects.playDamage(diff, weapon, victimName);
@@ -3038,7 +3055,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {activeComboStrike && (
         <ComboStrikeOverlay
           strike={activeComboStrike}
-          onDismiss={() => setActiveComboStrike(null)}
+          onDismiss={handleDismissComboStrike}
         />
       )}
 

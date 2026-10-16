@@ -255,6 +255,11 @@ export function useGame(
     setGameState((prev) => (prev.lastUpgrade ? { ...prev, lastUpgrade: null } : prev));
   }, []);
 
+  // 연격 연출 완료 후 lastComboStrike 초기화
+  const clearLastComboStrike = useCallback(() => {
+    setGameState((prev) => (prev.lastComboStrike ? { ...prev, lastComboStrike: null } : prev));
+  }, []);
+
   // 효과 발동 팝업 닫힘 시 lastEffectEvent 초기화
   const clearLastEffectEvent = useCallback(() => {
     setGameState((prev) => (prev.lastEffectEvent ? { ...prev, lastEffectEvent: null } : prev));
@@ -409,6 +414,7 @@ export function useGame(
         };
       } else {
         // AI에게 남은 연격이 없거나 낼 수 있는 적색 카드가 없을 때 -> 연격 정상 종료!
+        // (1350ms 연격 애니메이션 및 보이스가 완전히 끝난 뒤 450ms의 여유를 두고 종료 페이즈 진입)
         setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
@@ -418,7 +424,7 @@ export function useGame(
             return prev;
           });
           setIsAiThinking(false);
-        }, 1400);
+        }, 1800);
         return () => {
           clearTimeout(timer);
           setIsAiThinking(false);
@@ -483,6 +489,7 @@ export function useGame(
     handleEndTurn,
     handleForceResolveClash,
     clearLastUpgrade,
+    clearLastComboStrike,
     clearLastEffectEvent,
   };
 }

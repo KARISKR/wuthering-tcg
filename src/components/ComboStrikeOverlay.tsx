@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ComboStrikeEffect } from '../types/tcg';
 import { Flame, Swords, Zap, Sparkles } from 'lucide-react';
 
@@ -11,6 +11,8 @@ interface ComboStrikeOverlayProps {
 
 export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, onDismiss }) => {
   const [activeStage, setActiveStage] = useState<'SLASH' | 'IMPACT'>('SLASH');
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
 
   useEffect(() => {
     const attackerWeapon = getWeaponByCharacter(strike.attackerName);
@@ -35,14 +37,15 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
 
     // 1350ms 후 자동 퇴장 (연격 연출을 확실히 체감할 수 있도록 여유 부여)
     const tDismiss = setTimeout(() => {
-      onDismiss();
+      onDismissRef.current();
     }, 1350);
 
     return () => {
       clearTimeout(tImpact);
       clearTimeout(tDismiss);
+      soundEffects.stopComboSounds();
     };
-  }, [strike.id, onDismiss]);
+  }, [strike.id]);
 
   const comboNum = strike.comboCount || 1;
 

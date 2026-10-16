@@ -3999,11 +3999,10 @@ export function executeComboAttack(
     if (player.isAi) {
       newState = addLog(
         newState,
-        `[연격 단계 완료] ${player.name}이(가) 더 이상 사용할 수 있는 연격 카드가 없어 연격 단계를 종료합니다.`,
+        `[연격 단계 완료] ${player.name}이(가) 더 이상 사용할 수 있는 연격 카드가 없습니다.`,
         'ACTION',
         playerIndex
       );
-      newState = executeBattlePhaseEndStep(newState);
     } else {
       // Human 유저:
       // 바로 checkHandOverflowOrEndTurn으로 턴을 넘겨버리지 않고 COMBO_STEP 상태를 유지하여

@@ -378,6 +378,14 @@ class SoundEffectsEngine {
   // 동시 중복 다운로드/디코딩 방지를 위한 비동기 로딩 프로미스 캐시
   private loadingPromises: Map<string, Promise<AudioBuffer[] | null>> = new Map();
 
+  // 연격 사운드 전용 오디오 채널 (연격 연속 발동 시 이전 연격 참격음 자연스러운 중단)
+  private activeComboSource: AudioBufferSourceNode | null = null;
+  private activeComboGain: GainNode | null = null;
+
+  // 캐릭터 보이스 전용 오디오 채널 (연격/스킬 연속 시 보이스 겹침 방지)
+  private activeVoiceSource: AudioBufferSourceNode | null = null;
+  private activeVoiceGain: GainNode | null = null;
+
   constructor() {
     try {
       const savedMute = localStorage.getItem('wuthering_sfx_muted');
@@ -794,6 +802,44 @@ class SoundEffectsEngine {
   }
 
   /**
+   * 연격 참격 사운드 즉시 중단 (페이드아웃)
+   */
+  public stopComboSounds() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      if (this.activeComboGain && this.activeComboSource) {
+        this.activeComboGain.gain.cancelScheduledValues(now);
+        this.activeComboGain.gain.setValueAtTime(this.activeComboGain.gain.value, now);
+        this.activeComboGain.gain.linearRampToValueAtTime(0.001, now + 0.04);
+        this.activeComboSource.stop(now + 0.04);
+        this.activeComboSource = null;
+        this.activeComboGain = null;
+      }
+    } catch {}
+  }
+
+  /**
+   * 캐릭터 보이스 사운드 즉시 중단 (페이드아웃)
+   */
+  public stopVoiceSounds() {
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      if (this.activeVoiceGain && this.activeVoiceSource) {
+        this.activeVoiceGain.gain.cancelScheduledValues(now);
+        this.activeVoiceGain.gain.setValueAtTime(this.activeVoiceGain.gain.value, now);
+        this.activeVoiceGain.gain.linearRampToValueAtTime(0.001, now + 0.04);
+        this.activeVoiceSource.stop(now + 0.04);
+        this.activeVoiceSource = null;
+        this.activeVoiceGain = null;
+      }
+    } catch {}
+  }
+
+  /**
    * 디코딩된 AudioBuffer 재생 도우미
    */
   private playDecodedBuffer(buffer: AudioBuffer, key: string, volumeMultiplier: number = 1.0): boolean {
@@ -801,19 +847,67 @@ class SoundEffectsEngine {
     if (!ctx || this.isMuted) return false;
 
     try {
+      const now = ctx.currentTime;
+      const isCombo = key.startsWith('combo');
+      const isVoice = key.startsWith('char_');
+
+      // 이전 연격 사운드가 재생 중이면 부드럽게 50ms 페이드아웃 후 새 연격 사운드로 전환 (겹침 방지)
+      if (isCombo && this.activeComboGain && this.activeComboSource) {
+        try {
+          this.activeComboGain.gain.cancelScheduledValues(now);
+          this.activeComboGain.gain.setValueAtTime(this.activeComboGain.gain.value, now);
+          this.activeComboGain.gain.linearRampToValueAtTime(0.001, now + 0.05);
+          this.activeComboSource.stop(now + 0.05);
+        } catch {}
+        this.activeComboSource = null;
+        this.activeComboGain = null;
+      }
+
+      // 이전 캐릭터 보이스가 재생 중이면 부드럽게 60ms 페이드아웃 후 새 보이스로 전환 (대사 겹침 방지)
+      if (isVoice && this.activeVoiceGain && this.activeVoiceSource) {
+        try {
+          this.activeVoiceGain.gain.cancelScheduledValues(now);
+          this.activeVoiceGain.gain.setValueAtTime(this.activeVoiceGain.gain.value, now);
+          this.activeVoiceGain.gain.linearRampToValueAtTime(0.001, now + 0.06);
+          this.activeVoiceSource.stop(now + 0.06);
+        } catch {}
+        this.activeVoiceSource = null;
+        this.activeVoiceGain = null;
+      }
+
       const source = ctx.createBufferSource();
       source.buffer = buffer;
 
       // 캐릭터 보이스(char_*) 음원일 경우 가청성 향상을 위해 10% 볼륨 업(1.1x) 적용
-      const isVoice = key.startsWith('char_');
       const finalMultiplier = volumeMultiplier * (isVoice ? this.VOICE_VOLUME_MULTIPLIER : 1.0);
 
       const gain = ctx.createGain();
-      gain.gain.setValueAtTime(Math.max(0, Math.min(1.5, this.volume * finalMultiplier)), ctx.currentTime);
+      gain.gain.setValueAtTime(Math.max(0, Math.min(1.5, this.volume * finalMultiplier)), now);
 
       source.connect(gain);
       gain.connect(ctx.destination);
       source.start();
+
+      if (isCombo) {
+        this.activeComboSource = source;
+        this.activeComboGain = gain;
+        source.onended = () => {
+          if (this.activeComboSource === source) {
+            this.activeComboSource = null;
+            this.activeComboGain = null;
+          }
+        };
+      } else if (isVoice) {
+        this.activeVoiceSource = source;
+        this.activeVoiceGain = gain;
+        source.onended = () => {
+          if (this.activeVoiceSource === source) {
+            this.activeVoiceSource = null;
+            this.activeVoiceGain = null;
+          }
+        };
+      }
+
       return true;
     } catch {
       return false;
@@ -1544,6 +1638,9 @@ class SoundEffectsEngine {
   // =========================================================================
   public playComboSlash(comboCount: number = 1) {
     if (this.isMuted) return;
+
+    // 이전 연격 사운드가 재생 중이면 부드럽게 중단하여 1/2/3연격 참격음 겹침 방지
+    this.stopComboSounds();
 
     // 1. 콤보 카테고리 결정: combo_1, combo_2, combo_3
     const cat = comboCount <= 1 ? 'combo_1' : comboCount === 2 ? 'combo_2' : 'combo_3';
