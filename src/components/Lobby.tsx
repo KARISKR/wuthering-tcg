@@ -1,6 +1,6 @@
 import React, { useState, Suspense, lazy } from 'react';
 import { BgmPlayer } from './BgmPlayer';
-import { CURRENT_GAME_VERSION } from '../data/patchNotes';
+import { CURRENT_GAME_VERSION, LATEST_PATCH_NOTE } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import { DeckSelectModal } from './DeckSelectModal';
 
@@ -77,7 +77,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             <h1 className="text-base font-black tracking-widest text-white uppercase flex items-center gap-2">
               <span>WUTHERING WAVES : BATTLE</span>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black tracking-normal shadow">
-                BETA 1.0
+                {CURRENT_GAME_VERSION} UPDATE
               </span>
             </h1>
             <span className="text-[10px] text-amber-400 font-mono tracking-wider">
@@ -149,9 +149,11 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </header>
 
-      {/* 2. 메인 중앙 콘텐츠 */}
-      <main className="relative z-20 flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col items-center justify-center gap-8">
-        {/* 타이틀 히어로 영역 */}
+      {/* 2. 메인 콘텐츠 (좌측 대전 메뉴 + 우측 최신 패치노트 요약 사이드바) */}
+      <main className="relative z-20 flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 py-6 flex flex-col xl:flex-row items-start justify-center gap-6">
+        {/* 좌측 메인 듀얼 메뉴 영역 */}
+        <div className="flex-1 w-full flex flex-col items-center justify-center gap-6">
+          {/* 타이틀 히어로 영역 */}
         <div className="text-center space-y-2 max-w-2xl">
           <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 font-extrabold text-xs tracking-widest uppercase shadow-lg shadow-amber-500/10">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -396,7 +398,90 @@ export const Lobby: React.FC<LobbyProps> = ({
             <span>승리 조건: 상대 생명력(20pt) 0으로 격파</span>
           </div>
         </div>
-      </main>
+      </div>
+
+      {/* 우측 공간: 최신 패치노트 요약 위젯 */}
+      <aside className="w-full xl:w-[350px] 2xl:w-[380px] shrink-0 flex flex-col gap-4 bg-slate-900/85 backdrop-blur-md border border-amber-500/40 rounded-2xl p-5 shadow-2xl shadow-amber-950/20">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <ScrollText className="w-5 h-5 text-amber-400" />
+            <h3 className="font-black text-sm text-white tracking-wide">최신 패치노트 요약</h3>
+          </div>
+          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black shadow">
+            {CURRENT_GAME_VERSION}
+          </span>
+        </div>
+
+        <div className="space-y-1">
+          <h4 className="text-xs font-black text-amber-300 leading-snug">
+            {LATEST_PATCH_NOTE.title}
+          </h4>
+          <p className="text-[11px] text-slate-400 font-mono">
+            릴리즈 일자: {LATEST_PATCH_NOTE.releaseDate}
+          </p>
+        </div>
+
+        <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+          {LATEST_PATCH_NOTE.summary}
+        </p>
+
+        {/* 주요 변경사항 하이라이트 */}
+        <div className="space-y-2.5">
+          <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            <span>주요 업데이트 항목</span>
+          </div>
+          <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+            {LATEST_PATCH_NOTE.sections.map((sec, idx) => (
+              <div
+                key={idx}
+                className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 flex flex-col gap-1"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
+                      sec.tag === 'NEW'
+                        ? 'bg-amber-500 text-slate-950'
+                        : sec.tag === 'FIX'
+                        ? 'bg-emerald-500 text-slate-950'
+                        : 'bg-cyan-500 text-slate-950'
+                    }`}
+                  >
+                    {sec.tag}
+                  </span>
+                  <span className="text-xs font-bold text-slate-200">{sec.title}</span>
+                </div>
+                <ul className="text-[11px] text-slate-400 space-y-0.5 pl-2 list-disc list-inside">
+                  {sec.items.slice(0, 2).map((item, itemIdx) => (
+                    <li key={itemIdx} className="leading-snug truncate" title={item}>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 액션 버튼 */}
+        <div className="pt-2 flex flex-col gap-2">
+          <button
+            onClick={() => setIsPatchNotesOpen(true)}
+            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-amber-500/20"
+          >
+            <BookOpen className="w-3.5 h-3.5" />
+            <span>전체 패치노트 전문 보기</span>
+          </button>
+          <button
+            onClick={() => setIsFeedbackOpen(true)}
+            className="w-full py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+          >
+            <Bug className="w-3.5 h-3.5 text-red-400" />
+            <span>버그 제보 & 피드백 남기기</span>
+          </button>
+        </div>
+      </aside>
+    </main>
 
       {/* 푸터 영역 */}
       <footer className="relative z-20 h-14 border-t border-slate-900 bg-slate-950/50 px-6 flex items-center justify-between text-xs text-slate-500">
