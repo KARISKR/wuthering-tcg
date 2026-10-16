@@ -116,8 +116,8 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
   // 현재 상태 트래커
   let p0State: ReplayPlayerSnapshot = {
     name: replay.p0Name || '플레이어 1',
-    hp: 10,
-    maxHp: 10,
+    hp: 20,
+    maxHp: 20,
     concerto: 0,
     leader: { ...p0InitialLeader },
     leftSupport: p0Left ? { ...p0Left } : undefined,
@@ -129,8 +129,8 @@ export function buildReplayTimeline(replay: BattleReplayData): ReplaySnapshot[] 
 
   let p1State: ReplayPlayerSnapshot = {
     name: replay.p1Name || '플레이어 2 (AI)',
-    hp: 10,
-    maxHp: 10,
+    hp: 20,
+    maxHp: 20,
     concerto: 0,
     leader: { ...p1InitialLeader },
     leftSupport: p1Left ? { ...p1Left } : undefined,

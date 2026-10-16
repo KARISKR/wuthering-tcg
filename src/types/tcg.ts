@@ -77,6 +77,7 @@ export interface ActionCard {
   artUrl?: string;
   rarity?: string; // 공식 희귀도 (★ ~ ★★★)
   rawOfficial?: any; // 연결된 공식 원본 카드 데이터
+  feature?: string; // 카드 특징 (<체공>, <기본 공격>, <공명 해방> 등)
 }
 
 export type AnyCard = CharacterCard | ActionCard;
@@ -110,12 +111,18 @@ export interface PlayerState {
     upgraded: boolean;
     switchedLeader: boolean;
     chargedConcerto: boolean;
+    firstNormalAttackBonusUsed?: boolean;
   };
   // 연격 횟수 및 무제한 여부
   comboCount: number;
   comboUnlimited?: boolean; // 적색 승리로 인한 이번 턴 무제한 콤보 여부 (공식 룰 604.1.2.7)
   actionArea?: ActionCard[]; // 이번 턴 액션 에리어에 사용/배치된 카드 목록 (공식 룰 604.1.3.2)
   isAi: boolean;
+  hasDominance?: boolean; // 지난 턴 배틀 승리 또는 상대 배틀 패스로 획득한 【우세】 보유 여부
+  tempCostPenaltyRed?: number; // SD01-016 북풍의 소용돌이: 상대 적색 카드 COST+1 다음 턴
+  comboBlockedNextTurn?: boolean; // SD02-016 죽음의 눈보라: 다음 턴 콤보 발동 불가
+  ankePendingRetaliationDmg?: number; // BP01-014 앙코 Lv.1: 적색 패배 시 배틀 페이즈 종료 반격 데미지
+  introSkillBonusDrawCount?: number; // BP01-057 결말의 순환: 다음 2장의 변주 스킬 드로우 보너스
 }
 
 // 게임 페이즈
@@ -212,7 +219,8 @@ export interface PendingChoice {
     | 'VIEW_ONLY'
     | 'SELECT_EFFECT_UPGRADE'
     | 'SWAP_LEADER'
-    | 'RECOVER_BP01_069';
+    | 'RECOVER_BP01_069'
+    | 'BP01_022_YANGYANG_SWAP';
   targetSlot?: 'leader' | 'leftSupport' | 'rightSupport';
 }
 

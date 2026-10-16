@@ -594,11 +594,11 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                     {/* HP 바 */}
                     <div className="flex items-center gap-2.5 bg-slate-950 px-4 py-2 rounded-full border border-slate-800 shadow-inner">
                       <Heart className="w-5 h-5 text-red-400 fill-red-400" />
-                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p1.hp} / 10</span>
+                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p1.hp} / {p1.maxHp || 20}</span>
                       <div className="w-28 sm:w-40 bg-slate-800 h-3 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
                           className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
-                          style={{ width: `${Math.max(0, (p1.hp / 10) * 100)}%` }}
+                          style={{ width: `${Math.max(0, (p1.hp / (p1.maxHp || 20)) * 100)}%` }}
                         />
                       </div>
                     </div>
@@ -796,11 +796,11 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                     {/* HP 바 */}
                     <div className="flex items-center gap-2.5 bg-slate-950 px-4 py-2 rounded-full border border-slate-800 shadow-inner">
                       <Heart className="w-5 h-5 text-red-400 fill-red-400" />
-                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p0.hp} / 10</span>
+                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p0.hp} / {p0.maxHp || 20}</span>
                       <div className="w-28 sm:w-40 bg-slate-800 h-3 rounded-full overflow-hidden ml-1 border border-slate-700/50">
                         <div
                           className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
-                          style={{ width: `${Math.max(0, (p0.hp / 10) * 100)}%` }}
+                          style={{ width: `${Math.max(0, (p0.hp / (p0.maxHp || 20)) * 100)}%` }}
                         />
                       </div>
                     </div>
