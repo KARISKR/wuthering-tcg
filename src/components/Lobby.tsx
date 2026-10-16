@@ -60,6 +60,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
+  const [isPatchSummaryOpen, setIsPatchSummaryOpen] = useState(true);
 
   return (
     <div className="relative min-h-screen w-full bg-[#070a13] text-slate-100 flex flex-col justify-between overflow-x-hidden">
@@ -149,11 +150,9 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </header>
 
-      {/* 2. 메인 콘텐츠 (좌측 대전 메뉴 + 우측 최신 패치노트 요약 사이드바) */}
-      <main className="relative z-20 flex-1 max-w-[1500px] w-full mx-auto px-4 sm:px-6 py-6 flex flex-col xl:flex-row items-start justify-center gap-6">
-        {/* 좌측 메인 듀얼 메뉴 영역 */}
-        <div className="flex-1 w-full flex flex-col items-center justify-center gap-6">
-          {/* 타이틀 히어로 영역 */}
+      {/* 2. 메인 중앙 콘텐츠 (100% 정중앙 불변 유지) */}
+      <main className="relative z-20 flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col items-center justify-center gap-8">
+        {/* 타이틀 히어로 영역 */}
         <div className="text-center space-y-2 max-w-2xl">
           <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 font-extrabold text-xs tracking-widest uppercase shadow-lg shadow-amber-500/10">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -398,90 +397,110 @@ export const Lobby: React.FC<LobbyProps> = ({
             <span>승리 조건: 상대 생명력(20pt) 0으로 격파</span>
           </div>
         </div>
-      </div>
+      </main>
 
-      {/* 우측 공간: 최신 패치노트 요약 위젯 */}
-      <aside className="w-full xl:w-[350px] 2xl:w-[380px] shrink-0 flex flex-col gap-4 bg-slate-900/85 backdrop-blur-md border border-amber-500/40 rounded-2xl p-5 shadow-2xl shadow-amber-950/20">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <ScrollText className="w-5 h-5 text-amber-400" />
-            <h3 className="font-black text-sm text-white tracking-wide">최신 패치노트 요약</h3>
-          </div>
-          <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black shadow">
-            {CURRENT_GAME_VERSION}
-          </span>
-        </div>
-
-        <div className="space-y-1">
-          <h4 className="text-xs font-black text-amber-300 leading-snug">
-            {LATEST_PATCH_NOTE.title}
-          </h4>
-          <p className="text-[11px] text-slate-400 font-mono">
-            릴리즈 일자: {LATEST_PATCH_NOTE.releaseDate}
-          </p>
-        </div>
-
-        <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-          {LATEST_PATCH_NOTE.summary}
-        </p>
-
-        {/* 주요 변경사항 하이라이트 */}
-        <div className="space-y-2.5">
-          <div className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-            <span>주요 업데이트 항목</span>
-          </div>
-          <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-            {LATEST_PATCH_NOTE.sections.map((sec, idx) => (
-              <div
-                key={idx}
-                className="p-2.5 rounded-xl bg-slate-950/50 border border-slate-800/80 flex flex-col gap-1"
+      {/* 3. 우측 빈 공간 플로팅 위젯: 최신 패치노트 요약 (메인 UI 흐름과 100% 분리되어 메인 센터 레이아웃을 절대 밀지 않음) */}
+      {isPatchSummaryOpen ? (
+        <aside className="fixed right-3 2xl:right-6 top-20 z-30 w-72 2xl:w-80 max-h-[calc(100vh-6rem)] overflow-y-auto bg-slate-900/95 backdrop-blur-md border border-amber-500/40 rounded-2xl p-4 shadow-2xl shadow-black/80 flex flex-col gap-3 animate-in fade-in slide-in-from-right-4 duration-200">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+            <div className="flex items-center gap-2">
+              <ScrollText className="w-4 h-4 text-amber-400" />
+              <h3 className="font-black text-xs text-white tracking-wide">v1.1 패치노트 요약</h3>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-black">
+                {CURRENT_GAME_VERSION}
+              </span>
+              <button
+                onClick={() => setIsPatchSummaryOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 text-xs transition cursor-pointer"
+                title="요약창 닫기 (접기)"
               >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`text-[9px] px-1.5 py-0.2 rounded font-black ${
-                      sec.tag === 'NEW'
-                        ? 'bg-amber-500 text-slate-950'
-                        : sec.tag === 'FIX'
-                        ? 'bg-emerald-500 text-slate-950'
-                        : 'bg-cyan-500 text-slate-950'
-                    }`}
-                  >
-                    {sec.tag}
-                  </span>
-                  <span className="text-xs font-bold text-slate-200">{sec.title}</span>
-                </div>
-                <ul className="text-[11px] text-slate-400 space-y-0.5 pl-2 list-disc list-inside">
-                  {sec.items.slice(0, 2).map((item, itemIdx) => (
-                    <li key={itemIdx} className="leading-snug truncate" title={item}>
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
+                ✕
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* 액션 버튼 */}
-        <div className="pt-2 flex flex-col gap-2">
-          <button
-            onClick={() => setIsPatchNotesOpen(true)}
-            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-lg shadow-amber-500/20"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>전체 패치노트 전문 보기</span>
-          </button>
-          <button
-            onClick={() => setIsFeedbackOpen(true)}
-            className="w-full py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
-          >
-            <Bug className="w-3.5 h-3.5 text-red-400" />
-            <span>버그 제보 & 피드백 남기기</span>
-          </button>
-        </div>
-      </aside>
-    </main>
+          <div className="space-y-0.5">
+            <h4 className="text-[11px] font-black text-amber-300 leading-snug">
+              {LATEST_PATCH_NOTE.title}
+            </h4>
+            <p className="text-[10px] text-slate-400 font-mono">
+              릴리즈 일자: {LATEST_PATCH_NOTE.releaseDate}
+            </p>
+          </div>
+
+          <p className="text-[11px] text-slate-300 leading-relaxed bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/80">
+            {LATEST_PATCH_NOTE.summary}
+          </p>
+
+          {/* 주요 변경사항 하이라이트 */}
+          <div className="space-y-2">
+            <div className="text-[10px] font-bold text-slate-400 flex items-center gap-1 uppercase tracking-wider">
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              <span>주요 업데이트 항목</span>
+            </div>
+            <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
+              {LATEST_PATCH_NOTE.sections.map((sec, idx) => (
+                <div
+                  key={idx}
+                  className="p-2 rounded-xl bg-slate-950/50 border border-slate-800/80 flex flex-col gap-0.5"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`text-[8px] px-1 py-0.2 rounded font-black ${
+                        sec.tag === 'NEW'
+                          ? 'bg-amber-500 text-slate-950'
+                          : sec.tag === 'FIX'
+                          ? 'bg-emerald-500 text-slate-950'
+                          : 'bg-cyan-500 text-slate-950'
+                      }`}
+                    >
+                      {sec.tag}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-200">{sec.title}</span>
+                  </div>
+                  <ul className="text-[10px] text-slate-400 space-y-0.5 pl-1.5 list-disc list-inside">
+                    {sec.items.slice(0, 2).map((item, itemIdx) => (
+                      <li key={itemIdx} className="leading-snug truncate" title={item}>
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 액션 버튼 */}
+          <div className="pt-1 flex flex-col gap-1.5">
+            <button
+              onClick={() => setIsPatchNotesOpen(true)}
+              className="w-full py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-[11px] flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md shadow-amber-500/20"
+            >
+              <BookOpen className="w-3 h-3" />
+              <span>전체 패치노트 전문 보기</span>
+            </button>
+            <button
+              onClick={() => setIsFeedbackOpen(true)}
+              className="w-full py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 text-[10px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+            >
+              <Bug className="w-3 h-3 text-red-400" />
+              <span>버그 제보 & 피드백 남기기</span>
+            </button>
+          </div>
+        </aside>
+      ) : (
+        <button
+          onClick={() => setIsPatchSummaryOpen(true)}
+          className="fixed right-3 2xl:right-6 top-20 z-30 px-3 py-2 rounded-xl bg-slate-900/90 border border-amber-500/50 text-amber-300 shadow-xl flex items-center gap-2 hover:bg-slate-800 hover:border-amber-400 transition cursor-pointer"
+          title="v1.1 패치노트 요약 열기"
+        >
+          <ScrollText className="w-4 h-4 text-amber-400" />
+          <span className="text-xs font-black">v1.1 패치요약</span>
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        </button>
+      )}
 
       {/* 푸터 영역 */}
       <footer className="relative z-20 h-14 border-t border-slate-900 bg-slate-950/50 px-6 flex items-center justify-between text-xs text-slate-500">
