@@ -851,13 +851,47 @@ export function executeStartPhase(state: GameState): GameState {
   );
 
   // 캐릭터 패시브 확인
-  // 1) Lv.2 방랑자 패시브: 턴 시작 시 추가 드로우 1장 (방랑자 Lv.2 이상이거나 하위 스택 보유 시)
-  const hasRoverLv2 = slotHasCharacterSkill(activePlayer.slots.leader, '방랑자', 2);
-  if (hasRoverLv2) {
+  // 1) SD01-001 방랑자(여) Lv.2: 【자신의 턴 시작 시】카드 1장을 뽑는다.
+  //    ※ 공식 카드 텍스트에 【리더】 제한이 없으므로, 다른 카드가 리더이고 방랑자(여)가 백(서포터) 자리에 있어도 정상 발동
+  const allActiveChars = getActiveCharacterCards(activePlayer);
+  const roverFemaleTurnStartCard = allActiveChars.find(({ card }) => {
+    if (card.code === 'SD01-001') return true;
+    const isRoverFemale =
+      card.nameKr.includes('방랑자(여)') ||
+      card.characterName.includes('방랑자(여)') ||
+      (card.characterName === '방랑자' && !card.nameKr.includes('방랑자(남)'));
+    return (
+      isRoverFemale &&
+      card.level >= 2 &&
+      (card.description?.includes('턴 시작 시') || card.description?.includes('턴 시작시'))
+    );
+  });
+
+  if (roverFemaleTurnStartCard) {
     const card = drawSingleCardFromDeck(activePlayer);
     if (card) {
       addCardsToHand(activePlayer, [card]);
-      newState = addLog(newState, `[방랑자 Lv.2 패시브] ${activePlayer.name}이(가) 카드를 1장 추가 드로우했습니다.`, 'ACTION', activeIdx);
+      const slotNameKr = roverFemaleTurnStartCard.isLeader
+        ? '리더'
+        : roverFemaleTurnStartCard.slotKey === 'leftSupport'
+        ? '좌측 서포터(백)'
+        : '우측 서포터(백)';
+      newState = addLog(
+        newState,
+        `[방랑자(여) Lv.2 턴 시작 효과] ${slotNameKr} 자리에 있는 방랑자(여)의 효과로 덱에서 카드를 1장 드로우했습니다.`,
+        'ACTION',
+        activeIdx
+      );
+      newState.lastEffectEvent = {
+        id: `effect-rover-female-draw-${Date.now()}`,
+        effectType: 'DRAW',
+        title: '방랑자(여) Lv.2 효과',
+        description: `【자신의 턴 시작 시】${slotNameKr} 자리에 있는 방랑자(여)의 효과로 카드 1장을 드로우했습니다.`,
+        sourceCardName: '방랑자(여) Lv.2 [SD01-001]',
+        sourceCardArt: roverFemaleTurnStartCard.card.artUrl || '/cards/card_images/SD01-001_방랑자(여)_1139.webp',
+        playerIndex: activeIdx,
+        timestamp: Date.now(),
+      };
     }
   }
 
