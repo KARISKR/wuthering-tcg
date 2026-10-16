@@ -70,6 +70,10 @@ import {
   ExternalLink,
   AlertTriangle,
   AlertCircle,
+  ZoomIn,
+  ZoomOut,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
 import { BgmPlayer } from './BgmPlayer';
@@ -636,6 +640,57 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 좌측 패널 탭 (카드 상세 정보 vs 실시간 대전 기록 타임라인)
   const [leftPanelTab, setLeftPanelTab] = useState<'PREVIEW' | 'LOG'>('PREVIEW');
 
+  // 좌측 카드 상세 패널 크기 ('compact' 300px | 'normal' 400px | 'wide' 500px) 및 접힘 상태
+  type LeftPanelSize = 'compact' | 'normal' | 'wide';
+  const [leftPanelSize, setLeftPanelSize] = useState<LeftPanelSize>(() => {
+    return (localStorage.getItem('wuthering_left_panel_size') as LeftPanelSize) || 'normal';
+  });
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('wuthering_left_panel_collapsed') === 'true';
+  });
+
+  // 전장(플레이매트) 배율 줌 상태 (0.75 ~ 1.25, 기본 1.0)
+  const [arenaZoom, setArenaZoom] = useState<number>(() => {
+    const saved = localStorage.getItem('wuthering_arena_zoom');
+    return saved ? parseFloat(saved) : 1.0;
+  });
+
+  const changeLeftPanelSize = (size: LeftPanelSize) => {
+    setLeftPanelSize(size);
+    setIsLeftPanelCollapsed(false);
+    localStorage.setItem('wuthering_left_panel_size', size);
+    localStorage.setItem('wuthering_left_panel_collapsed', 'false');
+  };
+
+  const toggleLeftPanelCollapsed = () => {
+    setIsLeftPanelCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('wuthering_left_panel_collapsed', String(next));
+      return next;
+    });
+  };
+
+  const changeArenaZoom = (delta: number) => {
+    setArenaZoom((prev) => {
+      const next = Math.max(0.75, Math.min(1.25, Math.round((prev + delta) * 10) / 10));
+      localStorage.setItem('wuthering_arena_zoom', String(next));
+      return next;
+    });
+  };
+
+  const resetArenaZoom = () => {
+    setArenaZoom(1.0);
+    localStorage.setItem('wuthering_arena_zoom', '1');
+  };
+
+  const leftPanelWidthClass = isLeftPanelCollapsed
+    ? 'w-12 min-w-[48px]'
+    : leftPanelSize === 'compact'
+    ? 'w-[280px] lg:w-[310px] min-w-[260px]'
+    : leftPanelSize === 'wide'
+    ? 'w-[440px] lg:w-[480px] xl:w-[520px] 2xl:w-[560px] min-w-[420px]'
+    : 'w-[360px] lg:w-[400px] xl:w-[440px] 2xl:w-[480px] min-w-[340px]';
+
   // 대미지 및 회복 트랜지션 애니메이션 상태 (실시간 피격 및 회복 팝업)
   const [p0DamageAlert, setP0DamageAlert] = useState<{ prev: number; curr: number; diff: number } | null>(null);
   const [p1DamageAlert, setP1DamageAlert] = useState<{ prev: number; curr: number; diff: number } | null>(null);
@@ -1014,6 +1069,33 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
         {/* 우측 퀵 컨트롤 버튼 */}
         <div className="flex items-center gap-1.5">
+          {/* 전장(플레이매트) 배율 줌 컨트롤러 */}
+          <div className="flex items-center gap-0.5 bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-800 shadow-md">
+            <button
+              onClick={() => changeArenaZoom(-0.1)}
+              disabled={arenaZoom <= 0.75}
+              className="p-1 rounded-lg hover:bg-slate-800 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
+              title="전장 축소 (-10%) - 작은 화면에서 스크롤 없이 보기"
+            >
+              <ZoomOut className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+            <button
+              onClick={resetArenaZoom}
+              className="px-1.5 py-0.5 rounded-lg text-xs font-mono font-black text-amber-300 hover:bg-slate-800 transition cursor-pointer"
+              title="클릭 시 기본 배율(100%)로 복원"
+            >
+              {Math.round(arenaZoom * 100)}%
+            </button>
+            <button
+              onClick={() => changeArenaZoom(0.1)}
+              disabled={arenaZoom >= 1.25}
+              className="p-1 rounded-lg hover:bg-slate-800 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
+              title="전장 확대 (+10%) - 대형 모니터에서 크게 보기"
+            >
+              <ZoomIn className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+          </div>
+
           <div className="hidden lg:block mr-2">
             <BgmPlayer />
           </div>
@@ -1073,11 +1155,89 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* --------------------------------------------------------- */}
         {/* [좌측 패널] 덱 빌더 동일 규격 초대형 카드 상세 패널 (모든 텍스트/효과 선명히 표시) */}
         {/* --------------------------------------------------------- */}
-        <div
-          ref={leftPanelRef}
-          onWheel={handleLeftPanelWheel}
-          className="w-[360px] lg:w-[400px] xl:w-[440px] 2xl:w-[480px] shrink-0 min-w-[340px] bg-slate-950 border-r border-slate-800 p-3.5 sm:p-4 flex flex-col justify-start overflow-y-auto overflow-x-hidden custom-scrollbar select-text relative h-full min-h-0"
-        >
+        {isLeftPanelCollapsed ? (
+          <div className="w-12 shrink-0 bg-slate-950 border-r border-slate-800 py-3 flex flex-col items-center justify-between h-full select-none z-20">
+            <div className="flex flex-col items-center gap-3">
+              <button
+                onClick={toggleLeftPanelCollapsed}
+                className="w-8 h-8 rounded-xl bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-500/50 flex items-center justify-center transition cursor-pointer shadow"
+                title="카드 상세 패널 펼치기"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+
+              <div
+                onClick={toggleLeftPanelCollapsed}
+                className="cursor-pointer text-xs font-black tracking-widest text-slate-400 hover:text-amber-300 py-4 transition flex items-center gap-2"
+                style={{ writingMode: 'vertical-rl' }}
+              >
+                <span>카드 상세 정보</span>
+                <Layers className="w-3.5 h-3.5 transform -rotate-90 text-amber-400" />
+              </div>
+            </div>
+
+            {previewCard && (
+              <div
+                onClick={toggleLeftPanelCollapsed}
+                className="w-8 h-11 rounded-lg overflow-hidden border border-amber-500/40 shadow cursor-pointer hover:scale-110 transition"
+                title={`${previewCard.nameKr} (클릭하여 패널 펼치기)`}
+              >
+                <img
+                  src={(previewCard as any).artUrl}
+                  alt={previewCard.nameKr}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div
+            ref={leftPanelRef}
+            onWheel={handleLeftPanelWheel}
+            className={`${leftPanelWidthClass} shrink-0 bg-slate-950 border-r border-slate-800 p-3.5 sm:p-4 flex flex-col justify-start overflow-y-auto overflow-x-hidden custom-scrollbar select-text relative h-full min-h-0 transition-all duration-200`}
+          >
+            {/* 패널 상단: 크기 조절 버튼 & 접기 버튼 */}
+            <div className="flex items-center justify-between gap-1.5 mb-2.5">
+              <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-[11px] font-bold text-slate-400">
+                <span className="text-[10px] text-slate-500 px-1 font-mono hidden sm:inline">패널</span>
+                <button
+                  onClick={() => changeLeftPanelSize('compact')}
+                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
+                    leftPanelSize === 'compact' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  }`}
+                  title="작게 (노트북 화면용 300px)"
+                >
+                  S
+                </button>
+                <button
+                  onClick={() => changeLeftPanelSize('normal')}
+                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
+                    leftPanelSize === 'normal' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  }`}
+                  title="기본 (표준 화면용 400px)"
+                >
+                  M
+                </button>
+                <button
+                  onClick={() => changeLeftPanelSize('wide')}
+                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
+                    leftPanelSize === 'wide' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  }`}
+                  title="크게 (대형 모니터용 500px)"
+                >
+                  L
+                </button>
+              </div>
+
+              <button
+                onClick={toggleLeftPanelCollapsed}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs font-bold transition cursor-pointer shadow"
+                title="좌측 패널 접어서 전장(플레이매트) 넓게 보기"
+              >
+                <PanelLeftClose className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">접기</span>
+              </button>
+            </div>
           {/* 상단 탭 스위처: [카드 상세 정보] ↔ [실시간 대전 기록] */}
           <div className="flex items-center gap-1.5 mb-3 p-1 bg-slate-900/90 rounded-xl border border-slate-800 shrink-0">
             <button
@@ -1372,6 +1532,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             마우스 스크롤 & 손패 호버 실시간 연동
           </div>
         </div>
+      )}
 
         {/* ========================================================= */}
         {/* [중앙 배틀 컬럼] 공식 플레이매트 (상단 스크롤) + 내 손패 (하단 고정) */}
@@ -1383,7 +1544,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             onScroll={handleArenaScroll}
             className="flex-1 flex flex-col items-center py-2 px-3 overflow-y-auto min-h-0 custom-scrollbar"
           >
-            <div className="w-full max-w-[1360px] flex flex-col items-center gap-3.5 mx-auto py-1">
+            <div
+              className="w-full max-w-[1360px] flex flex-col items-center gap-3.5 mx-auto py-1 transition-all duration-200"
+              style={{
+                zoom: arenaZoom,
+              }}
+            >
               {/* ------------------------------------------------------- */}
               {/* 1. 상대방 공식 플레이매트 (상단 - 대칭 마주보기 구조) */}
               {/* ------------------------------------------------------- */}

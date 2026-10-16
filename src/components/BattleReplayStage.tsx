@@ -36,6 +36,10 @@ import {
   User,
   Home,
   Eye,
+  ZoomIn,
+  ZoomOut,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 
 interface BattleReplayStageProps {
@@ -124,6 +128,57 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
 
   // 손패 검증 뷰어 대상 플레이어 (0: 1P, 1: 2P)
   const [selectedHandPlayer, setSelectedHandPlayer] = useState<0 | 1>(0);
+
+  // 좌측 카드 상세 패널 크기 ('compact' 300px | 'normal' 400px | 'wide' 500px) 및 접힘 상태
+  type LeftPanelSize = 'compact' | 'normal' | 'wide';
+  const [leftPanelSize, setLeftPanelSize] = useState<LeftPanelSize>(() => {
+    return (localStorage.getItem('wuthering_left_panel_size') as LeftPanelSize) || 'normal';
+  });
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem('wuthering_left_panel_collapsed') === 'true';
+  });
+
+  // 전장(플레이매트) 배율 줌 상태 (0.75 ~ 1.25, 기본 1.0)
+  const [arenaZoom, setArenaZoom] = useState<number>(() => {
+    const saved = localStorage.getItem('wuthering_arena_zoom');
+    return saved ? parseFloat(saved) : 1.0;
+  });
+
+  const changeLeftPanelSize = (size: LeftPanelSize) => {
+    setLeftPanelSize(size);
+    setIsLeftPanelCollapsed(false);
+    localStorage.setItem('wuthering_left_panel_size', size);
+    localStorage.setItem('wuthering_left_panel_collapsed', 'false');
+  };
+
+  const toggleLeftPanelCollapsed = () => {
+    setIsLeftPanelCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('wuthering_left_panel_collapsed', String(next));
+      return next;
+    });
+  };
+
+  const changeArenaZoom = (delta: number) => {
+    setArenaZoom((prev) => {
+      const next = Math.max(0.75, Math.min(1.25, Math.round((prev + delta) * 10) / 10));
+      localStorage.setItem('wuthering_arena_zoom', String(next));
+      return next;
+    });
+  };
+
+  const resetArenaZoom = () => {
+    setArenaZoom(1.0);
+    localStorage.setItem('wuthering_arena_zoom', '1');
+  };
+
+  const leftPanelWidthClass = isLeftPanelCollapsed
+    ? 'w-12 min-w-[48px]'
+    : leftPanelSize === 'compact'
+    ? 'w-[280px] lg:w-[310px] min-w-[260px]'
+    : leftPanelSize === 'wide'
+    ? 'w-[440px] lg:w-[480px] xl:w-[520px] 2xl:w-[560px] min-w-[420px]'
+    : 'w-[360px] lg:w-[400px] xl:w-[440px] 2xl:w-[480px] min-w-[340px]';
 
   // 카드 미리보기 상태 (기본적으로 현재 사용된 카드 또는 리더)
   const [previewCard, setPreviewCard] = useState<AnyCard | null>(null);
@@ -395,8 +450,35 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
           </button>
         </div>
 
-        {/* 우측 BGM 및 스텝 인디케이터 */}
+        {/* 우측 전장 배율, BGM 및 스텝 인디케이터 */}
         <div className="flex items-center gap-2">
+          {/* 전장 배율 줌 컨트롤러 */}
+          <div className="flex items-center gap-0.5 bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-800 shadow-md">
+            <button
+              onClick={() => changeArenaZoom(-0.1)}
+              disabled={arenaZoom <= 0.75}
+              className="p-1 rounded-lg hover:bg-slate-800 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
+              title="전장 축소 (-10%) - 작은 화면에서 스크롤 없이 보기"
+            >
+              <ZoomOut className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+            <button
+              onClick={resetArenaZoom}
+              className="px-1.5 py-0.5 rounded-lg text-xs font-mono font-black text-amber-300 hover:bg-slate-800 transition cursor-pointer"
+              title="클릭 시 기본 배율(100%)로 복원"
+            >
+              {Math.round(arenaZoom * 100)}%
+            </button>
+            <button
+              onClick={() => changeArenaZoom(0.1)}
+              disabled={arenaZoom >= 1.25}
+              className="p-1 rounded-lg hover:bg-slate-800 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
+              title="전장 확대 (+10%) - 대형 모니터에서 크게 보기"
+            >
+              <ZoomIn className="w-3.5 h-3.5 text-amber-400" />
+            </button>
+          </div>
+
           <div className="hidden lg:block mr-2">
             <BgmPlayer />
           </div>
@@ -432,162 +514,242 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
         {/* ======================================================= */}
         {/* [좌측 패널] 실제 배틀과 100% 동일 규격 카드 상세 패널 */}
         {/* ======================================================= */}
-        <div className="w-[360px] lg:w-[400px] xl:w-[440px] 2xl:w-[480px] shrink-0 min-w-[340px] bg-slate-950 border-r border-slate-800 p-3.5 sm:p-4 flex flex-col justify-start overflow-y-auto overflow-x-hidden custom-scrollbar select-text relative h-full min-h-0">
-          <div className="flex flex-col space-y-3">
-            {previewCard ? (
-              <>
-                {/* 실물 일러스트 대형 카드 */}
-                <div className="relative w-full max-w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-2xl p-1 overflow-hidden ring-2 ring-amber-500/30 group mx-auto shrink-0">
-                  <img
-                    src={(previewCard as any).artUrl}
-                    alt={previewCard.nameKr}
-                    className="w-full h-auto object-contain rounded-xl shadow-2xl drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)] transition-transform duration-300 group-hover:scale-[1.01]"
-                  />
-                </div>
+        {isLeftPanelCollapsed ? (
+          <div className="w-12 shrink-0 bg-slate-950 border-r border-slate-800 py-3 flex flex-col items-center justify-between h-full select-none z-20">
+            <div className="flex flex-col items-center gap-3">
+              <button
+                onClick={toggleLeftPanelCollapsed}
+                className="w-8 h-8 rounded-xl bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-500/50 flex items-center justify-center transition cursor-pointer shadow"
+                title="카드 상세 패널 펼치기"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
 
-                {/* 카드 타이틀 & 배지 */}
-                <div className="shrink-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-xs font-black tracking-wide ${
-                        previewCard.kind === 'CHARACTER'
-                          ? 'bg-amber-500 text-slate-950'
-                          : previewCard.color === 'RED'
-                          ? 'bg-red-500 text-white'
-                          : previewCard.color === 'GREEN'
-                          ? 'bg-emerald-500 text-white'
-                          : 'bg-cyan-500 text-white'
-                      }`}
-                    >
-                      {previewCard.kind === 'CHARACTER'
-                        ? `캐릭터 Lv.${(previewCard as CharacterCard).level}`
-                        : `${(previewCard as ActionCard).color} 액션`}
-                    </span>
-                    <span className="text-[11px] font-mono font-bold text-amber-300 bg-slate-900 border border-slate-700 px-2 py-0.5 rounded shadow">
-                      {previewCard.code}
-                    </span>
-                  </div>
+              <div
+                onClick={toggleLeftPanelCollapsed}
+                className="cursor-pointer text-xs font-black tracking-widest text-slate-400 hover:text-amber-300 py-4 transition flex items-center gap-2"
+                style={{ writingMode: 'vertical-rl' }}
+              >
+                <span>카드 상세 정보</span>
+                <Layers className="w-3.5 h-3.5 transform -rotate-90 text-amber-400" />
+              </div>
+            </div>
 
-                  <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
-                    {previewCard.nameKr}
-                  </h3>
-
-                  {'characterExclusive' in previewCard && previewCard.characterExclusive && (
-                    <p className="text-xs text-amber-400 font-bold mt-0.5">
-                      전용: {previewCard.characterExclusive}
-                    </p>
-                  )}
-                </div>
-
-                {/* 스탯 바 */}
-                <div className="bg-slate-900 rounded-xl p-2.5 border border-slate-800 grid grid-cols-3 gap-1.5 text-center shrink-0">
-                  {previewCard.kind === 'ACTION' ? (
-                    <>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] text-slate-400 font-bold mb-0.5">비용 (COST)</span>
-                        <strong className="text-lg sm:text-xl text-amber-400 font-black">{previewCard.cost}</strong>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] text-slate-400 font-bold mb-0.5">속도 (SPEED)</span>
-                        <strong className="text-lg sm:text-xl text-amber-300 font-black">{previewCard.speed ?? '-'}</strong>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] text-slate-400 font-bold mb-0.5">피해 (DMG)</span>
-                        <strong className="text-lg sm:text-xl text-red-400 font-black">{previewCard.damage}</strong>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] text-slate-400 font-bold mb-0.5">레벨</span>
-                        <strong className="text-lg sm:text-xl text-amber-400 font-black">Lv.{previewCard.level}</strong>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] text-slate-400 font-bold mb-0.5">속성</span>
-                        <strong className="text-lg sm:text-xl text-cyan-400 font-black">{getElementKr(previewCard.element)}</strong>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[11px] text-slate-400 font-bold mb-0.5">무기</span>
-                        <strong className="text-lg sm:text-xl text-slate-200 font-black">{officialPreview?.weaponType || '직검'}</strong>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                {/* 공식 효과 텍스트 원문 */}
-                <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800 space-y-1 shrink-0">
-                  <span className="text-xs font-black text-amber-300 flex items-center gap-1">
-                    <Info className="w-3.5 h-3.5 text-amber-400" />
-                    공식 효과 텍스트 {previewCard.kind === 'CHARACTER' ? `(Lv.${previewCard.level} 현재 레벨)` : ''}
-                  </span>
-                  <p className="text-xs sm:text-sm text-slate-100 leading-relaxed whitespace-pre-line font-medium max-h-[140px] overflow-y-auto pr-1">
-                    {previewCard.description}
-                  </p>
-                </div>
-
-                {/* 캐릭터 레벨업 진화 스택 & 누적 상속 스킬 (공식 룰: 하위 카드 효과 영구 보유) */}
-                {previewCard.kind === 'CHARACTER' && (
-                  <div className="bg-slate-900/95 rounded-xl p-3 border border-amber-500/40 space-y-2 shrink-0 shadow-lg">
-                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-                      <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-amber-400" />
-                        <span>진화 스택 & 누적 상속 스킬</span>
-                      </span>
-                      <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                        {previewCard.underlyingCards && previewCard.underlyingCards.length > 0
-                          ? `스택: 총 ${previewCard.underlyingCards.length + 1}장 보유`
-                          : `Lv.${previewCard.level} 단일`}
-                      </span>
-                    </div>
-
-                    {/* 하위 카드 스택이 있는 경우 */}
-                    {previewCard.underlyingCards && previewCard.underlyingCards.length > 0 ? (
-                      <div className="space-y-2">
-                        <div className="text-[11px] text-amber-200/90 bg-amber-950/40 border border-amber-500/20 p-2 rounded-lg leading-relaxed flex items-start gap-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                          <span>
-                            공식 룰: 레벨업한 캐릭터는 하위에 겹쳐진 <strong>이전 레벨의 모든 스킬 효과를 영구 상속하여 함께 보유</strong>합니다.
-                          </span>
-                        </div>
-
-                        {/* 상속된 이전 레벨 스킬 카드 목록 */}
-                        {previewCard.underlyingCards.map((underCard, idx) => (
-                          <div
-                            key={underCard.id || idx}
-                            onClick={() => setPreviewCard({ ...underCard, underlyingCards: previewCard.underlyingCards })}
-                            className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-700 hover:border-amber-400 transition cursor-pointer group"
-                            title="클릭하여 이 카드의 대형 일러스트와 원문 스탯 보기"
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-black text-[10px] border border-amber-400/30 flex items-center gap-1">
-                                <Crown className="w-2.5 h-2.5" />
-                                <span>Lv.{underCard.level} 상속 효과</span>
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-mono group-hover:text-amber-300">
-                                {underCard.nameKr}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-medium pl-1">
-                              {underCard.description}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-slate-400 leading-relaxed">
-                        캐릭터가 레벨업되면 기존 카드가 하위 스택으로 누적되며, 이전 레벨의 모든 스킬 효과가 이곳에 표시되고 함께 발동됩니다.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="my-auto text-center text-slate-500 text-sm py-12">
-                필드나 손패의 카드에 마우스를 올리면<br />상세 정보와 대형 일러스트가 여기에 표시됩니다.
+            {previewCard && (
+              <div
+                onClick={toggleLeftPanelCollapsed}
+                className="w-8 h-11 rounded-lg overflow-hidden border border-amber-500/40 shadow cursor-pointer hover:scale-110 transition"
+                title={`${previewCard.nameKr} (클릭하여 패널 펼치기)`}
+              >
+                <img
+                  src={(previewCard as any).artUrl}
+                  alt={previewCard.nameKr}
+                  className="w-full h-full object-cover"
+                />
               </div>
             )}
           </div>
-        </div>
+        ) : (
+          <div className={`${leftPanelWidthClass} shrink-0 bg-slate-950 border-r border-slate-800 p-3.5 sm:p-4 flex flex-col justify-start overflow-y-auto overflow-x-hidden custom-scrollbar select-text relative h-full min-h-0 transition-all duration-200`}>
+            {/* 패널 상단: 크기 조절 버튼 & 접기 버튼 */}
+            <div className="flex items-center justify-between gap-1.5 mb-2.5">
+              <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-[11px] font-bold text-slate-400">
+                <span className="text-[10px] text-slate-500 px-1 font-mono hidden sm:inline">패널</span>
+                <button
+                  onClick={() => changeLeftPanelSize('compact')}
+                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
+                    leftPanelSize === 'compact' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  }`}
+                  title="작게 (노트북 화면용 300px)"
+                >
+                  S
+                </button>
+                <button
+                  onClick={() => changeLeftPanelSize('normal')}
+                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
+                    leftPanelSize === 'normal' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  }`}
+                  title="기본 (표준 화면용 400px)"
+                >
+                  M
+                </button>
+                <button
+                  onClick={() => changeLeftPanelSize('wide')}
+                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
+                    leftPanelSize === 'wide' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  }`}
+                  title="크게 (대형 모니터용 500px)"
+                >
+                  L
+                </button>
+              </div>
+
+              <button
+                onClick={toggleLeftPanelCollapsed}
+                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs font-bold transition cursor-pointer shadow"
+                title="좌측 패널 접어서 전장(플레이매트) 넓게 보기"
+              >
+                <PanelLeftClose className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">접기</span>
+              </button>
+            </div>
+
+            <div className="flex flex-col space-y-3">
+              {previewCard ? (
+                <>
+                  {/* 실물 일러스트 대형 카드 */}
+                  <div className="relative w-full max-w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-2xl p-1 overflow-hidden ring-2 ring-amber-500/30 group mx-auto shrink-0">
+                    <img
+                      src={(previewCard as any).artUrl}
+                      alt={previewCard.nameKr}
+                      className="w-full h-auto object-contain rounded-xl shadow-2xl drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)] transition-transform duration-300 group-hover:scale-[1.01]"
+                    />
+                  </div>
+
+                  {/* 카드 타이틀 & 배지 */}
+                  <div className="shrink-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-xs font-black tracking-wide ${
+                          previewCard.kind === 'CHARACTER'
+                            ? 'bg-amber-500 text-slate-950'
+                            : previewCard.color === 'RED'
+                            ? 'bg-red-500 text-white'
+                            : previewCard.color === 'GREEN'
+                            ? 'bg-emerald-500 text-white'
+                            : 'bg-cyan-500 text-white'
+                        }`}
+                      >
+                        {previewCard.kind === 'CHARACTER'
+                          ? `캐릭터 Lv.${(previewCard as CharacterCard).level}`
+                          : `${(previewCard as ActionCard).color} 액션`}
+                      </span>
+                      <span className="text-[11px] font-mono font-bold text-amber-300 bg-slate-900 border border-slate-700 px-2 py-0.5 rounded shadow">
+                        {previewCard.code}
+                      </span>
+                    </div>
+
+                    <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
+                      {previewCard.nameKr}
+                    </h3>
+
+                    {'characterExclusive' in previewCard && previewCard.characterExclusive && (
+                      <p className="text-xs text-amber-400 font-bold mt-0.5">
+                        전용: {previewCard.characterExclusive}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* 스탯 바 */}
+                  <div className="bg-slate-900 rounded-xl p-2.5 border border-slate-800 grid grid-cols-3 gap-1.5 text-center shrink-0">
+                    {previewCard.kind === 'ACTION' ? (
+                      <>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">비용 (COST)</span>
+                          <strong className="text-lg sm:text-xl text-amber-400 font-black">{previewCard.cost}</strong>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">속도 (SPEED)</span>
+                          <strong className="text-lg sm:text-xl text-amber-300 font-black">{previewCard.speed ?? '-'}</strong>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">피해 (DMG)</span>
+                          <strong className="text-lg sm:text-xl text-red-400 font-black">{previewCard.damage}</strong>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">레벨</span>
+                          <strong className="text-lg sm:text-xl text-amber-400 font-black">Lv.{previewCard.level}</strong>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">속성</span>
+                          <strong className="text-lg sm:text-xl text-cyan-400 font-black">{getElementKr(previewCard.element)}</strong>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">무기</span>
+                          <strong className="text-lg sm:text-xl text-slate-200 font-black">{officialPreview?.weaponType || '직검'}</strong>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* 공식 효과 텍스트 원문 */}
+                  <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800 space-y-1 shrink-0">
+                    <span className="text-xs font-black text-amber-300 flex items-center gap-1">
+                      <Info className="w-3.5 h-3.5 text-amber-400" />
+                      공식 효과 텍스트 {previewCard.kind === 'CHARACTER' ? `(Lv.${previewCard.level} 현재 레벨)` : ''}
+                    </span>
+                    <p className="text-xs sm:text-sm text-slate-100 leading-relaxed whitespace-pre-line font-medium max-h-[140px] overflow-y-auto pr-1">
+                      {previewCard.description}
+                    </p>
+                  </div>
+
+                  {/* 캐릭터 레벨업 진화 스택 & 누적 상속 스킬 (공식 룰: 하위 카드 효과 영구 보유) */}
+                  {previewCard.kind === 'CHARACTER' && (
+                    <div className="bg-slate-900/95 rounded-xl p-3 border border-amber-500/40 space-y-2 shrink-0 shadow-lg">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                        <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
+                          <Layers className="w-4 h-4 text-amber-400" />
+                          <span>진화 스택 & 누적 상속 스킬</span>
+                        </span>
+                        <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
+                          {previewCard.underlyingCards && previewCard.underlyingCards.length > 0
+                            ? `스택: 총 ${previewCard.underlyingCards.length + 1}장 보유`
+                            : `Lv.${previewCard.level} 단일`}
+                        </span>
+                      </div>
+
+                      {/* 하위 카드 스택이 있는 경우 */}
+                      {previewCard.underlyingCards && previewCard.underlyingCards.length > 0 ? (
+                        <div className="space-y-2">
+                          <div className="text-[11px] text-amber-200/90 bg-amber-950/40 border border-amber-500/20 p-2 rounded-lg leading-relaxed flex items-start gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                            <span>
+                              공식 룰: 레벨업한 캐릭터는 하위에 겹쳐진 <strong>이전 레벨의 모든 스킬 효과를 영구 상속하여 함께 보유</strong>합니다.
+                            </span>
+                          </div>
+
+                          {/* 상속된 이전 레벨 스킬 카드 목록 */}
+                          {previewCard.underlyingCards.map((underCard, idx) => (
+                            <div
+                              key={underCard.id || idx}
+                              onClick={() => setPreviewCard({ ...underCard, underlyingCards: previewCard.underlyingCards })}
+                              className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-700 hover:border-amber-400 transition cursor-pointer group"
+                              title="클릭하여 이 카드의 대형 일러스트와 원문 스탯 보기"
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-black text-[10px] border border-amber-400/30 flex items-center gap-1">
+                                  <Crown className="w-2.5 h-2.5" />
+                                  <span>Lv.{underCard.level} 상속 효과</span>
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-mono group-hover:text-amber-300">
+                                  {underCard.nameKr}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-medium pl-1">
+                                {underCard.description}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                          캐릭터가 레벨업되면 기존 카드가 하위 스택으로 누적되며, 이전 레벨의 모든 스킬 효과가 이곳에 표시되고 함께 발동됩니다.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="my-auto text-center text-slate-500 text-sm py-12">
+                  필드나 손패의 카드에 마우스를 올리면<br />상세 정보와 대형 일러스트가 여기에 표시됩니다.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* ======================================================= */}
         {/* [중앙 배틀 컬럼] 실제 배틀과 100% 동일 규격 공식 플레이매트 */}
@@ -598,7 +760,12 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
             ref={centerArenaRef}
             className="flex-1 flex flex-col items-center py-2 px-3 overflow-y-auto min-h-0 custom-scrollbar"
           >
-            <div className="w-full max-w-[1360px] flex flex-col items-center gap-3.5 mx-auto py-1">
+            <div
+              className="w-full max-w-[1360px] flex flex-col items-center gap-3.5 mx-auto py-1 transition-all duration-200"
+              style={{
+                zoom: arenaZoom,
+              }}
+            >
               {/* ----------------------------------------------------- */}
               {/* 1. 상대방(P1) 공식 플레이매트 (상단 - 대칭 마주보기 구조) */}
               {/* ----------------------------------------------------- */}
