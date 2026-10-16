@@ -37,10 +37,40 @@ export type SortOptionType =
   | 'COST_ASC'
   | 'NAME_ASC';
 
+export function normalizeRarity(rarity?: string): string {
+  if (!rarity) return '★~★★';
+  if (rarity.startsWith('PR')) return rarity;
+  if (rarity === '★' || rarity === '★★' || rarity === '★~★★') return '★~★★';
+  return rarity;
+}
+
+// 웹에서 1성과 2성은 일러스트 및 성능 차이가 없으므로 동일 코드는 1종으로 통합 (★~★★)
+export function getDeduplicatedCatalogCards(cards: OfficialCardData[]): OfficialCardData[] {
+  const seen = new Set<string>();
+  const result: OfficialCardData[] = [];
+
+  for (const c of cards) {
+    const normRar = normalizeRarity(c.rarity);
+    const key = `${c.code}_${normRar}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push({
+        ...c,
+        rarity: normRar,
+      });
+    }
+  }
+
+  return result;
+}
+
+export const CATALOG_CARDS = getDeduplicatedCatalogCards(OFFICIAL_CARDS);
+
 const packOrder: Record<string, number> = { SD01: 1, SD02: 2, BP01: 3 };
 const rarOrder: Record<string, number> = {
   '★': 1,
-  '★★': 2,
+  '★★': 1,
+  '★~★★': 1,
   '★★★': 3,
   '★★★★': 4,
   '★★★★★': 5,
@@ -113,12 +143,12 @@ export function getCharacterBaseName(c: OfficialCardData): string {
   return c.nameKr.replace(/Lv\.\d+/g, '').trim();
 }
 
-// 동일 카드의 다른 성급 / 다른 일러스트 버전 리스트 추출 헬퍼 (동일 레벨만 제한하여 몰림 방지)
+// 동일 카드의 다른 성급 / 다른 일러스트 버전 리스트 추출 헬퍼 (동일 레벨만 제한 + 1~2성 통합)
 export function getCardVariants(target: OfficialCardData): OfficialCardData[] {
   if (target.kind === 'CHARACTER') {
     const targetBaseName = getCharacterBaseName(target);
     const targetLevel = target.level ?? 0;
-    const variants = OFFICIAL_CARDS.filter((c) => {
+    const variants = CATALOG_CARDS.filter((c) => {
       if (c.kind !== 'CHARACTER') return false;
       if ((c.level ?? 0) !== targetLevel) return false;
       return getCharacterBaseName(c) === targetBaseName;
@@ -135,7 +165,7 @@ export function getCardVariants(target: OfficialCardData): OfficialCardData[] {
       return a.code.localeCompare(b.code);
     });
   } else {
-    const variants = OFFICIAL_CARDS.filter(
+    const variants = CATALOG_CARDS.filter(
       (c) => c.kind === target.kind && (c.code === target.code || c.nameKr === target.nameKr)
     );
     return variants.sort((a, b) => {
@@ -152,7 +182,7 @@ export function getCardVariants(target: OfficialCardData): OfficialCardData[] {
   }
 }
 
-export type RarityFilterType = 'ALL' | '★★★★★' | '★★★★' | '★★★' | '★★' | '★' | 'PR';
+export type RarityFilterType = 'ALL' | '★★★★★' | '★★★★' | '★★★' | '★~★★' | 'PR';
 
 export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onClose }) => {
   const [tab, setTab] = useState<'ALL' | 'CHARACTER' | 'ACTION' | 'ECHO'>('ALL');
@@ -184,16 +214,18 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
   // 필터링 및 정렬된 공식 카드 목록 (리스트 & 갤러리 둘 다 일관되게 적용)
   const filteredCards = useMemo(() => {
     if (!isOpen) return [];
-    const list = OFFICIAL_CARDS.filter((c) => {
+    const list = CATALOG_CARDS.filter((c) => {
       // 1. 탭 필터
       if (tab === 'CHARACTER' && c.kind !== 'CHARACTER') return false;
       if (tab === 'ACTION' && (c.kind !== 'ACTION' || (c.feature && c.feature.includes('에코')))) return false;
       if (tab === 'ECHO' && (!c.feature || !c.feature.includes('에코'))) return false;
 
-      // 2. 성급 필터
+      // 2. 성급 필터 (1성, 2성은 통합)
       if (selectedRarity !== 'ALL') {
         if (selectedRarity === 'PR') {
           if (!c.rarity?.startsWith('PR')) return false;
+        } else if (selectedRarity === '★~★★') {
+          if (c.rarity !== '★~★★' && c.rarity !== '★' && c.rarity !== '★★') return false;
         } else {
           if (c.rarity !== selectedRarity) return false;
         }
@@ -400,7 +432,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   tab === 'ALL' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                전체 ({OFFICIAL_CARDS.length})
+                전체 ({CATALOG_CARDS.length})
               </button>
               <button
                 onClick={() => setTab('CHARACTER')}
@@ -408,7 +440,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   tab === 'CHARACTER' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                캐릭터 카드 ({OFFICIAL_CARDS.filter((c) => c.kind === 'CHARACTER').length})
+                캐릭터 카드 ({CATALOG_CARDS.filter((c) => c.kind === 'CHARACTER').length})
               </button>
               <button
                 onClick={() => setTab('ACTION')}
@@ -416,7 +448,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   tab === 'ACTION' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                액션 카드 ({OFFICIAL_CARDS.filter((c) => c.kind === 'ACTION' && (!c.feature || !c.feature.includes('에코'))).length})
+                액션 카드 ({CATALOG_CARDS.filter((c) => c.kind === 'ACTION' && (!c.feature || !c.feature.includes('에코'))).length})
               </button>
               <button
                 onClick={() => setTab('ECHO')}
@@ -425,11 +457,11 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                 }`}
               >
                 <Sparkles className="w-3 h-3 text-amber-300" />
-                에코 ({OFFICIAL_CARDS.filter((c) => c.feature && c.feature.includes('에코')).length})
+                에코 ({CATALOG_CARDS.filter((c) => c.feature && c.feature.includes('에코')).length})
               </button>
             </div>
 
-            {/* 성급(Rarity) 필터 (5성, 4성, 3성, 2성, 1성, PR) */}
+            {/* 성급(Rarity) 필터 (5성, 4성, 3성, 1~2성 통합, PR) */}
             <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 flex-wrap">
               <span className="text-[11px] text-slate-400 font-bold px-1.5 flex items-center gap-1">
                 <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> 성급:
@@ -440,8 +472,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   { key: '★★★★★', label: '★★★★★', special: 'gold' },
                   { key: '★★★★', label: '★★★★', special: 'purple' },
                   { key: '★★★', label: '★★★' },
-                  { key: '★★', label: '★★' },
-                  { key: '★', label: '★' },
+                  { key: '★~★★', label: '★~★★ (1~2성)' },
                   { key: 'PR', label: 'PR' },
                 ] as const
               ).map((r) => {
@@ -451,6 +482,8 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   activeStyle = 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black shadow-lg shadow-amber-500/40 ring-1 ring-yellow-200';
                 } else if (r.key === '★★★★') {
                   activeStyle = 'bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black shadow-lg shadow-purple-500/40 ring-1 ring-purple-300';
+                } else if (r.key === '★~★★') {
+                  activeStyle = 'bg-slate-700 text-amber-300 border border-amber-400/50 font-black shadow';
                 } else if (r.key === 'PR') {
                   activeStyle = 'bg-rose-500 text-white font-black shadow';
                 }
@@ -621,7 +654,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                     key={card.id}
                     onClick={() => setDetailCard(card)}
                     className="relative aspect-[5/7] w-full rounded-2xl overflow-hidden bg-slate-950/80 border border-slate-800/90 hover:border-amber-400 group shadow-lg hover:shadow-2xl hover:shadow-amber-500/25 transition-all duration-300 cursor-pointer hover:-translate-y-1.5 flex items-center justify-center p-0.5 select-none"
-                    title={`${card.nameKr} [${card.code}] (${card.rarity || '★'}) - 클릭 시 상세 보기`}
+                    title={`${card.nameKr} [${card.code}] (${card.rarity || '★~★★'}) - 클릭 시 상세 보기`}
                   >
                     {/* 100% 순수 카드 일러스트 (여백/찌그러짐 없이 완벽한 TCG 비율 렌더링) */}
                     <img
@@ -637,7 +670,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                         {card.code}
                       </span>
                       <span className="text-[10px] font-black text-amber-400 drop-shadow">
-                        {card.rarity || '★'}
+                        {card.rarity || '★~★★'}
                       </span>
                     </div>
                   </div>
@@ -712,9 +745,11 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                                 ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-300 shadow'
                                 : c.rarity?.startsWith('PR')
                                 ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                                : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                : c.rarity === '★★★'
+                                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                                : 'bg-slate-800 text-slate-300 border-slate-700'
                             }`}>
-                              {c.rarity || '★'}
+                              {c.rarity || '★~★★'}
                             </span>
                           </td>
 
@@ -884,9 +919,11 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                       ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white border-purple-300 shadow-lg shadow-purple-500/30'
                       : detailCard.rarity?.startsWith('PR')
                       ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                      : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : detailCard.rarity === '★★★'
+                      ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                      : 'bg-slate-800 text-slate-300 border-slate-700'
                   }`}>
-                    성급: {detailCard.rarity || '★'}
+                    성급: {detailCard.rarity || '★~★★'}
                   </span>
                   <span className="px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono text-xs">
                     {detailCard.obtain}
@@ -941,7 +978,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between">
                               <span className="text-amber-300 font-black text-xs sm:text-sm">
-                                {v.rarity || '★'}
+                                {v.rarity || '★~★★'}
                               </span>
                               {v.level !== undefined && v.level !== null && (
                                 <span className="text-xs font-mono font-bold text-amber-400">
