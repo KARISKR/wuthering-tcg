@@ -83,9 +83,9 @@ export function restoreSampleReplays(): BattleReplayData[] {
 }
 
 /**
- * 게임 종료 시 리플레이 자동/수동 저장
+ * 현재 경기 데이터로부터 BattleReplayData 객체 생성 (저장은 별도)
  */
-export function saveBattleReplay(
+export function createBattleReplayData(
   winner: 0 | 1,
   players: [PlayerState, PlayerState],
   logs: LogItem[],
@@ -95,7 +95,7 @@ export function saveBattleReplay(
   const p0Leader = players[0].slots.leader;
   const p1Leader = players[1].slots.leader;
 
-  const replay: BattleReplayData = {
+  return {
     id: `replay-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     timestamp: Date.now(),
     gameMode,
@@ -132,7 +132,12 @@ export function saveBattleReplay(
       actionCardCount: players[1].actionDeck.length + players[1].hand.length + players[1].dropZone.length,
     },
   };
+}
 
+/**
+ * 생성된 BattleReplayData 객체를 로컬스토리지에 저장
+ */
+export function saveReplayObject(replay: BattleReplayData): BattleReplayData {
   try {
     const existing = getSavedReplays();
     // 중복 방지 (동일 id) 및 최대 개수 제한(20개)
@@ -141,8 +146,21 @@ export function saveBattleReplay(
   } catch (e) {
     console.error('Failed to save battle replay:', e);
   }
-
   return replay;
+}
+
+/**
+ * 게임 종료 시 리플레이 자동/수동 저장
+ */
+export function saveBattleReplay(
+  winner: 0 | 1,
+  players: [PlayerState, PlayerState],
+  logs: LogItem[],
+  totalTurns: number,
+  gameMode: 'AI' | 'SOLO_DUAL'
+): BattleReplayData {
+  const replay = createBattleReplayData(winner, players, logs, totalTurns, gameMode);
+  return saveReplayObject(replay);
 }
 
 /**

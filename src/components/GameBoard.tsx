@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useGame } from '../hooks/useGame';
 import { CardView } from './CardView';
 import { CharacterSlot } from './CharacterSlot';
@@ -18,7 +18,7 @@ import { RulesGuideModal } from './RulesGuideModal';
 import { CardCatalogModal } from './CardCatalogModal';
 import { GameOverModal } from './GameOverModal';
 import { BattleReplayModal } from './BattleReplayModal';
-import { saveBattleReplay, BattleReplayData } from '../utils/replayManager';
+import { createBattleReplayData, BattleReplayData } from '../utils/replayManager';
 import { CardListModal } from './CardListModal';
 import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
@@ -273,22 +273,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
   const [evolutionModalChar, setEvolutionModalChar] = useState<CharacterCard | null>(null);
-  const replaySavedRef = useRef<boolean>(false);
-
-  // 게임 종료 시 리플레이 자동 저장
-  useEffect(() => {
-    if (gameState.phase === 'GAME_OVER' && gameState.winner !== null && !replaySavedRef.current) {
-      replaySavedRef.current = true;
-      saveBattleReplay(
-        gameState.winner as 0 | 1,
-        gameState.players,
-        gameState.logs,
-        gameState.turn,
-        gameState.gameMode
-      );
-    } else if (gameState.phase !== 'GAME_OVER') {
-      replaySavedRef.current = false;
-    }
+  // 게임 종료 시 현재 매치 리플레이 데이터 준비 (GameOverModal에서 저장 여부를 질문)
+  const currentMatchReplay = useMemo<BattleReplayData | null>(() => {
+    if (gameState.phase !== 'GAME_OVER' || gameState.winner === null) return null;
+    return createBattleReplayData(
+      gameState.winner as 0 | 1,
+      gameState.players,
+      gameState.logs,
+      gameState.turn,
+      gameState.gameMode
+    );
   }, [gameState.phase, gameState.winner, gameState.players, gameState.logs, gameState.turn, gameState.gameMode]);
 
   // 트래시 및 협주 존 카드 목록 뷰어 모달 상태
@@ -2922,9 +2916,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           winner={gameState.winner as 0 | 1}
           players={gameState.players}
           turn={gameState.turn}
+          currentReplay={currentMatchReplay}
           onRestart={handleRestartBattle}
           onExitToLobby={onExitToLobby}
           onOpenReplay={() => setIsReplayOpen(true)}
+          onPlayBattleReplay={onPlayBattleReplay}
         />
       )}
 
