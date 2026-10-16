@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Check,
+  ArrowUpDown,
 } from 'lucide-react';
 
 interface CardCatalogModalProps {
@@ -28,53 +29,126 @@ interface CardCatalogModalProps {
   onClose: () => void;
 }
 
-// 동일 카드의 다른 성급 / 다른 일러스트 버전 리스트 추출 헬퍼
-function getCardVariants(target: OfficialCardData): OfficialCardData[] {
-  // 1. 동일한 카드 코드를 가진 모든 변형 (예: BP01-001의 3성, 4성, 5성)
-  const sameCode = OFFICIAL_CARDS.filter((c) => c.code === target.code);
-  if (sameCode.length > 1) {
-    const rarOrder: Record<string, number> = {
-      '★': 1,
-      '★★': 2,
-      '★★★': 3,
-      '★★★★': 4,
-      '★★★★★': 5,
-      'PR★★': 6,
-    };
-    return sameCode.sort((a, b) => {
+export type SortOptionType =
+  | 'CODE_ASC'
+  | 'RARITY_DESC'
+  | 'RARITY_ASC'
+  | 'LEVEL_DESC'
+  | 'COST_ASC'
+  | 'NAME_ASC';
+
+const packOrder: Record<string, number> = { SD01: 1, SD02: 2, BP01: 3 };
+const rarOrder: Record<string, number> = {
+  '★': 1,
+  '★★': 2,
+  '★★★': 3,
+  '★★★★': 4,
+  '★★★★★': 5,
+  'PR★★': 6,
+  PR: 6,
+};
+
+function compareCode(a: OfficialCardData, b: OfficialCardData): number {
+  const [pA, numA] = a.code.split('-');
+  const [pB, numB] = b.code.split('-');
+  const wA = packOrder[pA] || 99;
+  const wB = packOrder[pB] || 99;
+  if (wA !== wB) return wA - wB;
+  const nA = parseInt(numA || '0', 10);
+  const nB = parseInt(numB || '0', 10);
+  if (nA !== nB) return nA - nB;
+  const rA = rarOrder[a.rarity || ''] || 0;
+  const rB = rarOrder[b.rarity || ''] || 0;
+  return rA - rB;
+}
+
+export function sortCards(cards: OfficialCardData[], sortBy: SortOptionType): OfficialCardData[] {
+  return [...cards].sort((a, b) => {
+    switch (sortBy) {
+      case 'CODE_ASC':
+        return compareCode(a, b);
+      case 'RARITY_DESC': {
+        const rA = rarOrder[a.rarity || ''] || 0;
+        const rB = rarOrder[b.rarity || ''] || 0;
+        if (rA !== rB) return rB - rA;
+        return compareCode(a, b);
+      }
+      case 'RARITY_ASC': {
+        const rA = rarOrder[a.rarity || ''] || 0;
+        const rB = rarOrder[b.rarity || ''] || 0;
+        if (rA !== rB) return rA - rB;
+        return compareCode(a, b);
+      }
+      case 'LEVEL_DESC': {
+        const lA = a.kind === 'CHARACTER' ? (a.level ?? -1) : -99;
+        const lB = b.kind === 'CHARACTER' ? (b.level ?? -1) : -99;
+        if (lA !== lB) return lB - lA;
+        return compareCode(a, b);
+      }
+      case 'COST_ASC': {
+        const cA = a.kind === 'ACTION' ? a.cost : 99;
+        const cB = b.kind === 'ACTION' ? b.cost : 99;
+        if (cA !== cB) return cA - cB;
+        return compareCode(a, b);
+      }
+      case 'NAME_ASC': {
+        const n = a.nameKr.localeCompare(b.nameKr, 'ko');
+        if (n !== 0) return n;
+        return compareCode(a, b);
+      }
+      default:
+        return compareCode(a, b);
+    }
+  });
+}
+
+export function getCharacterBaseName(c: OfficialCardData): string {
+  if (c.nameKr.includes('방랑자(남)')) return '방랑자(남)';
+  if (c.nameKr.includes('방랑자(여)')) return '방랑자(여)';
+  if (c.characterName) {
+    if (c.characterName.includes('방랑자(남)')) return '방랑자(남)';
+    if (c.characterName.includes('방랑자(여)')) return '방랑자(여)';
+    return c.characterName.replace(/Lv\.\d+/g, '').trim();
+  }
+  return c.nameKr.replace(/Lv\.\d+/g, '').trim();
+}
+
+// 동일 카드의 다른 성급 / 다른 일러스트 버전 리스트 추출 헬퍼 (동일 레벨만 제한하여 몰림 방지)
+export function getCardVariants(target: OfficialCardData): OfficialCardData[] {
+  if (target.kind === 'CHARACTER') {
+    const targetBaseName = getCharacterBaseName(target);
+    const targetLevel = target.level ?? 0;
+    const variants = OFFICIAL_CARDS.filter((c) => {
+      if (c.kind !== 'CHARACTER') return false;
+      if ((c.level ?? 0) !== targetLevel) return false;
+      return getCharacterBaseName(c) === targetBaseName;
+    });
+    return variants.sort((a, b) => {
+      const [pA] = a.code.split('-');
+      const [pB] = b.code.split('-');
+      const wA = packOrder[pA] || 99;
+      const wB = packOrder[pB] || 99;
+      if (wA !== wB) return wA - wB;
       const rA = rarOrder[a.rarity || ''] || 0;
       const rB = rarOrder[b.rarity || ''] || 0;
-      return rA - rB;
-    });
-  }
-
-  // 2. 캐릭터 카드인 경우 동일 캐릭터의 다른 버전들
-  if (target.kind === 'CHARACTER') {
-    const charName = target.characterName || target.nameKr;
-    return OFFICIAL_CARDS.filter(
-      (c) =>
-        c.kind === 'CHARACTER' &&
-        (c.characterName === charName ||
-          c.nameKr.includes(charName) ||
-          charName.includes(c.characterName || ''))
-    ).sort((a, b) => {
-      const lvlA = a.level ?? 0;
-      const lvlB = b.level ?? 0;
-      if (lvlA !== lvlB) return lvlA - lvlB;
-      const rarA = a.rarity?.length ?? 1;
-      const rarB = b.rarity?.length ?? 1;
-      if (rarA !== rarB) return rarA - rarB;
+      if (rA !== rB) return rA - rB;
       return a.code.localeCompare(b.code);
     });
   } else {
-    // 3. 액션 카드인 경우 동일한 이름의 다른 버전들
-    const sameName = OFFICIAL_CARDS.filter(
-      (c) => c.kind === 'ACTION' && c.nameKr === target.nameKr
+    const variants = OFFICIAL_CARDS.filter(
+      (c) => c.kind === target.kind && (c.code === target.code || c.nameKr === target.nameKr)
     );
-    if (sameName.length > 1) {
-      return sameName.sort((a, b) => (a.rarity?.length ?? 1) - (b.rarity?.length ?? 1));
-    }
-    return [target];
+    return variants.sort((a, b) => {
+      const [pA] = a.code.split('-');
+      const [pB] = b.code.split('-');
+      const wA = packOrder[pA] || 99;
+      const wB = packOrder[pB] || 99;
+      if (wA !== wB) return wA - wB;
+      const rA = rarOrder[a.rarity || ''] || 0;
+      const rB = rarOrder[b.rarity || ''] || 0;
+      if (rA !== rB) return rA - rB;
+      return a.code.localeCompare(b.code);
+    });
   }
 }
 
@@ -89,6 +163,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
   const [selectedPack, setSelectedPack] = useState<'ALL' | 'SD01' | 'SD02' | 'BP01'>('ALL');
   const [selectedColor, setSelectedColor] = useState<'ALL' | 'RED' | 'GREEN' | 'BLUE'>('ALL');
   const [selectedChar, setSelectedChar] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<SortOptionType>('CODE_ASC');
   const [searchTerm, setSearchTerm] = useState('');
   const [detailCard, setDetailCard] = useState<OfficialCardData | null>(null);
 
@@ -106,10 +181,10 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
     '앙코',
   ];
 
-  // 필터링된 공식 카드 목록
+  // 필터링 및 정렬된 공식 카드 목록 (리스트 & 갤러리 둘 다 일관되게 적용)
   const filteredCards = useMemo(() => {
     if (!isOpen) return [];
-    return OFFICIAL_CARDS.filter((c) => {
+    const list = OFFICIAL_CARDS.filter((c) => {
       // 1. 탭 필터
       if (tab === 'CHARACTER' && c.kind !== 'CHARACTER') return false;
       if (tab === 'ACTION' && (c.kind !== 'ACTION' || (c.feature && c.feature.includes('에코')))) return false;
@@ -164,7 +239,9 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
 
       return true;
     });
-  }, [isOpen, tab, selectedRarity, selectedPack, selectedColor, selectedChar, searchTerm]);
+
+    return sortCards(list, sortBy);
+  }, [isOpen, tab, selectedRarity, selectedPack, selectedColor, selectedChar, searchTerm, sortBy]);
 
   // 상세 뷰어에서 현재 카드의 모든 성급/버전 변형들 계산
   const currentVariants = useMemo(() => {
@@ -457,28 +534,51 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
               ))}
             </div>
 
-            {/* 속성 색상 필터 */}
-            <div className="flex items-center gap-1">
-              <span className="text-slate-500 text-[11px] mr-1 font-bold">액션 색상:</span>
-              {(['ALL', 'RED', 'GREEN', 'BLUE'] as const).map((col) => (
-                <button
-                  key={col}
-                  onClick={() => setSelectedColor(col)}
-                  className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                    selectedColor === col
-                      ? col === 'RED'
-                        ? 'bg-red-500 text-white font-black'
-                        : col === 'GREEN'
-                        ? 'bg-emerald-500 text-white font-black'
-                        : col === 'BLUE'
-                        ? 'bg-cyan-500 text-white font-black'
-                        : 'bg-slate-700 text-white font-black'
-                      : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
-                  }`}
+            {/* 우측 그룹: 액션 색상 필터 & 정렬 옵션 */}
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {/* 속성 색상 필터 */}
+              <div className="flex items-center gap-1">
+                <span className="text-slate-500 text-[11px] mr-1 font-bold">액션 색상:</span>
+                {(['ALL', 'RED', 'GREEN', 'BLUE'] as const).map((col) => (
+                  <button
+                    key={col}
+                    onClick={() => setSelectedColor(col)}
+                    className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                      selectedColor === col
+                        ? col === 'RED'
+                          ? 'bg-red-500 text-white font-black'
+                          : col === 'GREEN'
+                          ? 'bg-emerald-500 text-white font-black'
+                          : col === 'BLUE'
+                          ? 'bg-cyan-500 text-white font-black'
+                          : 'bg-slate-700 text-white font-black'
+                        : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
+                    }`}
+                  >
+                    {col === 'ALL' ? '전체' : col}
+                  </button>
+                ))}
+              </div>
+
+              {/* 카드 순서 정렬 옵션 (코드/팩, 성급, 레벨, 비용, 이름) */}
+              <div className="flex items-center gap-1.5 bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-800 shadow-sm">
+                <span className="text-slate-400 text-[11px] font-bold flex items-center gap-1 whitespace-nowrap">
+                  <ArrowUpDown className="w-3.5 h-3.5 text-amber-400" />
+                  정렬:
+                </span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as SortOptionType)}
+                  className="bg-slate-950 text-amber-300 border border-slate-700 rounded-lg px-2 py-0.5 text-xs font-bold focus:outline-none focus:border-amber-400 cursor-pointer"
                 >
-                  {col === 'ALL' ? '전체' : col}
-                </button>
-              ))}
+                  <option value="CODE_ASC">팩/코드 번호순 (SD01 → SD02 → BP01)</option>
+                  <option value="RARITY_DESC">성급 높은순 (★★★★★ → ★)</option>
+                  <option value="RARITY_ASC">성급 낮은순 (★ → ★★★★★)</option>
+                  <option value="LEVEL_DESC">캐릭터 레벨순 (Lv.2 → Lv.0)</option>
+                  <option value="COST_ASC">액션 비용 낮은순</option>
+                  <option value="NAME_ASC">카드 이름순 (가나다)</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -498,6 +598,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   setSelectedPack('ALL');
                   setSelectedColor('ALL');
                   setSelectedChar('ALL');
+                  setSortBy('CODE_ASC');
                   setSearchTerm('');
                 }}
                 className="mt-2 text-xs text-amber-400 hover:underline"
@@ -550,15 +651,15 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-[11px] font-bold">
-                      <th className="py-2.5 px-3 text-center w-14">일러스트</th>
-                      <th className="py-2.5 px-3 w-28">코드 / 팩</th>
-                      <th className="py-2.5 px-3 w-40">카드명</th>
-                      <th className="py-2.5 px-3 w-20 text-center">성급 (Rarity)</th>
-                      <th className="py-2.5 px-3 w-24">분류 / 레벨</th>
-                      <th className="py-2.5 px-3 w-24">속성 / 색상</th>
-                      <th className="py-2.5 px-3 w-32">스탯 (비용/속도/피해)</th>
-                      <th className="py-2.5 px-3 w-44">다른 성급/버전</th>
-                      <th className="py-2.5 px-4">공식 효과 설명 요약</th>
+                      <th className="py-2.5 px-3 text-center w-14 align-middle">일러스트</th>
+                      <th className="py-2.5 px-3 w-28 align-middle">코드 / 팩</th>
+                      <th className="py-2.5 px-3 w-40 align-middle">카드명</th>
+                      <th className="py-2.5 px-3 w-24 text-center align-middle">성급 (Rarity)</th>
+                      <th className="py-2.5 px-3 w-24 align-middle">분류 / 레벨</th>
+                      <th className="py-2.5 px-3 w-24 align-middle">속성 / 색상</th>
+                      <th className="py-2.5 px-3 w-36 align-middle">스탯 (비용/속도/피해)</th>
+                      <th className="py-2.5 px-3 w-48 align-middle">다른 성급/버전 (동일 Lv)</th>
+                      <th className="py-2.5 px-4 align-middle">공식 효과 설명 요약</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
@@ -572,7 +673,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           className="hover:bg-slate-800/50 transition-colors cursor-pointer group"
                         >
                           {/* 1. 일러스트 썸네일 */}
-                          <td className="py-2 px-3 text-center">
+                          <td className="py-2.5 px-3 text-center align-middle">
                             <img
                               src={c.artUrl}
                               alt={c.nameKr}
@@ -581,7 +682,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           </td>
 
                           {/* 2. 카드 코드 & 팩 */}
-                          <td className="py-2 px-3">
+                          <td className="py-2.5 px-3 align-middle">
                             <div className="font-mono font-bold text-amber-300 text-xs">
                               {c.code}
                             </div>
@@ -591,7 +692,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           </td>
 
                           {/* 3. 카드명 */}
-                          <td className="py-2 px-3">
+                          <td className="py-2.5 px-3 align-middle">
                             <div className="font-black text-white text-sm group-hover:text-amber-300 transition">
                               {c.nameKr}
                             </div>
@@ -603,8 +704,8 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           </td>
 
                           {/* 4. 성급 */}
-                          <td className="py-2 px-3 text-center">
-                            <span className={`px-2 py-0.5 rounded-full font-black text-xs border whitespace-nowrap ${
+                          <td className="py-2.5 px-3 text-center align-middle">
+                            <span className={`inline-block px-2 py-0.5 rounded-full font-black text-xs border whitespace-nowrap ${
                               c.rarity === '★★★★★'
                                 ? 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 border-amber-300 shadow'
                                 : c.rarity === '★★★★'
@@ -618,7 +719,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           </td>
 
                           {/* 5. 분류 / 레벨 */}
-                          <td className="py-2 px-3">
+                          <td className="py-2.5 px-3 align-middle">
                             {c.kind === 'CHARACTER' ? (
                               <span className="font-bold text-amber-300">
                                 캐릭터 Lv.{c.level}
@@ -631,7 +732,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           </td>
 
                           {/* 6. 속성 / 색상 */}
-                          <td className="py-2 px-3">
+                          <td className="py-2.5 px-3 align-middle">
                             {c.kind === 'CHARACTER' ? (
                               <span className="font-bold text-cyan-300">
                                 {getElementKr(c.element)}
@@ -650,7 +751,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           </td>
 
                           {/* 7. 스탯 (비용/속도/피해) */}
-                          <td className="py-2 px-3 font-mono text-xs">
+                          <td className="py-2.5 px-3 font-mono text-xs align-middle">
                             {c.kind === 'ACTION' ? (
                               <div className="flex items-center gap-1.5 text-slate-300">
                                 <span>비용 <strong className="text-amber-400">{c.cost}</strong></span>
@@ -664,25 +765,25 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                             )}
                           </td>
 
-                          {/* 8. 다른 성급 / 버전 목록 (클릭 시 해당 버전 상세로 즉시 열림) */}
-                          <td className="py-2 px-3" onClick={(e) => e.stopPropagation()}>
+                          {/* 8. 다른 성급 / 버전 목록 (동일 레벨 버전만 표시) */}
+                          <td className="py-2.5 px-3 align-middle" onClick={(e) => e.stopPropagation()}>
                             {variants.length > 1 ? (
                               <div className="flex items-center gap-1 flex-wrap">
                                 {variants.map((v) => {
                                   const isCurrent = v.id === c.id;
+                                  const pack = v.code.split('-')[0] || '';
                                   return (
                                     <button
                                       key={v.id}
                                       onClick={() => setDetailCard(v)}
-                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer ${
+                                      className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition cursor-pointer whitespace-nowrap ${
                                         isCurrent
-                                          ? 'bg-amber-400 text-slate-950 font-black shadow'
+                                          ? 'bg-amber-400 text-slate-950 font-black shadow ring-1 ring-amber-300'
                                           : 'bg-slate-950 border border-slate-700 text-slate-300 hover:text-white hover:border-amber-400'
                                       }`}
                                       title={`${v.code} (${v.rarity})`}
                                     >
-                                      {v.rarity || '★'}
-                                      {v.level !== undefined && v.level !== null ? ` L${v.level}` : ''}
+                                      {pack} {v.rarity || '★'}
                                     </button>
                                   );
                                 })}
@@ -693,8 +794,10 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           </td>
 
                           {/* 9. 효과 요약 */}
-                          <td className="py-2 px-4 text-[11px] text-slate-300 max-w-xs truncate">
-                            {c.description}
+                          <td className="py-2.5 px-4 text-[11px] text-slate-300 align-middle">
+                            <div className="line-clamp-2 leading-relaxed max-w-sm" title={c.description}>
+                              {c.description}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -807,7 +910,9 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
-                      성급 / 버전 선택 ({currentVariants.length}종 등록됨)
+                      {detailCard.kind === 'CHARACTER'
+                        ? `동일 레벨 (Lv.${detailCard.level}) 성급/버전 선택 (${currentVariants.length}종)`
+                        : `성급 / 일러스트 버전 선택 (${currentVariants.length}종)`}
                     </span>
                     <span className="text-[10px] text-slate-400 font-medium">
                       클릭 시 해당 성급/버전 일러스트로 즉시 전환
