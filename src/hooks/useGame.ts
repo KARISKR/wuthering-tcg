@@ -199,12 +199,28 @@ export function useGame(
   }, []);
 
   // 8. 연격(Combo) 공격
-  const handleComboAttack = useCallback((playerIndex: 0 | 1, cardId: string, spentConcertoIds?: string[], discardForBonusDmgId?: string) => {
-    setGameState((prev) => {
-      const res = executeComboAttack(prev, playerIndex, cardId, spentConcertoIds, discardForBonusDmgId);
-      return res.success ? res.newState : prev;
-    });
-  }, []);
+  const handleComboAttack = useCallback(
+    (
+      playerIndex: 0 | 1,
+      cardId: string,
+      spentConcertoIds?: string[],
+      discardForBonusDmgId?: string,
+      swapSupportSlot?: 'leftSupport' | 'rightSupport'
+    ) => {
+      setGameState((prev) => {
+        const res = executeComboAttack(
+          prev,
+          playerIndex,
+          cardId,
+          spentConcertoIds,
+          discardForBonusDmgId,
+          swapSupportSlot
+        );
+        return res.success ? res.newState : prev;
+      });
+    },
+    []
+  );
 
   // 8-1. 선택 발동 효과 해결
   const handleResolvePendingChoice = useCallback((chosenCardIds: string[]) => {

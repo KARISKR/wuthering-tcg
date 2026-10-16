@@ -29,7 +29,17 @@ import { ZoneCardStack } from './ZoneCardStack';
 import { DeckStack } from './DeckStack';
 import { MatchOpeningOverlay } from './MatchOpeningOverlay';
 import { CharacterCard, ActionCard, AnyCard, ComboStrikeEffect, UpgradeEffect, getElementKr } from '../types/tcg';
-import { CustomDeckConfig, isSameCharacter, slotHasCharacterSkill, playerHasCharacterSkill, findAllUpgradableCards, canPlayerExecuteCombo } from '../engine/gameEngine';
+import {
+  CustomDeckConfig,
+  isSameCharacter,
+  slotHasCharacterSkill,
+  playerHasCharacterSkill,
+  findAllUpgradableCards,
+  canPlayerExecuteCombo,
+  isIntroSkillCard,
+  getIntroSkillTargetChar,
+  doesCharMatchIntroTarget,
+} from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
 import { getCharacterIdleQuote, getCharacterLowHpQuote } from '../data/characterQuotes';
 import {
@@ -213,7 +223,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   };
 
-  // 연격 공격 시 협주 코스트 지불 선택 분기
+  // <변주 스킬> 발동 시 백(서포터) 교체 대상 선택 모달 상태
+  const [introSwapModalState, setIntroSwapModalState] = useState<{
+    isOpen: boolean;
+    targetCard: ActionCard | null;
+    spentConcertoIds?: string[];
+    playerIndex: 0 | 1;
+  }>({
+    isOpen: false,
+    targetCard: null,
+    spentConcertoIds: undefined,
+    playerIndex: 0,
+  });
+
+  // 연격 공격 시 협주 코스트 지불 선택 및 <변주 스킬> 백 캐릭터 교체 선택 분기
   const requestComboAttack = (playerIndex: 0 | 1, cardId: string) => {
     const player = gameState.players[playerIndex];
     const card = player.hand.find((c) => c.id === cardId);
@@ -231,6 +254,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         targetCard: card,
         requiredCost: effectiveCost,
         actionType: 'COMBO',
+        playerIndex,
+      });
+    } else if (isIntroSkillCard(card)) {
+      setIntroSwapModalState({
+        isOpen: true,
+        targetCard: card,
+        spentConcertoIds: undefined,
         playerIndex,
       });
     } else {
@@ -748,20 +778,32 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 현재 조종 중인 플레이어 상태
   const activeControlledPlayer = gameState.players[controlledPlayerIndex];
   const isCurrentControlledTurn = gameState.activePlayerIndex === controlledPlayerIndex;
+  const otherPlayerIndex: 0 | 1 = controlledPlayerIndex === 0 ? 1 : 0;
+  const otherPlayer = gameState.players[otherPlayerIndex];
 
-  // COMBO_STEP에서 사용 가능한 연격 카드가 없을 때 알림 팝업 및 자동 턴 넘김 카운트다운
+  // AI가 현재 연격 단계를 진행 중인지 여부 판별
+  const isAiComboInProgress =
+    otherPlayer.isAi &&
+    (Boolean(otherPlayer.comboUnlimited) ||
+      (otherPlayer.comboCount ?? 0) > 0 ||
+      (gameState.lastComboStrike?.attackerIndex === otherPlayerIndex &&
+        !activeControlledPlayer.comboUnlimited &&
+        (activeControlledPlayer.comboCount ?? 0) === 0));
+
+  // 인간 플레이어의 연격 단계 여부 (연격을 모두 소진하여 comboCount가 0이 된 직후에도 연격 종료 처리가 가능하도록 유지)
+  const isPlayerComboPhase =
+    gameState.phase === 'COMBO_STEP' &&
+    !activeControlledPlayer.isAi &&
+    !isAiComboInProgress;
+
+  // COMBO_STEP에서 사용 가능한 연격 카드가 없거나 추격 횟수를 모두 소진했을 때 알림 팝업 및 자동 턴 넘김 카운트다운
   const [noComboCountdown, setNoComboCountdown] = useState<number | null>(null);
 
   useEffect(() => {
-    const playerHasComboPerm =
-      !activeControlledPlayer.isAi &&
-      (Boolean(activeControlledPlayer.comboUnlimited) || (activeControlledPlayer.comboCount ?? 0) > 0);
-
-    // COMBO_STEP이 아니거나 플레이어에게 연격 권한이 없거나,
+    // COMBO_STEP이 아니거나 플레이어 연격 차례가 아니거나,
     // 연격 애니메이션(activeComboStrike), 레벨업(activeUpgrade), 효과 선택(pendingChoice) 진행 중이면 카운트다운 대기
     if (
-      gameState.phase !== 'COMBO_STEP' ||
-      !playerHasComboPerm ||
+      !isPlayerComboPhase ||
       Boolean(activeComboStrike) ||
       Boolean(activeUpgrade) ||
       Boolean(gameState.pendingChoice)
@@ -790,8 +832,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       setNoComboCountdown(null);
     }
   }, [
-    gameState.phase,
-    activeControlledPlayer.isAi,
+    isPlayerComboPhase,
     activeControlledPlayer.hand.length,
     activeControlledPlayer.concertoZone.length,
     activeControlledPlayer.comboCount,
@@ -2391,8 +2432,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               )}
 
               {/* 3. 연격 단계 (COMBO_STEP) 액션 버튼 */}
-              {gameState.phase === 'COMBO_STEP' &&
-                (Boolean(activeControlledPlayer.comboUnlimited) || activeControlledPlayer.comboCount > 0) && (
+              {isPlayerComboPhase && (
                 <div className="flex flex-col gap-2">
                   {canPlayerExecuteCombo(activeControlledPlayer) ? (
                     <div className="p-3 rounded-2xl bg-gradient-to-r from-red-950/95 via-orange-950/90 to-red-950/95 border-2 border-red-500 text-red-200 font-black text-xs flex items-center justify-between shadow-xl shadow-red-500/30 animate-pulse">
@@ -2419,10 +2459,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     <div className="p-3.5 rounded-2xl bg-amber-950/90 border-2 border-amber-500/80 text-amber-100 flex flex-col gap-2 shadow-xl shadow-amber-500/20 animate-in fade-in">
                       <div className="flex items-center gap-2 text-amber-300 font-black text-xs">
                         <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 animate-bounce" />
-                        <span>사용 가능한 연격(적색) 카드가 없습니다!</span>
+                        <span>
+                          {!activeControlledPlayer.comboUnlimited && (activeControlledPlayer.comboCount ?? 0) === 0
+                            ? '모든 추격(연격) 횟수를 소진했습니다!'
+                            : '사용 가능한 연격(적색) 카드가 없습니다!'}
+                        </span>
                       </div>
                       <p className="text-[11px] text-amber-200/90 leading-tight">
-                        추가 공격할 수 있는 카드나 협주 에너지가 없어 턴을 넘깁니다.
+                        {!activeControlledPlayer.comboUnlimited && (activeControlledPlayer.comboCount ?? 0) === 0
+                          ? '추격 공격을 모두 완료하여 연격 단계를 종료하고 턴을 넘깁니다.'
+                          : '추가 공격할 수 있는 카드나 협주 에너지가 없어 턴을 넘깁니다.'}
                       </p>
                     </div>
                   )}
@@ -2942,18 +2988,152 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           if (concertoModalState.actionType === 'CLASH' && concertoModalState.targetCard) {
             handleSetClashCard(concertoModalState.playerIndex, concertoModalState.targetCard.id, selectedConcertoIds);
           } else if (concertoModalState.actionType === 'COMBO' && concertoModalState.targetCard) {
-            handleComboAttack(concertoModalState.playerIndex, concertoModalState.targetCard.id, selectedConcertoIds);
+            const targetCard = concertoModalState.targetCard;
+            const pIdx = concertoModalState.playerIndex;
+            if (isIntroSkillCard(targetCard)) {
+              setIntroSwapModalState({
+                isOpen: true,
+                targetCard,
+                spentConcertoIds: selectedConcertoIds,
+                playerIndex: pIdx,
+              });
+            } else {
+              handleComboAttack(pIdx, targetCard.id, selectedConcertoIds);
+            }
           }
         }}
       />
 
-      {/* 연격 카드 없음 알림 팝업 모달 */}
+      {/* <변주 스킬> 발동 시 리더와 교체할 백(서포터) 캐릭터 선택 모달 */}
+      {introSwapModalState.isOpen && introSwapModalState.targetCard && (() => {
+        const swapPlayer = gameState.players[introSwapModalState.playerIndex];
+        const card = introSwapModalState.targetCard;
+        const targetCharName = getIntroSkillTargetChar(card);
+        const currentLeader = swapPlayer.slots.leader;
+        const isLeaderAlreadyTarget = doesCharMatchIntroTarget(currentLeader, targetCharName);
+        const supportOptions = (
+          [
+            { slotKey: 'leftSupport' as const, label: '좌측 백 (LEFT SUPPORT)', char: swapPlayer.slots.leftSupport },
+            { slotKey: 'rightSupport' as const, label: '우측 백 (RIGHT SUPPORT)', char: swapPlayer.slots.rightSupport },
+          ]
+        ).filter((item): item is { slotKey: 'leftSupport' | 'rightSupport'; label: string; char: CharacterCard } => Boolean(item.char));
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
+            <div className="relative w-full max-w-xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-2 border-amber-500/70 rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-amber-500/20 pb-3.5">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-300 shadow">
+                    <ArrowLeftRight className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-lg font-black text-white">변주 스킬 리더 교체 대상 선택</h3>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-950 text-amber-300 border border-amber-500/40 font-bold">
+                        {card.nameKr}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      현재 리더 <strong className="text-amber-300">[{currentLeader.nameKr}]</strong>와(과) 자리를 교체할 백(서포터) 캐릭터를 선택하세요.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-amber-950/30 border border-amber-500/30 rounded-2xl p-3 text-xs text-amber-100 leading-relaxed">
+                <div className="font-bold text-amber-300 mb-0.5">
+                  효과 조건: 「{targetCharName || '대상 캐릭터'}」가 교체될 경우 추가 효과 발동
+                </div>
+                <p className="text-slate-300">{card.description}</p>
+                {isLeaderAlreadyTarget && (
+                  <p className="text-emerald-300 font-bold mt-1.5">
+                    ✓ 현재 「{currentLeader.nameKr}」가 리더 자리에 있으므로, 어느 백 캐릭터와 교체하더라도 「{currentLeader.nameKr}」가 교체되어 변주 스킬 추가 효과가 정상 발동됩니다!
+                  </p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 py-1">
+                {supportOptions.map(({ slotKey, label, char }) => {
+                  const triggersBonus = isLeaderAlreadyTarget || doesCharMatchIntroTarget(char, targetCharName);
+                  return (
+                    <button
+                      key={slotKey}
+                      onClick={() => {
+                        const charName = char.characterName || char.nameKr;
+                        soundEffects.playLeaderSwitch(charName);
+                        const pIdx = introSwapModalState.playerIndex;
+                        const spentIds = introSwapModalState.spentConcertoIds;
+                        setIntroSwapModalState({
+                          isOpen: false,
+                          targetCard: null,
+                          spentConcertoIds: undefined,
+                          playerIndex: 0,
+                        });
+                        handleComboAttack(pIdx, card.id, spentIds, undefined, slotKey);
+                      }}
+                      className={`group relative rounded-2xl overflow-hidden border-2 p-3 flex flex-col items-center gap-2.5 transition transform hover:scale-[1.03] cursor-pointer text-left ${
+                        triggersBonus
+                          ? 'border-emerald-400 bg-emerald-950/25 hover:bg-emerald-950/40 shadow-[0_0_25px_rgba(52,211,153,0.3)]'
+                          : 'border-slate-700 bg-slate-900/70 hover:border-amber-400/70 hover:bg-slate-900'
+                      }`}
+                    >
+                      <div className="w-full flex items-center justify-between text-[11px] font-bold">
+                        <span className="text-slate-400 font-mono">{label}</span>
+                        {triggersBonus ? (
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black text-[10px]">
+                            ✨ 변주 보너스 발동
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-bold text-[10px]">
+                            일반 리더 교체
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="relative w-32 aspect-[5/7] rounded-xl overflow-hidden border border-slate-700 shadow-lg">
+                        <img src={char.artUrl} alt={char.nameKr} className="w-full h-full object-cover" />
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-1.5 text-center">
+                          <div className="text-xs font-black text-white truncate">{char.nameKr}</div>
+                          <div className="text-[10px] font-mono text-amber-300">
+                            Lv.{char.level} · {getElementKr(char.element)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="w-full py-2 rounded-xl bg-amber-500 group-hover:bg-amber-400 text-slate-950 font-black text-xs text-center shadow transition">
+                        [{char.nameKr}] 리더로 교체 후 공격
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-slate-800">
+                <button
+                  onClick={() =>
+                    setIntroSwapModalState({
+                      isOpen: false,
+                      targetCard: null,
+                      spentConcertoIds: undefined,
+                      playerIndex: 0,
+                    })
+                  }
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 연격 카드 없음 / 추격 횟수 소진 알림 팝업 모달 */}
       {!activeComboStrike &&
         !activeUpgrade &&
         !gameState.pendingChoice &&
-        gameState.phase === 'COMBO_STEP' &&
-        !activeControlledPlayer.isAi &&
-        (Boolean(activeControlledPlayer.comboUnlimited) || (activeControlledPlayer.comboCount ?? 0) > 0) &&
+        !introSwapModalState.isOpen &&
+        isPlayerComboPhase &&
         !canPlayerExecuteCombo(activeControlledPlayer) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200 select-none">
             <div className="relative max-w-md w-full bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-2 border-amber-500/80 rounded-3xl p-6 shadow-[0_0_60px_rgba(245,158,11,0.35)] text-center flex flex-col items-center gap-4">
@@ -2963,11 +3143,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
               <div className="space-y-1.5">
                 <h3 className="text-xl font-black text-white flex items-center justify-center gap-2">
-                  <span>연격 카드가 없습니다</span>
+                  <span>
+                    {!activeControlledPlayer.comboUnlimited && (activeControlledPlayer.comboCount ?? 0) === 0
+                      ? '추격(연격) 공격 완료'
+                      : '연격 카드가 없습니다'}
+                  </span>
                 </h3>
                 <p className="text-sm text-slate-300 leading-relaxed">
-                  손패에 사용할 수 있는 <strong className="text-amber-400">적색(RED) 연격 카드</strong>나 협주 에너지가 없습니다.<br />
-                  <span className="text-xs text-amber-300/90 mt-1 block font-medium">연격을 종료하고 턴을 넘깁니다. (5초 후 자동 전환 또는 버튼 클릭)</span>
+                  {!activeControlledPlayer.comboUnlimited && (activeControlledPlayer.comboCount ?? 0) === 0 ? (
+                    <>
+                      남은 추격(연격) 횟수를 모두 소진했습니다.<br />
+                      <span className="text-xs text-amber-300/90 mt-1 block font-medium">연격을 종료하고 턴을 넘깁니다. (5초 후 자동 전환 또는 버튼 클릭)</span>
+                    </>
+                  ) : (
+                    <>
+                      손패에 사용할 수 있는 <strong className="text-amber-400">적색(RED) 연격 카드</strong>나 협주 에너지가 없습니다.<br />
+                      <span className="text-xs text-amber-300/90 mt-1 block font-medium">연격을 종료하고 턴을 넘깁니다. (5초 후 자동 전환 또는 버튼 클릭)</span>
+                    </>
+                  )}
                 </p>
               </div>
 

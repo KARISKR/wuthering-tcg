@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PendingChoice } from '../types/tcg';
+import { PendingChoice, getElementKr } from '../types/tcg';
 import { Sparkles, Check, CheckCircle2, ChevronRight, Eye } from 'lucide-react';
 
 interface EffectChoiceModalProps {
@@ -14,7 +14,11 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
   React.useEffect(() => {
     setIsSubmitting(false);
     if (choice) {
-      if (choice.maxSelect === 1 && choice.revealedCards.length === 1) {
+      if (
+        choice.onResolveType !== 'SELECT_EFFECT_UPGRADE' &&
+        choice.maxSelect === 1 &&
+        choice.revealedCards.length === 1
+      ) {
         setSelectedIds([choice.revealedCards[0].id]);
       } else {
         setSelectedIds([]);
@@ -23,6 +27,9 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
   }, [choice?.id]);
 
   if (!choice) return null;
+
+  const minSelect = choice.minSelect ?? 0;
+  const isUpgradeChoice = choice.onResolveType === 'SELECT_EFFECT_UPGRADE';
 
   const toggleSelect = (cardId: string) => {
     if (choice.onResolveType === 'VIEW_ONLY') return;
@@ -51,6 +58,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
 
   const handleConfirm = () => {
     if (isSubmitting) return;
+    if (choice.onResolveType !== 'VIEW_ONLY' && selectedIds.length < minSelect) return;
     setIsSubmitting(true);
     if (choice.onResolveType === 'VIEW_ONLY') {
       onResolve([]);
@@ -63,7 +71,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
   };
 
   const handleSkip = () => {
-    if (isSubmitting) return;
+    if (isSubmitting || minSelect > 0) return;
     setIsSubmitting(true);
     onResolve([]);
     setTimeout(() => setIsSubmitting(false), 800);
@@ -81,7 +89,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             <div className="flex items-center gap-2">
               <h2 className="text-xl font-black text-white">{choice.title}</h2>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold">
-                선택 발동
+                {isUpgradeChoice ? '레벨업 대상 수동 선택' : '선택 발동'}
               </span>
             </div>
             <p className="text-xs text-slate-300 mt-0.5 font-medium">
@@ -97,6 +105,8 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             <span>
               {choice.onResolveType === 'VIEW_ONLY'
                 ? `상대의 패 ${choice.revealedCards.length}장이 확인되었습니다.`
+                : choice.onResolveType === 'SELECT_EFFECT_UPGRADE'
+                ? `캐릭터 덱에서 중첩 레벨업 가능한 대상 카드 ${choice.revealedCards.length}장 확인`
                 : choice.onResolveType === 'SET_CONCERTO'
                 ? `덱 위의 카드 ${choice.revealedCards.length}장이 확인되었습니다 (협주 에리어 배치 선택)`
                 : choice.onResolveType === 'RECOVER_FROM_DROP'
@@ -114,7 +124,9 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
           <div className="flex items-center justify-between bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2">
             <div className="flex items-center gap-2 text-xs">
               <span className="text-slate-400 font-bold">
-                {choice.onResolveType === 'SET_CONCERTO'
+                {choice.onResolveType === 'SELECT_EFFECT_UPGRADE'
+                  ? '중첩할 레벨업 캐릭터 카드 선택:'
+                  : choice.onResolveType === 'SET_CONCERTO'
                   ? '협주 에리어에 배치할 카드:'
                   : choice.onResolveType === 'RECOVER_FROM_DROP'
                   ? '패에 회수할 카드:'
@@ -123,24 +135,28 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                   : '패에 추가할 카드 선택:'}
               </span>
               <span className="font-mono font-black text-amber-300 px-2 py-0.5 bg-slate-900 rounded border border-slate-700">
-                {selectedIds.length} / 최대 {choice.maxSelect}장 (0장 선택 가능)
+                {minSelect > 0
+                  ? `${selectedIds.length} / ${choice.maxSelect}장 (필수 ${minSelect}장 선택)`
+                  : `${selectedIds.length} / 최대 ${choice.maxSelect}장 (0장 선택 가능)`}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <button
-                onClick={selectAll}
-                className="text-emerald-400 hover:text-emerald-300 font-bold px-2 py-1 rounded hover:bg-emerald-950/40 transition"
-              >
-                전체 선택 ({choice.maxSelect}장)
-              </button>
-              <span className="text-slate-600">|</span>
-              <button
-                onClick={clearAll}
-                className="text-slate-400 hover:text-slate-200 font-bold px-2 py-1 rounded hover:bg-slate-800 transition"
-              >
-                선택 초기화 (0장)
-              </button>
-            </div>
+            {!isUpgradeChoice && (
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  onClick={selectAll}
+                  className="text-emerald-400 hover:text-emerald-300 font-bold px-2 py-1 rounded hover:bg-emerald-950/40 transition"
+                >
+                  전체 선택 ({choice.maxSelect}장)
+                </button>
+                <span className="text-slate-600">|</span>
+                <button
+                  onClick={clearAll}
+                  className="text-slate-400 hover:text-slate-200 font-bold px-2 py-1 rounded hover:bg-slate-800 transition"
+                >
+                  선택 초기화 (0장)
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex items-center justify-between bg-cyan-950/40 border border-cyan-800/60 rounded-xl px-4 py-2">
@@ -164,18 +180,19 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             choice.revealedCards.map((card, idx) => {
               const isSelected = selectedIds.includes(card.id);
               const isViewOnly = choice.onResolveType === 'VIEW_ONLY';
+              const isCharCard = card.kind === 'CHARACTER';
               return (
                 <div
                   key={`${card.id}-${idx}`}
                   onClick={() => {
                     if (!isViewOnly) toggleSelect(card.id);
                   }}
-                  className={`relative w-44 aspect-[5/7] rounded-2xl overflow-hidden border-2 transition transform select-none shadow-xl ${
+                  className={`relative w-48 aspect-[5/7] rounded-2xl overflow-hidden border-2 transition transform select-none shadow-xl ${
                     isViewOnly
                       ? 'border-cyan-500/50 hover:border-cyan-400 cursor-default'
                       : isSelected
                       ? 'border-emerald-400 ring-4 ring-emerald-400/50 shadow-[0_0_25px_rgba(52,211,153,0.6)] cursor-pointer hover:scale-105'
-                      : 'border-slate-700 opacity-75 hover:opacity-100 hover:border-slate-500 cursor-pointer hover:scale-105'
+                      : 'border-slate-700 opacity-80 hover:opacity-100 hover:border-amber-400/70 cursor-pointer hover:scale-105'
                   }`}
                 >
                   <img
@@ -188,6 +205,8 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                   <div className="absolute top-2 left-2 bg-black/80 backdrop-blur-sm rounded-lg px-2 py-0.5 text-xs font-mono font-bold text-slate-200 border border-slate-700">
                     {choice.onResolveType === 'VIEW_ONLY'
                       ? `상대 패 #${idx + 1}`
+                      : choice.onResolveType === 'SELECT_EFFECT_UPGRADE'
+                      ? `${card.code}`
                       : choice.onResolveType === 'RECOVER_FROM_DROP'
                       ? '트래시'
                       : `공개 #${idx + 1}`}
@@ -203,25 +222,41 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                   )}
 
                   {/* 카드 정보 하단 배너 */}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/80 to-transparent p-2 text-left">
-                    <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="font-black text-white truncate">{card.nameKr}</span>
-                      <span
-                        className={`text-[10px] font-black px-1.5 py-0.2 rounded ${
-                          card.color === 'RED'
-                            ? 'bg-red-950 text-red-300'
-                            : card.color === 'GREEN'
-                            ? 'bg-emerald-950 text-emerald-300'
-                            : 'bg-cyan-950 text-cyan-300'
-                        }`}
-                      >
-                        {card.color}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
-                      <span>비용: {card.cost}</span>
-                      <span>피해: {card.damage}</span>
-                    </div>
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/85 to-transparent p-2.5 text-left">
+                    {isCharCard ? (
+                      <>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-black text-white truncate">{card.nameKr}</span>
+                          <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-500/40">
+                            Lv.{card.level} · {getElementKr(card.element)}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-200 line-clamp-3 leading-snug">
+                          {card.description}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="font-black text-white truncate">{card.nameKr}</span>
+                          <span
+                            className={`text-[10px] font-black px-1.5 py-0.2 rounded ${
+                              card.color === 'RED'
+                                ? 'bg-red-950 text-red-300'
+                                : card.color === 'GREEN'
+                                ? 'bg-emerald-950 text-emerald-300'
+                                : 'bg-cyan-950 text-cyan-300'
+                            }`}
+                          >
+                            {card.color}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
+                          <span>비용: {card.cost}</span>
+                          <span>피해: {card.damage}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -245,28 +280,44 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             </div>
           ) : (
             <>
-              <button
-                disabled={isSubmitting}
-                onClick={handleSkip}
-                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 bg-slate-800/80 hover:bg-slate-800 transition"
-              >
-                {choice.onResolveType === 'SET_CONCERTO'
-                  ? '협주 에리어에 배치하지 않고 넘어가기 (덱 맨 위 유지)'
-                  : choice.onResolveType === 'RECOVER_FROM_DROP'
-                  ? '회수하지 않고 넘어가기'
-                  : choice.onResolveType === 'DISCARD_FOR_DAMAGE'
-                  ? '패를 버리지 않고 기본 피해로 공격'
-                  : '패에 추가하지 않고 넘어가기 (0장)'}
-              </button>
+              {minSelect === 0 ? (
+                <button
+                  disabled={isSubmitting}
+                  onClick={handleSkip}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-slate-200 bg-slate-800/80 hover:bg-slate-800 transition cursor-pointer"
+                >
+                  {choice.onResolveType === 'SET_CONCERTO'
+                    ? '협주 에리어에 배치하지 않고 넘어가기 (덱 맨 위 유지)'
+                    : choice.onResolveType === 'RECOVER_FROM_DROP'
+                    ? '회수하지 않고 넘어가기'
+                    : choice.onResolveType === 'DISCARD_FOR_DAMAGE'
+                    ? '패를 버리지 않고 기본 피해로 공격'
+                    : '패에 추가하지 않고 넘어가기 (0장)'}
+                </button>
+              ) : (
+                <div className="text-xs font-bold text-amber-300">
+                  {selectedIds.length < minSelect
+                    ? `⚠️ 위 목록에서 카드를 클릭하여 ${minSelect}장 선택해주세요.`
+                    : '✓ 대상 카드가 선택되었습니다. 우측 버튼을 눌러 확정하세요.'}
+                </div>
+              )}
 
               <button
-                disabled={isSubmitting}
+                disabled={isSubmitting || selectedIds.length < minSelect}
                 onClick={handleConfirm}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 hover:brightness-110 shadow-lg shadow-emerald-500/25 transition cursor-pointer"
+                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-black transition ${
+                  selectedIds.length < minSelect
+                    ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-slate-950 hover:brightness-110 shadow-lg shadow-emerald-500/25 cursor-pointer'
+                }`}
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>
-                  {choice.onResolveType === 'SET_CONCERTO'
+                  {choice.onResolveType === 'SELECT_EFFECT_UPGRADE'
+                    ? selectedIds.length > 0
+                      ? '선택한 카드로 중첩 레벨업 확정'
+                      : '레벨업할 카드를 선택하세요'
+                    : choice.onResolveType === 'SET_CONCERTO'
                     ? `선택한 ${selectedIds.length}장 협주 에리어에 배치`
                     : choice.onResolveType === 'RECOVER_FROM_DROP'
                     ? `선택한 ${selectedIds.length}장 패에 회수`
@@ -283,3 +334,4 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
     </div>
   );
 };
+

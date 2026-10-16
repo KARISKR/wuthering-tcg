@@ -193,7 +193,7 @@ export interface UpgradeEffect {
   slotName: 'leader' | 'leftSupport' | 'rightSupport';
 }
 
-// 효과 발동/패 드로우 등 유저 선택 이벤트 (선택 발동 모달)
+// 효과 발동/패 드로우/효과 레벨업 등 유저 선택 이벤트 (선택 발동 모달)
 export interface PendingChoice {
   id: string;
   playerIndex: 0 | 1;
@@ -201,10 +201,17 @@ export interface PendingChoice {
   sourceCardName: string;
   sourceCardArt?: string;
   description: string;
-  revealedCards: ActionCard[]; // 공개된 덱 위 카드들
-  minSelect: number; // 예: 0장 선택 가능
-  maxSelect: number; // 예: 최대 2장 선택 가능
-  onResolveType: 'ADD_TO_HAND' | 'SET_CONCERTO' | 'RECOVER_FROM_DROP' | 'DISCARD_FOR_DAMAGE' | 'VIEW_ONLY';
+  revealedCards: Array<ActionCard | CharacterCard>; // 공개된 덱 위 카드들 또는 캐릭터 덱 진화 후보들
+  minSelect: number; // 예: 0장 또는 1장 필수 선택
+  maxSelect: number; // 예: 최대 1~2장 선택 가능
+  onResolveType:
+    | 'ADD_TO_HAND'
+    | 'SET_CONCERTO'
+    | 'RECOVER_FROM_DROP'
+    | 'DISCARD_FOR_DAMAGE'
+    | 'VIEW_ONLY'
+    | 'SELECT_EFFECT_UPGRADE';
+  targetSlot?: 'leader' | 'leftSupport' | 'rightSupport';
 }
 
 export interface GameState {

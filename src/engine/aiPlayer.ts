@@ -96,8 +96,8 @@ function cardRawValue(c: ActionCard, leader: CharacterCard | undefined): number 
   if (leaderName.includes('방랑자') && c.color === 'GREEN') v += 1.2;
   let combo = (c.color === 'RED' ? 1 : 0) + (c.pursuitCount ?? 0);
   if (slotHasCharacterSkill(leader, '치샤', 1)) combo += 1;
-  if (c.code === 'SD02-010') { combo += 8; v += 4.5; } // 용을 타고 하늘로 향해 (추격 8 + 3드로우)
-  if (c.code === 'BP01-057') { combo += 8; v += 3.5; } // 결말의 순환 (추격 8 + 1힐)
+  if (c.code === 'SD02-010') { if (!c.pursuitCount) combo += 8; v += 4.5; } // 용을 타고 하늘로 향해 (추격 8 + 3드로우)
+  if (c.code === 'BP01-057') { if (!c.pursuitCount) combo += 8; v += 3.5; } // 결말의 순환 (추격 8 + 1힐)
   if (c.code === 'SD01-023') { v += 4.0; } // 울림의 연주 (5pt 힐)
   v += Math.min(combo, 8) * 1.1;
   if (c.effectType === 'DRAW' || c.code === 'BP01-058') v += 2.0;

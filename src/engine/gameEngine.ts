@@ -327,6 +327,11 @@ export function findLv2Card(characterDeck: CharacterCard[], slotChar: CharacterC
   });
 }
 
+// 특정 캐릭터의 모든 Lv.2 카드 목록 탐색 헬퍼 (그늘이의 대폭주 등 카드 효과 레벨업 선택용, BP01-011 포함)
+export function findAllLv2Cards(characterDeck: CharacterCard[], slotChar: CharacterCard): CharacterCard[] {
+  return characterDeck.filter((c) => isSameCharacter(c, slotChar) && c.level === 2);
+}
+
 // 공식 룰 603.1.2.2: 선택한 캐릭터와 레벨이 동일하거나 1단계 높은, 동명의 캐릭터 카드 전체 탐색
 export function findAllUpgradableCards(characterDeck: CharacterCard[], slotChar: CharacterCard): CharacterCard[] {
   return characterDeck.filter(
@@ -335,6 +340,46 @@ export function findAllUpgradableCards(characterDeck: CharacterCard[], slotChar:
       (c.level === slotChar.level + 1 || c.level === slotChar.level) &&
       c.code !== 'BP01-011'
   );
+}
+
+// <변주 스킬> 카드 여부 및 대상 캐릭터 판별 헬퍼
+const INTRO_SKILL_TARGET_MAP: Record<string, string> = {
+  'SD01-009': '치샤',       // 도약의 불빛
+  'SD01-014': '양양',       // 숨결
+  'SD01-019': '방랑자(여)', // 진동 소리 (방랑자 여)
+  'SD02-009': '금희',       // 반룡의 빛
+  'SD02-014': '산화',       // 차가운 눈꽃
+  'SD02-019': '방랑자(남)', // 진동 소리 (방랑자 남)
+  'BP01-046': '카멜리아',   // 팔천의 춘추
+  'BP01-054': '파수인',     // 계발
+  'BP01-063': '앙코',       // 양들의 도움
+};
+
+export function isIntroSkillCard(card: { code?: string; nameKr?: string; feature?: string } | null | undefined): boolean {
+  if (!card) return false;
+  const baseCode = (card.code || '').split('_')[0];
+  if (INTRO_SKILL_TARGET_MAP[baseCode]) return true;
+  if (card.feature && card.feature.includes('변주 스킬')) return true;
+  if (card.nameKr && card.nameKr.includes('변주 스킬')) return true;
+  return false;
+}
+
+export function getIntroSkillTargetChar(card: { code?: string; characterExclusive?: string; characterName?: string } | null | undefined): string | null {
+  if (!card) return null;
+  const baseCode = (card.code || '').split('_')[0];
+  if (INTRO_SKILL_TARGET_MAP[baseCode]) return INTRO_SKILL_TARGET_MAP[baseCode];
+  return card.characterExclusive || card.characterName || null;
+}
+
+export function doesCharMatchIntroTarget(char: CharacterCard | null | undefined, targetName: string | null): boolean {
+  if (!char || !targetName) return false;
+  if (targetName === '방랑자(여)') {
+    return char.nameKr.includes('방랑자(여)') || char.characterName.includes('방랑자(여)');
+  }
+  if (targetName === '방랑자(남)') {
+    return char.nameKr.includes('방랑자(남)') || char.characterName.includes('방랑자(남)');
+  }
+  return char.characterName === targetName || char.nameKr.includes(targetName);
 }
 
 
@@ -1096,13 +1141,13 @@ export function applyCharacterEvolutionSkills(
   const sh1 = upgradeCard.code === 'BP01-009' ? upgradeCard : currentSlotCard.code === 'BP01-009' ? currentSlotCard : null;
   if (sh1) {
     const isEntry = sh1 === upgradeCard;
-    const introSkills = player.dropZone.filter((c) => c.kind === 'ACTION' && c.nameKr.includes('변주 스킬')) as ActionCard[];
+    const introSkills = player.dropZone.filter((c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard)) as ActionCard[];
     if (introSkills.length > 0) {
       if (player.isAi) {
-        const dropIdx = player.dropZone.findIndex((c) => c.kind === 'ACTION' && c.nameKr.includes('변주 스킬'));
+        const dropIdx = player.dropZone.findIndex((c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard));
         if (dropIdx !== -1) {
           const [reclaimed] = player.dropZone.splice(dropIdx, 1);
-          player.hand.push(reclaimed as ActionCard);
+          addCardsToHand(player, [reclaimed as ActionCard]);
           newState.players[playerIndex] = player;
           newState = addLog(
             newState,
@@ -1760,89 +1805,140 @@ export function applyBattleStepSkills(state: GameState): GameState {
       }
     }
 
-    // 4. 피어난 동백꽃 [BP01-048] 배틀 효과: 카멜리아 레벨업!
+    // 4. 피어난 동백꽃 [BP01-048] 배틀 효과: 카멜리아 레벨업! (유저 수동 선택 지원)
     if (clashCard.code === 'BP01-048') {
       const camSlotKey = (['leader', 'leftSupport', 'rightSupport'] as const).find(
         (k) => player.slots[k]?.characterName === '카멜리아'
       );
       if (camSlotKey && player.slots[camSlotKey]) {
         const currentCam = player.slots[camSlotKey]!;
-        const nextCam = findEvolutionCard(player.characterDeck, currentCam);
-        if (nextCam) {
-          player.characterDeck = player.characterDeck.filter((c) => c.id !== nextCam.id);
-          const prevUnderlying = currentCam.underlyingCards || [];
-          player.slots[camSlotKey] = {
-            ...nextCam,
-            underlyingCards: [...prevUnderlying, currentCam],
-          };
-          newState.lastUpgrade = {
-            id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            playerIndex,
-            playerName: player.name,
-            character: { ...nextCam },
-            previousLevel: currentCam.level as 0 | 1,
-            newLevel: nextCam.level as 1 | 2,
-            slotName: camSlotKey,
-          };
-          newState = addLog(
-            newState,
-            `[피어난 동백꽃 BP01-048 배틀 효과] [카멜리아]가 [${nextCam.nameKr}](Lv.${nextCam.level})(으)로 각성 레벨업했습니다!`,
-            'ACTION',
-            playerIndex,
-            { cardArt: nextCam.artUrl, cardName: nextCam.nameKr, effectTag: '배틀 레벨업' }
-          );
-          // 레벨업/등장 스킬 발동 연계
-          newState.players = players;
-          newState = applyCharacterEvolutionSkills(newState, playerIndex, camSlotKey, nextCam, currentCam, false);
-          player = { ...newState.players[playerIndex] };
-          players[playerIndex] = player;
+        const upgradableCams = findAllUpgradableCards(player.characterDeck, currentCam);
+        if (upgradableCams.length > 0) {
+          if (player.isAi) {
+            const nextCam = findEvolutionCard(player.characterDeck, currentCam) || upgradableCams[0];
+            player.characterDeck = player.characterDeck.filter((c) => c.id !== nextCam.id);
+            const prevUnderlying = currentCam.underlyingCards || [];
+            player.slots[camSlotKey] = {
+              ...nextCam,
+              underlyingCards: [...prevUnderlying, { ...currentCam, underlyingCards: undefined }],
+            };
+            newState.lastUpgrade = {
+              id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              playerIndex,
+              playerName: player.name,
+              character: { ...nextCam },
+              previousLevel: currentCam.level as 0 | 1 | 2,
+              newLevel: nextCam.level as 1 | 2,
+              slotName: camSlotKey,
+            };
+            newState = addLog(
+              newState,
+              `[피어난 동백꽃 BP01-048 배틀 효과] [카멜리아]가 [${nextCam.nameKr}](Lv.${nextCam.level})(으)로 각성 레벨업했습니다!`,
+              'ACTION',
+              playerIndex,
+              { cardArt: nextCam.artUrl, cardName: nextCam.nameKr, effectTag: '배틀 레벨업' }
+            );
+            newState.players = players;
+            newState = applyCharacterEvolutionSkills(newState, playerIndex, camSlotKey, nextCam, currentCam, false);
+            player = { ...newState.players[playerIndex] };
+            players[playerIndex] = player;
+          } else {
+            const upgradeChoice: PendingChoice = {
+              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              playerIndex,
+              title: '피어난 동백꽃 — 카멜리아 레벨업 대상 선택',
+              sourceCardName: '피어난 동백꽃 [BP01-048]',
+              sourceCardArt: clashCard.artUrl,
+              description: `캐릭터 덱에서 [카멜리아](현재 Lv.${currentCam.level}) 위에 겹쳐 레벨업할 카드를 직접 선택하세요.`,
+              revealedCards: upgradableCams,
+              minSelect: 1,
+              maxSelect: 1,
+              onResolveType: 'SELECT_EFFECT_UPGRADE',
+              targetSlot: camSlotKey,
+            };
+            newState = queueChoice(newState, upgradeChoice, false);
+            players[playerIndex] = player;
+          }
         }
       }
     }
 
-    // 5. 그늘이의 대폭주 [BP01-062] 배틀 효과: 앙코를 Lv.2로 진화시키고 리더를 앙코로 교체!
+    // 5. 그늘이의 대폭주 [BP01-062] 배틀 효과: 앙코를 Lv.2로 진화(수동 카드 선택)시키고 리더를 앙코로 교체!
     if (clashCard.code === 'BP01-062') {
       const ankeSlotKey = (['leader', 'leftSupport', 'rightSupport'] as const).find(
         (k) => player.slots[k]?.characterName === '앙코'
       );
       if (ankeSlotKey && player.slots[ankeSlotKey]) {
-        const currentAnke = player.slots[ankeSlotKey]!;
-        const lv2Anke = findLv2Card(player.characterDeck, currentAnke);
-        if (lv2Anke) {
-          player.characterDeck = player.characterDeck.filter((c) => c.id !== lv2Anke.id);
-          const prevUnderlying = currentAnke.underlyingCards || [];
-          player.slots[ankeSlotKey] = {
-            ...lv2Anke,
-            underlyingCards: [...prevUnderlying, currentAnke],
-          };
-          newState.lastUpgrade = {
-            id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-            playerIndex,
-            playerName: player.name,
-            character: { ...lv2Anke },
-            previousLevel: currentAnke.level as 0 | 1,
-            newLevel: 2,
-            slotName: ankeSlotKey,
-          };
-        }
+        // 먼저 리더를 앙코로 교체
         if (ankeSlotKey !== 'leader') {
           const prevLeader = player.slots.leader;
           player.slots.leader = player.slots[ankeSlotKey]!;
           player.slots[ankeSlotKey] = prevLeader;
         }
-        newState = addLog(
-          newState,
-          `[그늘이의 대폭주 BP01-062 배틀 효과] 앙코를 Lv.2로 각성시키고 리더를 [앙코]로 교체했습니다!`,
-          'ACTION',
-          playerIndex,
-          { cardArt: clashCard.artUrl, cardName: '그늘이의 대폭주', effectTag: '리더 교체&진화' }
-        );
-        if (lv2Anke) {
-          // 레벨업/등장 스킬 발동 연계
-          newState.players = players;
-          newState = applyCharacterEvolutionSkills(newState, playerIndex, 'leader', lv2Anke, currentAnke, false);
-          player = { ...newState.players[playerIndex] };
-          players[playerIndex] = player;
+        const currentAnke = player.slots.leader;
+        const lv2AnkeCards = findAllLv2Cards(player.characterDeck, currentAnke);
+
+        if (lv2AnkeCards.length > 0) {
+          if (player.isAi) {
+            const lv2Anke = lv2AnkeCards.find((c) => c.code === 'BP01-011') || lv2AnkeCards[0];
+            player.characterDeck = player.characterDeck.filter((c) => c.id !== lv2Anke.id);
+            const prevUnderlying = currentAnke.underlyingCards || [];
+            player.slots.leader = {
+              ...lv2Anke,
+              underlyingCards: [...prevUnderlying, { ...currentAnke, underlyingCards: undefined }],
+            };
+            newState.lastUpgrade = {
+              id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              playerIndex,
+              playerName: player.name,
+              character: { ...lv2Anke },
+              previousLevel: currentAnke.level as 0 | 1 | 2,
+              newLevel: 2,
+              slotName: 'leader',
+            };
+            newState = addLog(
+              newState,
+              `[그늘이의 대폭주 BP01-062 배틀 효과] 앙코를 Lv.2 [${lv2Anke.code}]로 각성시키고 리더를 [앙코]로 교체했습니다!`,
+              'ACTION',
+              playerIndex,
+              { cardArt: clashCard.artUrl, cardName: '그늘이의 대폭주', effectTag: '리더 교체&진화' }
+            );
+            newState.players = players;
+            newState = applyCharacterEvolutionSkills(newState, playerIndex, 'leader', lv2Anke, currentAnke, false);
+            player = { ...newState.players[playerIndex] };
+            players[playerIndex] = player;
+          } else {
+            newState = addLog(
+              newState,
+              `[그늘이의 대폭주 BP01-062 배틀 효과] 리더를 [앙코]로 교체했습니다! 캐릭터 덱에서 배치할 Lv.2 [앙코]를 선택하세요.`,
+              'ACTION',
+              playerIndex,
+              { cardArt: clashCard.artUrl, cardName: '그늘이의 대폭주', effectTag: '리더 교체&진화' }
+            );
+            const upgradeChoice: PendingChoice = {
+              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              playerIndex,
+              title: '그늘이의 대폭주 — Lv.2 앙코 레벨업 카드 선택',
+              sourceCardName: '그늘이의 대폭주 [BP01-062]',
+              sourceCardArt: clashCard.artUrl,
+              description: '캐릭터 덱에서 [앙코] 위에 배치하여 레벨업할 레벨 2 [앙코] 카드 1장을 직접 선택하세요.',
+              revealedCards: lv2AnkeCards,
+              minSelect: 1,
+              maxSelect: 1,
+              onResolveType: 'SELECT_EFFECT_UPGRADE',
+              targetSlot: 'leader',
+            };
+            newState = queueChoice(newState, upgradeChoice, false);
+            players[playerIndex] = player;
+          }
+        } else {
+          newState = addLog(
+            newState,
+            `[그늘이의 대폭주 BP01-062 배틀 효과] 리더를 [앙코]로 교체했습니다! (캐릭터 덱에 남은 Lv.2 앙코 없음)`,
+            'ACTION',
+            playerIndex,
+            { cardArt: clashCard.artUrl, cardName: '그늘이의 대폭주', effectTag: '리더 교체' }
+          );
         }
       }
     }
@@ -2519,16 +2615,21 @@ export function finishClashJudgment(state: GameState): GameState {
       winnerPlayer.comboUnlimited = false;
     }
 
-    // 카드 자체 [추격 X] 및 캐릭터 추격 효과 가산
+    // 카드 자체 [추격 X] 및 캐릭터 추격 효과 가산 (winCard.pursuitCount 중복 가산 방지)
     let officialPursuit = winCard.pursuitCount ?? 0;
-    if (winCard.code === 'SD02-010') officialPursuit += 8; // 금희 용을 타고 하늘로 향해 [추격 8]
-    if (winCard.code === 'BP01-057') officialPursuit += 8; // 결말의 순환 [추격 8]
-    if (winCard.code === 'BP01-069') officialPursuit += 1; // 날개의 뜻 [추격 1]
-    if (winCard.code === 'SD01-013') officialPursuit += 2; // 날카로운 바람·회피 [추격 2]
-    if (winCard.code === 'SD01-015') officialPursuit += 1; // 점프 [추격 1]
-    if (winCard.code === 'SD01-021') officialPursuit += 2; // 로프 [추격 2]
-    if (winCard.code === 'SD02-013') officialPursuit += 2; // 차가운 빛·회피 [추격 2]
-    if (winCard.code === 'SD02-021') officialPursuit += 2; // 로프 [추격 2]
+    if (officialPursuit === 0) {
+      if (winCard.code === 'SD02-010' || winCard.code === 'BP01-057') officialPursuit = 8;
+      else if (
+        winCard.code === 'SD01-013' ||
+        winCard.code === 'SD01-021' ||
+        winCard.code === 'SD02-013' ||
+        winCard.code === 'SD02-021'
+      ) {
+        officialPursuit = 2;
+      } else if (winCard.code === 'BP01-069' || winCard.code === 'SD01-015') {
+        officialPursuit = 1;
+      }
+    }
 
     // 방랑자(남) Lv.2 [BP01-019] 리더 판정: 자신이 녹색 카드로 승리했을 경우 【추격 3】
     if (winnerLeaderCards.some((c) => c.code === 'BP01-019') && winCard.color === 'GREEN') {
@@ -2819,7 +2920,8 @@ export function executeComboAttack(
   playerIndex: 0 | 1,
   cardId: string,
   spentConcertoIds?: string[],
-  discardForBonusDmgId?: string
+  discardForBonusDmgId?: string,
+  swapSupportSlot?: 'leftSupport' | 'rightSupport'
 ): { success: boolean; newState: GameState; error?: string } {
   let player = { ...state.players[playerIndex] };
   const opponent = { ...state.players[playerIndex === 0 ? 1 : 0] };
@@ -2890,200 +2992,215 @@ export function executeComboAttack(
   }
 
   let newState = { ...state };
+  let introBonusDmg = 0;
 
-  // 연격 카드 특수 효과 & 리더 교체 발동
-  // 1. 도약의 불빛 [SD01-009]: 치샤로 교체 & 데미지 +2
-  if (card.code === 'SD01-009') {
-    const chixiaSlot = (['leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '치샤'
-    );
-    if (chixiaSlot && player.slots[chixiaSlot]) {
-      const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[chixiaSlot]!;
-      player.slots[chixiaSlot] = prevLeader;
-      newState = addLog(
-        newState,
-        `[도약의 불빛 SD01-009 연격 효과] 리더를 [치샤]로 교체했습니다!`,
-        'ACTION',
-        playerIndex,
-        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체' }
+  // ==========================================
+  // <변주 스킬> 9종 공통 리더 교체 & 고유 변주 효과 처리
+  // 공식 텍스트: "【콤보】자신의 리더를 교체한다. 「캐릭터명」이(가) 교체될 경우, [효과]."
+  // ★ 대상 캐릭터가 이미 리더(Leader) 자리에 있는 경우에도 후열(백) 캐릭터와 정상 교체되며,
+  //   리더에서 후열로 교체된 것 역시 「캐릭터명」이 교체된 것이므로 변주 추가 효과가 정상 발동됩니다!
+  // ==========================================
+  if (isIntroSkillCard(card)) {
+    const introTargetName = getIntroSkillTargetChar(card);
+    let chosenSupportKey: 'leftSupport' | 'rightSupport' | null = null;
+
+    if (swapSupportSlot && player.slots[swapSupportSlot]) {
+      chosenSupportKey = swapSupportSlot;
+    } else {
+      const matchedSupport = (['leftSupport', 'rightSupport'] as const).find((k) =>
+        doesCharMatchIntroTarget(player.slots[k], introTargetName)
       );
-    }
-  }
-
-  // 2. 반룡의 빛 [SD02-009]: 금희로 교체 & 데미지 +2
-  if (card.code === 'SD02-009') {
-    const jinhsiSlot = (['leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '금희'
-    );
-    if (jinhsiSlot && player.slots[jinhsiSlot]) {
-      const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[jinhsiSlot]!;
-      player.slots[jinhsiSlot] = prevLeader;
-      newState = addLog(
-        newState,
-        `[반룡의 빛 SD02-009 연격 효과] 리더를 [금희]로 교체했습니다!`,
-        'ACTION',
-        playerIndex,
-        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체' }
-      );
-    }
-  }
-
-  // 3. 팔천의 춘추 [BP01-046]: 리더를 카멜리아로 교체하고, 카멜리아 레벨업!
-  if (card.code === 'BP01-046') {
-    const camSlot = (['leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '카멜리아'
-    );
-    if (camSlot && player.slots[camSlot]) {
-      const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[camSlot]!;
-      player.slots[camSlot] = prevLeader;
-    }
-    const targetKey = player.slots.leader.characterName === '카멜리아' ? 'leader' : (camSlot || 'leader');
-    const curCam = player.slots[targetKey];
-    if (curCam && curCam.characterName === '카멜리아') {
-      const nextCam = findEvolutionCard(player.characterDeck, curCam);
-      if (nextCam) {
-        player.characterDeck = player.characterDeck.filter((c) => c.id !== nextCam.id);
-        const prevUnder = curCam.underlyingCards || [];
-        player.slots[targetKey] = { ...nextCam, underlyingCards: [...prevUnder, curCam] };
-        newState.lastUpgrade = {
-          id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-          playerIndex,
-          playerName: player.name,
-          character: { ...nextCam },
-          previousLevel: curCam.level as 0 | 1,
-          newLevel: nextCam.level as 1 | 2,
-          slotName: targetKey,
-        };
-        // 레벨업/등장 스킬 연계
-        newState.players[playerIndex] = player;
-        newState = applyCharacterEvolutionSkills(newState, playerIndex, targetKey, nextCam, curCam, false);
-        player = { ...newState.players[playerIndex] };
+      if (matchedSupport && player.slots[matchedSupport]) {
+        chosenSupportKey = matchedSupport;
+      } else {
+        // 대상 캐릭터가 이미 리더 자리에 있는 경우: 백(후열 서포터) 캐릭터와 교체!
+        chosenSupportKey = player.slots.leftSupport ? 'leftSupport' : player.slots.rightSupport ? 'rightSupport' : null;
       }
     }
-    newState = addLog(
-      newState,
-      `[팔천의 춘추 BP01-046 연격 효과] 리더를 [카멜리아]로 교체하고 카멜리아를 진화 레벨업시켰습니다!`,
-      'ACTION',
-      playerIndex,
-      { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&진화' }
-    );
-  }
 
-  // 4. 계발 [BP01-054]: 리더를 파수인으로 교체하고 생명력 1pt 회복
-  if (card.code === 'BP01-054') {
-    const shSlot = (['leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '파수인'
-    );
-    if (shSlot && player.slots[shSlot]) {
-      const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[shSlot]!;
-      player.slots[shSlot] = prevLeader;
-    }
-    player.hp = Math.min(player.maxHp, player.hp + 1);
-    newState = addLog(
-      newState,
-      `[계발 BP01-054 연격 효과] 리더를 [파수인]으로 교체하고 생명력을 +1 회복했습니다! (현재 HP: ${player.hp}/${player.maxHp})`,
-      'HEAL',
-      playerIndex,
-      { cardArt: card.artUrl, cardName: card.nameKr, amount: 1, effectTag: '리더 교체&회복' }
-    );
-  }
+    let wasTargetSwapped = false;
+    let swappedSlotAfter: 'leader' | 'leftSupport' | 'rightSupport' = 'leader';
 
-  // 5. 양들의 도움 [BP01-063]: 리더를 앙코로 교체하고 트래시에서 앙코 적색 카드 1장 패에 추가
-  if (card.code === 'BP01-063') {
-    const ankeSlot = (['leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '앙코'
-    );
-    if (ankeSlot && player.slots[ankeSlot]) {
+    if (chosenSupportKey && player.slots[chosenSupportKey]) {
       const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[ankeSlot]!;
-      player.slots[ankeSlot] = prevLeader;
-    }
-    const redAnkeIdx = player.dropZone.findIndex(
-      (c) => c.kind === 'ACTION' && (c as ActionCard).characterExclusive === '앙코' && (c as ActionCard).color === 'RED'
-    );
-    if (redAnkeIdx !== -1) {
-      const [reclaimed] = player.dropZone.splice(redAnkeIdx, 1);
-      player.hand.push(reclaimed as ActionCard);
-    }
-    newState = addLog(
-      newState,
-      `[양들의 도움 BP01-063 연격 효과] 리더를 [앙코]로 교체하고 트래시에서 앙코 적색 카드를 패에 회수했습니다!`,
-      'ACTION',
-      playerIndex,
-      { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&회수' }
-    );
-  }
+      const nextLeader = player.slots[chosenSupportKey]!;
+      player.slots.leader = nextLeader;
+      player.slots[chosenSupportKey] = prevLeader;
 
-  // 6. 숨결 [SD01-014]: 리더를 양양으로 교체하고 덱 위 1장 협주 에리어에 배치
-  if (card.code === 'SD01-014') {
-    const yangSlot = (['leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '양양'
-    );
-    if (yangSlot && player.slots[yangSlot]) {
-      const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[yangSlot]!;
-      player.slots[yangSlot] = prevLeader;
+      const prevMatched = doesCharMatchIntroTarget(prevLeader, introTargetName);
+      const nextMatched = doesCharMatchIntroTarget(nextLeader, introTargetName);
+      wasTargetSwapped = prevMatched || nextMatched;
+      swappedSlotAfter = nextMatched ? 'leader' : chosenSupportKey;
     }
-    const charged = drawSingleCardFromDeck(player);
-    if (charged) player.concertoZone.push(charged);
-    newState = addLog(
-      newState,
-      `[숨결 SD01-014 연격 효과] 리더를 [양양]으로 교체하고 협주 에너지 1장을 충전했습니다!`,
-      'ACTION',
-      playerIndex,
-      { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&충전' }
-    );
-  }
 
-  // 7. 차가운 눈꽃 [SD02-014]: 리더를 산화로 교체하고 덱 위 1장 협주 에리어에 배치
-  if (card.code === 'SD02-014') {
-    const sanSlot = (['leftSupport', 'rightSupport'] as const).find(
-      (k) => player.slots[k]?.characterName === '산화'
-    );
-    if (sanSlot && player.slots[sanSlot]) {
-      const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[sanSlot]!;
-      player.slots[sanSlot] = prevLeader;
-    }
-    const charged = drawSingleCardFromDeck(player);
-    if (charged) player.concertoZone.push(charged);
-    newState = addLog(
-      newState,
-      `[차가운 눈꽃 SD02-014 연격 효과] 리더를 [산화]로 교체하고 협주 에너지 1장을 충전했습니다!`,
-      'ACTION',
-      playerIndex,
-      { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&충전' }
-    );
-  }
+    const newLeaderName = player.slots.leader.characterName || player.slots.leader.nameKr;
 
-  // 8. 진동 소리 [SD01-019 / SD02-019]: 리더를 방랑자로 교체하고 카드 1장 드로우
-  if (card.code === 'SD01-019' || card.code === 'SD02-019') {
-    const isFemale = card.code === 'SD01-019';
-    const roverSlot = (['leftSupport', 'rightSupport'] as const).find((k) => {
-      const ch = player.slots[k];
-      if (!ch) return false;
-      return isFemale
-        ? ch.nameKr.includes('방랑자(여)') || ch.characterName.includes('방랑자(여)')
-        : ch.nameKr.includes('방랑자(남)') || ch.characterName.includes('방랑자(남)');
-    });
-    if (roverSlot && player.slots[roverSlot]) {
-      const prevLeader = player.slots.leader;
-      player.slots.leader = player.slots[roverSlot]!;
-      player.slots[roverSlot] = prevLeader;
+    // 1. 도약의 불빛 [SD01-009] (치샤) / 2. 반룡의 빛 [SD02-009] (금희): 교체 시 데미지 +2
+    if (card.code === 'SD01-009' || card.code === 'SD02-009') {
+      if (wasTargetSwapped) {
+        introBonusDmg += 2;
+      }
+      newState = addLog(
+        newState,
+        `[${card.nameKr} ${card.code} 변주 효과] 리더를 [${newLeaderName}](으)로 교체했습니다!${wasTargetSwapped ? ' (변주 효과: 데미지 +2)' : ''}`,
+        'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체' }
+      );
     }
-    const drawn = drawSingleCardFromDeck(player);
-    if (drawn) player.hand.push(drawn);
-    newState = addLog(
-      newState,
-      `[진동 소리 연격 효과] 리더를 [방랑자]로 교체하고 카드 1장을 드로우했습니다!`,
-      'ACTION',
-      playerIndex,
-      { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&드로우' }
-    );
+
+    // 3. 팔천의 춘추 [BP01-046] (카멜리아): 카멜리아가 교체될 경우 카멜리아 레벨업! (유저 수동 선택 지원)
+    if (card.code === 'BP01-046') {
+      if (wasTargetSwapped) {
+        const camSlotKey: 'leader' | 'leftSupport' | 'rightSupport' =
+          doesCharMatchIntroTarget(player.slots.leader, '카멜리아')
+            ? 'leader'
+            : swappedSlotAfter;
+        const curCam = player.slots[camSlotKey];
+        if (curCam && doesCharMatchIntroTarget(curCam, '카멜리아')) {
+          const upgradableCams = findAllUpgradableCards(player.characterDeck, curCam);
+          if (upgradableCams.length > 0) {
+            if (player.isAi) {
+              const nextCam = findEvolutionCard(player.characterDeck, curCam) || upgradableCams[0];
+              player.characterDeck = player.characterDeck.filter((c) => c.id !== nextCam.id);
+              const prevUnder = curCam.underlyingCards || [];
+              player.slots[camSlotKey] = {
+                ...nextCam,
+                underlyingCards: [...prevUnder, { ...curCam, underlyingCards: undefined }],
+              };
+              newState.lastUpgrade = {
+                id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                playerIndex,
+                playerName: player.name,
+                character: { ...nextCam },
+                previousLevel: curCam.level as 0 | 1 | 2,
+                newLevel: nextCam.level as 1 | 2,
+                slotName: camSlotKey,
+              };
+              newState.players[playerIndex] = player;
+              newState = applyCharacterEvolutionSkills(newState, playerIndex, camSlotKey, nextCam, curCam, false);
+              player = { ...newState.players[playerIndex] };
+            } else {
+              const upgradeChoice: PendingChoice = {
+                id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                playerIndex,
+                title: '팔천의 춘추 — 카멜리아 레벨업 대상 선택',
+                sourceCardName: '팔천의 춘추 [BP01-046]',
+                sourceCardArt: card.artUrl,
+                description: `캐릭터 덱에서 [카멜리아](현재 Lv.${curCam.level}) 위에 겹쳐 레벨업할 카드를 직접 선택하세요.`,
+                revealedCards: upgradableCams,
+                minSelect: 1,
+                maxSelect: 1,
+                onResolveType: 'SELECT_EFFECT_UPGRADE',
+                targetSlot: camSlotKey,
+              };
+              newState = queueChoice(newState, upgradeChoice, false);
+            }
+          }
+        }
+      }
+      newState = addLog(
+        newState,
+        `[팔천의 춘추 BP01-046 변주 효과] 리더를 [${newLeaderName}](으)로 교체했습니다!${wasTargetSwapped ? ' (카멜리아 레벨업 발동)' : ''}`,
+        'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&진화' }
+      );
+    }
+
+    // 4. 계발 [BP01-054] (파수인): 파수인이 교체될 경우 생명력 1pt 회복
+    if (card.code === 'BP01-054') {
+      if (wasTargetSwapped) {
+        player.hp = Math.min(player.maxHp, player.hp + 1);
+      }
+      newState = addLog(
+        newState,
+        `[계발 BP01-054 변주 효과] 리더를 [${newLeaderName}](으)로 교체${wasTargetSwapped ? `하고 생명력을 +1 회복했습니다! (현재 HP: ${player.hp}/${player.maxHp})` : '했습니다!'}`,
+        wasTargetSwapped ? 'HEAL' : 'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, amount: wasTargetSwapped ? 1 : undefined, effectTag: '리더 교체&회복' }
+      );
+    }
+
+    // 5. 양들의 도움 [BP01-063] (앙코): 앙코가 교체될 경우 트래시에서 <변주 스킬> 외의 앙코 적색 카드 1장 패에 추가
+    if (card.code === 'BP01-063') {
+      if (wasTargetSwapped) {
+        const eligibleRedAnke = player.dropZone.filter(
+          (c) =>
+            c.kind === 'ACTION' &&
+            (c as ActionCard).characterExclusive?.includes('앙코') &&
+            (c as ActionCard).color === 'RED' &&
+            !isIntroSkillCard(c as ActionCard)
+        ) as ActionCard[];
+
+        if (eligibleRedAnke.length > 0) {
+          if (player.isAi) {
+            const redAnkeIdx = player.dropZone.findIndex(
+              (c) =>
+                c.kind === 'ACTION' &&
+                (c as ActionCard).characterExclusive?.includes('앙코') &&
+                (c as ActionCard).color === 'RED' &&
+                !isIntroSkillCard(c as ActionCard)
+            );
+            if (redAnkeIdx !== -1) {
+              const [reclaimed] = player.dropZone.splice(redAnkeIdx, 1);
+              addCardsToHand(player, [reclaimed as ActionCard]);
+            }
+          } else {
+            const recoverChoice: PendingChoice = {
+              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              playerIndex,
+              title: '양들의 도움 — 앙코 적색 카드 회수',
+              sourceCardName: '양들의 도움 [BP01-063]',
+              sourceCardArt: card.artUrl,
+              description: '트래시 에리어에서 <변주 스킬> 외의 [앙코] 적색 카드 1장을 선택하여 패에 추가하세요.',
+              revealedCards: eligibleRedAnke,
+              minSelect: 0,
+              maxSelect: 1,
+              onResolveType: 'RECOVER_FROM_DROP',
+            };
+            newState = queueChoice(newState, recoverChoice, false);
+          }
+        }
+      }
+      newState = addLog(
+        newState,
+        `[양들의 도움 BP01-063 변주 효과] 리더를 [${newLeaderName}](으)로 교체했습니다!${wasTargetSwapped ? ' (앙코 적색 카드 회수 발동)' : ''}`,
+        'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&회수' }
+      );
+    }
+
+    // 6. 숨결 [SD01-014] (양양) / 7. 차가운 눈꽃 [SD02-014] (산화): 교체 시 덱 위 1장 협주 에리어에 배치
+    if (card.code === 'SD01-014' || card.code === 'SD02-014') {
+      if (wasTargetSwapped) {
+        const charged = drawSingleCardFromDeck(player);
+        if (charged) player.concertoZone.push(charged);
+      }
+      newState = addLog(
+        newState,
+        `[${card.nameKr} ${card.code} 변주 효과] 리더를 [${newLeaderName}](으)로 교체${wasTargetSwapped ? '하고 협주 에너지 1장을 충전했습니다!' : '했습니다!'}`,
+        'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&충전' }
+      );
+    }
+
+    // 8. 진동 소리 [SD01-019 / SD02-019] (방랑자): 교체 시 카드 1장 드로우
+    if (card.code === 'SD01-019' || card.code === 'SD02-019') {
+      if (wasTargetSwapped) {
+        const drawn = drawSingleCardFromDeck(player);
+        if (drawn) addCardsToHand(player, [drawn]);
+      }
+      newState = addLog(
+        newState,
+        `[진동 소리 ${card.code} 변주 효과] 리더를 [${newLeaderName}](으)로 교체${wasTargetSwapped ? '하고 카드 1장을 드로우했습니다!' : '했습니다!'}`,
+        'ACTION',
+        playerIndex,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체&드로우' }
+      );
+    }
   }
 
   // 9. 복성재우 [BP01-071]: 덱 위 1장 협주 에리어에 배치
@@ -3100,12 +3217,7 @@ export function executeComboAttack(
   }
 
   // 대미지 계산
-  let dmg = card.damage;
-
-  // 도약의 불빛 [SD01-009] / 반룡의 빛 [SD02-009]: 리더 교체 시 데미지 +2
-  if (card.code === 'SD01-009' || card.code === 'SD02-009') {
-    dmg += 2;
-  }
+  let dmg = card.damage + introBonusDmg;
 
   // SD02-011 만물의 정화: 액션 에리어에 카드가 3장 이상 있을 경우 데미지 +3
   if (card.code === 'SD02-011' && (player.actionArea?.length || 0) >= 3) {
@@ -3478,7 +3590,7 @@ export function resolvePendingChoice(
   };
 
   const maxAllowed = state.pendingChoice.maxSelect ?? 1;
-  const chosenCards: ActionCard[] = [];
+  const chosenCards: Array<ActionCard | CharacterCard> = [];
   const remainingRevealed = [...revealedCards];
   for (const id of chosenCardIds) {
     if (chosenCards.length >= maxAllowed) break;
@@ -3488,7 +3600,8 @@ export function resolvePendingChoice(
       chosenCards.push(card);
     }
   }
-  const unchosenCards = remainingRevealed;
+  const unchosenCards = remainingRevealed as ActionCard[];
+  const chosenActionCards = chosenCards as ActionCard[];
 
   if (onResolveType === 'VIEW_ONLY') {
     // 0. 상대방 패 확인 효과 (스캔 등: 패와 덱을 변동시키지 않고, 턴 종료 시까지 상대 손패 전면 공개)
@@ -3500,6 +3613,71 @@ export function resolvePendingChoice(
       playerIndex,
       { effectTag: '상대 패 확인' }
     );
+  } else if (onResolveType === 'SELECT_EFFECT_UPGRADE') {
+    // 0-B. 효과에 의한 캐릭터 중첩 레벨업 대상 수동 선택 (그늘이의 대폭주, 피어난 동백꽃, 팔천의 춘추 등)
+    const targetSlot = state.pendingChoice.targetSlot ?? 'leader';
+    const prevSlotChar = player.slots[targetSlot];
+    const chosenChar = (chosenCards[0] || revealedCards[0]) as CharacterCard | undefined;
+
+    if (prevSlotChar && chosenChar) {
+      let deckIdx = player.characterDeck.findIndex((c) => c.id === chosenChar.id);
+      if (deckIdx === -1) {
+        deckIdx = player.characterDeck.findIndex((c) => c.code === chosenChar.code);
+      }
+      const lv2Card = deckIdx !== -1 ? player.characterDeck.splice(deckIdx, 1)[0] : chosenChar;
+
+      const previousStack = prevSlotChar.underlyingCards || [];
+      const { underlyingCards: _, ...cleanCurrent } = prevSlotChar;
+      const stackedCard: CharacterCard = {
+        ...lv2Card,
+        underlyingCards: [...previousStack, cleanCurrent],
+      };
+      player.slots[targetSlot] = stackedCard;
+
+      const upgradeEff = {
+        id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        playerIndex,
+        playerName: player.name,
+        character: { ...lv2Card },
+        previousLevel: prevSlotChar.level as 0 | 1 | 2,
+        newLevel: stackedCard.level as 1 | 2,
+        slotName: targetSlot,
+      };
+
+      if (newState.phase === 'CLASH_REVEAL' && !newState.clashResult) {
+        newState.deferredUpgrade = upgradeEff;
+      } else {
+        newState.lastUpgrade = upgradeEff;
+      }
+
+      newState.lastEffectEvent = {
+        id: `eff-upg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        sourceCardName,
+        effectType: 'BUFF',
+        title: `${stackedCard.nameKr} 즉시 각성!`,
+        description: `[${sourceCardName}] 효과로 선택한 [${stackedCard.nameKr} (${stackedCard.code})] 카드로 중첩 레벨업했습니다!`,
+        playerIndex,
+        timestamp: Date.now(),
+      };
+
+      newState = addLog(
+        newState,
+        `✨ [${sourceCardName}] ${player.name}이(가) [${prevSlotChar.nameKr}] 위에 [${stackedCard.nameKr} (${stackedCard.code})]을(를) 직접 선택하여 중첩 레벨업했습니다!`,
+        'ACTION',
+        playerIndex,
+        { cardName: stackedCard.nameKr, cardArt: stackedCard.artUrl, effectTag: '효과 레벨업 완료' }
+      );
+
+      newState = applyCharacterEvolutionSkills(
+        newState,
+        playerIndex,
+        targetSlot,
+        stackedCard,
+        prevSlotChar,
+        false
+      );
+      newState = checkGameOver(newState);
+    }
   } else if (onResolveType === 'SET_CONCERTO') {
     // 1. 협주 에리어 배치 선택
     // 출처가 트래시(dropZone, 예: 산화 Lv.1)인지 덱(actionDeck, 예: 양양/산화 배틀 효과)인지 명확히 판별
@@ -3507,8 +3685,8 @@ export function resolvePendingChoice(
       sourceCardName.includes('산화') ||
       player.dropZone.some((c) => revealedCards.some((rc) => rc.id === c.id || rc.code === c.code));
 
-    if (chosenCards.length > 0) {
-      for (const chosen of chosenCards) {
+    if (chosenActionCards.length > 0) {
+      for (const chosen of chosenActionCards) {
         if (isFromDropZone) {
           // dropZone에서 선택된 카드를 1:1로 정확히 제거
           let dIdx = player.dropZone.findIndex((c) => c.id === chosen.id);
@@ -3529,7 +3707,7 @@ export function resolvePendingChoice(
           }
         }
       }
-      player.concertoZone = [...player.concertoZone, ...chosenCards];
+      player.concertoZone = [...player.concertoZone, ...chosenActionCards];
     }
 
     if (!isFromDropZone) {
@@ -3540,19 +3718,19 @@ export function resolvePendingChoice(
     }
     // (트래시에서 공개된 미선택 카드는 dropZone에 그대로 유지되며, 덱에 절대 추가되지 않음!)
 
-    if (chosenCards.length > 0) {
+    if (chosenActionCards.length > 0) {
       newState.lastEffectEvent = {
         id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         sourceCardName,
         effectType: 'CHARGE',
         title: '협주 에리어 배치 완료',
-        description: `[${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 협주 에리어에 배치했습니다!`,
+        description: `[${sourceCardName}] 효과로 카드 ${chosenActionCards.length}장을 협주 에리어에 배치했습니다!`,
         playerIndex,
         timestamp: Date.now(),
       };
       newState = addLog(
         newState,
-        `[${sourceCardName}] ${player.name}이(가) [${chosenCards.map((c) => c.nameKr).join(', ')}]을(를) 협주 에리어에 배치했습니다. (현재 협주: ${player.concertoZone.length})`,
+        `[${sourceCardName}] ${player.name}이(가) [${chosenActionCards.map((c) => c.nameKr).join(', ')}]을(를) 협주 에리어에 배치했습니다. (현재 협주: ${player.concertoZone.length})`,
         'ACTION',
         playerIndex
       );
@@ -3567,7 +3745,7 @@ export function resolvePendingChoice(
   } else if (onResolveType === 'RECOVER_FROM_DROP') {
     // 2. 트래시 에리어 회수 선택 (dropZone에서 1:1로 정확히 실물 카드를 추출하여 패로 이동, 절대 복제 불가)
     const recoveredCards: ActionCard[] = [];
-    for (const chosen of chosenCards) {
+    for (const chosen of chosenActionCards) {
       if (recoveredCards.length >= maxAllowed) break;
       // 1순위: 카드 고유 ID로 dropZone에서 정확히 1:1 추출
       let dropIdx = player.dropZone.findIndex((c) => c.id === chosen.id);
@@ -3614,10 +3792,10 @@ export function resolvePendingChoice(
   } else {
     // 3. 패에 추가 (ADD_TO_HAND)
     // 선택된 카드를 actionDeck에서 완전히 제거 (중복 드로우 원천 차단)
-    player.actionDeck = player.actionDeck.filter((c) => !chosenCards.some((ch) => ch.id === c.id));
+    player.actionDeck = player.actionDeck.filter((c) => !chosenActionCards.some((ch) => ch.id === c.id));
 
     // 손패 고유 ID 중복 방지 가드로 패에 안전 추가
-    addCardsToHand(player, chosenCards);
+    addCardsToHand(player, chosenActionCards);
 
     // 단일 공개 카드(파수인 BP01-010 또는 판정 패배 드로우)인 경우 미선택 시 덱 맨 위에 유지!
     // 다중 공개(방랑자 BP01-018)인 경우 미선택 카드는 덱 맨 아래로
@@ -3627,13 +3805,13 @@ export function resolvePendingChoice(
       player.actionDeck = [...player.actionDeck, ...unchosenCards];
     }
 
-    if (chosenCards.length > 0) {
+    if (chosenActionCards.length > 0) {
       newState.lastEffectEvent = {
         id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         sourceCardName,
         effectType: 'DRAW',
         title: '카드 패 추가 완료',
-        description: `[${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 패에 추가했습니다!`,
+        description: `[${sourceCardName}] 효과로 카드 ${chosenActionCards.length}장을 패에 추가했습니다!`,
         playerIndex,
         timestamp: Date.now(),
       };
@@ -3641,7 +3819,7 @@ export function resolvePendingChoice(
 
     newState = addLog(
       newState,
-      `${player.name}이(가) [${sourceCardName}] 효과로 카드 ${chosenCards.length}장을 선택하여 패에 추가했습니다.${
+      `${player.name}이(가) [${sourceCardName}] 효과로 카드 ${chosenActionCards.length}장을 선택하여 패에 추가했습니다.${
         unchosenCards.length > 0
           ? revealedCards.length <= 1
             ? ' (선택하지 않은 카드는 덱 맨 위 유지)'
@@ -3653,7 +3831,12 @@ export function resolvePendingChoice(
     );
   }
 
-  // 1. 큐에 대기 중인 다음 선택 발동 효과가 있다면 순차적으로 표출
+  // 1. 효과 해결 중(예: 캐릭터 진화 스킬 발동) 새로운 pendingChoice가 생성되었다면 우선 반환
+  if (newState.pendingChoice) {
+    return newState;
+  }
+
+  // 1-B. 큐에 대기 중인 다음 선택 발동 효과가 있다면 순차적으로 표출
   if (newState.pendingChoiceQueue && newState.pendingChoiceQueue.length > 0) {
     const [nextChoice, ...rest] = newState.pendingChoiceQueue;
     newState.pendingChoice = nextChoice;
