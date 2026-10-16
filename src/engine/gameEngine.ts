@@ -158,14 +158,36 @@ export interface CharacterSlotsLike {
   rightSupport?: CharacterCard | null;
 }
 
+// <에코> 카드 판별 통합 헬퍼
+export function isEchoCard(card: any): boolean {
+  if (!card || card.kind !== 'ACTION') return false;
+  const feat = card.feature || '';
+  const desc = card.description || '';
+  const baseCode = (card.code || '').split('_')[0];
+  return (
+    feat.includes('에코') ||
+    desc.includes('동시에 1장의 <에코>만') ||
+    (baseCode >= 'BP01-034' && baseCode <= 'BP01-043')
+  );
+}
+
 // 공식 규칙에 따른 액션 카드 사용 가능 여부 판별
 // 1. 일반 공용 카드: 누구나 사용 가능
 // 2. 【리더 스킬】 카드: 해당 캐릭터가 '현재 리더(중앙)' 자리에 있어야만 발동 가능
 // 3. 비(非) 리더 스킬 전용 카드: 해당 캐릭터가 '전장 3인 파티(리더 또는 좌/우 서포터)'에 존재하면 자유롭게 사용 가능!
+// 4. <에코> 카드: 자신의 액션 에리어에는 동시에 1장의 <에코>만 존재할 수 있음
 export function canPlayerUseActionCard(
   slots: CharacterSlotsLike,
-  card: ActionCard
+  card: ActionCard,
+  actionArea?: ActionCard[]
 ): { canUse: boolean; reason?: string } {
+  if (actionArea && isEchoCard(card) && actionArea.some(isEchoCard)) {
+    return {
+      canUse: false,
+      reason: '자신의 액션 에리어에는 동시에 1장의 <에코>만 존재할 수 있습니다.',
+    };
+  }
+
   if (!card.characterExclusive || card.characterExclusive === '일반' || card.characterExclusive === '-') {
     return { canUse: true };
   }
@@ -223,13 +245,13 @@ export function canLeaderUseCard(
   return isCharacterMatching(char, card.characterExclusive);
 }
 
-// <일반 공격> 카드 판별 통합 헬퍼 (카멜리아 등 공식 룰 매칭)
+// <일반 공격>/<기본 공격> 카드 판별 통합 헬퍼 (카멜리아, 앙코, 치샤 등 공식 룰 매칭)
 export function isNormalAttackCard(card: any): boolean {
   if (!card || card.kind !== 'ACTION') return false;
   const name = card.nameKr || '';
   const feat = card.feature || '';
   const desc = card.description || '';
-  const code = card.code || '';
+  const code = (card.code || '').split('_')[0];
 
   return (
     name.includes('일반 공격') ||
@@ -246,7 +268,8 @@ export function isNormalAttackCard(card: any): boolean {
     code === 'SD02-012' || // 차가운 빛·일반 공격
     code === 'SD02-017' || // 소리의 변화·일반 공격
     code === 'BP01-052' || // 근원의 추구·일반 공격
-    code === 'BP01-059'    // 그늘이와 구름이 출격·일반 공격
+    code === 'BP01-059' || // 그늘이와 구름이 출격·일반 공격
+    code === 'BP01-060'    // 양치기 소녀의 길·강공격 (<기본 공격,강공격,용융>)
   );
 }
 
@@ -256,7 +279,7 @@ export function isAerialCard(card: any): boolean {
   const feat = card.feature || '';
   const desc = card.description || '';
   const name = card.nameKr || '';
-  const code = card.code || '';
+  const code = (card.code || '').split('_')[0];
   return (
     feat.includes('체공') ||
     desc.includes('체공') ||
@@ -267,6 +290,94 @@ export function isAerialCard(card: any): boolean {
     code === 'SD02-021' || // 로프 (탐색 모듈,체공)
     code === 'BP01-069'    // 날개의 뜻·회피 (회피,체공)
   );
+}
+
+// 액션 카드 유효 코스트 계산 헬퍼 (SD01-016 북풍의 소용돌이 적색 코스트 페널티 반영)
+export function getEffectiveCardCost(player: PlayerState, card: ActionCard): number {
+  let effectiveCost = card.cost;
+  if (card.color === 'RED' && player.tempCostPenaltyRed && player.tempCostPenaltyRed > 0) {
+    effectiveCost += player.tempCostPenaltyRed;
+  }
+  return effectiveCost;
+}
+
+// 협주 에리어 코스트 지불 헬퍼 (자동 소모 시 에코 카드 보존 우선)
+export function spendConcertoCost(
+  player: PlayerState,
+  cost: number,
+  spentConcertoIds?: string[]
+): ActionCard[] {
+  if (cost <= 0) return [];
+  const spentCards: ActionCard[] = [];
+  if (spentConcertoIds && spentConcertoIds.length === cost) {
+    const remaining: ActionCard[] = [];
+    for (const c of player.concertoZone) {
+      if (spentConcertoIds.includes(c.id) && spentCards.length < cost) {
+        spentCards.push(c);
+      } else {
+        remaining.push(c);
+      }
+    }
+    player.concertoZone = remaining;
+  } else {
+    // 에코가 아닌 일반 카드를 먼저 소모하여 협주 에코 시너지 유지
+    const nonEchoIndices: number[] = [];
+    const echoIndices: number[] = [];
+    player.concertoZone.forEach((c, idx) => {
+      if (isEchoCard(c)) echoIndices.push(idx);
+      else nonEchoIndices.push(idx);
+    });
+    const toSpendIdxSet = new Set([...nonEchoIndices, ...echoIndices].slice(0, cost));
+    const remaining: ActionCard[] = [];
+    player.concertoZone.forEach((c, idx) => {
+      if (toSpendIdxSet.has(idx)) spentCards.push(c);
+      else remaining.push(c);
+    });
+    player.concertoZone = remaining;
+  }
+  player.dropZone.push(...spentCards);
+  return spentCards;
+}
+
+// 0코스트 프리즘/후슈슈 에코 5종 【협주】 시너지 데미지 보너스 계산
+const SONATA_ECHO_CONFIG = [
+  { prismCode: 'BP01-034', sonataTag: '솟구치는 용암', partnerCode: 'BP01-035', elementTag: '용융' },
+  { prismCode: 'BP01-036', sonataTag: '야밤의 서리', partnerCode: 'BP01-037', elementTag: '응결' },
+  { prismCode: 'BP01-038', sonataTag: '스쳐가는 바람', partnerCode: 'BP01-039', elementTag: '기류' },
+  { prismCode: 'BP01-040', sonataTag: '빛을 삼키는 해', partnerCode: 'BP01-041', elementTag: '인멸' },
+  { prismCode: 'BP01-042', sonataTag: '빛나는 별', partnerCode: 'BP01-043', elementTag: '회절' },
+] as const;
+
+export function hasCardElementTag(card: ActionCard | null | undefined, elementTag: string): boolean {
+  if (!card) return false;
+  const feat = card.feature || (card as any).rawOfficial?.feature || '';
+  return feat.includes(elementTag);
+}
+
+export function getConcertoSonataBonusDamage(player: PlayerState, card: ActionCard): number {
+  let bonus = 0;
+  const prevUsedCards = (player.actionArea || []).filter((c) => c.id !== card.id);
+
+  for (const cfg of SONATA_ECHO_CONFIG) {
+    if (!hasCardElementTag(card, cfg.elementTag)) continue;
+    // 이번 턴에 자신이 처음 사용한 해당 속성 카드인지 확인
+    const alreadyUsedElement = prevUsedCards.some((c) => hasCardElementTag(c, cfg.elementTag));
+    if (alreadyUsedElement) continue;
+
+    // 협주 에리어에 해당 프리즘 에코가 있고, 동일 화음의 다른 카드명 에코가 최소 2종류 이상 존재하는지 확인
+    const matchingSonataCards = player.concertoZone.filter((c) => {
+      const baseCode = (c.code || '').split('_')[0];
+      const feat = c.feature || '';
+      return baseCode === cfg.prismCode || baseCode === cfg.partnerCode || feat.includes(cfg.sonataTag);
+    });
+    const distinctCodes = new Set(matchingSonataCards.map((c) => (c.code || '').split('_')[0]));
+    const prismCount = matchingSonataCards.filter((c) => (c.code || '').split('_')[0] === cfg.prismCode).length;
+
+    if (prismCount > 0 && distinctCodes.size >= 2) {
+      bonus += prismCount;
+    }
+  }
+  return bonus;
 }
 
 // 덱에서 카드 1장 추출 헬퍼 (덱 소진 시 드롭 존의 액션 카드를 분산 리셔플)
@@ -639,12 +750,29 @@ export function decideAiStartingLeader(aiPlayer: PlayerState): string {
     let score = 0;
     const exclusiveCount = aiPlayer.hand.filter((c) => c.characterExclusive === charName).length;
     const usableCount = aiPlayer.hand.filter((c) => canLeaderUseCard(ch, c)).length;
-    score += exclusiveCount * 3.0 + usableCount * 1.5;
+    const zeroCostUsable = aiPlayer.hand.filter((c) => c.cost === 0 && canLeaderUseCard(ch, c)).length;
+    score += exclusiveCount * 2.5 + usableCount * 1.2 + zeroCostUsable * 1.0;
 
-    if (charName === '양양') score += 2.5; // 시작 무료 협주 에너지 1충전 패시브
-    if (charName === '금희') score += 1.8;
-    if (charName === '치샤') score += 1.5;
-    if (charName === '산화') score += 1.2;
+    // 만약 손패에 해당 캐릭터의 <변주 스킬>이 있다면 서포터(후열)에서 대기하다가 변주로 나오는 것도 유리하지만,
+    // 1턴 배틀 주도권(Lv.0 리더 스킬)이 강한 캐릭터에 가산점 부여
+    if (charName === '앙코') score += 2.2; // Lv.0 매 턴 첫 기본 공격 +2 데미지
+    if (charName === '카멜리아') score += 2.0; // Lv.0 승리 시 트래시 일반 공격 회수
+    if (charName === '방랑자' || charName.includes('방랑자')) {
+      const greenCount = aiPlayer.hand.filter((c) => c.color === 'GREEN').length;
+      score += 1.4 + greenCount * 1.2; // Lv.0 녹색 배틀 시 최대 2장 드로우
+    }
+    if (charName === '파수인') {
+      const greenCount = aiPlayer.hand.filter((c) => c.color === 'GREEN').length;
+      score += 1.5 + greenCount * 1.0; // Lv.0 녹색 배틀 드로우 + 녹색 승리 회복
+    }
+    if (charName === '양양' || charName === '산화') {
+      const blueCount = aiPlayer.hand.filter((c) => c.color === 'BLUE').length;
+      score += 1.3 + blueCount * 1.1; // Lv.0 청색 배틀 시 협주 1장 충전
+    }
+    if (charName === '치샤' || charName === '금희') {
+      const redCount = aiPlayer.hand.filter((c) => c.color === 'RED').length;
+      score += 1.5 + redCount * 0.6; // Lv.0 적색 배틀 시 1pt 번 데미지
+    }
 
     if (score > bestScore) {
       bestScore = score;
@@ -895,25 +1023,19 @@ export function executeStartPhase(state: GameState): GameState {
     }
   }
 
-  // 2) Lv.1 양양 리더 효과: 턴 시작 시 협주 존 카드가 1장 이하라면 덱에서 1장 충전 (Lv.2 양양이어도 하위 Lv.1 스킬 보유!)
-  const hasYangyangLv1 = slotHasCharacterSkill(activePlayer.slots.leader, '양양', 1);
-  if (hasYangyangLv1 && activePlayer.concertoZone.length <= 1) {
-    const card = drawSingleCardFromDeck(activePlayer);
-    if (card) {
-      activePlayer.concertoZone.push(card);
-      newState = addLog(newState, `[양양 Lv.1 리더 효과] 협주 존에 카드를 1장 무료 충전했습니다.`, 'ACTION', activeIdx);
-    }
+  // 양 플레이어의 턴 단위 피격/초회 보너스 플래그 초기화 및 현재 턴 플레이어 행동 플래그 초기화
+  for (const pl of [p0, p1]) {
+    pl.actionFlags = {
+      upgraded: false,
+      switchedLeader: false,
+      chargedConcerto: false,
+      firstNormalAttackBonusUsed: false,
+      firstDamageTakenReducedThisTurn: false,
+      damageTakenThisTurn: false,
+      shorekeeperLv2HealDrawCount: 0,
+    };
   }
-
-  // 행동 플래그 및 연격 카운트 초기화
-  activePlayer.actionFlags = {
-    upgraded: false,
-    switchedLeader: false,
-    chargedConcerto: false,
-  };
   activePlayer.comboCount = 0;
-  activePlayer.tempCostPenaltyRed = 0;
-  activePlayer.comboBlockedNextTurn = false;
   activePlayer.introSkillBonusDrawCount = 0;
 
   // 드로우 단계(DRAW_PHASE)로 진입 (플레이어가 직접 덱을 클릭하거나 AI 턴 시 비동기 드로우 실행)
@@ -949,8 +1071,9 @@ export function executeDrawPhase(state: GameState): GameState {
 
   addCardsToHand(player, drawnCards);
 
-  // 행동 플래그 리셋
+  // 행동 플래그 리셋 (턴 시작 시 초기화된 보너스 플래그는 유지)
   player.actionFlags = {
+    ...player.actionFlags,
     upgraded: false,
     switchedLeader: false,
     chargedConcerto: false,
@@ -1023,14 +1146,8 @@ export function upgradeCharacter(
     };
   }
 
-  // 레벨업 비용 계산: 기본 목표 레벨 수만큼 패 버림
-  // 단, Lv.2 양양 지속 효과(코스트 1장 경감, 최소 1장) 적용
-  let requiredDiscard = upgradeCard.level;
-  const hasYangyangLv2 = playerHasCharacterSkill(player, '양양', 2);
-
-  if (hasYangyangLv2 && requiredDiscard > 1) {
-    requiredDiscard -= 1;
-  }
+  // 공식 룰 603.1.2.1: 목표 캐릭터 레벨 수만큼 자신의 패를 버린다
+  const requiredDiscard = upgradeCard.level;
 
   if (discardCardIds.length !== requiredDiscard) {
     return {
@@ -1132,9 +1249,9 @@ export function applyCharacterEvolutionSkills(
   // 2) 1 -> 2 레벨업 시: 그 위에 2레벨 카드가 겹쳐지면서 밑에 깔린 1레벨 카드의 【레벨업】 효과 발동!
   // ==========================================
 
-  // 1. BP01-003 카멜리아 Lv.1: 트래시에서 <일반 공격> 1장 패에 추가 가능
+  // 1. BP01-003 카멜리아 Lv.1: 【등장】/【레벨업】트래시에서 <일반 공격> 1장 패에 추가 가능
   const isCamellya1 = (c: CharacterCard | undefined) =>
-    Boolean(c && (c.code?.startsWith('BP01-003') || (c.level === 1 && (c.characterName === '카멜리아' || c.nameKr?.includes('카멜리아')))));
+    Boolean(c && c.code?.startsWith('BP01-003'));
 
   const cam1 = isCamellya1(upgradeCard) ? upgradeCard : isCamellya1(currentSlotCard) ? currentSlotCard : null;
   if (cam1) {
@@ -1145,7 +1262,7 @@ export function applyCharacterEvolutionSkills(
         const dropIdx = player.dropZone.findIndex(isNormalAttackCard);
         if (dropIdx !== -1) {
           const [reclaimed] = player.dropZone.splice(dropIdx, 1);
-          player.hand.push(reclaimed as ActionCard);
+          addCardsToHand(player, [reclaimed as ActionCard]);
           newState.players[playerIndex] = player;
           newState = addLog(
             newState,
@@ -1194,7 +1311,11 @@ export function applyCharacterEvolutionSkills(
   }
 
   // 2. BP01-009 파수인 Lv.1: 트래시에서 <변주 스킬> 카드 1장 패에 추가 가능
-  const sh1 = upgradeCard.code === 'BP01-009' ? upgradeCard : currentSlotCard.code === 'BP01-009' ? currentSlotCard : null;
+  const sh1 = upgradeCard.code?.startsWith('BP01-009')
+    ? upgradeCard
+    : currentSlotCard.code?.startsWith('BP01-009')
+    ? currentSlotCard
+    : null;
   if (sh1) {
     const isEntry = sh1 === upgradeCard;
     const introSkills = player.dropZone.filter((c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard)) as ActionCard[];
@@ -1232,7 +1353,11 @@ export function applyCharacterEvolutionSkills(
   }
 
   // 3. BP01-013 앙코 Lv.1: 트래시에서 【앙코】의 적색 카드 1장 패에 추가 가능
-  const anke1 = upgradeCard.code === 'BP01-013' ? upgradeCard : currentSlotCard.code === 'BP01-013' ? currentSlotCard : null;
+  const anke1 = upgradeCard.code?.startsWith('BP01-013')
+    ? upgradeCard
+    : currentSlotCard.code?.startsWith('BP01-013')
+    ? currentSlotCard
+    : null;
   if (anke1) {
     const isEntry = anke1 === upgradeCard;
     const ankeRed = player.dropZone.filter(
@@ -1245,7 +1370,7 @@ export function applyCharacterEvolutionSkills(
         );
         if (dropIdx !== -1) {
           const [reclaimed] = player.dropZone.splice(dropIdx, 1);
-          player.hand.push(reclaimed as ActionCard);
+          addCardsToHand(player, [reclaimed as ActionCard]);
           newState.players[playerIndex] = player;
           newState = addLog(
             newState,
@@ -1274,20 +1399,20 @@ export function applyCharacterEvolutionSkills(
   }
 
   // 4. BP01-026 치샤 Lv.1: 트래시에서 <기본 공격> 카드 1장 패에 추가 가능
-  const chixia1 = upgradeCard.code === 'BP01-026' ? upgradeCard : currentSlotCard.code === 'BP01-026' ? currentSlotCard : null;
+  const chixia1 = upgradeCard.code?.startsWith('BP01-026')
+    ? upgradeCard
+    : currentSlotCard.code?.startsWith('BP01-026')
+    ? currentSlotCard
+    : null;
   if (chixia1) {
     const isEntry = chixia1 === upgradeCard;
-    const normalAttacks = player.dropZone.filter(
-      (c) => c.kind === 'ACTION' && (c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격'))
-    ) as ActionCard[];
+    const normalAttacks = player.dropZone.filter(isNormalAttackCard) as ActionCard[];
     if (normalAttacks.length > 0) {
       if (player.isAi) {
-        const dropIdx = player.dropZone.findIndex(
-          (c) => c.kind === 'ACTION' && (c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격'))
-        );
+        const dropIdx = player.dropZone.findIndex(isNormalAttackCard);
         if (dropIdx !== -1) {
           const [reclaimed] = player.dropZone.splice(dropIdx, 1);
-          player.hand.push(reclaimed as ActionCard);
+          addCardsToHand(player, [reclaimed as ActionCard]);
           newState.players[playerIndex] = player;
           newState = addLog(
             newState,
@@ -1316,7 +1441,11 @@ export function applyCharacterEvolutionSkills(
   }
 
   // 5. BP01-032 산화 Lv.1: 트래시에서 카드 1장을 협주 에리어에 배치 가능
-  const sanhua1 = upgradeCard.code === 'BP01-032' ? upgradeCard : currentSlotCard.code === 'BP01-032' ? currentSlotCard : null;
+  const sanhua1 = upgradeCard.code?.startsWith('BP01-032')
+    ? upgradeCard
+    : currentSlotCard.code?.startsWith('BP01-032')
+    ? currentSlotCard
+    : null;
   if (sanhua1) {
     const isEntry = sanhua1 === upgradeCard;
     const dropCards = player.dropZone.filter((c) => c.kind === 'ACTION') as ActionCard[];
@@ -1351,13 +1480,17 @@ export function applyCharacterEvolutionSkills(
   }
 
   // 6. BP01-017 / BP01-020 방랑자 Lv.1: 덱 위의 카드 1장을 공개하고 패에 추가 가능
-  const rover1 = (upgradeCard.code === 'BP01-017' || upgradeCard.code === 'BP01-020') ? upgradeCard : (currentSlotCard.code === 'BP01-017' || currentSlotCard.code === 'BP01-020') ? currentSlotCard : null;
+  const rover1 = (upgradeCard.code?.startsWith('BP01-017') || upgradeCard.code?.startsWith('BP01-020'))
+    ? upgradeCard
+    : (currentSlotCard.code?.startsWith('BP01-017') || currentSlotCard.code?.startsWith('BP01-020'))
+    ? currentSlotCard
+    : null;
   if (rover1) {
     const isEntry = rover1 === upgradeCard;
     const topCard = drawSingleCardFromDeck(player);
     if (topCard) {
       if (player.isAi) {
-        player.hand.push(topCard);
+        addCardsToHand(player, [topCard]);
         newState.players[playerIndex] = player;
         newState = addLog(
           newState,
@@ -1384,14 +1517,13 @@ export function applyCharacterEvolutionSkills(
     }
   }
 
-  // 7. 양양 Lv.1 (BP01-023 등): 【등장】/【레벨업】자신의 덱 위의 카드 1장을 협주 에리어에 배치한다.
-  // 1) 0 -> 1 레벨업 시 (등장): upgradeCard가 양양 Lv.1일 때 덱 위 1장 즉시 협주 에리어에 자동 배치
-  // 2) 1 -> 2 레벨업 시 (레벨업): 밑에 깔린 currentSlotCard가 양양 Lv.1일 때 덱 위 1장 즉시 협주 에리어에 자동 배치
-  const isYangyangLv1 = (c: CharacterCard | undefined | null) =>
-    Boolean(c && (c.code === 'BP01-023' || (c.level === 1 && (c.characterName === '양양' || c.nameKr?.includes('양양')))));
+  // 7. 양양 Lv.1 [BP01-023]: 【등장】/【레벨업】자신의 덱 위의 카드 1장을 협주 에리어에 배치한다.
+  // (SD01-004 양양 Lv.1은 패배 드로우 카드이므로 BP01-023 코드만 정확히 판별!)
+  const isYangyangBp023 = (c: CharacterCard | undefined | null) =>
+    Boolean(c && c.code?.startsWith('BP01-023'));
 
-  const isYangEntry = isYangyangLv1(upgradeCard);
-  const isYangStack = isYangyangLv1(currentSlotCard);
+  const isYangEntry = isYangyangBp023(upgradeCard);
+  const isYangStack = isYangyangBp023(currentSlotCard);
 
   if (isYangEntry || isYangStack) {
     const yangCard = isYangEntry ? upgradeCard : currentSlotCard;
@@ -1420,7 +1552,7 @@ export function applyCharacterEvolutionSkills(
   }
 
   // 8. BP01-001 / BP01-002 카멜리아 Lv.2: 【레벨업】이 카드를 캐릭터 덱으로 되돌린다.
-  if (currentSlotCard.code === 'BP01-001' || currentSlotCard.code === 'BP01-002') {
+  if (currentSlotCard.code?.startsWith('BP01-001') || currentSlotCard.code?.startsWith('BP01-002')) {
     player.characterDeck.push({ ...currentSlotCard, underlyingCards: undefined });
     if (player.slots[targetSlot]?.underlyingCards) {
       player.slots[targetSlot]!.underlyingCards = player.slots[targetSlot]!.underlyingCards!.filter(
@@ -1437,6 +1569,208 @@ export function applyCharacterEvolutionSkills(
   }
 
   newState.players[playerIndex] = player;
+  return newState;
+}
+
+// 파수인 Lv.1 [BP01-008] 【교체】 공통 발동 헬퍼
+export function triggerShorekeeperSwitchSkill(
+  state: GameState,
+  playerIndex: 0 | 1,
+  player: PlayerState,
+  prevLeader: CharacterCard | null | undefined,
+  nextLeader: CharacterCard | null | undefined
+): GameState {
+  const hasShorekeeperSwitch =
+    getAllCardsInSlot(prevLeader).some((c) => c.code?.startsWith('BP01-008')) ||
+    getAllCardsInSlot(nextLeader).some((c) => c.code?.startsWith('BP01-008'));
+  if (!hasShorekeeperSwitch) return state;
+
+  let newState = { ...state };
+  const drawn = drawSingleCardFromDeck(player);
+  if (drawn) {
+    addCardsToHand(player, [drawn]);
+    if (player.hand.length > 0) {
+      // 가장 가치가 낮은 카드(전용 조건 미충족 또는 0코스트 방어/저데미지)를 버림
+      let discardIdx = 0;
+      let minVal = 999;
+      player.hand.forEach((c, idx) => {
+        const usable = canPlayerUseActionCard(player.slots, c).canUse;
+        const val = (usable ? 10 : 0) + (c.damage || 0) + (c.pursuitCount || 0) * 2;
+        if (val < minVal) {
+          minVal = val;
+          discardIdx = idx;
+        }
+      });
+      const [discarded] = player.hand.splice(discardIdx, 1);
+      if (discarded) player.dropZone.push(discarded);
+    }
+    newState.players[playerIndex] = player;
+    newState = addLog(
+      newState,
+      `[파수인 Lv.1 BP01-008 교체 효과] 리더 교대로 카드 1장을 드로우하고 패 1장을 트래시로 버렸습니다.`,
+      'ACTION',
+      playerIndex
+    );
+  }
+  return newState;
+}
+
+// 파수인 Lv.2 [BP01-006] 【상시】 생명력 회복 시 1장 드로우 (1턴 2회) 공통 헬퍼
+export function triggerShorekeeperHealPassive(
+  state: GameState,
+  playerIndex: 0 | 1,
+  player: PlayerState
+): GameState {
+  const hasShorekeeperLv2 = hasActiveCharacterSkill(player, (info) =>
+    getAllCardsInSlot(info.card).some((c) => c.code?.startsWith('BP01-006'))
+  );
+  const currentCount = player.actionFlags.shorekeeperLv2HealDrawCount || 0;
+  if (!hasShorekeeperLv2 || currentCount >= 2) return state;
+
+  player.actionFlags.shorekeeperLv2HealDrawCount = currentCount + 1;
+  const drawn = drawSingleCardFromDeck(player);
+  let newState = { ...state };
+  if (drawn) {
+    addCardsToHand(player, [drawn]);
+    newState.players[playerIndex] = player;
+    newState = addLog(
+      newState,
+      `[파수인 Lv.2 BP01-006 상시 효과] 생명력이 회복되어 카드 1장을 드로우했습니다! (${player.actionFlags.shorekeeperLv2HealDrawCount}/2회)`,
+      'ACTION',
+      playerIndex
+    );
+  }
+  return newState;
+}
+
+// 피격자 리더 데미지 보정 및 피격 플래그 기록 공통 헬퍼
+// - BP01-001 카멜리아 Lv.2 리더: 받는 데미지 +1 (includeVulnerability=true일 때)
+// - BP01-002 카멜리아 Lv.2 리더: 매 턴 처음 받는 데미지 -1
+// - BP01-012 앙코 Lv.2 리더 조건용 damageTakenThisTurn 기록
+export function applyDamageWithLeaderModifiers(
+  targetPlayer: PlayerState,
+  rawDmg: number,
+  includeVulnerability: boolean = false
+): number {
+  if (rawDmg <= 0) return 0;
+  let finalDmg = rawDmg;
+  const targetLeaderCards = getAllCardsInSlot(targetPlayer.slots.leader);
+
+  if (includeVulnerability && targetLeaderCards.some((c) => c.code?.startsWith('BP01-001'))) {
+    finalDmg += 1;
+  }
+
+  if (
+    targetLeaderCards.some((c) => c.code?.startsWith('BP01-002')) &&
+    !targetPlayer.actionFlags.firstDamageTakenReducedThisTurn
+  ) {
+    finalDmg = Math.max(0, finalDmg - 1);
+    targetPlayer.actionFlags.firstDamageTakenReducedThisTurn = true;
+  }
+
+  if (finalDmg > 0) {
+    targetPlayer.hp = Math.max(0, targetPlayer.hp - finalDmg);
+    targetPlayer.actionFlags.damageTakenThisTurn = true;
+  }
+
+  return finalDmg;
+}
+
+// 1코스트 보스 에코 5종 (BP01-035, BP01-037, BP01-039, BP01-041, BP01-043) 【우세】 데미지 적중 효과
+export function applyBossEchoHitEffects(
+  state: GameState,
+  attackerIndex: 0 | 1,
+  attacker: PlayerState,
+  defender: PlayerState,
+  card: ActionCard,
+  dmgDealt: number
+): GameState {
+  if (dmgDealt <= 0 || !attacker.hasDominance) return state;
+  let newState = { ...state };
+  const baseCode = (card.code || '').split('_')[0];
+
+  // BP01-035 지옥불 기사: 【우세】상대에게 데미지를 입힐 시 상대 패 4장당 상대의 패를 무작위로 1장 제거한다.
+  if (baseCode === 'BP01-035' && defender.hand.length >= 4) {
+    const removeCount = Math.floor(defender.hand.length / 4);
+    const removedNames: string[] = [];
+    for (let k = 0; k < removeCount && defender.hand.length > 0; k++) {
+      const randIdx = Math.floor(Math.random() * defender.hand.length);
+      const [discarded] = defender.hand.splice(randIdx, 1);
+      if (discarded) {
+        defender.dropZone.push(discarded);
+        removedNames.push(discarded.nameKr);
+      }
+    }
+    if (removedNames.length > 0) {
+      newState = addLog(
+        newState,
+        `[지옥불 기사 BP01-035 우세 효과] 상대의 패 ${removedNames.length}장(${removedNames.join(', ')})을 무작위로 제거했습니다!`,
+        'ACTION',
+        attackerIndex
+      );
+    }
+  }
+
+  // BP01-037 반디의 군세: 【우세】상대에게 데미지를 입힐 시 상대 협주 에리어에 있는 카드 1장을 트래시 에리어에 놓는다.
+  if (baseCode === 'BP01-037' && defender.concertoZone.length > 0) {
+    const [discarded] = defender.concertoZone.splice(0, 1);
+    defender.dropZone.push(discarded);
+    newState = addLog(
+      newState,
+      `[반디의 군세 BP01-037 우세 효과] 상대의 협주 에너지 1장([${discarded.nameKr}])을 트래시로 버렸습니다!`,
+      'ACTION',
+      attackerIndex
+    );
+  }
+
+  // BP01-039 폭주의 고릴라: 【우세】상대에게 데미지를 입힐 시 상대의 패를 무작위로 1장 상대 덱 맨 아래로 되돌린다.
+  if (baseCode === 'BP01-039' && defender.hand.length > 0) {
+    const randIdx = Math.floor(Math.random() * defender.hand.length);
+    const [returnedCard] = defender.hand.splice(randIdx, 1);
+    if (returnedCard) {
+      defender.actionDeck.push(returnedCard);
+      newState = addLog(
+        newState,
+        `[폭주의 고릴라 BP01-039 우세 효과] 상대의 패 1장을 상대 덱 맨 아래로 되돌렸습니다!`,
+        'ACTION',
+        attackerIndex
+      );
+    }
+  }
+
+  // BP01-041 크라운리스: 【우세】상대에게 데미지를 입힐 시 상대의 덱 위의 카드 3장을 트래시 에리어에 놓는다.
+  if (baseCode === 'BP01-041' && defender.actionDeck.length > 0) {
+    const milled = defender.actionDeck.splice(0, Math.min(3, defender.actionDeck.length));
+    defender.dropZone.push(...milled);
+    newState = addLog(
+      newState,
+      `[크라운리스 BP01-041 우세 효과] 상대의 덱 위에서 ${milled.length}장을 트래시로 버렸습니다!`,
+      'ACTION',
+      attackerIndex
+    );
+  }
+
+  // BP01-043 애곡하는 아익스: 【우세】상대에게 데미지를 입힐 시 상대의 트래시 에리어에서 카드를 최대 2장까지 상대의 덱 맨 아래로 되돌린다.
+  if (baseCode === 'BP01-043') {
+    const actionDrops = defender.dropZone.filter((c) => c.kind === 'ACTION') as ActionCard[];
+    if (actionDrops.length > 0) {
+      const toReturn = actionDrops.slice(0, Math.min(2, actionDrops.length));
+      for (const ret of toReturn) {
+        const dIdx = defender.dropZone.findIndex((c) => c.id === ret.id);
+        if (dIdx !== -1) {
+          defender.dropZone.splice(dIdx, 1);
+          defender.actionDeck.push(ret);
+        }
+      }
+      newState = addLog(
+        newState,
+        `[애곡하는 아익스 BP01-043 우세 효과] 상대의 트래시 에리어에서 카드 ${toReturn.length}장을 상대 덱 맨 아래로 되돌렸습니다!`,
+        'ACTION',
+        attackerIndex
+      );
+    }
+  }
+
   return newState;
 }
 
@@ -1463,28 +1797,7 @@ export function switchLeader(
   player.actionFlags.switchedLeader = true;
 
   let newState = { ...state };
-
-  // 파수인 Lv.1 [BP01-008]: 【교체】카드 1장 뽑기 가능. 카드를 뽑았을 경우, 자신의 패 1장을 버린다.
-  const hasShorekeeperSwitch =
-    getAllCardsInSlot(prevLeader).some((c) => c.code === 'BP01-008') ||
-    getAllCardsInSlot(targetCharacter).some((c) => c.code === 'BP01-008');
-
-  if (hasShorekeeperSwitch) {
-    const drawn = drawSingleCardFromDeck(player);
-    if (drawn) {
-      player.hand.push(drawn);
-      if (player.hand.length > 0) {
-        const discarded = player.hand.shift();
-        if (discarded) player.dropZone.push(discarded);
-      }
-      newState = addLog(
-        newState,
-        `[파수인 Lv.1 BP01-008 교체 효과] 리더 교대로 카드 1장을 드로우하고 패 1장을 트래시로 버렸습니다.`,
-        'ACTION',
-        playerIndex
-      );
-    }
-  }
+  newState = triggerShorekeeperSwitchSkill(newState, playerIndex, player, prevLeader, targetCharacter);
 
   newState.players[playerIndex] = player;
   newState = addLog(
@@ -1618,17 +1931,18 @@ export function setClashCard(
       return { success: false, newState: state, error: '패에 카드가 없습니다.' };
     }
 
-    // 코스트 검증
-    if (player.concertoZone.length < card.cost) {
+    // 코스트 검증 (SD01-016 적색 코스트 페널티 반영)
+    const effectiveCost = getEffectiveCardCost(player, card);
+    if (player.concertoZone.length < effectiveCost) {
       return {
         success: false,
         newState: state,
-        error: `비용(COST ${card.cost})이 부족합니다. 현재 협주: ${player.concertoZone.length}`,
+        error: `비용(COST ${effectiveCost})이 부족합니다. 현재 협주: ${player.concertoZone.length}`,
       };
     }
 
-    // 전용 카드 조건 검증
-    const cardUsage = canPlayerUseActionCard(player.slots, card);
+    // 전용 카드 및 에코 중복 조건 검증
+    const cardUsage = canPlayerUseActionCard(player.slots, card, player.actionArea);
     if (!cardUsage.canUse) {
       return {
         success: false,
@@ -1637,24 +1951,8 @@ export function setClashCard(
       };
     }
 
-    // 코스트 지불: 전달받은 spentConcertoIds가 있으면 우선 소모, 없으면 앞에서부터 차감
-    if (card.cost > 0) {
-      let spentCards: ActionCard[] = [];
-      if (spentConcertoIds && spentConcertoIds.length === card.cost) {
-        const remaining: ActionCard[] = [];
-        for (const c of player.concertoZone) {
-          if (spentConcertoIds.includes(c.id) && spentCards.length < card.cost) {
-            spentCards.push(c);
-          } else {
-            remaining.push(c);
-          }
-        }
-        player.concertoZone = remaining;
-      } else {
-        spentCards = player.concertoZone.splice(0, card.cost);
-      }
-      player.dropZone.push(...spentCards);
-    }
+    // 코스트 지불: 에코 카드 보존 우선 소모
+    spendConcertoCost(player, effectiveCost, spentConcertoIds);
 
     // 패에서 세트 존으로
     player.hand = player.hand.filter((c) => c.id !== cardId);
@@ -1685,12 +1983,13 @@ export function forceResolveClash(state: GameState): GameState {
 
   // AI가 아직 세트하지 않은 경우 AI 최선 카드 세트
   if (!p1.clashCardReady && p1.isAi) {
-    const usable = p1.hand.find((c) => p1.concertoZone.length >= c.cost && canPlayerUseActionCard(p1.slots, c).canUse);
+    const usable = p1.hand.find((c) => {
+      const effCost = getEffectiveCardCost(p1, c);
+      return p1.concertoZone.length >= effCost && canPlayerUseActionCard(p1.slots, c, p1.actionArea).canUse;
+    });
     if (usable) {
-      if (usable.cost > 0) {
-        const spent = p1.concertoZone.splice(0, usable.cost);
-        p1.dropZone.push(...spent);
-      }
+      const effCost = getEffectiveCardCost(p1, usable);
+      spendConcertoCost(p1, effCost);
       p1.hand = p1.hand.filter((c) => c.id !== usable.id);
       p1.clashCard = usable;
     }
@@ -1727,77 +2026,75 @@ export function applyBattleStepSkills(state: GameState): GameState {
     if (clashCard.color === 'RED') {
       // 1-A. 치샤 Lv.0 [BP01-027]: 적색 카드로 배틀 시 상대에게 1pt 피해
       const hasChixia0 = leaderCards.some(
-        (c) => c.code === 'BP01-027' || (c.level === 0 && (c.characterName === '치샤' || c.nameKr.includes('치샤')))
+        (c) => c.code?.startsWith('BP01-027') || (c.level === 0 && (c.characterName === '치샤' || c.nameKr.includes('치샤')))
       );
       if (hasChixia0) {
-        oppPlayer.hp = Math.max(0, oppPlayer.hp - 1);
+        const dealt = applyDamageWithLeaderModifiers(oppPlayer, 1, true);
         newState.lastEffectEvent = {
           id: `eff-${Date.now()}-chixia0-${playerIndex}`,
           sourceCardName: '치샤 Lv.0',
           sourceCardArt: player.slots.leader.artUrl,
           effectType: 'DAMAGE',
           title: '치샤 배틀 효과',
-          description: '적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!',
+          description: `적색 카드로 배틀에 돌입하여 상대에게 ${dealt}pt 데미지를 입혔습니다!`,
           playerIndex,
           timestamp: Date.now(),
         };
         newState = addLog(
           newState,
-          `[치샤 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
+          `[치샤 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 ${dealt}pt 데미지를 입혔습니다!`,
           'DAMAGE',
           playerIndex,
-          { amount: 1, effectTag: '배틀 피해' }
+          { amount: dealt, effectTag: '배틀 피해' }
         );
       }
 
       // 1-B. 금희 Lv.0 [BP01-030]: 적색 카드로 배틀 시 상대에게 1pt 피해
       const hasJinhsi0 = leaderCards.some(
-        (c) => c.code === 'BP01-030' || (c.level === 0 && (c.characterName === '금희' || c.nameKr.includes('금희')))
+        (c) => c.code?.startsWith('BP01-030') || (c.level === 0 && (c.characterName === '금희' || c.nameKr.includes('금희')))
       );
       if (hasJinhsi0) {
-        oppPlayer.hp = Math.max(0, oppPlayer.hp - 1);
+        const dealt = applyDamageWithLeaderModifiers(oppPlayer, 1, true);
         newState.lastEffectEvent = {
           id: `eff-${Date.now()}-jinhsi0-${playerIndex}`,
           sourceCardName: '금희 Lv.0',
           sourceCardArt: player.slots.leader.artUrl,
           effectType: 'DAMAGE',
           title: '금희 배틀 효과',
-          description: '적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!',
+          description: `적색 카드로 배틀에 돌입하여 상대에게 ${dealt}pt 데미지를 입혔습니다!`,
           playerIndex,
           timestamp: Date.now(),
         };
         newState = addLog(
           newState,
-          `[금희 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 1pt 데미지를 입혔습니다!`,
+          `[금희 Lv.0 배틀 효과] 적색 카드로 배틀에 돌입하여 상대에게 ${dealt}pt 데미지를 입혔습니다!`,
           'DAMAGE',
           playerIndex,
-          { amount: 1, effectTag: '배틀 피해' }
+          { amount: dealt, effectTag: '배틀 피해' }
         );
       }
 
       // 1-C. 상대 양양 Lv.2 [SD01-003]: 상대가 적색 카드로 배틀 시 1 COST 지불 가능. 미지불 시 3pt 피해
+      // (BP01-022 양양 Lv.2는 턴 종료 교체 스킬이므로 SD01-003 코드만 정확히 판별!)
       const oppLeaderCards = getAllCardsInSlot(oppPlayer.slots.leader);
-      const oppHasYangyangLv2 = oppLeaderCards.some(
-        (c) => c.code === 'SD01-003' || (c.characterName === '양양' && c.level === 2)
-      );
-      if (oppHasYangyangLv2) {
+      const oppHasYangyangSd01003 = oppLeaderCards.some((c) => c.code?.startsWith('SD01-003'));
+      if (oppHasYangyangSd01003) {
         if (player.concertoZone.length >= 1) {
-          const [spent] = player.concertoZone.splice(0, 1);
-          player.dropZone.push(spent);
+          spendConcertoCost(player, 1);
           newState = addLog(
             newState,
-            `[상대 양양 Lv.2 배틀 효과] 상대 적색 배틀 견제로 1 COST를 지불했습니다.`,
+            `[상대 양양 Lv.2 SD01-003 배틀 효과] 상대 적색 배틀 견제로 1 COST를 지불했습니다.`,
             'ACTION',
             playerIndex
           );
         } else {
-          player.hp = Math.max(0, player.hp - 3);
+          const dealt = applyDamageWithLeaderModifiers(player, 3, true);
           newState = addLog(
             newState,
-            `[상대 양양 Lv.2 배틀 효과] 1 COST를 지불할 수 없어 3pt 데미지를 받았습니다!`,
+            `[상대 양양 Lv.2 SD01-003 배틀 효과] 1 COST를 지불할 수 없어 ${dealt}pt 데미지를 받았습니다!`,
             'DAMAGE',
             oppIdx,
-            { amount: 3, effectTag: '배틀 피해' }
+            { amount: dealt, effectTag: '배틀 피해' }
           );
         }
       }
@@ -1808,15 +2105,15 @@ export function applyBattleStepSkills(state: GameState): GameState {
       // 2-A. 방랑자(여) [BP01-018] / 방랑자(남) [BP01-021] Lv.0 배틀 효과
       const hasRover0 = leaderCards.some(
         (c) =>
-          c.code === 'BP01-018' ||
-          c.code === 'BP01-021' ||
+          c.code?.startsWith('BP01-018') ||
+          c.code?.startsWith('BP01-021') ||
           (c.level === 0 && (c.characterName?.includes('방랑자') || c.nameKr?.includes('방랑자')))
       );
       if (hasRover0) {
         const revealed = player.actionDeck.splice(0, Math.min(2, player.actionDeck.length));
         if (revealed.length > 0) {
           if (player.isAi) {
-            player.hand.push(...revealed);
+            addCardsToHand(player, revealed);
             newState = addLog(
               newState,
               `[방랑자 Lv.0 배틀 효과] 녹색 카드 배틀 효과로 덱 위의 카드 ${revealed.length}장을 패에 추가했습니다.`,
@@ -1844,13 +2141,13 @@ export function applyBattleStepSkills(state: GameState): GameState {
 
       // 2-B. 파수인 Lv.0 [BP01-010]: 녹색 카드로 배틀 시 덱 위 1장 패 추가 가능
       const hasShorekeeper0 = leaderCards.some(
-        (c) => c.code === 'BP01-010' || (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))
+        (c) => c.code?.startsWith('BP01-010') || (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))
       );
       if (hasShorekeeper0) {
         const card = drawSingleCardFromDeck(player);
         if (card) {
           if (player.isAi) {
-            player.hand.push(card);
+            addCardsToHand(player, [card]);
             newState = addLog(
               newState,
               `[파수인 Lv.0 배틀 효과] 녹색 카드 배틀 효과로 덱에서 1장을 패에 추가했습니다.`,
@@ -1880,10 +2177,10 @@ export function applyBattleStepSkills(state: GameState): GameState {
     // 3. 청색 배틀 시 스킬
     if (clashCard.color === 'BLUE') {
       const hasYangyang0 = leaderCards.some(
-        (c) => c.code === 'BP01-024' || (c.level === 0 && (c.characterName === '양양' || c.nameKr.includes('양양')))
+        (c) => c.code?.startsWith('BP01-024') || (c.level === 0 && (c.characterName === '양양' || c.nameKr.includes('양양')))
       );
       const hasSanhua0 = leaderCards.some(
-        (c) => c.code === 'BP01-033' || (c.level === 0 && (c.characterName === '산화' || c.nameKr.includes('산화')))
+        (c) => c.code?.startsWith('BP01-033') || (c.level === 0 && (c.characterName === '산화' || c.nameKr.includes('산화')))
       );
       if (hasYangyang0 || hasSanhua0) {
         const card = drawSingleCardFromDeck(player);
@@ -1984,15 +2281,18 @@ export function applyBattleStepSkills(state: GameState): GameState {
         // 먼저 리더를 앙코로 교체
         if (ankeSlotKey !== 'leader') {
           const prevLeader = player.slots.leader;
-          player.slots.leader = player.slots[ankeSlotKey]!;
+          const nextLeader = player.slots[ankeSlotKey]!;
+          player.slots.leader = nextLeader;
           player.slots[ankeSlotKey] = prevLeader;
+          newState.players = players;
+          newState = triggerShorekeeperSwitchSkill(newState, playerIndex, player, prevLeader, nextLeader);
         }
         const currentAnke = player.slots.leader;
         const lv2AnkeCards = findAllLv2Cards(player.characterDeck, currentAnke);
 
         if (lv2AnkeCards.length > 0) {
           if (player.isAi) {
-            const lv2Anke = lv2AnkeCards.find((c) => c.code === 'BP01-011') || lv2AnkeCards[0];
+            const lv2Anke = lv2AnkeCards.find((c) => c.code?.startsWith('BP01-011')) || lv2AnkeCards[0];
             player.characterDeck = player.characterDeck.filter((c) => c.id !== lv2Anke.id);
             const prevUnderlying = currentAnke.underlyingCards || [];
             player.slots.leader = {
@@ -2062,8 +2362,11 @@ export function applyBattleStepSkills(state: GameState): GameState {
       );
       if (sanhuaSlotKey && player.slots[sanhuaSlotKey]) {
         const prevLeader = player.slots.leader;
-        player.slots.leader = player.slots[sanhuaSlotKey]!;
+        const nextLeader = player.slots[sanhuaSlotKey]!;
+        player.slots.leader = nextLeader;
         player.slots[sanhuaSlotKey] = prevLeader;
+        newState.players = players;
+        newState = triggerShorekeeperSwitchSkill(newState, playerIndex, player, prevLeader, nextLeader);
         newState = addLog(
           newState,
           `[매서운 가시 BP01-076 배틀 효과] 리더를 [${player.slots.leader.nameKr}](으)로 교체했습니다!`,
@@ -2263,38 +2566,45 @@ export function finishClashJudgment(state: GameState): GameState {
     const loserCard = loserIndex === 0 ? c0 : c1;
 
     const winnerLeaderCards = getAllCardsInSlot(winnerPlayer.slots.leader);
-    const loserLeaderCards = getAllCardsInSlot(loserPlayer.slots.leader);
 
     // 1. 대미지 계산
     let baseDmg = winCard.damage;
     let extraDmg = 0;
 
+    // 0코스트 프리즘/후슈슈 에코 【협주】 시너지 데미지 보너스
+    extraDmg += getConcertoSonataBonusDamage(winnerPlayer, winCard);
+
     // 금희 Lv.1 [BP01-029] 리더 판정: 적색 승리 시 상대에게 데미지 2pt
-    if (winnerLeaderCards.some((c) => c.code === 'BP01-029') && winCard.color === 'RED') {
+    if (winnerLeaderCards.some((c) => c.code?.startsWith('BP01-029')) && winCard.color === 'RED') {
       extraDmg += 2;
     }
 
     // 치샤 Lv.2 [SD01-005]: 자신의 【리더 스킬】을 가진 【치샤】의 카드 데미지 +3 (필드 어디든 유효)
     const hasChixiaSd01005 = hasActiveCharacterSkill(winnerPlayer, (info) =>
-      getAllCardsInSlot(info.card).some((c) => c.code === 'SD01-005')
+      getAllCardsInSlot(info.card).some((c) => c.code?.startsWith('SD01-005'))
     );
     if (hasChixiaSd01005 && winCard.characterExclusive?.includes('치샤') && isLeaderSkillCard(winCard)) {
       extraDmg += 3;
     }
 
     // 앙코 Lv.0 [BP01-015] 리더: 매 턴 처음 사용한 앙코 기본 공격 데미지 +2
-    const hasAnke0 = winnerLeaderCards.some((c) => c.code === 'BP01-015');
+    const hasAnke0 = winnerLeaderCards.some((c) => c.code?.startsWith('BP01-015'));
     if (
       hasAnke0 &&
       winCard.characterExclusive?.includes('앙코') &&
-      (winCard.nameKr.includes('기본 공격') || winCard.nameKr.includes('일반 공격'))
+      isNormalAttackCard(winCard) &&
+      !winnerPlayer.actionFlags.firstNormalAttackBonusUsed
     ) {
       extraDmg += 2;
+      winnerPlayer.actionFlags.firstNormalAttackBonusUsed = true;
+    }
+    if (loserCard && loserCard.characterExclusive?.includes('앙코') && isNormalAttackCard(loserCard)) {
+      loserPlayer.actionFlags.firstNormalAttackBonusUsed = true;
     }
 
     // 앙코 Lv.2 [BP01-011]: 자신의 【앙코】 적색 카드 데미지 +1 (필드 어디든 유효)
     const hasAnkeBp01011 = hasActiveCharacterSkill(winnerPlayer, (info) =>
-      getAllCardsInSlot(info.card).some((c) => c.code === 'BP01-011')
+      getAllCardsInSlot(info.card).some((c) => c.code?.startsWith('BP01-011'))
     );
     if (hasAnkeBp01011 && winCard.characterExclusive?.includes('앙코') && winCard.color === 'RED') {
       extraDmg += 1;
@@ -2302,7 +2612,7 @@ export function finishClashJudgment(state: GameState): GameState {
 
     // 카멜리아 Lv.2 [BP01-001] 리더: 자신의 【카멜리아】 적색 카드 데미지 +1
     if (
-      winnerLeaderCards.some((c) => c.code === 'BP01-001') &&
+      winnerLeaderCards.some((c) => c.code?.startsWith('BP01-001')) &&
       winCard.characterExclusive?.includes('카멜리아') &&
       winCard.color === 'RED'
     ) {
@@ -2333,54 +2643,19 @@ export function finishClashJudgment(state: GameState): GameState {
       });
     }
 
-    // 피격자 데미지 보정
-    // 카멜리아 Lv.2 [BP01-001] 리더: 자신이 받는 데미지 +1
-    if (loserLeaderCards.some((c) => c.code === 'BP01-001')) {
-      baseDmg += 1;
-    }
-    // 카멜리아 Lv.2 [BP01-002] 리더: 매 턴 처음 받는 데미지 -1
-    if (loserLeaderCards.some((c) => c.code === 'BP01-002')) {
-      baseDmg = Math.max(0, baseDmg - 1);
-    }
+    // 피격자 데미지 보정 및 피격 플래그 적용 (BP01-001 +1, BP01-002 초회 -1, damageTakenThisTurn)
+    damageDealt = applyDamageWithLeaderModifiers(loserPlayer, baseDmg, true);
 
-    loserPlayer.hp = Math.max(0, loserPlayer.hp - baseDmg);
-    damageDealt = baseDmg;
-
-    // 에코 특수 효과 (데미지 적중 시)
-    if (damageDealt > 0) {
-      // BP01-035 지옥불 기사: 상대에게 데미지를 입힐 시 상대 패 4장당 상대 패 1장 제거
-      if (winCard.code === 'BP01-035' && loserPlayer.hand.length >= 4) {
-        const [discarded] = loserPlayer.hand.splice(0, 1);
-        loserPlayer.dropZone.push(discarded);
-        newState = addLog(newState, `[지옥불 기사 BP01-035 효과] 상대의 패 1장을 제거했습니다!`, 'ACTION', winnerIndex);
-      }
-      // BP01-037 반디의 군세: 상대에게 데미지를 입힐 시 상대 협주 존 카드 1장을 트래시로 버림
-      if (winCard.code === 'BP01-037' && loserPlayer.concertoZone.length > 0) {
-        const [discarded] = loserPlayer.concertoZone.splice(0, 1);
-        loserPlayer.dropZone.push(discarded);
-        newState = addLog(newState, `[반디의 군세 BP01-037 효과] 상대의 협주 에너지 1장을 파괴했습니다!`, 'ACTION', winnerIndex);
-      }
-      // BP01-039 폭주의 고릴라: 상대에게 데미지를 입힐 시 상대 패 1장을 덱 아래로
-      if (winCard.code === 'BP01-039' && loserPlayer.hand.length > 0) {
-        const [card] = loserPlayer.hand.splice(0, 1);
-        loserPlayer.actionDeck.push(card);
-        newState = addLog(newState, `[폭주의 고릴라 BP01-039 효과] 상대의 패 1장을 덱 아래로 되돌렸습니다!`, 'ACTION', winnerIndex);
-      }
-      // BP01-041 크라운리스: 상대에게 데미지를 입힐 시 상대 덱 위 3장 트래시로 버림
-      if (winCard.code === 'BP01-041' && loserPlayer.actionDeck.length > 0) {
-        const milled = loserPlayer.actionDeck.splice(0, Math.min(3, loserPlayer.actionDeck.length));
-        loserPlayer.dropZone.push(...milled);
-        newState = addLog(newState, `[크라운리스 BP01-041 효과] 상대의 덱 위에서 ${milled.length}장을 트래시로 버렸습니다!`, 'ACTION', winnerIndex);
-      }
-    }
+    // 1코스트 보스 에코 5종 (BP01-035, BP01-037, BP01-039, BP01-041, BP01-043) 【우세】 데미지 적중 효과
+    newState = applyBossEchoHitEffects(newState, winnerIndex, winnerPlayer, loserPlayer, winCard, damageDealt);
 
     // 2. 카드/리더 승리 특수 효과 발동
     // 금희 Lv.2 [BP01-028] 리더 판정: 자신의 턴에 승리했을 경우 덱 위 5장 확인, 모든 금희 카드 패 추가
-    if (winnerIndex === activeIdx && winnerLeaderCards.some((c) => c.code === 'BP01-028')) {
+    if (winnerIndex === activeIdx && winnerLeaderCards.some((c) => c.code?.startsWith('BP01-028'))) {
       const top5 = winnerPlayer.actionDeck.splice(0, Math.min(5, winnerPlayer.actionDeck.length));
       const jinhsiCards = top5.filter((c) => c.characterExclusive?.includes('금희') || c.nameKr.includes('금희'));
       const others = top5.filter((c) => !jinhsiCards.includes(c));
-      winnerPlayer.hand.push(...jinhsiCards);
+      addCardsToHand(winnerPlayer, jinhsiCards);
       winnerPlayer.dropZone.push(...others);
       newState = addLog(
         newState,
@@ -2392,7 +2667,7 @@ export function finishClashJudgment(state: GameState): GameState {
 
     // 방랑자(여) Lv.2 [BP01-016] 리더 판정: 녹색 카드가 청색 카드에 승리 시 패 8장까지 드로우
     if (
-      winnerLeaderCards.some((c) => c.code === 'BP01-016') &&
+      winnerLeaderCards.some((c) => c.code?.startsWith('BP01-016')) &&
       winCard.color === 'GREEN' &&
       loserCard?.color === 'BLUE'
     ) {
@@ -2414,7 +2689,7 @@ export function finishClashJudgment(state: GameState): GameState {
     }
 
     // BP01-005 카멜리아 리더 승리: 트래시에서 일반 공격 1장 패에 추가 가능
-    if (winnerLeaderCards.some((c) => c.code === 'BP01-005' || (c.level === 0 && (c.characterName === '카멜리아' || c.nameKr.includes('카멜리아'))))) {
+    if (winnerLeaderCards.some((c) => c.code?.startsWith('BP01-005') || (c.level === 0 && (c.characterName === '카멜리아' || c.nameKr.includes('카멜리아'))))) {
       const normalAttacks = winnerPlayer.dropZone.filter(isNormalAttackCard) as ActionCard[];
       if (normalAttacks.length > 0) {
         if (winnerPlayer.isAi) {
@@ -2455,18 +2730,10 @@ export function finishClashJudgment(state: GameState): GameState {
 
     // BP01-010 파수인 리더 승리: 녹색 카드로 승리 시 HP 1pt 회복
     if (
-      winnerLeaderCards.some((c) => c.code === 'BP01-010' || (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))) &&
+      winnerLeaderCards.some((c) => c.code?.startsWith('BP01-010') || (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))) &&
       winCard.color === 'GREEN'
     ) {
       winnerPlayer.hp = Math.min(winnerPlayer.maxHp, winnerPlayer.hp + 1);
-      // 파수인 Lv.2 [BP01-006]: HP 회복 시 1장 드로우 (1턴 2회)
-      const hasShorekeeperLv2 = hasActiveCharacterSkill(winnerPlayer, (info) =>
-        getAllCardsInSlot(info.card).some((c) => c.code === 'BP01-006' || (c.characterName === '파수인' && c.level === 2))
-      );
-      if (hasShorekeeperLv2) {
-        const d = drawSingleCardFromDeck(winnerPlayer);
-        if (d) winnerPlayer.hand.push(d);
-      }
       newState = addLog(
         newState,
         `[파수인 BP01-010 리더 효과] 녹색 카드 판정 승리로 HP +1을 회복했습니다! (현재 HP: ${winnerPlayer.hp}/${winnerPlayer.maxHp})`,
@@ -2474,6 +2741,7 @@ export function finishClashJudgment(state: GameState): GameState {
         winnerIndex,
         { cardArt: winnerPlayer.slots.leader.artUrl, cardName: winnerPlayer.slots.leader.nameKr, amount: 1, effectTag: '리더 회복' }
       );
+      newState = triggerShorekeeperHealPassive(newState, winnerIndex, winnerPlayer);
     }
 
     // 혼돈의 이론 [BP01-056] 승리 효과: 파수인 레벨업!
@@ -2709,9 +2977,19 @@ export function finishClashJudgment(state: GameState): GameState {
     // 소리의 변화·회피 [SD01-018 / SD02-018]: 승리 시 1장 드로우 후 패 1장 버리기
     if (winCard.code === 'SD01-018' || winCard.code === 'SD02-018') {
       const drawn = drawSingleCardFromDeck(winnerPlayer);
-      if (drawn) winnerPlayer.hand.push(drawn);
+      if (drawn) addCardsToHand(winnerPlayer, [drawn]);
       if (winnerPlayer.hand.length > 0) {
-        const discarded = winnerPlayer.hand.shift();
+        let discardIdx = 0;
+        let minVal = 999;
+        winnerPlayer.hand.forEach((c, idx) => {
+          const usable = canPlayerUseActionCard(winnerPlayer.slots, c).canUse;
+          const val = (usable ? 10 : 0) + (c.damage || 0) + (c.pursuitCount || 0) * 2;
+          if (val < minVal) {
+            minVal = val;
+            discardIdx = idx;
+          }
+        });
+        const [discarded] = winnerPlayer.hand.splice(discardIdx, 1);
         if (discarded) winnerPlayer.dropZone.push(discarded);
       }
       newState = addLog(
@@ -2757,6 +3035,7 @@ export function finishClashJudgment(state: GameState): GameState {
           effectTag: 'HP 회복',
         }
       );
+      newState = triggerShorekeeperHealPassive(newState, winnerIndex, winnerPlayer);
     }
 
     // I. CHARGE 기본 효과
@@ -2764,7 +3043,7 @@ export function finishClashJudgment(state: GameState): GameState {
       const c1 = drawSingleCardFromDeck(winnerPlayer);
       if (c1) winnerPlayer.concertoZone.push(c1);
       const c2 = drawSingleCardFromDeck(winnerPlayer);
-      if (c2) winnerPlayer.hand.push(c2);
+      if (c2) addCardsToHand(winnerPlayer, [c2]);
       triggeredEffects.push({
         id: `eff-${Date.now()}-charge`,
         sourceCardName: winCard.nameKr,
@@ -2825,11 +3104,11 @@ export function finishClashJudgment(state: GameState): GameState {
     }
 
     // 방랑자(남) Lv.2 [BP01-019] 리더 판정: 자신이 녹색 카드로 승리했을 경우 【추격 3】
-    if (winnerLeaderCards.some((c) => c.code === 'BP01-019') && winCard.color === 'GREEN') {
+    if (winnerLeaderCards.some((c) => c.code?.startsWith('BP01-019')) && winCard.color === 'GREEN') {
       officialPursuit += 3;
     }
     // 산화 Lv.2 [BP01-031] 리더 판정: 자신이 청색 카드로 승리했을 경우 【추격 3】 및 리더 교체 가능
-    const isSanhuaLv2Leader = winnerLeaderCards.some((c) => c.code === 'BP01-031');
+    const isSanhuaLv2Leader = winnerLeaderCards.some((c) => c.code?.startsWith('BP01-031'));
     if (isSanhuaLv2Leader && winCard.color === 'BLUE') {
       officialPursuit += 3;
     }
@@ -2855,8 +3134,11 @@ export function finishClashJudgment(state: GameState): GameState {
             ? 'leftSupport'
             : 'rightSupport';
           const prevLeader = winnerPlayer.slots.leader;
-          winnerPlayer.slots.leader = winnerPlayer.slots[supportKey]!;
+          const nextLeader = winnerPlayer.slots[supportKey]!;
+          winnerPlayer.slots.leader = nextLeader;
           winnerPlayer.slots[supportKey] = prevLeader;
+          newState.players[winnerIndex] = winnerPlayer;
+          newState = triggerShorekeeperSwitchSkill(newState, winnerIndex, winnerPlayer, prevLeader, nextLeader);
           newState = addLog(
             newState,
             `[${isSanhuaLv2Leader ? '산화 Lv.2 BP01-031' : '얼음 파편 BP01-077'} 판정 효과] ${winnerPlayer.name}이(가) 리더를 [${prevLeader.nameKr}]에서 [${winnerPlayer.slots.leader.nameKr}](으)로 교체했습니다!`,
@@ -2901,6 +3183,7 @@ export function finishClashJudgment(state: GameState): GameState {
     // 북풍의 소용돌이 [SD01-016] 승리 효과: 다음 턴 상대 적색 카드 COST+1
     if (winCard.code === 'SD01-016') {
       loserPlayer.tempCostPenaltyRed = (loserPlayer.tempCostPenaltyRed || 0) + 1;
+      loserPlayer.tempCostPenaltyRedTurns = activeIdx === loserIndex ? 2 : 1;
       newState = addLog(
         newState,
         `[북풍의 소용돌이 SD01-016 효과] 다음 턴에 상대방의 적색 카드 코스트가 +1 증가합니다!`,
@@ -2913,6 +3196,7 @@ export function finishClashJudgment(state: GameState): GameState {
     // 죽음의 눈보라 [SD02-016] 승리 효과: 다음 턴 상대 콤보 발동 불가
     if (winCard.code === 'SD02-016') {
       loserPlayer.comboBlockedNextTurn = true;
+      loserPlayer.comboBlockedTurns = activeIdx === loserIndex ? 2 : 1;
       newState = addLog(
         newState,
         `[죽음의 눈보라 SD02-016 효과] 다음 턴에 상대방은 콤보를 발동할 수 없습니다!`,
@@ -2922,11 +3206,14 @@ export function finishClashJudgment(state: GameState): GameState {
       );
     }
 
-    // 배틀 승패에 따른 【우세】 갱신 (공식 룰: 지난 턴에 자신이 배틀에 승리했을 경우 우세 획득)
-    winnerPlayer.hasDominance = true;
-    loserPlayer.hasDominance = false;
-
     // 콤보 금지/봉쇄 스킬 체크
+    // SD02-016 죽음의 눈보라 디버프가 걸려있는 경우
+    if (winnerPlayer.comboBlockedNextTurn) {
+      comboGranted = 0;
+      winnerPlayer.comboUnlimited = false;
+      newState = addLog(newState, `[죽음의 눈보라 SD02-016 제약] 이번 턴에 콤보를 발동할 수 없습니다!`, 'SYSTEM', winnerIndex);
+    }
+
     // BP01-074 승천하는 용 / BP01-061 그늘이와 구름이: 이번 턴에 자신은 콤보를 발동할 수 없다.
     if (winCard.code === 'BP01-074' || winCard.code === 'BP01-061') {
       comboGranted = 0;
@@ -2934,9 +3221,11 @@ export function finishClashJudgment(state: GameState): GameState {
       newState = addLog(newState, `[${winCard.nameKr} 제약] 이번 턴에 콤보를 발동할 수 없습니다.`, 'SYSTEM', winnerIndex);
     }
 
-    // BP01-058 해금: 상대 패배 시 우세 상태이고 파수인 리더인 경우 상대 콤보 봉쇄
+    // BP01-058 해금: 【판정】【우세】자신의 리더가 「파수인」인 경우, 이 카드가 배틀에 패배할 시 상대는 이번 턴에 <콤보> 발동 불가
+    const loserLeaderCards = getAllCardsInSlot(loserPlayer.slots.leader);
     if (
       loserCard?.code === 'BP01-058' &&
+      loserPlayer.hasDominance &&
       loserLeaderCards.some((c) => c.characterName?.includes('파수인') || c.nameKr?.includes('파수인'))
     ) {
       comboGranted = 0;
@@ -2953,6 +3242,7 @@ export function finishClashJudgment(state: GameState): GameState {
     const loserPlayer = loserIndex === 0 ? p0 : p1;
     const loserCard = loserIndex === 0 ? c0 : c1;
     const winnerCard = winnerIndex === 0 ? c0 : c1;
+    const loserLeaderCards = getAllCardsInSlot(loserPlayer.slots.leader);
 
     // SD01-010 투쟁의 마음: 청색 카드에 패배 시 패로 회수 (actionArea & dropZone 정리)
     if (loserCard?.code === 'SD01-010' && winnerCard?.color === 'BLUE') {
@@ -2963,9 +3253,10 @@ export function finishClashJudgment(state: GameState): GameState {
     }
 
     // 앙코 Lv.1 [BP01-014] 리더 효과: 앙코 <강공격>/<공명 회로>가 배틀에서 적색 카드에 패배한 경우 배틀 페이즈 종료 시 반격 데미지
-    const hasAnkeLv1 = slotHasCharacterSkill(loserPlayer.slots.leader, '앙코', 1);
+    // (BP01-013 앙코 Lv.1은 등장/레벨업 카드이므로 BP01-014 코드만 정확히 판별!)
+    const hasAnkeBp01014 = loserLeaderCards.some((c) => c.code?.startsWith('BP01-014'));
     if (
-      hasAnkeLv1 &&
+      hasAnkeBp01014 &&
       loserCard &&
       loserCard.characterExclusive?.includes('앙코') &&
       (loserCard.nameKr.includes('강공격') || (loserCard as any).feature?.includes('강공격') || (loserCard as any).feature?.includes('공명 회로')) &&
@@ -2980,29 +3271,29 @@ export function finishClashJudgment(state: GameState): GameState {
       );
     }
 
-    // 캐릭터 Lv.1 역경 패시브: 상성 패배 시 덱 위 1장 패 보충
+    // 캐릭터 Lv.1 역경 패시브: 상성 패배 시 덱 위 1장 패 보충 (해당 스킬을 가진 정확한 카드 코드 확인!)
     const isRoverDefeat =
-      slotHasCharacterSkill(loserPlayer.slots.leader, '방랑자', 1) &&
+      loserLeaderCards.some((c) => c.code?.startsWith('SD01-002') || c.code?.startsWith('SD02-002')) &&
       loserCard?.color === 'GREEN' &&
       winnerCard?.color === 'RED';
     const isYangyangDefeat =
-      slotHasCharacterSkill(loserPlayer.slots.leader, '양양', 1) &&
+      loserLeaderCards.some((c) => c.code?.startsWith('SD01-004')) &&
       loserCard?.color === 'BLUE' &&
       winnerCard?.color === 'GREEN';
     const isChixiaDefeat =
-      slotHasCharacterSkill(loserPlayer.slots.leader, '치샤', 1) &&
+      loserLeaderCards.some((c) => c.code?.startsWith('SD01-006')) &&
       loserCard?.color === 'RED' &&
       winnerCard?.color === 'BLUE';
     const isSanhuaDefeat =
-      slotHasCharacterSkill(loserPlayer.slots.leader, '산화', 1) &&
+      loserLeaderCards.some((c) => c.code?.startsWith('SD02-004')) &&
       loserCard?.color === 'BLUE' &&
       winnerCard?.color === 'GREEN';
     const isJinhsiDefeat =
-      slotHasCharacterSkill(loserPlayer.slots.leader, '금희', 1) &&
+      loserLeaderCards.some((c) => c.code?.startsWith('SD02-006')) &&
       loserCard?.color === 'RED' &&
       winnerCard?.color === 'BLUE';
     const isCamellyaDefeat =
-      slotHasCharacterSkill(loserPlayer.slots.leader, '카멜리아', 1) &&
+      loserLeaderCards.some((c) => c.code?.startsWith('BP01-004')) &&
       loserCard?.color === 'RED' &&
       winnerCard?.color === 'BLUE';
 
@@ -3020,7 +3311,7 @@ export function finishClashJudgment(state: GameState): GameState {
           timestamp: Date.now(),
         });
         if (loserPlayer.isAi) {
-          loserPlayer.hand.push(...revealed);
+          addCardsToHand(loserPlayer, revealed);
           newState = addLog(
             newState,
             `[${loserPlayer.slots.leader.nameKr} 리더 효과] ${loserPlayer.name}이(가) 패배 시 덱 위 1장을 패에 추가했습니다.`,
@@ -3230,8 +3521,8 @@ export function executeComboAttack(
     return { success: false, newState: state, error: '연격 단계에서는 빨간색(RED) 카드만 사용할 수 있습니다.' };
   }
 
-  // 전용 카드 조건 검증
-  const cardUsage = canPlayerUseActionCard(player.slots, card);
+  // 전용 카드 및 에코 중복 조건 검증
+  const cardUsage = canPlayerUseActionCard(player.slots, card, player.actionArea);
   if (!cardUsage.canUse) {
     return {
       success: false,
@@ -3240,15 +3531,8 @@ export function executeComboAttack(
     };
   }
 
-  // 금희 Lv.1: 연격 단계 적색 카드 비용 1 감소 (최소 0)
-  let effectiveCost = card.cost;
-  if (getAllCardsInSlot(player.slots.leader).some((c) => c.characterName === '금희' && c.level >= 1)) {
-    effectiveCost = Math.max(0, effectiveCost - 1);
-  }
-  // SD01-016 북풍의 소용돌이 페널티
-  if (player.tempCostPenaltyRed && player.tempCostPenaltyRed > 0 && card.color === 'RED') {
-    effectiveCost += player.tempCostPenaltyRed;
-  }
+  // 유효 코스트 계산 (SD01-016 북풍의 소용돌이 적색 코스트 페널티 반영)
+  const effectiveCost = getEffectiveCardCost(player, card);
 
   if (player.concertoZone.length < effectiveCost) {
     return {
@@ -3258,24 +3542,8 @@ export function executeComboAttack(
     };
   }
 
-  // 비용 지불: spentConcertoIds 우선 소모
-  if (effectiveCost > 0) {
-    let spentCards: ActionCard[] = [];
-    if (spentConcertoIds && spentConcertoIds.length === effectiveCost) {
-      const remaining: ActionCard[] = [];
-      for (const c of player.concertoZone) {
-        if (spentConcertoIds.includes(c.id) && spentCards.length < effectiveCost) {
-          spentCards.push(c);
-        } else {
-          remaining.push(c);
-        }
-      }
-      player.concertoZone = remaining;
-    } else {
-      spentCards = player.concertoZone.splice(0, effectiveCost);
-    }
-    player.dropZone.push(...spentCards);
-  }
+  // 비용 지불: 에코 카드 보존 우선 소모
+  spendConcertoCost(player, effectiveCost, spentConcertoIds);
 
   // 패에서 액션 에리어로 배치 (공식 룰 604.1.3.2)
   player.hand = player.hand.filter((c) => c.id !== cardId);
@@ -3326,6 +3594,9 @@ export function executeComboAttack(
       const nextMatched = doesCharMatchIntroTarget(nextLeader, introTargetName);
       wasTargetSwapped = prevMatched || nextMatched;
       swappedSlotAfter = nextMatched ? 'leader' : chosenSupportKey;
+
+      newState.players[playerIndex] = player;
+      newState = triggerShorekeeperSwitchSkill(newState, playerIndex, player, prevLeader, nextLeader);
     }
 
     const newLeaderName = player.slots.leader.characterName || player.slots.leader.nameKr;
@@ -3415,6 +3686,10 @@ export function executeComboAttack(
         playerIndex,
         { cardArt: card.artUrl, cardName: card.nameKr, amount: wasTargetSwapped ? 1 : undefined, effectTag: '리더 교체&회복' }
       );
+      if (wasTargetSwapped) {
+        newState.players[playerIndex] = player;
+        newState = triggerShorekeeperHealPassive(newState, playerIndex, player);
+      }
     }
 
     // 5. 양들의 도움 [BP01-063] (앙코): 앙코가 교체될 경우 트래시에서 <변주 스킬> 외의 앙코 적색 카드 1장 패에 추가
@@ -3506,7 +3781,7 @@ export function executeComboAttack(
       : null;
     const isAerial = isAerialCard(prevActionCard);
 
-    if (isAerial || !prevActionCard) {
+    if (isAerial) {
       const charged = drawSingleCardFromDeck(player);
       if (charged) {
         player.concertoZone.push(charged);
@@ -3528,7 +3803,7 @@ export function executeComboAttack(
           { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '협주 충전' }
         );
       }
-    } else {
+    } else if (prevActionCard) {
       newState = addLog(
         newState,
         `[복성재우 BP01-071 연격] 직전에 사용한 카드 [${prevActionCard.nameKr}]이(가) <체공> 카드가 아니므로 협주 충전이 발동하지 않았습니다. (체공 카드: 점프, 로프, 날개의 뜻·회피 등)`,
@@ -3554,6 +3829,9 @@ export function executeComboAttack(
   // 대미지 계산
   let dmg = card.damage + introBonusDmg;
 
+  // 0코스트 프리즘/후슈슈 에코 【협주】 시너지 데미지 보너스
+  dmg += getConcertoSonataBonusDamage(player, card);
+
   // SD02-011 만물의 정화: 액션 에리어에 카드가 3장 이상 있을 경우 데미지 +3
   if (card.code === 'SD02-011' && (player.actionArea?.length || 0) >= 3) {
     dmg += 3;
@@ -3561,9 +3839,7 @@ export function executeComboAttack(
 
   // BP01-050 넝쿨의 춤: 액션 에리어에 일반 공격 카드가 2장 이상 있을 경우 데미지 +1
   if (card.code === 'BP01-050') {
-    const normalAttackCount = (player.actionArea || []).filter(
-      (c) => c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격')
-    ).length;
+    const normalAttackCount = (player.actionArea || []).filter(isNormalAttackCard).length;
     if (normalAttackCount >= 2) {
       dmg += 1;
     }
@@ -3590,11 +3866,19 @@ export function executeComboAttack(
   // BP01-065 / BP01-067 소리의 변화·강공격: 패 1장 버리고 데미지 +1
   if (card.code === 'BP01-065' || card.code === 'BP01-067') {
     if (player.isAi && player.hand.length > 0) {
-      const discarded = player.hand.pop();
-      if (discarded) {
-        player.dropZone.push(discarded);
-        dmg += 1;
-        newState = addLog(newState, `[${card.nameKr} 콤보 효과] 패 1장을 버리고 데미지가 +1 증가했습니다!`, 'ACTION', playerIndex);
+      // AI는 이번 연격에서 당장 쓸 수 없는 카드(비적색 또는 코스트 부족)가 있거나 킬각일 때만 버림
+      const nonComboIdx = player.hand.findIndex(
+        (c) => c.color !== 'RED' || !canPlayerUseActionCard(player.slots, c, player.actionArea).canUse
+      );
+      const shouldDiscardForLethal = opponent.hp <= dmg + 1 && opponent.hp > dmg;
+      const targetDiscardIdx = nonComboIdx !== -1 ? nonComboIdx : shouldDiscardForLethal ? 0 : -1;
+      if (targetDiscardIdx !== -1) {
+        const [discarded] = player.hand.splice(targetDiscardIdx, 1);
+        if (discarded) {
+          player.dropZone.push(discarded);
+          dmg += 1;
+          newState = addLog(newState, `[${card.nameKr} 콤보 효과] 패 1장을 버리고 데미지가 +1 증가했습니다!`, 'ACTION', playerIndex);
+        }
       }
     } else if (discardForBonusDmgId) {
       const idx = player.hand.findIndex((c) => c.id === discardForBonusDmgId);
@@ -3608,51 +3892,48 @@ export function executeComboAttack(
   }
 
   const leaderCards = getAllCardsInSlot(player.slots.leader);
-  const oppLeaderCards = getAllCardsInSlot(opponent.slots.leader);
 
   // 금희 Lv.2 [SD02-005] 리더: 적색 카드가 『【콤보】이 카드의 데미지 +1.』 획득
-  if (leaderCards.some((c) => c.code === 'SD02-005') && card.color === 'RED') {
+  if (leaderCards.some((c) => c.code?.startsWith('SD02-005')) && card.color === 'RED') {
     dmg += 1;
   }
 
   // 치샤 Lv.2 [SD01-005]: 자신의 【리더 스킬】을 가진 【치샤】의 카드 데미지 +3 (필드 어디든 유효)
   const hasChixiaSd01005 = hasActiveCharacterSkill(player, (info) =>
-    getAllCardsInSlot(info.card).some((c) => c.code === 'SD01-005')
+    getAllCardsInSlot(info.card).some((c) => c.code?.startsWith('SD01-005'))
   );
   if (hasChixiaSd01005 && card.characterExclusive?.includes('치샤') && isLeaderSkillCard(card)) {
     dmg += 3;
   }
 
-  // 앙코 Lv.0 [BP01-015] 리더: 매 턴 처음 사용한 앙코 기본 공격 데미지 +2
+  // 앙코 Lv.0 [BP01-015] 리더: 매 턴 처음 사용한 앙코 기본 공격 데미지 +2 (【리더】 전용!)
   if (
-    hasActiveCharacterSkill(player, (info) => getAllCardsInSlot(info.card).some((c) => c.code === 'BP01-015')) &&
+    leaderCards.some((c) => c.code?.startsWith('BP01-015')) &&
     card.characterExclusive?.includes('앙코') &&
     isNormalAttackCard(card) &&
     !player.actionFlags.firstNormalAttackBonusUsed
   ) {
     dmg += 2;
     player.actionFlags.firstNormalAttackBonusUsed = true;
+  } else if (card.characterExclusive?.includes('앙코') && isNormalAttackCard(card)) {
+    player.actionFlags.firstNormalAttackBonusUsed = true;
   }
 
   // 앙코 Lv.2 [BP01-011]: 자신의 【앙코】 적색 카드 데미지 +1 (필드 어디든 유효)
   const hasAnkeBp01011 = hasActiveCharacterSkill(player, (info) =>
-    getAllCardsInSlot(info.card).some((c) => c.code === 'BP01-011')
+    getAllCardsInSlot(info.card).some((c) => c.code?.startsWith('BP01-011'))
   );
   if (hasAnkeBp01011 && card.characterExclusive?.includes('앙코') && card.color === 'RED') {
     dmg += 1;
   }
 
   // 카멜리아 Lv.2 [BP01-001] 리더: 자신의 【카멜리아】 적색 카드 데미지 +1
-  if (leaderCards.some((c) => c.code === 'BP01-001') && card.characterExclusive?.includes('카멜리아') && card.color === 'RED') {
+  if (leaderCards.some((c) => c.code?.startsWith('BP01-001')) && card.characterExclusive?.includes('카멜리아') && card.color === 'RED') {
     dmg += 1;
   }
 
-  // 피격자 데미지 보정 (상대 리더가 카멜리아 Lv.2 [BP01-001]인 경우 피격 데미지 +1)
-  if (oppLeaderCards.some((c) => c.code === 'BP01-001')) {
-    dmg += 1;
-  }
-
-  opponent.hp = Math.max(0, opponent.hp - dmg);
+  // 피격자 데미지 보정 및 피격 플래그 적용 (BP01-001 +1, BP01-002 초회 -1, damageTakenThisTurn)
+  dmg = applyDamageWithLeaderModifiers(opponent, dmg, true);
 
   newState.players[playerIndex] = player;
   newState.players[playerIndex === 0 ? 1 : 0] = opponent;
@@ -3681,38 +3962,17 @@ export function executeComboAttack(
     }
   );
 
-  // 에코 카드 데미지 유발 효과 (BP01-035, BP01-037, BP01-039, BP01-041)
-  if (dmg > 0) {
-    if (card.code === 'BP01-035' && opponent.hand.length >= 4) {
-      const [discarded] = opponent.hand.splice(0, 1);
-      opponent.dropZone.push(discarded);
-      newState = addLog(newState, `[지옥불 기사 BP01-035 효과] 상대의 패 1장을 제거했습니다!`, 'ACTION', playerIndex);
-    }
-    if (card.code === 'BP01-037' && opponent.concertoZone.length > 0) {
-      const [discarded] = opponent.concertoZone.splice(0, 1);
-      opponent.dropZone.push(discarded);
-      newState = addLog(newState, `[반디의 군세 BP01-037 효과] 상대의 협주 에너지 1장을 파괴했습니다!`, 'ACTION', playerIndex);
-    }
-    if (card.code === 'BP01-039' && opponent.hand.length > 0) {
-      const [c] = opponent.hand.splice(0, 1);
-      opponent.actionDeck.push(c);
-      newState = addLog(newState, `[폭주의 고릴라 BP01-039 효과] 상대의 패 1장을 덱 아래로 되돌렸습니다!`, 'ACTION', playerIndex);
-    }
-    if (card.code === 'BP01-041' && opponent.actionDeck.length > 0) {
-      const milled = opponent.actionDeck.splice(0, Math.min(3, opponent.actionDeck.length));
-      opponent.dropZone.push(...milled);
-      newState = addLog(newState, `[크라운리스 BP01-041 효과] 상대의 덱 위에서 ${milled.length}장을 트래시로 버렸습니다!`, 'ACTION', playerIndex);
-    }
-  }
+  // 1코스트 보스 에코 5종 (BP01-035, BP01-037, BP01-039, BP01-041, BP01-043) 【우세】 데미지 적중 효과
+  newState = applyBossEchoHitEffects(newState, playerIndex, player, opponent, card, dmg);
 
-  // BP01-060 그늘이와 구름이 출격·강공격: 상대에게 데미지를 입힐 시, 자신의 리더가 「앙코」인 경우 카드 1장을 뽑는다.
+  // BP01-060 양치기 소녀의 길·강공격: 상대에게 데미지를 입힐 시, 자신의 리더가 「앙코」인 경우 카드 1장을 뽑는다.
   if (card.code === 'BP01-060' && slotHasCharacterSkill(player.slots.leader, '앙코') && dmg > 0) {
     const drawn = drawSingleCardFromDeck(player);
     if (drawn) {
       addCardsToHand(player, [drawn]);
       newState = addLog(
         newState,
-        `[그늘이와 구름이 출격·강공격 BP01-060 효과] 상대에게 연격 피해를 입혀 덱에서 카드 1장을 드로우했습니다!`,
+        `[양치기 소녀의 길·강공격 BP01-060 효과] 상대에게 연격 피해를 입혀 덱에서 카드 1장을 드로우했습니다!`,
         'ACTION',
         playerIndex,
         { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '카드 드로우' }
@@ -3731,10 +3991,8 @@ export function executeComboAttack(
     (player.comboUnlimited || player.comboCount > 0) &&
     player.hand.some((c) => {
       if (c.color !== 'RED') return false;
-      const cCost = getAllCardsInSlot(player.slots.leader).some((ch) => ch.characterName === '금희' && ch.level >= 1)
-        ? Math.max(0, c.cost - 1)
-        : c.cost;
-      return player.concertoZone.length >= cCost && canPlayerUseActionCard(player.slots, c).canUse;
+      const cCost = getEffectiveCardCost(player, c);
+      return player.concertoZone.length >= cCost && canPlayerUseActionCard(player.slots, c, player.actionArea).canUse;
     });
 
   if (!canStillCombo) {
@@ -3775,20 +4033,18 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
     const p = newState.players[pIdx];
     const opp = newState.players[oppIdx];
 
-    const hasChixiaBp01025 = getAllCardsInSlot(p.slots.leader).some((c) => c.code === 'BP01-025');
-    const normalAttacksInAction = (p.actionArea || []).filter(
-      (c) => c.nameKr.includes('기본 공격') || c.nameKr.includes('일반 공격')
-    ).length;
+    const hasChixiaBp01025 = getAllCardsInSlot(p.slots.leader).some((c) => c.code?.startsWith('BP01-025'));
+    const normalAttacksInAction = (p.actionArea || []).filter(isNormalAttackCard).length;
 
     if (hasChixiaBp01025 && normalAttacksInAction >= 2) {
-      opp.hp = Math.max(0, opp.hp - 3);
+      const dealt = applyDamageWithLeaderModifiers(opp, 3, true);
       newState.players[oppIdx] = opp;
       newState = addLog(
         newState,
-        `[치샤 Lv.2 BP01-025 배틀 종료 효과] 액션 에리어에 기본 공격 카드가 ${normalAttacksInAction}장 있어 상대에게 3pt 추가 피해를 입혔습니다!`,
+        `[치샤 Lv.2 BP01-025 배틀 종료 효과] 액션 에리어에 기본 공격 카드가 ${normalAttacksInAction}장 있어 상대에게 ${dealt}pt 추가 피해를 입혔습니다!`,
         'DAMAGE',
         pIdx,
-        { amount: 3, effectTag: '배틀 종료 피해' }
+        { amount: dealt, effectTag: '배틀 종료 피해' }
       );
       if (opp.hp <= 0) {
         return checkGameOver(newState);
@@ -3804,17 +4060,17 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
     const opp = newState.players[oppIdx];
 
     if (p.ankePendingRetaliationDmg && p.ankePendingRetaliationDmg > 0) {
-      const dmg = p.ankePendingRetaliationDmg;
+      const rawDmg = p.ankePendingRetaliationDmg;
       p.ankePendingRetaliationDmg = 0;
-      opp.hp = Math.max(0, opp.hp - dmg);
+      const dealt = applyDamageWithLeaderModifiers(opp, rawDmg, true);
       newState.players[pIdx] = p;
       newState.players[oppIdx] = opp;
       newState = addLog(
         newState,
-        `[앙코 Lv.1 BP01-014 반격] 배틀 페이즈 종료 시 적색 카드에 패배한 반격으로 상대에게 ${dmg}pt 피해를 입혔습니다!`,
+        `[앙코 Lv.1 BP01-014 반격] 배틀 페이즈 종료 시 적색 카드에 패배한 반격으로 상대에게 ${dealt}pt 피해를 입혔습니다!`,
         'DAMAGE',
         pIdx,
-        { amount: dmg, effectTag: '반격 데미지' }
+        { amount: dealt, effectTag: '반격 데미지' }
       );
       if (opp.hp <= 0) {
         return checkGameOver(newState);
@@ -3835,24 +4091,24 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
 
     if (hasYangyangLeader && wingCard && p.concertoZone.length >= 1) {
       if (p.isAi) {
-        // AI: 1 COST 지불하고 패로 회수
-        const [spent] = p.concertoZone.splice(0, 1);
-        p.dropZone.push(spent);
-        const aIdx = p.actionArea.findIndex((c) => c.id === wingCard.id || c.code === 'BP01-069');
-        if (aIdx !== -1) {
-          p.actionArea.splice(aIdx, 1);
-        } else {
-          const dIdx = p.dropZone.findIndex((c) => c.id === wingCard.id || c.code === 'BP01-069');
-          if (dIdx !== -1) p.dropZone.splice(dIdx, 1);
+        if (p.hand.length < 8 && p.concertoZone.length >= 2) {
+          spendConcertoCost(p, 1);
+          const aIdx = p.actionArea.findIndex((c) => c.id === wingCard.id || c.code === 'BP01-069');
+          if (aIdx !== -1) {
+            p.actionArea.splice(aIdx, 1);
+          } else {
+            const dIdx = p.dropZone.findIndex((c) => c.id === wingCard.id || c.code === 'BP01-069');
+            if (dIdx !== -1) p.dropZone.splice(dIdx, 1);
+          }
+          addCardsToHand(p, [wingCard as ActionCard]);
+          newState = addLog(
+            newState,
+            `[날개의 뜻·회피 BP01-069 배틀 페이즈 종료 효과] 1 COST를 지불하고 [날개의 뜻·회피]를 패로 회수했습니다!`,
+            'ACTION',
+            pIdx,
+            { cardName: wingCard.nameKr, cardArt: wingCard.artUrl, effectTag: '패 회수' }
+          );
         }
-        addCardsToHand(p, [wingCard as ActionCard]);
-        newState = addLog(
-          newState,
-          `[날개의 뜻·회피 BP01-069 배틀 페이즈 종료 효과] 1 COST를 지불하고 [날개의 뜻·회피]를 패로 회수했습니다!`,
-          'ACTION',
-          pIdx,
-          { cardName: wingCard.nameKr, cardArt: wingCard.artUrl, effectTag: '패 회수' }
-        );
       } else {
         // Human 유저: 선택 모달 띄우기
         const choice: PendingChoice = {
@@ -3870,6 +4126,13 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
         newState = queueChoice(newState, choice, false);
       }
     }
+  }
+
+  // 공식 룰 【우세】 갱신: 이번 턴 배틀 페이즈가 종료될 때 다음 턴을 위한 우세 상태를 판정 결과에 따라 갱신
+  if (newState.clashResult) {
+    const wIdx = newState.clashResult.winnerIndex;
+    newState.players[0].hasDominance = wIdx === 0;
+    newState.players[1].hasDominance = wIdx === 1;
   }
 
   // 만약 선택 효과(날개의 뜻 회수 등)가 대기 중이라면 해당 선택 완료 후 턴 종료로 넘어가도록 대기
@@ -3949,19 +4212,20 @@ export function executeEndPhase(state: GameState): GameState {
   // 605.1.1 턴 종료 스킬 발동 (중첩 스킬 지원)
   for (let i = 0; i < 2; i++) {
     const pl = i === 0 ? p0 : p1;
+    const opp = i === 0 ? p1 : p0;
     const lCards = getAllCardsInSlot(pl.slots.leader);
 
     // 방랑자(남) Lv.2 [SD02-001] 리더: 각 턴 종료 시 카드 1장 드로우
-    if (lCards.some((c) => c.code === 'SD02-001')) {
+    if (lCards.some((c) => c.code?.startsWith('SD02-001'))) {
       const drawn = drawSingleCardFromDeck(pl);
       if (drawn) {
-        pl.hand.push(drawn);
+        addCardsToHand(pl, [drawn]);
         newState = addLog(newState, `[방랑자(남) Lv.2 턴 종료 효과] 덱에서 카드 1장을 드로우했습니다.`, 'ACTION', i as 0 | 1);
       }
     }
 
     // 산화 Lv.2 [SD02-003] 리더: 각 턴 종료 시 덱 위 1장 협주 에리어에 배치
-    if (lCards.some((c) => c.code === 'SD02-003')) {
+    if (lCards.some((c) => c.code?.startsWith('SD02-003'))) {
       const charged = drawSingleCardFromDeck(pl);
       if (charged) {
         pl.concertoZone.push(charged);
@@ -3969,41 +4233,45 @@ export function executeEndPhase(state: GameState): GameState {
       }
     }
 
-    // 앙코 Lv.2 [BP01-012] 리더: 이번 턴에 상대가 데미지를 받은 경우 트래시에서 앙코 카드 1장 패 추가
-    if (lCards.some((c) => c.code === 'BP01-012')) {
+    // 앙코 Lv.2 [BP01-012] 리더: 이번 턴에 상대가 데미지를 받은 경우 트래시에서 앙코 카드 1장 패 추가 가능
+    if (lCards.some((c) => c.code?.startsWith('BP01-012')) && opp.actionFlags.damageTakenThisTurn) {
       const dropIdx = pl.dropZone.findIndex(
         (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
       );
       if (dropIdx !== -1) {
         const [ankeCard] = pl.dropZone.splice(dropIdx, 1);
         const reclaimed = ankeCard as ActionCard;
-        if (!pl.hand.some((h) => h.id === reclaimed.id)) {
-          pl.hand.push(reclaimed);
-        }
-        newState = addLog(newState, `[앙코 Lv.2 턴 종료 효과] 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`, 'ACTION', i as 0 | 1);
+        addCardsToHand(pl, [reclaimed]);
+        newState = addLog(newState, `[앙코 Lv.2 BP01-012 턴 종료 효과] 이번 턴 상대가 데미지를 받아 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`, 'ACTION', i as 0 | 1);
       }
     }
 
-    // 양양 Lv.2 [BP01-022] 턴 종료: 패 1장 버리고 리더를 양양으로 교체
+    // 양양 Lv.2 [BP01-022] 턴 종료: 패 1장 버리고 리더를 양양으로 교체 가능
     if (i === newState.activePlayerIndex && pl.hand.length > 0) {
       const yangyangSupportKey = (['leftSupport', 'rightSupport'] as const).find((k) =>
-        getAllCardsInSlot(pl.slots[k]).some((c) => c.code === 'BP01-022')
+        getAllCardsInSlot(pl.slots[k]).some((c) => c.code?.startsWith('BP01-022'))
       );
       if (yangyangSupportKey && pl.slots[yangyangSupportKey]) {
         const yangyangCard = pl.slots[yangyangSupportKey]!;
         if (pl.isAi) {
-          const discarded = pl.hand.pop();
-          if (discarded) {
-            pl.dropZone.push(discarded);
-            const prevLeader = pl.slots.leader;
-            pl.slots.leader = yangyangCard;
-            pl.slots[yangyangSupportKey] = prevLeader;
-            newState = addLog(
-              newState,
-              `[양양 Lv.2 BP01-022 턴 종료 효과] 패 [${discarded.nameKr}]을(를) 버리고 리더를 [양양]으로 교체했습니다!`,
-              'ACTION',
-              i as 0 | 1
-            );
+          // AI는 현재 리더가 Lv.2 주력이 아니며 패가 충분할 때만 선택적으로 교체
+          const shouldAiSwapYangyang = pl.slots.leader.level < 2 && pl.hand.length >= 5;
+          if (shouldAiSwapYangyang) {
+            const discarded = pl.hand.pop();
+            if (discarded) {
+              pl.dropZone.push(discarded);
+              const prevLeader = pl.slots.leader;
+              pl.slots.leader = yangyangCard;
+              pl.slots[yangyangSupportKey] = prevLeader;
+              newState.players = [p0, p1];
+              newState = triggerShorekeeperSwitchSkill(newState, i as 0 | 1, pl, prevLeader, yangyangCard);
+              newState = addLog(
+                newState,
+                `[양양 Lv.2 BP01-022 턴 종료 효과] 패 [${discarded.nameKr}]을(를) 버리고 리더를 [양양]으로 교체했습니다!`,
+                'ACTION',
+                i as 0 | 1
+              );
+            }
           }
         } else {
           const choice: PendingChoice = {
@@ -4057,6 +4325,26 @@ export function finalizeEndPhase(state: GameState): GameState {
   if (p1.actionArea && p1.actionArea.length > 0) {
     p1.dropZone.push(...p1.actionArea);
     p1.actionArea = [];
+  }
+
+  // 턴을 마치는 플레이어의 지속 턴제 디버프(SD01-016 적색 코스트+1, SD02-016 콤보 불가) 차감 및 만료 처리
+  const finishingPlayer = newState.activePlayerIndex === 0 ? p0 : p1;
+  if (finishingPlayer.tempCostPenaltyRedTurns && finishingPlayer.tempCostPenaltyRedTurns > 0) {
+    finishingPlayer.tempCostPenaltyRedTurns -= 1;
+    if (finishingPlayer.tempCostPenaltyRedTurns <= 0) {
+      finishingPlayer.tempCostPenaltyRed = 0;
+    }
+  } else {
+    finishingPlayer.tempCostPenaltyRed = 0;
+  }
+
+  if (finishingPlayer.comboBlockedTurns && finishingPlayer.comboBlockedTurns > 0) {
+    finishingPlayer.comboBlockedTurns -= 1;
+    if (finishingPlayer.comboBlockedTurns <= 0) {
+      finishingPlayer.comboBlockedNextTurn = false;
+    }
+  } else {
+    finishingPlayer.comboBlockedNextTurn = false;
   }
 
   // 연격 카운트 및 대결 플래그 초기화

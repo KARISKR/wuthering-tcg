@@ -67,7 +67,8 @@ export function encodeDeckCode(deck: CustomDeckConfig): string {
 
 import { COMMUNITY_DECK_PRESETS } from '../data/communityDecks';
 import { SLDARK_DECK_PRESETS } from '../data/sldarkDecks';
-export { COMMUNITY_DECK_PRESETS };
+import { AI_RECOMMENDED_DECKS } from '../data/aiRecommendedDecks';
+export { COMMUNITY_DECK_PRESETS, AI_RECOMMENDED_DECKS };
 
 // 3인의 캐릭터를 바탕으로 기본 Lv.0, Lv.1, Lv.2 캐릭터 덱(9장) 자동 구성 헬퍼
 export function generateCharacterDeckFor3(
@@ -250,6 +251,7 @@ export function getDefaultPresets(): DeckPreset[] {
   });
 
   return [
+    ...AI_RECOMMENDED_DECKS,
     {
       id: 'preset-official-sd01',
       name: '공식 스타터 SD01 [빛과 그림자의 방랑자]',

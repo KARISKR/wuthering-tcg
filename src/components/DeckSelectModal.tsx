@@ -72,12 +72,20 @@ const DeckColumn: React.FC<{
                     className={`shrink-0 text-xs font-black px-2 py-0.5 rounded-md ${
                       preset.authorName === '내 덱'
                         ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50'
+                        : preset.id.startsWith('preset-ai-rec-') || preset.authorName === 'AI 추천덱!'
+                        ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50'
                         : preset.isOfficial
                         ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
                         : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
                     }`}
                   >
-                    {preset.authorName === '내 덱' ? '★ 보유 덱' : preset.isOfficial ? '공식' : '프리셋'}
+                    {preset.authorName === '내 덱'
+                      ? '★ 보유 덱'
+                      : preset.id.startsWith('preset-ai-rec-') || preset.authorName === 'AI 추천덱!'
+                      ? '🤖 AI 추천'
+                      : preset.isOfficial
+                      ? '공식'
+                      : '프리셋'}
                   </span>
                   <span className="font-black text-base text-white truncate">{preset.name}</span>
                 </div>
