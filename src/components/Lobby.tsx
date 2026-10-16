@@ -151,31 +151,28 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </header>
 
-      {/* 2. 메인 중앙 콘텐츠 */}
+      {/* 1.5 실시간 방문자 & 접속자 현황 위젯 (OFFICIAL TRADING CARD GAME SIMULATOR 바로 밑) */}
+      <div className="w-full px-6 pt-3 sm:absolute sm:top-20 sm:left-6 sm:w-auto sm:pt-0 z-30">
+        <VisitorStatsWidget />
+      </div>
+
+      {/* 2. 메인 중앙 콘텐츠 (100% 정중앙 불변 유지) */}
       <main className="relative z-20 flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col items-center justify-center gap-8">
-        {/* 상단 섹션: 좌측 실시간 방문자 통계 위젯 + 중앙 타이틀 히어로 */}
-        <div className="relative w-full flex flex-col items-center justify-center">
-          {/* 좌측 상단: 실시간 방문자 & 접속자 현황 위젯 (유저 요청 지정 위치) */}
-          <div className="w-full flex justify-center xl:absolute xl:left-0 xl:top-0 xl:w-auto z-10 mb-4 xl:mb-0">
-            <VisitorStatsWidget />
+        {/* 타이틀 히어로 영역 */}
+        <div className="text-center space-y-2 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 font-extrabold text-xs tracking-widest uppercase shadow-lg shadow-amber-500/10">
+            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+            2026 OFFICIAL TCG COMPLETE EDITION
           </div>
 
-          {/* 중앙 타이틀 히어로 영역 */}
-          <div className="text-center space-y-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 font-extrabold text-xs tracking-widest uppercase shadow-lg shadow-amber-500/10">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              2026 OFFICIAL TCG COMPLETE EDITION
-            </div>
+          <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">
+            명조: 대결 <span className="text-amber-400">배틀 TCG</span>
+          </h2>
 
-            <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight drop-shadow-md">
-              명조: 대결 <span className="text-amber-400">배틀 TCG</span>
-            </h2>
-
-            <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed">
-              실제 오프라인 카드의 삼각 상성(`RED &gt; GREEN &gt; BLUE &gt; RED`)과 속도 대결,<br className="hidden sm:inline" />
-              캐릭터 진화 및 연격(Combo) 시스템을 브라우저에서 100% 완전 자동화로 경험하세요.
-            </p>
-          </div>
+          <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed">
+            실제 오프라인 카드의 삼각 상성(`RED &gt; GREEN &gt; BLUE &gt; RED`)과 속도 대결,<br className="hidden sm:inline" />
+            캐릭터 진화 및 연격(Combo) 시스템을 브라우저에서 100% 완전 자동화로 경험하세요.
+          </p>
         </div>
 
         {/* 메인 메뉴 카드 8선 그리드 (4칸 2줄 깔끔한 대칭 레이아웃) */}
