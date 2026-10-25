@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { SharedDeck, CustomDeckConfig, DeckPreset } from '../types/tcg';
 import {
   getSharedDecks,
+  fetchGlobalSharedDecks,
   shareNewDeck,
   toggleLikeSharedDeck,
   importSharedDeckToPreset,
@@ -114,6 +115,10 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
   const reloadData = () => {
     const decks = getSharedDecks();
     setSharedDecks(decks);
+    // 클라우드 글로벌 공유 덱 리스트 비동기 동기화
+    fetchGlobalSharedDecks().then((globalDecks) => {
+      setSharedDecks(globalDecks);
+    });
     const presets = getStoredPresets();
     setMyPresets(presets);
     if (presets.length > 0 && !selectedPresetId) {

@@ -34,6 +34,9 @@ export interface FeedbackItem {
 const STORAGE_KEY = 'wuthering_tcg_feedbacks_v3';
 const DRAFT_KEY = 'wuthering_tcg_feedback_draft_v3';
 
+const BOARD_POINTER_ID = 'ff808181a09d98f701a173ca355e092f';
+const BOARD_POINTER_NAME = 'wuthering-tcg-community-board-v2';
+
 export const CATEGORY_INFO: Record<
   FeedbackCategory,
   { label: string; icon: string; color: string; badgeClass: string; desc: string }
@@ -208,6 +211,122 @@ export function getFeedbackList(): FeedbackItem[] {
   }
 }
 
+export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
+  let remotePosts: FeedbackItem[] | null = null;
+
+  // 1순위: Cloudflare Pages Function (/api/community?type=board)
+  try {
+    const res = await fetch(`/api/community?type=board&t=${Date.now()}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.posts)) {
+        remotePosts = data.posts;
+      }
+    }
+  } catch {}
+
+  // 2순위 폴백: 직접 클라우드 스토어 조회
+  if (!remotePosts) {
+    try {
+      const ptrRes = await fetch(`https://api.restful-api.dev/objects/${BOARD_POINTER_ID}`);
+      if (ptrRes.ok) {
+        const ptrJson = await ptrRes.json();
+        const blobKey = ptrJson?.data?.key;
+        if (blobKey) {
+          const blobRes = await fetch(`https://bytebin.lucko.me/${blobKey}`);
+          if (blobRes.ok) {
+            const blobData = await blobRes.json();
+            if (Array.isArray(blobData?.posts)) {
+              remotePosts = blobData.posts;
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  const localPosts = getFeedbackList();
+  if (!remotePosts) {
+    return localPosts;
+  }
+
+  // 원격 게시글과 로컬 게시글을 ID 기준으로 병합
+  const mergedMap = new Map<string, FeedbackItem>();
+  for (const p of [...remotePosts, ...localPosts]) {
+    if (!p || !p.id) continue;
+    const existing = mergedMap.get(p.id);
+    if (!existing) {
+      mergedMap.set(p.id, p);
+    } else {
+      // 댓글 병합 (중복 제거)
+      const commentMap = new Map<string, CommentItem>();
+      for (const c of [...(existing.comments || []), ...(p.comments || [])]) {
+        if (c && c.id) commentMap.set(c.id, c);
+      }
+      mergedMap.set(p.id, {
+        ...existing,
+        likes: Math.max(existing.likes || 0, p.likes || 0),
+        dislikes: Math.max(existing.dislikes || 0, p.dislikes || 0),
+        views: Math.max(existing.views || 0, p.views || 0),
+        likedByMe: Boolean(existing.likedByMe || p.likedByMe),
+        dislikedByMe: Boolean(existing.dislikedByMe || p.dislikedByMe),
+        comments: Array.from(commentMap.values()),
+      });
+    }
+  }
+
+  const merged = Array.from(mergedMap.values());
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+  } catch {}
+  return merged;
+}
+
+export async function syncFeedbackListToCloud(postsToSync?: FeedbackItem[]): Promise<void> {
+  try {
+    const mergedPosts = postsToSync || (await fetchGlobalFeedbackList());
+    const payload = JSON.stringify({
+      posts: mergedPosts.map(({ likedByMe, dislikedByMe, ...rest }) => rest),
+      updatedAt: Date.now(),
+    });
+
+    let savedViaApi = false;
+    try {
+      const res = await fetch('/api/community?type=board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      });
+      if (res.ok) savedViaApi = true;
+    } catch {}
+
+    if (!savedViaApi) {
+      const blobRes = await fetch('https://bytebin.lucko.me/post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      });
+      if (blobRes.ok) {
+        const { key } = await blobRes.json();
+        if (key) {
+          await fetch(`https://api.restful-api.dev/objects/${BOARD_POINTER_ID}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: BOARD_POINTER_NAME,
+              data: { key, updatedAt: Date.now() },
+            }),
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[feedbackManager] 클라우드 동기화 실패:', err);
+  }
+}
+
 export function saveFeedback(
   data: Omit<FeedbackItem, 'id' | 'createdAt' | 'appVersion'> & { appVersion?: string }
 ): FeedbackItem {
@@ -230,6 +349,17 @@ export function saveFeedback(
   } catch (err) {
     console.warn('[feedbackManager] Failed to persist feedback list:', err);
   }
+
+  // 글로벌 클라우드 병합 및 동기화
+  fetchGlobalFeedbackList().then((latest) => {
+    const exists = latest.some((item) => item.id === newItem.id);
+    const finalPosts = exists ? latest : [newItem, ...latest];
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(finalPosts));
+    } catch {}
+    syncFeedbackListToCloud(finalPosts);
+  });
+
   return newItem;
 }
 
@@ -265,6 +395,7 @@ export function toggleLikeFeedback(id: string): { likes: number; likedByMe: bool
   } catch (err) {
     console.warn('[feedbackManager] Failed to toggle like:', err);
   }
+  syncFeedbackListToCloud(updated);
   return result;
 }
 
@@ -285,6 +416,7 @@ export function toggleDislikeFeedback(id: string): { dislikes: number; dislikedB
   } catch (err) {
     console.warn('[feedbackManager] Failed to toggle dislike:', err);
   }
+  syncFeedbackListToCloud(updated);
   return result;
 }
 
@@ -313,6 +445,7 @@ export function addCommentToFeedback(id: string, author: string, text: string): 
   } catch (err) {
     console.warn('[feedbackManager] Failed to add comment:', err);
   }
+  syncFeedbackListToCloud(updated);
   return newComment;
 }
 
@@ -324,6 +457,7 @@ export function updateFeedback(id: string, updates: Partial<Omit<FeedbackItem, '
   } catch (err) {
     console.warn('[feedbackManager] Failed to update feedback:', err);
   }
+  syncFeedbackListToCloud(updated);
 }
 
 export function deleteFeedback(id: string): void {
@@ -334,6 +468,7 @@ export function deleteFeedback(id: string): void {
   } catch (err) {
     console.warn('[feedbackManager] Failed to delete feedback:', err);
   }
+  syncFeedbackListToCloud(filtered);
 }
 
 export function clearAllFeedback(): void {

@@ -38,6 +38,7 @@ import {
   FeedbackItem,
   CATEGORY_INFO,
   getFeedbackList,
+  fetchGlobalFeedbackList,
   saveFeedback,
   deleteFeedback,
   toggleLikeFeedback,
@@ -201,6 +202,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   const refreshList = () => {
     setItems(getFeedbackList());
+    fetchGlobalFeedbackList().then((globalList) => {
+      setItems(globalList);
+    });
   };
 
   useEffect(() => {

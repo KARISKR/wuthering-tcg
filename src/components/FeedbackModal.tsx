@@ -27,6 +27,7 @@ import {
   FeedbackItem,
   CATEGORY_INFO,
   getFeedbackList,
+  fetchGlobalFeedbackList,
   saveFeedback,
   deleteFeedback,
   toggleLikeFeedback,
@@ -90,6 +91,9 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
   const refreshList = () => {
     setItems(getFeedbackList());
+    fetchGlobalFeedbackList().then((globalList) => {
+      setItems(globalList);
+    });
   };
 
   // Load items & draft on mount/open
