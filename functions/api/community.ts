@@ -76,10 +76,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (request.method === 'POST' || request.method === 'PUT') {
       const bodyText = await request.text();
 
-      // (A) Cloudflare KV 저장
+      // (A) Cloudflare KV 저장 (최우선)
       if (env.VISITOR_STATS) {
         try {
           await env.VISITOR_STATS.put(kvKey, bodyText);
+          return new Response(JSON.stringify({ ok: true, source: 'kv', updatedAt: Date.now() }), { headers });
         } catch (e) {
           console.warn('[Community KV PUT Error]:', e);
         }
