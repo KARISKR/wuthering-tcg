@@ -77,6 +77,23 @@ export function getKstDateString(): string {
 }
 
 /**
+ * 브라우저 세션별 고유 클라이언트 ID (새로고침 시 중복 접속자 증가 방지)
+ */
+export function getSessionClientId(): string {
+  if (typeof window === 'undefined') return 'server';
+  try {
+    let id = sessionStorage.getItem('wuthering_session_client_id');
+    if (!id) {
+      id = Math.random().toString(36).substring(2, 12);
+      sessionStorage.setItem('wuthering_session_client_id', id);
+    }
+    return id;
+  } catch {
+    return 'anon';
+  }
+}
+
+/**
  * 실시간 접속자 판별용 90초 시간 슬롯
  */
 export function getCurrentSlot(): number {
@@ -93,10 +110,12 @@ async function fetchStatsApi(
   action: 'visit' | 'ping' | 'get',
   options: { incDaily?: boolean; incTotal?: boolean; slot: number; isExcluded: boolean; date: string }
 ): Promise<{ online: number; today: number; total: number; isDevExcluded: boolean } | null> {
+  const clientId = getSessionClientId();
   const params = new URLSearchParams({
     action,
     slot: String(options.slot),
     date: options.date,
+    clientId,
     isExcluded: options.isExcluded ? '1' : '0',
     incDaily: options.incDaily ? '1' : '0',
     incTotal: options.incTotal ? '1' : '0',

@@ -25,6 +25,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const action = url.searchParams.get('action') || 'get';
   const incDaily = url.searchParams.get('incDaily') === '1';
   const incTotal = url.searchParams.get('incTotal') === '1';
+  const clientId = url.searchParams.get('clientId') || '';
   const slotParam = url.searchParams.get('slot');
   const dateParam = url.searchParams.get('date');
 
@@ -68,24 +69,24 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             const currentDay = parseInt((await env.VISITOR_STATS.get(`daily_${dateKey}`)) || '0', 10);
             await env.VISITOR_STATS.put(`daily_${dateKey}`, String(currentDay + 1), { expirationTtl: 86400 * 7 });
           }
-        } else if (action === 'ping') {
-          const currentSlotCount = parseInt((await env.VISITOR_STATS.get(`slot_${currentSlot}`)) || '0', 10);
-          await env.VISITOR_STATS.put(`slot_${currentSlot}`, String(currentSlotCount + 1), { expirationTtl: 600 });
+        }
+        // 고유 세션 ID 기준 120초 유효 생존 핑 기록 (동일 브라우저 새로고침 시 덮어쓰기되므로 접속자 수 뻥튀기 방지)
+        if (clientId) {
+          await env.VISITOR_STATS.put(`active_client_${clientId}`, '1', { expirationTtl: 120 });
         }
       }
 
-      const [totalStr, dailyStr, curSlotStr, prevSlotStr] = await Promise.all([
+      // 실시간 접속자 = 활성화된 고유 세션 수 (중복 새로고침 완전 배제)
+      const activeUsers = await env.VISITOR_STATS.list({ prefix: 'active_client_' });
+      const online = Math.max(1, activeUsers.keys.length);
+
+      const [totalStr, dailyStr] = await Promise.all([
         env.VISITOR_STATS.get('total'),
         env.VISITOR_STATS.get(`daily_${dateKey}`),
-        env.VISITOR_STATS.get(`slot_${currentSlot}`),
-        env.VISITOR_STATS.get(`slot_${currentSlot - 1}`),
       ]);
 
       const total = parseInt(totalStr || '0', 10);
       const today = parseInt(dailyStr || '0', 10);
-      const curSlotCount = parseInt(curSlotStr || '0', 10);
-      const prevSlotCount = parseInt(prevSlotStr || '0', 10);
-      const online = Math.max(1, Math.max(curSlotCount, prevSlotCount));
 
       return new Response(
         JSON.stringify({
