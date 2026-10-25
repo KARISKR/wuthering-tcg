@@ -570,6 +570,24 @@ class SoundEffectsEngine {
   private activeFinisherGain: GainNode | null = null;
   private lastFinisherTime: number = 0;
 
+  // React 컴포넌트 실시간 볼륨/음소거 상태 구독 리스너
+  private listeners: Set<() => void> = new Set();
+
+  public subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify() {
+    this.listeners.forEach((l) => {
+      try {
+        l();
+      } catch {}
+    });
+  }
+
   constructor() {
     try {
       const savedMute = localStorage.getItem('wuthering_sfx_muted');
@@ -712,10 +730,15 @@ class SoundEffectsEngine {
     try {
       localStorage.setItem('wuthering_sfx_muted', String(muted));
     } catch {}
+    this.notify();
+  }
+
+  public toggleMute() {
+    this.setMuted(!this.isMuted);
   }
 
   public getMuted(): boolean {
-    return this.getAudioContext() ? this.isMuted : true;
+    return this.isMuted;
   }
 
   public setVolume(vol: number) {
@@ -723,6 +746,7 @@ class SoundEffectsEngine {
     try {
       localStorage.setItem('wuthering_sfx_volume', String(this.volume));
     } catch {}
+    this.notify();
   }
 
   public getVolume(): number {

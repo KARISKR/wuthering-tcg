@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { bgmManager, BgmMode } from '../utils/bgmManager';
+import { soundEffects } from '../utils/soundEffects';
 import {
   Volume2,
   Volume1,
@@ -16,21 +17,34 @@ import {
   Shuffle,
   Coffee,
   Swords,
+  Zap,
 } from 'lucide-react';
 
 export const BgmPlayer: React.FC = () => {
   const [bgmState, setBgmState] = useState(() => bgmManager.getState());
+  const [sfxVolume, setSfxVolume] = useState(() => soundEffects.getVolume());
+  const [isSfxMuted, setIsSfxMuted] = useState(() => soundEffects.getMuted());
   const [showPlaylist, setShowPlaylist] = useState(false);
   const [activeTab, setActiveTab] = useState<BgmMode>(() => bgmManager.getMode());
   const playlistRef = useRef<HTMLDivElement | null>(null);
 
-  // 글로벌 BGM 상태 구독
+  // 글로벌 BGM 및 SFX 상태 구독
   useEffect(() => {
-    return bgmManager.subscribe(() => {
+    const unsubBgm = bgmManager.subscribe(() => {
       const state = bgmManager.getState();
       setBgmState({ ...state });
       setActiveTab(state.mode);
     });
+
+    const unsubSfx = soundEffects.subscribe(() => {
+      setSfxVolume(soundEffects.getVolume());
+      setIsSfxMuted(soundEffects.getMuted());
+    });
+
+    return () => {
+      unsubBgm();
+      unsubSfx();
+    };
   }, []);
 
   // 플레이리스트 바깥 클릭 시 닫기
@@ -202,7 +216,7 @@ export const BgmPlayer: React.FC = () => {
         )}
       </button>
 
-      {/* 볼륨 슬라이더 (기본 10%의 정말 작은 소리로 세팅) */}
+      {/* BGM 볼륨 슬라이더 (기본 10%의 정말 작은 소리로 세팅) */}
       <div className="hidden sm:flex items-center gap-1">
         <input
           type="range"
@@ -227,6 +241,39 @@ export const BgmPlayer: React.FC = () => {
         </span>
       </div>
 
+      {/* 효과음 & 캐릭터 보이스 마스터 볼륨 슬라이더 */}
+      <div className="hidden md:flex items-center gap-1 border-l border-slate-700/80 pl-2">
+        <button
+          onClick={() => soundEffects.toggleMute()}
+          className="p-1 rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer transition"
+          title={isSfxMuted ? '효과음/보이스 음소거 해제' : '효과음/보이스 음소거'}
+        >
+          {isSfxMuted || sfxVolume === 0 ? (
+            <VolumeX className="w-3.5 h-3.5 text-red-400" />
+          ) : (
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
+          )}
+        </button>
+        <span className="text-[10px] font-bold text-amber-300">SFX</span>
+        <input
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={isSfxMuted ? 0 : sfxVolume}
+          onChange={(e) => {
+            const newVol = parseFloat(e.target.value);
+            soundEffects.setVolume(newVol);
+            if (isSfxMuted) soundEffects.setMuted(false);
+          }}
+          className="w-12 md:w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-400"
+          title={`효과음 & 캐릭터 사운드 볼륨: ${Math.round((isSfxMuted ? 0 : sfxVolume) * 100)}%`}
+        />
+        <span className="text-[10px] font-mono text-slate-400 w-6 text-right">
+          {Math.round((isSfxMuted ? 0 : sfxVolume) * 100)}%
+        </span>
+      </div>
+
       {/* 플레이리스트 메뉴 토글 버튼 */}
       <button
         onClick={() => {
@@ -236,7 +283,7 @@ export const BgmPlayer: React.FC = () => {
         className={`p-1 rounded-lg transition cursor-pointer ${
           showPlaylist ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-white'
         }`}
-        title="플레이리스트 선택"
+        title="플레이리스트 & 볼륨 설정 선택"
       >
         <ListMusic className="w-3.5 h-3.5" />
       </button>
@@ -247,8 +294,84 @@ export const BgmPlayer: React.FC = () => {
       {showPlaylist && (
         <div
           ref={playlistRef}
-          className="absolute right-0 top-full mt-2 w-80 bg-slate-900/98 border-2 border-amber-500/50 rounded-2xl p-3 shadow-2xl shadow-black/95 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 top-full mt-2 w-84 bg-slate-900/98 border-2 border-amber-500/50 rounded-2xl p-3 shadow-2xl shadow-black/95 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
         >
+          {/* 상단 통합 사운드 마스터 볼륨 설정 카드 */}
+          <div className="p-2.5 bg-slate-950/90 rounded-xl mb-2.5 border border-slate-800 space-y-2">
+            <div className="text-[11px] font-black text-amber-300 flex items-center justify-between">
+              <span>🔊 사운드 마스터 볼륨</span>
+              <span className="text-[9px] text-slate-400 font-normal">효과음·캐릭터 일괄 조절</span>
+            </div>
+
+            {/* BGM 볼륨 */}
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-300 text-[11px] w-20 shrink-0">
+                <button
+                  onClick={() => bgmManager.toggleMute()}
+                  className="p-0.5 rounded hover:text-white"
+                  title="BGM 음소거 토글"
+                >
+                  {isMuted ? <VolumeX className="w-3 h-3 text-red-400" /> : <Volume2 className="w-3 h-3 text-emerald-400" />}
+                </button>
+                <span>배경음악</span>
+              </div>
+              <div className="flex items-center gap-2 flex-1">
+                <input
+                  type="range"
+                  min="0"
+                  max="0.5"
+                  step="0.01"
+                  value={isMuted ? 0 : volume}
+                  onChange={(e) => {
+                    const newVol = parseFloat(e.target.value);
+                    bgmManager.setVolume(newVol);
+                    if (isMuted) bgmManager.toggleMute();
+                  }}
+                  className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-400"
+                />
+                <span className="text-[10px] font-mono text-slate-400 w-7 text-right">{currentDisplayVol}%</span>
+              </div>
+            </div>
+
+            {/* SFX 효과음 & 캐릭터 사운드 볼륨 */}
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-300 text-[11px] w-20 shrink-0">
+                <button
+                  onClick={() => soundEffects.toggleMute()}
+                  className="p-0.5 rounded hover:text-white"
+                  title="효과음/보이스 음소거 토글"
+                >
+                  {isSfxMuted || sfxVolume === 0 ? <VolumeX className="w-3 h-3 text-red-400" /> : <Zap className="w-3 h-3 text-amber-400" />}
+                </button>
+                <span>효과음/보이스</span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-1">
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={isSfxMuted ? 0 : sfxVolume}
+                  onChange={(e) => {
+                    const newVol = parseFloat(e.target.value);
+                    soundEffects.setVolume(newVol);
+                    if (isSfxMuted) soundEffects.setMuted(false);
+                  }}
+                  className="flex-1 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                />
+                <span className="text-[10px] font-mono text-slate-400 w-7 text-right">
+                  {Math.round((isSfxMuted ? 0 : sfxVolume) * 100)}%
+                </span>
+                <button
+                  onClick={() => soundEffects.playCardFlip()}
+                  className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 text-[9px] font-bold border border-amber-500/30 cursor-pointer shrink-0"
+                  title="효과음 테스트"
+                >
+                  테스트
+                </button>
+              </div>
+            </div>
+          </div>
           {/* 상단 모드 분리 탭 버튼 */}
           <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-950/80 rounded-xl mb-2.5 border border-slate-800">
             <button
