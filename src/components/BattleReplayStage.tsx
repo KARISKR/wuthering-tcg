@@ -3,6 +3,8 @@ import { BattleReplayData } from '../utils/replayManager';
 import { buildReplayTimeline } from '../utils/replayTimelineBuilder';
 import { ReplaySnapshot, ReplaySlotSnapshot, ReplayActionCardVisual } from '../types/replayTimeline';
 import { soundEffects, getWeaponByCharacter, WeaponType } from '../utils/soundEffects';
+import { bgmManager } from '../utils/bgmManager';
+import { preloadReplayCards } from '../utils/cardImagePreloader';
 import { CharacterSlot } from './CharacterSlot';
 import { CardView } from './CardView';
 import { HandView } from './HandView';
@@ -135,6 +137,15 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1.2); // 0.8, 1.2, 2.0
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+
+  // 리플레이 진입 시 사운드(BGM) 고정 잠금 해제 및 타임라인 카드 프리로드
+  useEffect(() => {
+    bgmManager.unlockTrack();
+    bgmManager.setMode('battle');
+    if (replay) {
+      preloadReplayCards(replay);
+    }
+  }, [replay]);
 
   // 손패 검증 뷰어 대상 플레이어 (0: 1P, 1: 2P)
   const [selectedHandPlayer, setSelectedHandPlayer] = useState<0 | 1>(0);

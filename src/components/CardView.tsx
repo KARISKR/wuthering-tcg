@@ -72,7 +72,8 @@ export const CardView: React.FC<CardViewProps> = ({
           src={backImage}
           alt={isCharacter ? '캐릭터 카드 뒷면' : '액션 카드 뒷면'}
           className="w-full h-full object-cover rounded-xl transition-transform duration-300 group-hover:scale-105 pointer-events-none"
-          loading="lazy"
+          loading="eager"
+          decoding="async"
         />
         {/* 카드 표면 미세 반사 하이라이트 */}
         <div className="absolute inset-0 bg-gradient-to-tr from-black/25 via-transparent to-white/15 pointer-events-none rounded-xl" />
@@ -190,7 +191,7 @@ const ActionCardView: React.FC<{
           <img
             src={artUrl}
             alt={card.nameKr}
-            loading="lazy"
+            loading="eager"
             decoding="async"
             className="w-full h-full object-contain drop-shadow transition-transform duration-300 group-hover:scale-[1.02]"
             onError={(e) => {
@@ -302,7 +303,7 @@ const CharacterCardView: React.FC<{
           <img
             src={card.artUrl}
             alt={card.nameKr}
-            loading="lazy"
+            loading="eager"
             decoding="async"
             className="w-full h-full object-contain drop-shadow transition-transform duration-300 group-hover:scale-[1.02]"
             onError={(e) => {

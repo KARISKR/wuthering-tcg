@@ -50,16 +50,28 @@ export function App() {
       const rawHash = window.location.hash.toLowerCase();
       const hash = rawHash.replace('#/', '#');
       if (hash === '#board') {
+        setIsTutorialBattle(false);
+        bgmManager.unlockTrack();
         setCurrentView('BOARD');
       } else if (hash === '#deck-builder' || hash === '#deckbuilder') {
+        setIsTutorialBattle(false);
+        bgmManager.unlockTrack();
         setCurrentView('DECK_BUILDER');
-      } else if (hash === '#battle-stage' || hash === '#tutorial-battle') {
-        if (hash === '#tutorial-battle') setIsTutorialBattle(true);
+      } else if (hash === '#tutorial-battle') {
+        setIsTutorialBattle(true);
+        setCurrentView('BATTLE');
+      } else if (hash === '#battle-stage') {
+        setIsTutorialBattle(false);
+        bgmManager.unlockTrack();
         setCurrentView('BATTLE');
       } else if (hash === '#replay-stage') {
+        setIsTutorialBattle(false);
+        bgmManager.unlockTrack();
         setCurrentView('REPLAY_STAGE');
       } else {
         // 빈 해시, #, #battle, #preset, #card-gallery, #shared-decks 등 모든 로비 화면/모달 라우트
+        setIsTutorialBattle(false);
+        bgmManager.unlockTrack();
         setCurrentView('LOBBY');
       }
     };
@@ -69,9 +81,9 @@ export function App() {
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
-  // 뷰 전환에 따라 대기실 BGM vs 배틀 BGM 자동 전환 (튜토리얼 시 The Sound of Midday Bells 고정)
+  // 뷰 전환에 따라 대기실 BGM vs 배틀 BGM 자동 전환 (튜토리얼 화면에서만 The Sound of Midday Bells 고정)
   useEffect(() => {
-    if (isTutorialBattle) {
+    if (currentView === 'BATTLE' && isTutorialBattle) {
       bgmManager.lockTrackByTitle('The Sound of Midday Bells');
     } else {
       bgmManager.unlockTrack();
@@ -93,6 +105,8 @@ export function App() {
   };
 
   const handleStartBattleWithCustomDeck = (deck: CustomDeckConfig) => {
+    setIsTutorialBattle(false);
+    bgmManager.unlockTrack();
     window.location.hash = '#battle-stage';
     setCustomDeck(deck);
     setOpponentDeck(null);
@@ -101,6 +115,8 @@ export function App() {
   };
 
   const handlePlayBattleReplay = (replay: BattleReplayData) => {
+    setIsTutorialBattle(false);
+    bgmManager.unlockTrack();
     window.location.hash = '#replay-stage';
     setPreviousView(currentView === 'BATTLE' ? 'BATTLE' : 'LOBBY');
     setActiveReplay(replay);
@@ -108,6 +124,8 @@ export function App() {
   };
 
   const handleExitReplay = () => {
+    setIsTutorialBattle(false);
+    bgmManager.unlockTrack();
     if (window.location.hash.toLowerCase().includes('replay')) {
       history.pushState('', document.title, window.location.pathname + window.location.search);
     }
@@ -149,6 +167,8 @@ export function App() {
   };
 
   const handleExitBattle = () => {
+    setIsTutorialBattle(false);
+    bgmManager.unlockTrack();
     if (window.location.hash.toLowerCase().includes('battle')) {
       history.pushState('', document.title, window.location.pathname + window.location.search);
     }

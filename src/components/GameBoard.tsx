@@ -28,6 +28,7 @@ import { EffectNotificationToast } from './EffectNotificationToast';
 import { InGameTutorialOverlay } from './InGameTutorialOverlay';
 import { EvolutionTreeModal } from './EvolutionTreeModal';
 import { HpHistoryModal } from './HpHistoryModal';
+import { preloadBattleCards } from '../utils/cardImagePreloader';
 import { ZoneCardStack } from './ZoneCardStack';
 import { DeckStack } from './DeckStack';
 import { MatchOpeningOverlay } from './MatchOpeningOverlay';
@@ -436,6 +437,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     if (chars.length > 0) {
       soundEffects.preloadCharacters(chars);
     }
+    // 배틀에 사용되는 양측 덱·슬롯·진화 카드 이미지 백그라운드 선행 프리로드
+    preloadBattleCards(gameState);
   }, [gameState.players]);
 
   // 매치 개시 양측 리더 컷인 및 출격 오프닝 대사 멘트 오버레이 상태

@@ -4,6 +4,7 @@ import { CURRENT_GAME_VERSION, LATEST_PATCH_NOTE } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import { DeckSelectModal } from './DeckSelectModal';
 import { VisitorStatsWidget } from './VisitorStatsWidget';
+import { startIdleCardPreload } from '../utils/cardImagePreloader';
 
 const OfficialManualModal = lazy(() => import('./OfficialManualModal').then((m) => ({ default: m.OfficialManualModal })));
 const CardCatalogModal = lazy(() => import('./CardCatalogModal').then((m) => ({ default: m.CardCatalogModal })));
@@ -172,6 +173,10 @@ export const Lobby: React.FC<LobbyProps> = ({
       history.pushState('', document.title, window.location.pathname + window.location.search);
     }
   };
+
+  useEffect(() => {
+    startIdleCardPreload();
+  }, []);
 
   useEffect(() => {
     const syncHashToModals = () => {
