@@ -44,8 +44,7 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onBypass }
 
   const handleAdminSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // admin 혹은 빈칸/엔터 시 관리자 권한으로 통과
-    if (adminKey.trim().toLowerCase() === 'admin' || adminKey.trim() === 'beta20' || adminKey.trim() === '') {
+    if (adminKey.trim() === 'admin15928282') {
       onBypass();
     } else {
       setAdminError(true);
@@ -189,7 +188,7 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onBypass }
             <form onSubmit={handleAdminSubmit} className="flex items-center gap-2 animate-in fade-in duration-200">
               <input
                 type="password"
-                placeholder="관리자 키 (엔터 시 즉시 통과)"
+                placeholder="관리자 비밀번호 입력"
                 value={adminKey}
                 onChange={(e) => setAdminKey(e.target.value)}
                 autoFocus

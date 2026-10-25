@@ -27,11 +27,10 @@ export function App() {
       return true;
     }
     const searchParams = new URLSearchParams(window.location.search);
+    const adminParam = searchParams.get('admin') || searchParams.get('key') || searchParams.get('pass') || searchParams.get('password');
     const hasAdminParam =
-      searchParams.get('admin') === 'true' ||
-      searchParams.get('bypass') === 'true' ||
-      searchParams.get('key') === 'beta20' ||
-      window.location.hash.toLowerCase().includes('admin');
+      adminParam === 'admin15928282' ||
+      window.location.hash === '#admin15928282';
 
     if (hasAdminParam) {
       sessionStorage.setItem('wuthering_maintenance_bypass', 'true');
