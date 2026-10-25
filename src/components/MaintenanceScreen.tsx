@@ -27,6 +27,7 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onBypass }
 
       if (diff <= 0) {
         setTimeLeft({ hours: 0, minutes: 0, seconds: 0, isOver: true });
+        onBypass();
         return;
       }
 

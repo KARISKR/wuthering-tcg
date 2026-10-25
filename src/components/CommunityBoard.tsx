@@ -507,7 +507,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             <Download className="w-3.5 h-3.5" />
             <span>백업</span>
           </button>
-          <span className="text-xs text-slate-400 font-bold bg-[#121520] px-2.5 py-1 rounded border border-[#2d354a]">v1.1</span>
+          <span className="text-xs text-slate-400 font-bold bg-[#121520] px-2.5 py-1 rounded border border-[#2d354a]">{CURRENT_GAME_VERSION}</span>
         </div>
       </header>
 
