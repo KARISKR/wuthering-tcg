@@ -10,12 +10,14 @@ import {
   Maximize2,
   X,
 } from 'lucide-react';
+import { formatEffectText } from '../utils/formatEffectText';
 
 interface CardViewProps {
   card?: AnyCard | null;
   cardBackType?: 'CHARACTER' | 'ACTION';
   isFacedown?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl';
+  customSizeClass?: string;
   isSelected?: boolean;
   isDisabled?: boolean;
   isPlayable?: boolean;
@@ -30,6 +32,7 @@ export const CardView: React.FC<CardViewProps> = ({
   cardBackType,
   isFacedown = false,
   size = 'md',
+  customSizeClass,
   isSelected = false,
   isDisabled = false,
   isPlayable = false,
@@ -40,8 +43,8 @@ export const CardView: React.FC<CardViewProps> = ({
 }) => {
   const [isZoomed, setIsZoomed] = useState(false);
 
-  // 크기별 스타일
-  const sizeStyles = {
+  // 크기별 스타일 (customSizeClass가 있으면 우선 적용)
+  const sizeStyles = customSizeClass || {
     sm: 'w-24 h-36 text-xs',
     md: 'w-36 h-52 text-xs',
     lg: 'w-48 h-72 text-sm',
@@ -108,27 +111,18 @@ export const CardView: React.FC<CardViewProps> = ({
     );
   }
 
-  // 캐릭터 카드
+  // 캐릭터 카드 (크게보기 제거)
   return (
-    <>
-      <CharacterCardView
-        card={card}
-        size={size}
-        sizeStyles={sizeStyles}
-        isSelected={isSelected}
-        isDisabled={isDisabled}
-        onClick={onClick}
-        onZoom={(e) => {
-          if (showZoomModal) {
-            e.stopPropagation();
-            setIsZoomed(true);
-          }
-        }}
-        badge={badge}
-        className={className}
-      />
-      {isZoomed && <CardZoomModal card={card} onClose={() => setIsZoomed(false)} />}
-    </>
+    <CharacterCardView
+      card={card}
+      size={size}
+      sizeStyles={sizeStyles}
+      isSelected={isSelected}
+      isDisabled={isDisabled}
+      onClick={onClick}
+      badge={badge}
+      className={className}
+    />
   );
 };
 
@@ -196,6 +190,8 @@ const ActionCardView: React.FC<{
           <img
             src={artUrl}
             alt={card.nameKr}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-contain drop-shadow transition-transform duration-300 group-hover:scale-[1.02]"
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';
@@ -250,9 +246,9 @@ const ActionCardView: React.FC<{
             </div>
           </div>
 
-          <p className="text-[10px] text-slate-300 line-clamp-2 leading-tight">
-            {card.description}
-          </p>
+          <div className="text-[10px] text-slate-300 line-clamp-2 leading-tight">
+            {formatEffectText(card.description, 'sm')}
+          </div>
         </div>
       )}
     </div>
@@ -269,10 +265,9 @@ const CharacterCardView: React.FC<{
   isSelected?: boolean;
   isDisabled?: boolean;
   onClick?: () => void;
-  onZoom?: (e: React.MouseEvent) => void;
   badge?: string;
   className?: string;
-}> = ({ card, size, sizeStyles, isSelected, isDisabled, onClick, onZoom, badge, className = '' }) => {
+}> = ({ card, size, sizeStyles, isSelected, isDisabled, onClick, badge, className = '' }) => {
   const elementColors: Record<
     string,
     { border: string; bg: string; text: string; label: string }
@@ -307,6 +302,8 @@ const CharacterCardView: React.FC<{
           <img
             src={card.artUrl}
             alt={card.nameKr}
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-contain drop-shadow transition-transform duration-300 group-hover:scale-[1.02]"
             onError={(e) => {
               (e.target as HTMLElement).style.display = 'none';
@@ -334,16 +331,6 @@ const CharacterCardView: React.FC<{
               {badge}
             </span>
           )}
-
-          {onZoom && (
-            <button
-              onClick={onZoom}
-              className="absolute bottom-1.5 right-1.5 z-20 opacity-0 group-hover:opacity-100 transition p-1 bg-slate-950/90 border border-slate-700/80 rounded-lg text-slate-300 hover:text-white shadow"
-              title="크게 보기"
-            >
-              <Maximize2 className="w-3 h-3" />
-            </button>
-          )}
         </div>
       ) : (
         /* 이미지가 없는 경우 텍스트 기반 카드 */
@@ -357,9 +344,9 @@ const CharacterCardView: React.FC<{
               {elem.label}
             </span>
           </div>
-          <p className="text-[10px] text-slate-300 my-auto line-clamp-3 leading-relaxed">
-            {card.description}
-          </p>
+          <div className="text-[10px] text-slate-300 my-auto line-clamp-3 leading-relaxed">
+            {formatEffectText(card.description, 'sm')}
+          </div>
           <div className="text-[9px] text-slate-400 font-mono text-center">
             {card.code}
           </div>
@@ -377,24 +364,34 @@ const CardZoomModal: React.FC<{ card: AnyCard; onClose: () => void }> = ({ card,
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 animate-in fade-in select-none"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in select-none"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative bg-slate-950 border-2 border-amber-500/70 rounded-3xl p-5 sm:p-6 max-w-md w-full flex flex-col items-center gap-3.5 shadow-2xl shadow-amber-500/20"
+        className="relative bg-[#0c101b]/95 border border-[#f97316]/60 p-5 sm:p-6 max-w-md w-full flex flex-col items-center gap-3.5 shadow-[0_0_50px_rgba(0,0,0,0.95)] overflow-hidden"
       >
+        {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
+        <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-cyan-400" />
+        <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-cyan-400" />
+
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 p-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white cursor-pointer"
+          className="absolute top-3 right-3 p-1.5 bg-[#111520] hover:bg-[#1a2234] border border-white/15 text-slate-300 hover:text-white cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)] z-10"
           title="닫기"
         >
           <X className="w-5 h-5" />
         </button>
         {artUrl && (
-          <div className="w-full max-h-[62vh] aspect-[5/7] flex items-center justify-center rounded-2xl overflow-hidden bg-black/40 border border-slate-800 shadow-xl">
+          <div
+            data-no-lod="true"
+            className="modal-preview w-full max-h-[62vh] aspect-[5/7] flex items-center justify-center overflow-hidden bg-black/40 border border-[#f97316]/30 shadow-xl"
+          >
             <img
               src={artUrl}
               alt={card.nameKr}
+              data-no-lod="true"
               className="w-full h-full object-contain drop-shadow-xl"
             />
           </div>
@@ -402,14 +399,14 @@ const CardZoomModal: React.FC<{ card: AnyCard; onClose: () => void }> = ({ card,
         <div className="w-full text-left space-y-2">
           <div className="flex items-center justify-between">
             <h4 className="font-black text-lg text-white">{card.nameKr}</h4>
-            <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+            <span className="text-xs font-mono font-bold text-[#f97316] bg-[#111520] border border-[#f97316]/40 px-2.5 py-0.5">
               {isChar ? `Lv.${(card as CharacterCard).level}` : card.code}
             </span>
           </div>
           {card.description && (
-            <p className="text-sm text-slate-200 leading-relaxed bg-slate-900/90 p-3.5 rounded-xl border border-slate-800 font-medium whitespace-pre-line">
-              {card.description}
-            </p>
+            <div className="text-sm text-slate-200 leading-relaxed bg-[#090d16] p-3.5 border border-white/10 font-medium whitespace-pre-line">
+              {formatEffectText(card.description, 'md')}
+            </div>
           )}
         </div>
       </div>

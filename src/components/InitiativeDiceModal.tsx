@@ -269,12 +269,18 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
   const isP1Win = winnerIndex === 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-lg animate-in fade-in duration-200 select-none">
-      <div className="relative w-full max-w-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl flex flex-col items-center overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
+      <div className="relative w-full max-w-2xl bg-[#0c101b]/95 border border-[#f97316]/60 p-6 sm:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center overflow-hidden">
+        {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
+        <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
+        <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
+
         {/* 상단 스킵 버튼 */}
         <button
           onClick={handleSkip}
-          className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer border border-slate-700"
+          className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer border border-white/15 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
           title="주사위 연출을 건너뛰고 즉시 게임을 시작합니다"
         >
           <span>스킵</span>
@@ -283,8 +289,8 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
         {/* 상단 타이틀 */}
         <div className="text-center space-y-1.5 mb-8">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-black tracking-wider shadow-inner">
-            <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" style={{ animationDuration: '4s' }} />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#111520] border border-[#f97316]/40 text-[#f97316] text-xs font-black tracking-wider shadow-inner">
+            <Sparkles className="w-3.5 h-3.5 text-[#f97316] animate-spin" style={{ animationDuration: '4s' }} />
             <span>선공/후공 결정전 (INITIATIVE ROLL)</span>
           </div>
           <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide flex items-center justify-center gap-2">
@@ -436,14 +442,14 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
                 {/* 선공 선택 */}
                 <button
                   onClick={() => handleChooseOrder('FIRST')}
-                  className="group relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-amber-500/20 via-slate-900 to-slate-950 border-2 border-amber-500/70 hover:border-amber-400 hover:from-amber-500/30 text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                  className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border border-[#f97316]/70 hover:border-[#f97316] text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs sm:text-sm font-black text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
+                    <span className="text-xs sm:text-sm font-black text-[#f97316] uppercase tracking-wide flex items-center gap-1.5">
+                      <Zap className="w-4 h-4 text-[#f97316] fill-[#f97316]" />
                       선공 (First)
                     </span>
-                    <span className="text-[10px] bg-amber-500/30 text-amber-300 px-1.5 py-0.5 rounded font-bold">
+                    <span className="text-[10px] bg-[#f97316]/20 text-[#f97316] px-1.5 py-0.5 border border-[#f97316]/40 font-bold">
                       1턴 선제
                     </span>
                   </div>
@@ -455,14 +461,14 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
                 {/* 후공 선택 */}
                 <button
                   onClick={() => handleChooseOrder('SECOND')}
-                  className="group relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-cyan-500/20 via-slate-900 to-slate-950 border-2 border-cyan-500/70 hover:border-cyan-400 hover:from-cyan-500/30 text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                  className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border border-[#22d3ee]/70 hover:border-[#22d3ee] text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs sm:text-sm font-black text-cyan-300 uppercase tracking-wide flex items-center gap-1.5">
-                      <Shield className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs sm:text-sm font-black text-[#22d3ee] uppercase tracking-wide flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-[#22d3ee]" />
                       후공 (Second)
                     </span>
-                    <span className="text-[10px] bg-cyan-500/30 text-cyan-300 px-1.5 py-0.5 rounded font-bold">
+                    <span className="text-[10px] bg-[#22d3ee]/20 text-[#22d3ee] px-1.5 py-0.5 border border-[#22d3ee]/40 font-bold">
                       대응 반격
                     </span>
                   </div>
@@ -476,7 +482,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
           {/* 2P(AI) 승리 시 알림 배너 */}
           {phase === 'RESULT' && winnerIndex === 1 && player1.isAi && (
-            <div className="w-full py-3 px-5 rounded-2xl text-center font-black bg-purple-950/80 border border-purple-500/80 text-purple-300 shadow-xl shadow-purple-500/20 flex flex-col items-center justify-center gap-1 animate-in zoom-in-95 duration-200">
+            <div className="w-full py-3 px-5 text-center font-black bg-purple-950/80 border border-purple-500/80 text-purple-300 shadow-xl shadow-purple-500/20 flex flex-col items-center justify-center gap-1 animate-in zoom-in-95 duration-200 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]">
               <div className="flex items-center gap-2 text-sm sm:text-base">
                 <Swords className="w-5 h-5 text-purple-400" />
                 <span>⚔️ [{player1.name}] 주사위 승리!</span>
@@ -490,7 +496,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
           {/* 2P(사람 대전) 승리 시 선택 UI */}
           {phase === 'RESULT' && winnerIndex === 1 && !player1.isAi && (
             <div className="w-full space-y-3 animate-in fade-in zoom-in-95 duration-200">
-              <div className="py-2 px-4 rounded-2xl text-center font-black bg-purple-950/80 border border-purple-500/80 text-purple-300 shadow-xl shadow-purple-500/20 flex items-center justify-center gap-2">
+              <div className="py-2 px-4 text-center font-black bg-purple-950/80 border border-purple-500/80 text-purple-300 shadow-xl shadow-purple-500/20 flex items-center justify-center gap-2 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]">
                 <Crown className="w-4 h-4 text-purple-400" />
                 <span className="text-xs sm:text-sm">
                   ⚔️ 2P [{player1.name}] 주사위 승리! 선공 또는 후공을 선택하세요
@@ -500,7 +506,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
               <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <button
                   onClick={() => handleChooseOrder('FIRST')}
-                  className="group relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-purple-500/20 via-slate-900 to-slate-950 border-2 border-purple-500/70 hover:border-purple-400 hover:from-purple-500/30 text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                  className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border border-purple-500/70 hover:border-purple-400 text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs sm:text-sm font-black text-purple-300 uppercase tracking-wide flex items-center gap-1.5">
@@ -515,11 +521,11 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
                 <button
                   onClick={() => handleChooseOrder('SECOND')}
-                  className="group relative p-3.5 sm:p-4 rounded-2xl bg-gradient-to-b from-cyan-500/20 via-slate-900 to-slate-950 border-2 border-cyan-500/70 hover:border-cyan-400 hover:from-cyan-500/30 text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98]"
+                  className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border border-[#22d3ee]/70 hover:border-[#22d3ee] text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
                 >
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs sm:text-sm font-black text-cyan-300 uppercase tracking-wide flex items-center gap-1.5">
-                      <Shield className="w-4 h-4 text-cyan-400" />
+                    <span className="text-xs sm:text-sm font-black text-[#22d3ee] uppercase tracking-wide flex items-center gap-1.5">
+                      <Shield className="w-4 h-4 text-[#22d3ee]" />
                       2P 후공 (1P 선공)
                     </span>
                   </div>
@@ -535,7 +541,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
           {phase === 'READY' && (
             <button
               onClick={startRoll}
-              className="w-full py-3.5 px-6 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-slate-950 font-black text-sm sm:text-base tracking-wide shadow-xl shadow-amber-500/25 transition cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full py-3.5 px-6 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-sm sm:text-base tracking-wide shadow-[0_0_20px_rgba(249,115,22,0.3)] transition cursor-pointer flex items-center justify-center gap-2 [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
             >
               <span>🎲 주사위 굴리기 (스페이스바)</span>
             </button>

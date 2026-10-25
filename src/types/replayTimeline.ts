@@ -17,6 +17,7 @@ export interface ReplayPlayerSnapshot {
   deckCount: number;
   dropCount: number;
   handCards?: ReplayActionCardVisual[]; // 해당 시점 플레이어 손패 카드 전체 (리플레이에서 상호 확인 가능)
+  hasDominance?: boolean;
 }
 
 export interface ReplayActionCardVisual {
@@ -52,7 +53,14 @@ export interface ReplaySnapshot {
   actionCard?: ReplayActionCardVisual;
   p0ActionCard?: ReplayActionCardVisual;
   p1ActionCard?: ReplayActionCardVisual;
+  p0ActionCards?: ReplayActionCardVisual[];
+  p1ActionCards?: ReplayActionCardVisual[];
   clash?: ReplayClashVisual;
+  combo?: {
+    playerIndex: 0 | 1;
+    comboCount: number;
+    cardName?: string;
+  } | null;
   damageEvent?: {
     targetIndex: 0 | 1;
     amount: number;

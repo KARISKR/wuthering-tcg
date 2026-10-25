@@ -361,9 +361,8 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
             <ArrowLeft className="w-4 h-4 text-amber-400" />
             <span>대기실로 나가기</span>
           </button>
-          <div className="h-6 w-px bg-slate-800 hidden sm:block" />
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-yellow-600 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black shrink-0">
-            <BookmarkCheck className="w-5 h-5" />
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400/20 to-yellow-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+            <img src="/images/menu_icons/deck-preset.png" alt="덱 프리셋" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
           </div>
           <div>
             <div className="flex items-center gap-2.5">

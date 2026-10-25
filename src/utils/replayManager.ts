@@ -53,6 +53,9 @@ const MAX_REPLAYS = 20;
  */
 export function getSavedReplays(): BattleReplayData[] {
   try {
+    if (typeof localStorage === 'undefined') {
+      return [...SAMPLE_BATTLE_REPLAYS];
+    }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       // 초기 기본 샘플 리플레이 자동 시딩
@@ -99,22 +102,28 @@ export function createBattleReplayData(
   const p0Leader = players[0].slots.leader;
   const p1Leader = players[1].slots.leader;
 
+  // 깔끔하고 직관적인 단축 리플레이 ID 생성 (예: RP-261022-X0LOU)
+  const d = new Date();
+  const dateStr = `${String(d.getFullYear()).slice(2)}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const randTag = Math.random().toString(36).substring(2, 7).toUpperCase();
+  const replayId = `RP-${dateStr}-${randTag}`;
+
   return {
-    id: `replay-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: replayId,
     timestamp: Date.now(),
     gameMode,
     totalTurns,
     winner,
     p0Leader: {
       nameKr: p0Leader.nameKr || p0Leader.characterName,
-      artUrl: p0Leader.underlyingCards?.[0]?.artUrl || p0Leader.artUrl,
-      level: 0,
+      artUrl: p0Leader.artUrl || p0Leader.underlyingCards?.[0]?.artUrl || '/cards/card_images/BP01-001_방랑자(남)_1985.webp',
+      level: p0Leader.level ?? 0,
       element: p0Leader.element,
     },
     p1Leader: {
       nameKr: p1Leader.nameKr || p1Leader.characterName,
-      artUrl: p1Leader.underlyingCards?.[0]?.artUrl || p1Leader.artUrl,
-      level: 0,
+      artUrl: p1Leader.artUrl || p1Leader.underlyingCards?.[0]?.artUrl || '/cards/card_images/BP01-001_방랑자(남)_1985.webp',
+      level: p1Leader.level ?? 0,
       element: p1Leader.element,
     },
     p0Hp: players[0].hp,
@@ -143,10 +152,12 @@ export function createBattleReplayData(
  */
 export function saveReplayObject(replay: BattleReplayData): BattleReplayData {
   try {
-    const existing = getSavedReplays();
-    // 중복 방지 (동일 id) 및 최대 개수 제한(20개)
-    const updated = [replay, ...existing.filter((r) => r.id !== replay.id)].slice(0, MAX_REPLAYS);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    if (typeof localStorage !== 'undefined') {
+      const existing = getSavedReplays();
+      // 중복 방지 (동일 id) 및 최대 개수 제한(20개)
+      const updated = [replay, ...existing.filter((r) => r.id !== replay.id)].slice(0, MAX_REPLAYS);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    }
   } catch (e) {
     console.error('Failed to save battle replay:', e);
   }
@@ -172,6 +183,7 @@ export function saveBattleReplay(
  */
 export function deleteBattleReplay(replayId: string): boolean {
   try {
+    if (typeof localStorage === 'undefined') return true;
     const existing = getSavedReplays();
     const updated = existing.filter((r) => r.id !== replayId);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -187,6 +199,7 @@ export function deleteBattleReplay(replayId: string): boolean {
  */
 export function clearAllBattleReplays(): boolean {
   try {
+    if (typeof localStorage === 'undefined') return true;
     localStorage.removeItem(STORAGE_KEY);
     return true;
   } catch (e) {
@@ -240,13 +253,64 @@ export function importReplayFromJson(jsonString: string): { success: boolean; re
 }
 
 /**
+ * 리플레이 데이터를 공유용 깔끔한 리플레이 코드(ID)로 반환
+ */
+export function encodeReplayToShareCode(replay: BattleReplayData): string {
+  return replay.id;
+}
+
+/**
+ * 리플레이 코드(ID) 또는 파일/JSON 데이터로부터 리플레이 검색 및 불러오기
+ */
+export function importReplayFromCodeOrJson(input: string): { success: boolean; replay?: BattleReplayData; error?: string } {
+  try {
+    const clean = input.trim();
+    if (!clean) {
+      return { success: false, error: '리플레이 코드 또는 JSON 데이터를 입력해주세요.' };
+    }
+
+    // 1. 저장된 리플레이 ID로 검색 (예: RP-261022-X0LOU 또는 replay-...)
+    const existing = getSavedReplays();
+    const foundById = existing.find(
+      (r) => r.id.toLowerCase() === clean.toLowerCase() || r.id.toLowerCase().includes(clean.toLowerCase())
+    );
+    if (foundById) {
+      return { success: true, replay: foundById };
+    }
+
+    // 2. 단축/레거시 Base64 공유 코드 (WTRP-...) 파싱 지원
+    if (clean.startsWith('WTRP-')) {
+      const rawBase64 = clean.replace(/^WTRP-/, '');
+      const decodedJson = decodeURIComponent(
+        Array.from(atob(rawBase64))
+          .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+          .join('')
+      );
+      return importReplayFromJson(decodedJson);
+    }
+
+    // 3. 일반 JSON 데이터인 경우
+    if (clean.startsWith('{') && clean.endsWith('}')) {
+      return importReplayFromJson(clean);
+    }
+
+    return {
+      success: false,
+      error: `입력하신 코드 [${clean}]에 해당하는 리플레이를 현재 브라우저 저장소에서 찾을 수 없습니다. 다른 기기의 리플레이인 경우 [파일 불러오기]를 이용해주세요.`,
+    };
+  } catch (e: any) {
+    return { success: false, error: '유효한 리플레이 코드 또는 JSON 데이터가 아닙니다.' };
+  }
+}
+
+/**
  * File 객체로부터 리플레이 파일 불러오기
  */
 export async function importReplayFromFile(file: File): Promise<{ success: boolean; replay?: BattleReplayData; error?: string }> {
   try {
     const text = await file.text();
-    return importReplayFromJson(text);
-  } catch (err: any) {
+    return importReplayFromCodeOrJson(text);
+  } catch {
     return { success: false, error: '파일을 읽는 도중 오류가 발생했습니다.' };
   }
 }

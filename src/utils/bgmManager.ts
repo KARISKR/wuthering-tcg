@@ -13,17 +13,17 @@ export interface BgmTrack {
 
 export const LOBBY_BGM_TRACKS: BgmTrack[] = [
   {
-    id: 'lobby-1',
-    title: 'City Bathed in Sea Breeze',
-    subtitle: '05. 바닷바람 머금은 도시 (금주성 대기실)',
-    src: '/audio/bgm/lobby/05.%20City%20Bathed%20in%20Sea%20Breeze.mp3',
-    mode: 'lobby',
-  },
-  {
     id: 'lobby-2',
     title: 'The Sound of Midday Bells',
     subtitle: '06. 한낮의 종소리 (평온한 대기실)',
     src: '/audio/bgm/lobby/06.%20The%20Sound%20of%20Midday%20Bells.mp3',
+    mode: 'lobby',
+  },
+  {
+    id: 'lobby-1',
+    title: 'City Bathed in Sea Breeze',
+    subtitle: '05. 바닷바람 머금은 도시 (금주성 대기실)',
+    src: '/audio/bgm/lobby/05.%20City%20Bathed%20in%20Sea%20Breeze.mp3',
     mode: 'lobby',
   },
   {
@@ -174,6 +174,7 @@ class BgmManager {
 
   private customLobbyTracks: BgmTrack[] = [];
   private customBattleTracks: BgmTrack[] = [];
+  private lockedTrackTitle: string | null = null;
 
   constructor() {
     if (typeof window === 'undefined') return;
@@ -210,55 +211,12 @@ class BgmManager {
     }
 
     this.initAudio();
-    this.scanCustomFolderTracks();
+    // 30회 이상의 불필요한 404 HEAD 프로빙 제거하여 초기 로딩 속도 극대화
   }
 
   private async scanCustomFolderTracks() {
-    if (typeof window === 'undefined') return;
-    const numbers = ['1', '2', '3', '4', '5'];
-    const exts = ['mp3', 'wav', 'ogg'];
-
-    for (const num of numbers) {
-      for (const ext of exts) {
-        const url = `/audio/bgm/lobby/${num}.${ext}`;
-        try {
-          const res = await fetch(url, { method: 'HEAD' });
-          if (res.ok && !res.headers.get('content-type')?.includes('text/html')) {
-            this.customLobbyTracks.push({
-              id: `user-lobby-${num}`,
-              title: `커스텀 대기실 BGM #${num}`,
-              subtitle: `lobby/${num}.${ext}`,
-              src: url,
-              mode: 'lobby',
-            });
-            break;
-          }
-        } catch {}
-      }
-    }
-
-    for (const num of numbers) {
-      for (const ext of exts) {
-        const url = `/audio/bgm/battle/${num}.${ext}`;
-        try {
-          const res = await fetch(url, { method: 'HEAD' });
-          if (res.ok && !res.headers.get('content-type')?.includes('text/html')) {
-            this.customBattleTracks.push({
-              id: `user-battle-${num}`,
-              title: `커스텀 전투 BGM #${num}`,
-              subtitle: `battle/${num}.${ext}`,
-              src: url,
-              mode: 'battle',
-            });
-            break;
-          }
-        } catch {}
-      }
-    }
-
-    if (this.customLobbyTracks.length > 0 || this.customBattleTracks.length > 0) {
-      this.notify();
-    }
+    // 사용자 지정 업로드 BGM은 UI 업로드 기능으로 완전히 대체됨
+    return;
   }
 
   public getCurrentTracks(): BgmTrack[] {
@@ -393,6 +351,7 @@ class BgmManager {
   }
 
   public setMode(newMode: BgmMode) {
+    if (this.lockedTrackTitle) return; // 특정 BGM(예: 튜토리얼) 고정 시 모드 자동 전환 차단
     if (this.mode === newMode) return;
     this.mode = newMode;
     try {
@@ -417,6 +376,54 @@ class BgmManager {
           this.audio.play().catch(() => {});
         }
       }
+    }
+    this.notify();
+  }
+
+  public lockTrackByTitle(title: string) {
+    this.lockedTrackTitle = title;
+    this.playTrackByTitle(title, true);
+  }
+
+  public unlockTrack() {
+    this.lockedTrackTitle = null;
+  }
+
+  public isTrackLocked(): boolean {
+    return this.lockedTrackTitle !== null;
+  }
+
+  public playTrackByTitle(title: string, loop: boolean = true) {
+    const allTracks = [
+      ...LOBBY_BGM_TRACKS,
+      ...BATTLE_BGM_TRACKS,
+      ...this.customLobbyTracks,
+      ...this.customBattleTracks,
+    ];
+    const track = allTracks.find((t) => t.title.toLowerCase().includes(title.toLowerCase()));
+    if (!track) return;
+
+    if (this.mode !== track.mode) {
+      this.mode = track.mode;
+    }
+    const currentTracks = this.getCurrentTracks();
+    const idx = currentTracks.findIndex((t) => t.id === track.id || t.title === track.title);
+    if (idx !== -1) {
+      this.currentTrackIdx = idx;
+    }
+
+    this.isLooping = loop;
+    if (this.audio) {
+      this.audio.src = track.src;
+      this.audio.loop = loop;
+      this.applyAudioVolume();
+      this.audio
+        .play()
+        .then(() => {
+          this.isPlaying = true;
+          this.notify();
+        })
+        .catch(() => {});
     }
     this.notify();
   }
@@ -504,6 +511,10 @@ class BgmManager {
   }
 
   public playRandomTrack() {
+    if (this.lockedTrackTitle) {
+      this.playTrackByTitle(this.lockedTrackTitle, true);
+      return;
+    }
     const tracks = this.getCurrentTracks();
     if (tracks.length <= 1) {
       this.selectTrack(0);
@@ -517,6 +528,10 @@ class BgmManager {
   }
 
   public nextTrack() {
+    if (this.lockedTrackTitle) {
+      this.playTrackByTitle(this.lockedTrackTitle, true);
+      return;
+    }
     if (this.isShuffle) {
       this.playRandomTrack();
     } else {
@@ -525,6 +540,10 @@ class BgmManager {
   }
 
   public prevTrack() {
+    if (this.lockedTrackTitle) {
+      this.playTrackByTitle(this.lockedTrackTitle, true);
+      return;
+    }
     if (this.playHistory.length > 0) {
       const prevIdx = this.playHistory.pop()!;
       this.selectTrack(prevIdx, false);

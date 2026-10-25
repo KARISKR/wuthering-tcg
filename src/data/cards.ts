@@ -38,9 +38,23 @@ export const ALL_CHARACTERS: CharacterCard[] = OFFICIAL_CARDS.filter(
   };
 });
 
-// 출전 캐릭터 (Lv.0): 같은 캐릭터 중에서 가장 높은 성급 1장만 추출하여 중복 제거
-export const DEDUPED_LV0_CHARACTERS: CharacterCard[] = (() => {
-  const lv0s = ALL_CHARACTERS.filter((c) => c.level === 0);
+// 선호 정렬 순서 (방랑자 -> 양양 -> 치샤 -> 산화 -> 금희 -> 카멜리아 -> 파수인 -> 앙코 등)
+const CHAR_SORT_ORDER = ['방랑자(여)', '방랑자(남)', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
+
+function sortCharacterCards(list: CharacterCard[]): CharacterCard[] {
+  return [...list].sort((a, b) => {
+    const idxA = CHAR_SORT_ORDER.indexOf(a.nameKr);
+    const idxB = CHAR_SORT_ORDER.indexOf(b.nameKr);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return a.nameKr.localeCompare(b.nameKr);
+  });
+}
+
+// 1. 일반(표준 1~2성) 출전 캐릭터 (Lv.0): PR 카드를 제외하고 일반 카드 중 1장씩 선별
+export const STANDARD_LV0_CHARACTERS: CharacterCard[] = (() => {
+  const lv0s = ALL_CHARACTERS.filter((c) => c.level === 0 && !c.rarity?.startsWith('PR'));
   const map = new Map<string, CharacterCard>();
   lv0s.forEach((c) => {
     const key = c.nameKr;
@@ -49,18 +63,31 @@ export const DEDUPED_LV0_CHARACTERS: CharacterCard[] = (() => {
       map.set(key, c);
     }
   });
-
-  // 선호 정렬 순서 (방랑자 -> 양양 -> 치샤 -> 산화 -> 금희 -> 카멜리아 -> 파수인 -> 앙코 등)
-  const order = ['방랑자(여)', '방랑자(남)', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
-  return Array.from(map.values()).sort((a, b) => {
-    const idxA = order.indexOf(a.nameKr);
-    const idxB = order.indexOf(b.nameKr);
-    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-    if (idxA !== -1) return -1;
-    if (idxB !== -1) return 1;
-    return a.nameKr.localeCompare(b.nameKr);
-  });
+  return sortCharacterCards(Array.from(map.values()));
 })();
+
+// 2. 프로모션(PR) 출전 캐릭터 (Lv.0): PR 카드만 선별
+export const PR_LV0_CHARACTERS: CharacterCard[] = (() => {
+  const lv0s = ALL_CHARACTERS.filter((c) => c.level === 0 && Boolean(c.rarity?.startsWith('PR')));
+  const map = new Map<string, CharacterCard>();
+  lv0s.forEach((c) => {
+    const key = c.nameKr;
+    const existing = map.get(key);
+    if (!existing || getRarityScore(c.rarity) > getRarityScore(existing.rarity)) {
+      map.set(key, c);
+    }
+  });
+  return sortCharacterCards(Array.from(map.values()));
+})();
+
+// 3. 전체 출전 캐릭터 (Lv.0) - 일반(1~2성)과 PR 카드를 분리하여 모두 제공
+export const ALL_LV0_CHARACTERS: CharacterCard[] = [
+  ...STANDARD_LV0_CHARACTERS,
+  ...PR_LV0_CHARACTERS,
+];
+
+// 기본 출전 캐릭터 (Lv.0 기본값): 모든 캐릭터가 PR로 강제 도배되는 것을 막기 위해 일반(1~2성) 카드를 기본값으로 제공
+export const DEDUPED_LV0_CHARACTERS: CharacterCard[] = STANDARD_LV0_CHARACTERS;
 
 // 공식 데이터베이스에서 액션 카드 템플릿 추출 (동일 코드 중 가장 높은 성급 1장씩 선별하여 중복 제거: 총 78종)
 export const ACTION_CARD_TEMPLATES: ActionCard[] = (() => {
@@ -83,10 +110,11 @@ export const ACTION_CARD_TEMPLATES: ActionCard[] = (() => {
     speed: c.speed ?? undefined,
     damage: c.damage,
     pursuitCount: c.pursuitCount ?? undefined,
-    characterExclusive: c.characterExclusive ?? undefined,
+    characterExclusive: (c.characterExclusive === '일반' || c.characterExclusive === '-' ? undefined : c.characterExclusive) ?? undefined,
     description: c.description,
     artUrl: c.artUrl,
     rarity: c.rarity,
+    feature: c.feature,
   }));
 })();
 

@@ -67,11 +67,7 @@ function baseCodeOf(code?: string): string {
 
 // BP01-062 그늘이의 대폭주 우세 코스트 감소(-1) 및 SD01-016 적색 코스트 페널티(+1)를 모두 반영한 실제 코스트
 export function comboCostOf(p: PlayerState, c: ActionCard): number {
-  let cost = getEffectiveCardCost(p, c);
-  if (baseCodeOf(c.code) === 'BP01-062' && p.hasDominance) {
-    cost = Math.max(0, cost - 1);
-  }
-  return cost;
+  return getEffectiveCardCost(p, c);
 }
 
 function canPlay(
@@ -105,13 +101,120 @@ function isComboTerminator(c: ActionCard): boolean {
   return code === 'BP01-074' || code === 'BP01-061';
 }
 
-// 특정 캐릭터 슬롯이特定 카드 코드를 보유(중첩 포함) 중인지 확인
+// 특정 캐릭터 슬롯이 특정 카드 코드를 보유(중첩 포함) 중인지 확인
 function slotHasCode(slot: CharacterCard | null | undefined, codePrefix: string): boolean {
   return getAllCardsInSlot(slot).some((c) => baseCodeOf(c.code) === codePrefix);
 }
 
 function playerFieldHasCode(p: PlayerState, codePrefix: string): boolean {
   return SLOT_KEYS.some((k) => slotHasCode(p.slots[k], codePrefix));
+}
+
+// 【콤보】 전용 효과를 가진 카드인지 판별 (대결 오프너로 소모하지 않고 연격 스텝에서 핵심 활용해야 하는 카드)
+function isComboOnlyEffectCard(c: ActionCard): boolean {
+  if (isIntroSkillCard(c)) return true;
+  const code = baseCodeOf(c.code);
+  return (
+    code === 'BP01-050' || // 넝쿨의 춤: 【콤보】 일반 공격 2장 이상 시 +1 데미지
+    code === 'BP01-065' || // 소리의 변화·강공격(여): 【콤보】 패 1장 버리고 +1 데미지
+    code === 'BP01-067' || // 소리의 변화·강공격(남): 【콤보】 패 1장 버리고 +1 데미지
+    code === 'BP01-071' || // 복성재우: 【콤보】 직전 카드가 <체공>이면 협주 +1
+    code === 'SD02-011'    // 만물의 정화: 【콤보】 액션 에리어 3장 이상 시 +3 데미지
+  );
+}
+
+// 대결(【배틀】/【판정】)에서만 고유 효과가 발동하는 적색 카드인지 판별 (무지성 연격 덤핑 방지 대상)
+function isPureClashEffectRedCard(c: ActionCard): boolean {
+  if (c.color !== 'RED') return false;
+  const code = baseCodeOf(c.code);
+  return (
+    code === 'SD01-015' || // 점프: 【판정】 승리 시 1드로우 + 추격 1 (0 데미지)
+    code === 'SD01-020' || // 스캔: 【판정】 승리 시 1드로우 + 패 확인 (0 데미지)
+    code === 'SD02-020' || // 스캔: 【판정】 승리 시 1드로우 + 패 확인 (0 데미지)
+    code === 'BP01-047' || // 육성·강공격: 【판정】 승리 시 1드로우
+    code === 'BP01-048' || // 피어난 동백꽃: 【배틀】 카멜리아 레벨업 (스피드 14)
+    code === 'BP01-051' || // 회전의 춤: 【판정】 승리 시 1드로우
+    code === 'BP01-056' || // 혼돈의 이론: 【판정】 승리 시 파수인 레벨업 (스피드 11)
+    code === 'BP01-059' || // 그늘이와 구름이 출격·일반 공격: 【우세】【배틀】 스피드 10
+    code === 'BP01-062' || // 그늘이의 대폭주: 【배틀】 앙코 Lv.2 진화 및 리더 교체
+    code === 'BP01-066' || // 소리의 변화·공중 공격(여): 【판정】 승리 시 1드로우
+    code === 'BP01-068'    // 소리의 변화·공중 공격(남): 【판정】 승리 시 1드로우
+  );
+}
+
+// <변주 스킬> 카드를 현재 슬롯 상태에서 사용했을 때 고유 변주 보너스가 발동하는지 판별
+function canIntroSkillTriggerBonus(
+  p: PlayerState,
+  slots: { leader: CharacterCard; leftSupport?: CharacterCard | null; rightSupport?: CharacterCard | null },
+  c: ActionCard
+): boolean {
+  if (!isIntroSkillCard(c)) return false;
+  const code = baseCodeOf(c.code);
+  const targetName = getIntroSkillTargetChar(c);
+  if (!targetName) return false;
+
+  // 팔천의 춘추 [BP01-046]: 「카멜리아」가 서포터에서 리더로 교체 진입할 때만 레벨업 발동!
+  if (code === 'BP01-046') {
+    const camInSup = (['leftSupport', 'rightSupport'] as const).find((k) =>
+      doesCharMatchIntroTarget(slots[k], '카멜리아')
+    );
+    if (!camInSup || !slots[camInSup]) return false;
+    const camCard = slots[camInSup]!;
+    return Boolean(findEvolutionCard(p.characterDeck, camCard));
+  }
+
+  const leaderMatches = doesCharMatchIntroTarget(slots.leader, targetName);
+  const supMatches = (['leftSupport', 'rightSupport'] as const).some((k) =>
+    doesCharMatchIntroTarget(slots[k], targetName)
+  );
+  if (!leaderMatches && !supMatches) return false;
+
+  // 계발 [BP01-054]: 파수인 교체 시 생명력 1 회복 (이미 풀피이고 파수인 힐 패시브도 없으면 회복 이득 없음)
+  if (code === 'BP01-054' && p.hp >= p.maxHp && !playerFieldHasCode(p, 'BP01-006')) {
+    return false;
+  }
+
+  // 양들의 도움 [BP01-063]: 앙코 교체 시 트래시에서 <변주 스킬> 외의 앙코 적색 카드 1장 회수
+  if (code === 'BP01-063') {
+    return p.dropZone.some(
+      (dc) =>
+        dc.kind === 'ACTION' &&
+        (dc as ActionCard).color === 'RED' &&
+        (dc as ActionCard).characterExclusive?.includes('앙코') &&
+        !isIntroSkillCard(dc as ActionCard)
+    );
+  }
+
+  return true;
+}
+
+// <변주 스킬> 사용 시 교체되어 들어올 최적 서포터 슬롯 반환
+function pickIntroSkillSwapSlot(
+  p: PlayerState,
+  opp: PlayerState,
+  slots: { leader: CharacterCard; leftSupport?: CharacterCard | null; rightSupport?: CharacterCard | null },
+  c: ActionCard
+): 'leftSupport' | 'rightSupport' | null {
+  const targetName = getIntroSkillTargetChar(c);
+  const matchedSup = (['leftSupport', 'rightSupport'] as const).find((k) =>
+    doesCharMatchIntroTarget(slots[k], targetName)
+  );
+  if (matchedSup && slots[matchedSup]) return matchedSup;
+
+  // 파수인 Lv.1 [BP01-008] 【교체】 스킬을 보유한 서포터가 있다면 우선 고려
+  const shorekeeperSup = (['leftSupport', 'rightSupport'] as const).find((k) =>
+    slotHasCode(slots[k], 'BP01-008')
+  );
+  if (shorekeeperSup && slots[shorekeeperSup]) return shorekeeperSup;
+
+  const lChar = slots.leftSupport;
+  const rChar = slots.rightSupport;
+  if (lChar && rChar) {
+    const lScore = leaderScore(p, opp, lChar, 1);
+    const rScore = leaderScore(p, opp, rChar, 1);
+    return lScore >= rScore ? 'leftSupport' : 'rightSupport';
+  }
+  return lChar ? 'leftSupport' : rChar ? 'rightSupport' : null;
 }
 
 // ----------------------------------------------------------
@@ -124,12 +227,22 @@ function estimateCardDamage(
   leader: CharacterCard | undefined = p.slots.leader,
   isComboStep = false,
   virtualActionArea: ActionCard[] = p.actionArea || [],
-  firstNormalAttackUsed = Boolean(p.actionFlags?.firstNormalAttackBonusUsed)
+  firstNormalAttackUsed = Boolean(p.actionFlags?.firstNormalAttackBonusUsed),
+  curSlots: { leader: CharacterCard; leftSupport?: CharacterCard | null; rightSupport?: CharacterCard | null } = p.slots
 ): number {
   const code = baseCodeOf(c.code);
   let dmg = c.damage;
 
-  const leaderCards = getAllCardsInSlot(leader);
+  // 연격 스텝에서 <변주 스킬>을 사용하는 경우 리더 교체가 먼저 일어난 뒤 리더 패시브가 적용됨
+  let effectiveLeader = leader;
+  if (isComboStep && isIntroSkillCard(c)) {
+    const swapSlot = pickIntroSkillSwapSlot(p, opp, curSlots, c);
+    if (swapSlot && curSlots[swapSlot]) {
+      effectiveLeader = curSlots[swapSlot]!;
+    }
+  }
+
+  const leaderCards = getAllCardsInSlot(effectiveLeader);
 
   // 1. 리더/필드 상시 데미지 버프
   if (!isComboStep) {
@@ -149,8 +262,8 @@ function estimateCardDamage(
     if (c.color === 'RED' && leaderCards.some((lc) => baseCodeOf(lc.code) === 'SD02-005')) {
       dmg += 1;
     }
-    // 변주 스킬 보너스 데미지 (도약의 불빛 SD01-009, 반룡의 빛 SD02-009)
-    if (code === 'SD01-009' || code === 'SD02-009') {
+    // 변주 스킬 보너스 데미지 (도약의 불빛 SD01-009, 반룡의 빛 SD02-009): 대상 캐릭터가 실제로 교체될 때만 +2!
+    if ((code === 'SD01-009' || code === 'SD02-009') && canIntroSkillTriggerBonus(p, curSlots, c)) {
       dmg += 2;
     }
   }
@@ -184,26 +297,26 @@ function estimateCardDamage(
     dmg += 2;
   }
 
-  // 2. 개별 액션 카드 조건부 데미지
-  // SD02-011 만물의 정화: 액션 에리어 3장 이상일 때 +3 (이 카드를 낼 때 virtualActionArea.length + 1 >= 3)
-  if (code === 'SD02-011' && virtualActionArea.length + 1 >= 3) {
+  // 2. 개별 액션 카드 조건부 데미지 (【콤보】 전용 조건부 데미지는 isComboStep일 때만 발동!)
+  // SD02-011 만물의 정화: 【콤보】 액션 에리어 3장 이상일 때 +3
+  if (isComboStep && code === 'SD02-011' && virtualActionArea.length + 1 >= 3) {
     dmg += 3;
   }
-  // BP01-050 넝쿨의 춤: 액션 에리어에 일반 공격 2장 이상일 때 +1
-  if (code === 'BP01-050') {
+  // BP01-050 넝쿨의 춤: 【콤보】 액션 에리어에 일반 공격 2장 이상일 때 +1
+  if (isComboStep && code === 'BP01-050') {
     const normalCount = [...virtualActionArea, c].filter(isNormalAttackCard).length;
     if (normalCount >= 2) dmg += 1;
   }
-  // BP01-055 근원의 추구·강공격: 내 체력이 상대보다 많으면 +1
+  // BP01-055 근원의 추구·강공격: 내 체력이 상대보다 많으면 +1 (상시 효과)
   if (code === 'BP01-055' && p.hp > opp.hp) {
     dmg += 1;
   }
-  // BP01-074 승천하는 용: 액션 에리어 카드 1장당 +1
+  // BP01-074 승천하는 용: 액션 에리어 카드 1장당 +1 (배틀/콤보 모두 가능하나 콤보에서 누적)
   if (code === 'BP01-074') {
     dmg += virtualActionArea.length;
   }
-  // BP01-065 / BP01-067 소리의 변화·강공격: 패 1장 버리고 +1
-  if ((code === 'BP01-065' || code === 'BP01-067') && p.hand.length >= 2) {
+  // BP01-065 / BP01-067 소리의 변화·강공격: 【콤보】 패 1장 버리고 +1
+  if (isComboStep && (code === 'BP01-065' || code === 'BP01-067') && p.hand.length >= 2) {
     dmg += 1;
   }
 
@@ -264,10 +377,13 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
       };
 
       // 대결 오프너 후보: 현재 협주(+extraConc)로 사용 가능한 카드들
-      const openers = p.hand.filter((c) => {
+      const allPlayableOpeners = p.hand.filter((c) => {
         const cost = comboCostOf(p, c);
         return p.concertoZone.length + extraConc >= cost && canPlayerUseActionCard(startSlots, c, []).canUse;
       });
+      // <변주 스킬>은 스피드 0 / 데미지 0의 【콤보】 전용 카드이므로 다른 오프너가 있으면 대결 오프너 후보에서 제외하여 연격용으로 보존!
+      const nonIntroOpeners = allPlayableOpeners.filter((c) => !isIntroSkillCard(c));
+      const openers = nonIntroOpeners.length > 0 ? nonIntroOpeners : allPlayableOpeners;
 
       for (const opener of openers) {
         const openerCode = baseCodeOf(opener.code);
@@ -322,7 +438,16 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
           curConcerto += 1;
         }
 
-        let totalDmg = estimateCardDamage(p, opp, opener, curLeader, false, [], Boolean(p.actionFlags?.firstNormalAttackBonusUsed));
+        let totalDmg = estimateCardDamage(
+          p,
+          opp,
+          opener,
+          curLeader,
+          false,
+          [],
+          Boolean(p.actionFlags?.firstNormalAttackBonusUsed),
+          curSlots
+        );
 
         // 2) 대결 승리 시 연격 가능 횟수 계산
         const comboUnlimited = opener.color === 'RED' && !isComboTerminator(opener);
@@ -389,20 +514,28 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
           const cCode = baseCodeOf(nextCard.code);
           curConcerto -= cCost;
 
-          // 변주 스킬 리더 교체 시뮬레이션
+          // 변주 스킬 리더 교체 시뮬레이션 (데미지 계산 전에 교체가 수행되나 estimateCardDamage가 curSlots 기준으로 처리)
+          const stepDmg = estimateCardDamage(
+            p,
+            opp,
+            nextCard,
+            curLeader,
+            true,
+            virtualActionArea,
+            firstNormalUsed,
+            curSlots
+          );
+
           if (isIntroSkillCard(nextCard)) {
-            const targetName = getIntroSkillTargetChar(nextCard);
-            const matchedSup = (['leftSupport', 'rightSupport'] as const).find((k) =>
-              doesCharMatchIntroTarget(curSlots[k], targetName)
-            );
-            const swapKey = matchedSup || (curSlots.leftSupport ? 'leftSupport' : 'rightSupport');
+            const swapKey = pickIntroSkillSwapSlot(p, opp, curSlots, nextCard);
+            const bonusTriggered = canIntroSkillTriggerBonus(p, curSlots, nextCard);
             if (swapKey && curSlots[swapKey]) {
               const prevL = curSlots.leader;
               curSlots.leader = curSlots[swapKey]!;
               curSlots[swapKey] = prevL;
               curLeader = curSlots.leader;
             }
-            if (cCode === 'SD01-014' || cCode === 'SD02-014') {
+            if ((cCode === 'SD01-014' || cCode === 'SD02-014') && bonusTriggered) {
               curConcerto += 1; // 숨결 / 차가운 눈꽃 협주 +1
             }
             if (cCode === 'BP01-046' && curLeader.characterName === '카멜리아' && curLeader.level < 2) {
@@ -416,15 +549,6 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
             curConcerto += 1;
           }
 
-          const stepDmg = estimateCardDamage(
-            p,
-            opp,
-            nextCard,
-            curLeader,
-            true,
-            virtualActionArea,
-            firstNormalUsed
-          );
           totalDmg += stepDmg;
           if (nextCard.characterExclusive?.includes('앙코') && isNormalAttackCard(nextCard)) {
             firstNormalUsed = true;
@@ -451,6 +575,7 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
           totalDmg +
           (isOtk ? 50 : 0) +
           (opener.color === 'RED' ? (opener.speed ?? 0) * 0.25 : 0.5) -
+          (isComboOnlyEffectCard(opener) ? 2.5 : 0) -
           (extraConc * 1.5);
 
         const bestScoreSoFar =
@@ -493,11 +618,83 @@ function pickBestNextComboCard(
 ): ActionCard | null {
   if (playableReds.length === 0) return null;
 
+  const lastActionCard = virtualActionArea[virtualActionArea.length - 1] || null;
+  const lastWasAerial = isAerialCard(lastActionCard);
+  const hasBp01071InList = playableReds.some((c) => baseCodeOf(c.code) === 'BP01-071');
+  const hasNormalAttackScalingCard = playableReds.some((c) => baseCodeOf(c.code) === 'BP01-050');
+  const hasActionAreaScalingCard = playableReds.some(
+    (c) => baseCodeOf(c.code) === 'SD02-011' || baseCodeOf(c.code) === 'BP01-074'
+  );
+
+  // 0순위: 연격 스텝에서 아무런 의미 없는 카드(0데미지 판정 전용 카드 및 무효 변주 스킬) 사전 필터링!
+  const meaningfulReds = playableReds.filter((c) => {
+    const code = baseCodeOf(c.code);
+    const dmg = estimateCardDamage(p, opp, c, curSlots.leader, true, virtualActionArea, firstNormalUsed, curSlots);
+
+    // 킬각이면 무조건 허용
+    if (dmg >= remainingOppHp && remainingOppHp > 0) return true;
+
+    // 스캔(SD01-020, SD02-020): 【판정】 전용 0데미지 카드 -> 연격에서 무지성 소모 금지 (만물의 정화/승천하는 용 장수 채우기나 버프 딜이 있을 때만 허용)
+    if (code === 'SD01-020' || code === 'SD02-020') {
+      return dmg >= 2 || hasActionAreaScalingCard;
+    }
+
+    // 점프(SD01-015): 【판정】 전용 0데미지 <체공> 카드 -> 복성재우(BP01-071) 연계나 장수 조건부 카드가 있을 때만 연격 허용!
+    if (code === 'SD01-015') {
+      return (hasBp01071InList && !lastWasAerial) || hasActionAreaScalingCard || dmg >= 2;
+    }
+
+    // <변주 스킬> 카드: 변주 보너스가 발동하거나, 파수인 Lv.1 [BP01-008] 교체 효과가 발동하거나,
+    // 결말의 순환 [BP01-057] 드로우가 켜져 있거나, 교체 시 남은 연격 카드를 강화/해금하는 경우에만 사용!
+    if (isIntroSkillCard(c)) {
+      const targetChar = getIntroSkillTargetChar(c);
+      const targetAlreadyLeader = Boolean(targetChar && curSlots.leader?.characterName === targetChar);
+      const alreadySwappedInCombo = virtualActionArea.some((prev) => isIntroSkillCard(prev));
+      const bonusOk = canIntroSkillTriggerBonus(p, curSlots, c);
+      const swapKey = pickIntroSkillSwapSlot(p, opp, curSlots, c);
+      const nextLeader = swapKey ? curSlots[swapKey] : null;
+      const triggersShorekeeperSwitch =
+        slotHasCode(curSlots.leader, 'BP01-008') || slotHasCode(nextLeader, 'BP01-008');
+      const triggersBp057Draw = Boolean(p.introSkillBonusDrawCount && p.introSkillBonusDrawCount > 0);
+      const unlocksLeaderSkillInHand = Boolean(
+        nextLeader &&
+          p.hand.some(
+            (h) =>
+              h.id !== c.id &&
+              h.color === 'RED' &&
+              !canPlayerUseActionCard(curSlots, h, virtualActionArea).canUse &&
+              canPlayerUseActionCard({ ...curSlots, leader: nextLeader }, h, virtualActionArea).canUse
+          )
+      );
+      const unlocksOrBuffsCombo = Boolean(
+        nextLeader &&
+          (unlocksLeaderSkillInHand ||
+            (!targetAlreadyLeader &&
+              (slotHasCode(nextLeader, 'SD02-005') ||
+                slotHasCode(nextLeader, 'BP01-001') ||
+                slotHasCode(nextLeader, 'BP01-025'))))
+      );
+
+      // ★ 이미 해당 변주 스킬의 대상 캐릭터가 리더에 나와 있거나 이번 연격에서 이미 변주 교체를 수행한 경우,
+      // 0데미지 유틸 변주 스킬(차가운 눈꽃, 숨결, 계발 등)로 다시 리더를 되돌리는 핑퐁(역스왑) 금지!
+      // (단, 파수인 Lv.1 [BP01-008] 교체 효과 발동, 결말의 순환 드로우, 손패의 리더 전용 스킬 해금은 예외)
+      if ((targetAlreadyLeader || alreadySwappedInCombo) && c.damage === 0) {
+        return triggersShorekeeperSwitch || triggersBp057Draw || unlocksLeaderSkillInHand;
+      }
+
+      return bonusOk || triggersShorekeeperSwitch || triggersBp057Draw || unlocksOrBuffsCombo || dmg >= 2;
+    }
+
+    return true;
+  });
+
+  if (meaningfulReds.length === 0) return null;
+
   // 1순위: 단일 카드로 즉시 킬각(Lethal)이 나오는 경우 코스트가 가장 낮은 킬 카드 즉시 선택!
-  const immediateLethals = playableReds
+  const immediateLethals = meaningfulReds
     .map((c) => ({
       c,
-      dmg: estimateCardDamage(p, opp, c, curSlots.leader, true, virtualActionArea, firstNormalUsed),
+      dmg: estimateCardDamage(p, opp, c, curSlots.leader, true, virtualActionArea, firstNormalUsed, curSlots),
       cost: comboCostOf(p, c),
     }))
     .filter((x) => x.dmg >= remainingOppHp)
@@ -507,17 +704,20 @@ function pickBestNextComboCard(
     return immediateLethals[0].c;
   }
 
-  const lastActionCard = virtualActionArea[virtualActionArea.length - 1] || null;
-  const lastWasAerial = isAerialCard(lastActionCard);
-  const hasBp01071InList = playableReds.some((c) => baseCodeOf(c.code) === 'BP01-071');
-  const hasNormalAttackScalingCard = playableReds.some((c) => baseCodeOf(c.code) === 'BP01-050');
-  const hasActionAreaScalingCard = playableReds.some(
-    (c) => baseCodeOf(c.code) === 'SD02-011' || baseCodeOf(c.code) === 'BP01-074'
-  );
-  const nonTerminatorCount = playableReds.filter((c) => !isComboTerminator(c)).length;
+  const nonTerminatorCount = meaningfulReds.filter((c) => !isComboTerminator(c)).length;
 
-  // 현재 리더 전용 【리더 스킬】 카드가 아직 손에 남아있는지 확인 (변주 스킬로 리더가 바뀌면 못 쓰게 되므로!)
-  const hasCurrentLeaderExclusiveSkill = playableReds.some(
+  // 현재 리더가 적색 연격 데미지 버프(금희 Lv.2 SD02-005, 카멜리아 Lv.2 BP01-001, 앙코 Lv.0 BP01-015, 치샤 Lv.2 BP01-025)를 보유 중인지 확인
+  const currentLeaderHasComboBuff =
+    slotHasCode(curSlots.leader, 'SD02-005') ||
+    slotHasCode(curSlots.leader, 'BP01-001') ||
+    slotHasCode(curSlots.leader, 'BP01-025') ||
+    (slotHasCode(curSlots.leader, 'BP01-015') && !firstNormalUsed);
+
+  // 현재 리더 전용 【리더 스킬】이나 버프 받을 일반 공격 카드가 아직 손에 남아있는지 확인
+  const hasOtherNonIntroRedAttacks = meaningfulReds.some(
+    (c) => !isIntroSkillCard(c) && !isComboTerminator(c)
+  );
+  const hasCurrentLeaderExclusiveSkill = meaningfulReds.some(
     (c) =>
       !isIntroSkillCard(c) &&
       !isComboTerminator(c) &&
@@ -525,11 +725,11 @@ function pickBestNextComboCard(
       canPlayerUseActionCard(curSlots, c, virtualActionArea).canUse
   );
 
-  const scored = playableReds.map((c) => {
+  const scored = meaningfulReds.map((c) => {
     const code = baseCodeOf(c.code);
     const cost = comboCostOf(p, c);
-    const dmg = estimateCardDamage(p, opp, c, curSlots.leader, true, virtualActionArea, firstNormalUsed);
-    let priority = dmg * 10 - cost * 6;
+    const dmg = estimateCardDamage(p, opp, c, curSlots.leader, true, virtualActionArea, firstNormalUsed, curSlots);
+    let priority = dmg * 12 - cost * 6;
 
     // [규칙 0] 연격 강제 종료 카드(BP01-074 승천하는 용, BP01-061 그늘이와 구름이)는 다른 연격 카드가 남아있으면 무조건 맨 마지막에 사용!
     if (isComboTerminator(c) && nonTerminatorCount > 0) {
@@ -539,52 +739,90 @@ function pickBestNextComboCard(
     // [규칙 1] <체공> -> BP01-071 (복성재우) 협주 +1 시너지 시퀀싱
     if (code === 'BP01-071') {
       if (lastWasAerial) {
-        priority += 500; // 직전 카드가 체공이면 최우선 발동하여 공짜 협주 +1 획득!
-      } else if (playableReds.some((otherCard) => otherCard.id !== c.id && isAerialCard(otherCard))) {
-        priority -= 250; // 손에 체공 카드가 있다면 체공 카드를 먼저 내도록 대기!
+        priority += 520; // 직전 카드가 체공이면 최우선 발동하여 공짜 협주 +1 획득!
+      } else if (meaningfulReds.some((otherCard) => otherCard.id !== c.id && isAerialCard(otherCard))) {
+        priority -= 280; // 손에 체공 카드가 있다면 체공 카드를 먼저 내도록 대기!
       }
     }
     if (isAerialCard(c) && hasBp01071InList && !lastWasAerial) {
-      priority += 400; // 복성재우 발동을 위해 체공 카드를 먼저 시전!
+      priority += 420; // 복성재우 발동을 위해 체공 카드를 먼저 시전!
     }
 
-    // [규칙 2] 0코스트 협주 충전 / 드로우 / 회수 / 진화 연격 카드는 선행 발동
-    if (code === 'BP01-046' || code === 'BP01-062' || code === 'BP01-048') {
-      priority += 280; // 진화 및 주력 딜러 리더 등판을 먼저 수행하여 후속 카드 딜량 증폭
+    // [규칙 2] 【콤보】 전용 효과 카드(변주 스킬, 넝쿨의 춤, 만물의 정화, 소리의 변화·강공격, 앙코 강공격) 적극 활용!
+    if (isComboOnlyEffectCard(c) && !isIntroSkillCard(c)) {
+      priority += 140; // 일반 대결/판정 카드보다 【콤보】 전용 카드를 연격에서 우선 사용!
     }
-    if (code === 'SD01-014' || code === 'SD02-014') {
-      priority += 220; // 0코스트 협주 +1 충전 변주 스킬
+    if (code === 'BP01-060' && slotHasCharacterSkill(curSlots.leader, '앙코')) {
+      priority += 230; // 앙코 리더일 때 적중 시 1드로우!
     }
-    if (code === 'SD01-019' || code === 'SD02-019' || code === 'BP01-060' || code === 'BP01-063') {
-      priority += 190; // 0코스트 드로우 / 트래시 적색 회수
+    if ((code === 'BP01-065' || code === 'BP01-067') && p.hand.length >= 2) {
+      priority += 160; // 소리의 변화·강공격 【콤보】 데미지 +1
     }
 
-    // [규칙 2-B] 단, 변주 스킬을 써서 현재 리더가 후열로 내려가면 현재 리더의 【리더 스킬】을 못 쓰게 되는 경우 방지
-    if (isIntroSkillCard(c) && hasCurrentLeaderExclusiveSkill && code !== 'BP01-046') {
-      const targetName = getIntroSkillTargetChar(c);
-      if (!doesCharMatchIntroTarget(curSlots.leader, targetName)) {
-        priority -= 180;
+    // [규칙 2-B] <변주 스킬> 정밀 시퀀싱 (리더 버프 유지 vs 선행 교체)
+    if (isIntroSkillCard(c)) {
+      const bonusOk = canIntroSkillTriggerBonus(p, curSlots, c);
+      const swapKey = pickIntroSkillSwapSlot(p, opp, curSlots, c);
+      const nextLeader = swapKey ? curSlots[swapKey] : null;
+      const nextLeaderHasComboBuff = Boolean(
+        nextLeader &&
+          (slotHasCode(nextLeader, 'SD02-005') ||
+            slotHasCode(nextLeader, 'BP01-001') ||
+            slotHasCode(nextLeader, 'BP01-025'))
+      );
+
+      if (code === 'BP01-046' && bonusOk) {
+        priority += 360; // 카멜리아 리더 진입 + 즉시 레벨업은 최우선 발동!
+      } else if (nextLeaderHasComboBuff && !currentLeaderHasComboBuff) {
+        priority += 340; // 서포터에 있던 주력 딜러(금희 Lv.2 / 카멜리아 Lv.2 등)를 리더로 먼저 끌어올려 후속 연격 전체 강화!
+      } else if (currentLeaderHasComboBuff && hasOtherNonIntroRedAttacks) {
+        // 현재 리더가 이미 강력한 연격 버퍼(금희 Lv.2 등)라면, 다른 적색 공격 카드를 먼저 다 꽂은 뒤 마지막에 변주 스킬(반룡의 빛 등)로 마무리!
+        priority -= 260;
+      } else if (hasCurrentLeaderExclusiveSkill) {
+        // 현재 리더 전용 【리더 스킬】을 먼저 쓴 뒤에 변주 스킬로 교체!
+        priority -= 240;
+      } else if (bonusOk) {
+        if (code === 'SD01-014' || code === 'SD02-014') {
+          priority += 240; // 0코스트 협주 +1 충전 변주 스킬
+        } else if (code === 'SD01-019' || code === 'SD02-019' || code === 'BP01-063') {
+          priority += 210; // 0코스트 드로우 / 트래시 적색 회수 변주 스킬
+        } else if (code === 'SD01-009' || code === 'SD02-009') {
+          priority += 190; // 도약의 불빛 / 반룡의 빛 (+2 데미지)
+        } else if (code === 'BP01-054') {
+          priority += 160; // 계발 (+1 회복)
+        }
       }
     }
 
-    // [규칙 3] <일반 공격> 카드를 넝쿨의 춤(BP01-050)이나 만물의 정화(SD02-011)보다 먼저 사용!
-    if (isNormalAttackCard(c) && cost === 0) {
-      priority += 90;
-      if (hasNormalAttackScalingCard || hasActionAreaScalingCard) {
-        priority += 80;
+    // [규칙 3] <일반 공격> 카드를 넝쿨의 춤(BP01-050), 만물의 정화(SD02-011), 치샤 Lv.2(BP01-025) 조건 충족용으로 먼저 사용!
+    if (isNormalAttackCard(c) && cost === 0 && !isComboOnlyEffectCard(c)) {
+      priority += 70;
+      if (hasNormalAttackScalingCard || hasActionAreaScalingCard || slotHasCode(curSlots.leader, 'BP01-025')) {
+        priority += 110;
       }
     }
 
-    // [규칙 4] 액션 에리어 장수 조건부 카드(SD02-011 만물의 정화, BP01-050 넝쿨의 춤)는 조건 충족 전이면 후순위로 대기
-    if (code === 'SD02-011' && virtualActionArea.length + 1 < 3 && playableReds.length > 1) {
-      priority -= 300;
+    // [규칙 4] 액션 에리어 장수 조건부 【콤보】 카드(SD02-011 만물의 정화, BP01-050 넝쿨의 춤)는 조건 충족 전이면 후순위로 대기, 충족 시 최우선 폭딜!
+    if (code === 'SD02-011') {
+      if (virtualActionArea.length + 1 < 3 && meaningfulReds.length > 1) {
+        priority -= 320;
+      } else if (virtualActionArea.length + 1 >= 3) {
+        priority += 220;
+      }
     }
-    if (
-      code === 'BP01-050' &&
-      [...virtualActionArea, c].filter(isNormalAttackCard).length < 2 &&
-      playableReds.some((o) => o.id !== c.id && isNormalAttackCard(o))
-    ) {
-      priority -= 200;
+    if (code === 'BP01-050') {
+      const normalCount = [...virtualActionArea, c].filter(isNormalAttackCard).length;
+      if (normalCount < 2 && meaningfulReds.some((o) => o.id !== c.id && isNormalAttackCard(o))) {
+        priority -= 220;
+      } else if (normalCount >= 2) {
+        priority += 190;
+      }
+    }
+
+    // [규칙 5] 【판정】/【배틀】 전용 효과를 가진 고성능 대결 카드(1드로우 강공격/공중공격, 피어난 동백꽃 등)는
+    // 순수 【콤보】 카드나 일반 공격보다 후순위로 밀어 다음 턴 대결 오프너로 아낄 수 있게 함
+    if (isPureClashEffectRedCard(c)) {
+      priority -= 65;
     }
 
     return { c, dmg, cost, priority };
@@ -712,6 +950,18 @@ function cardKeepValue(p: PlayerState, opp: PlayerState, c: ActionCard, protecte
   }
   if (!usableByAny) return -5; // 아무도 못 쓰는 카드 (완전한 데드 카드 -> 최우선 처분)
 
+  // 【콤보】 전용 카드(유효한 <변주 스킬>, 만물의 정화, 넝쿨의 춤, 복성재우, 소리의 변화·강공격)가
+  // 대결 기준 데미지가 낮다는 이유로 협주 충전/레벨업 코스트로 무지성 갈려나가는 현상 방지!
+  if (isIntroSkillCard(c) && canIntroSkillTriggerBonus(p, p.slots, c)) {
+    best += 4.2;
+  } else if (code === 'SD02-011' || code === 'BP01-050' || code === 'BP01-065' || code === 'BP01-067') {
+    best += 3.5;
+  } else if (code === 'BP01-071' && p.hand.some((h) => isAerialCard(h))) {
+    best += 3.8;
+  } else if (code === 'BP01-060' && SLOT_KEYS.some((k) => p.slots[k]?.characterName === '앙코')) {
+    best += 3.5;
+  }
+
   // 이미 동일 코드 카드가 손에 여러 장 있으면 중복분은 버리기 후보로 가치 소폭 감소
   const dupCount = p.hand.filter((h) => baseCodeOf(h.code) === code).length;
   const dupPenalty = dupCount >= 2 ? 0.85 : 1.0;
@@ -782,12 +1032,14 @@ function evaluateUpgradeCandidate(
   // 3. 버릴 수 있는 비보호 카드가 충분한지 확인
   const nonProtectedHand = p.hand.filter((c) => !burstPlan.usedCardIds.has(c.id));
   if (p.hand.length - reqDiscard < SMART_PARAMS.upgradeMinHandAfter) {
-    // 예외: 양양 Lv.1(BP01-023)이나 방랑자 Lv.1(BP01-017/020), 치샤 Lv.1(BP01-026), 앙코 Lv.1(BP01-013)처럼
+    // 예외: 양양 Lv.1(BP01-023)이나 방랑자 Lv.1(BP01-017/020), 치샤 Lv.1(BP01-026), 카멜리아 Lv.1(BP01-003), 앙코 Lv.1(BP01-013), 파수인 Lv.1(BP01-009)처럼
     // 레벨업 즉시 패/협주를 +1 보충해주는 경우에는 남는 패가 2장이어도 허용!
     const isSelfReplenishing =
       upCode === 'BP01-023' ||
       upCode === 'BP01-017' ||
       upCode === 'BP01-020' ||
+      (upCode === 'BP01-003' && p.dropZone.some(isNormalAttackCard)) ||
+      (upCode === 'BP01-009' && p.dropZone.some((c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard))) ||
       (upCode === 'BP01-026' && p.dropZone.some(isNormalAttackCard)) ||
       (upCode === 'BP01-013' && p.dropZone.some((c) => c.kind === 'ACTION' && c.characterExclusive?.includes('앙코'))) ||
       (upCode === 'BP01-032' && p.dropZone.some((c) => c.kind === 'ACTION'));
@@ -814,8 +1066,9 @@ function evaluateUpgradeCandidate(
     const hasDropAction = p.dropZone.some((c) => c.kind === 'ACTION');
     effectValue += hasDropAction ? 5.2 : -3.0; // 트래시가 비어있으면 지금 올리지 마라!
   } else if (upCode === 'BP01-003') {
-    // 카멜리아 Lv.1: 상대에게 1pt 번 데미지
-    effectValue += opp.hp <= 4 ? 6.0 : 3.6;
+    // 카멜리아 Lv.1: 트래시에서 <일반 공격> 1장 패 회수
+    const hasNormalInDrop = p.dropZone.some(isNormalAttackCard);
+    effectValue += hasNormalInDrop ? 5.1 : 1.2;
   } else if (upCode === 'BP01-017' || upCode === 'BP01-020') {
     // 방랑자 Lv.1: 덱 위 1장 공개 후 패에 추가 (사실상 무료 루팅 레벨업!)
     effectValue += 5.0;
@@ -830,9 +1083,12 @@ function evaluateUpgradeCandidate(
     );
     effectValue += hasAnkeInDrop ? 5.2 : 1.0;
   } else if (upCode === 'BP01-009') {
-    // 파수인 Lv.1: 패 1장 버리고 트래시 녹색 카드 회수
-    const hasGreenInDrop = p.dropZone.some((c) => c.kind === 'ACTION' && (c as ActionCard).color === 'GREEN');
-    effectValue += hasGreenInDrop ? 3.5 : 0.8;
+    // 파수인 Lv.1: 트래시에서 <변주 스킬> 카드 1장 패 회수
+    const hasIntroInDrop = p.dropZone.some((c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard));
+    effectValue += hasIntroInDrop ? 4.8 : 1.0;
+  } else if (upCode === 'BP01-008') {
+    // 파수인 Lv.1 [BP01-008]: 【교체】 1드로우 후 1장 버리기 (패 순환 엔진)
+    effectValue += 3.8;
   }
 
   // (B) 위치 무관 필드 상시 패시브 (서포터 자리에 있어도 100% 작동!)
@@ -848,12 +1104,15 @@ function evaluateUpgradeCandidate(
   } else if (upCode === 'BP01-022') {
     // 양양 Lv.2: 턴 종료 시 리더를 양양으로 교체 가능
     effectValue += 3.8;
+  } else if (upCode === 'BP01-011') {
+    // 앙코 Lv.2: 앙코 적색 카드 데미지 +1 (필드 어디든 유효)
+    effectValue += 5.6;
   }
 
   // (C) 【리더】 전용 스킬들
   const isLeaderOnlySkill =
     upCard.description?.includes('【리더】') &&
-    !['BP01-023', 'BP01-032', 'BP01-003', 'BP01-017', 'BP01-020', 'BP01-026', 'BP01-013', 'BP01-009', 'SD01-001', 'SD01-005', 'BP01-006', 'BP01-022'].includes(
+    !['BP01-023', 'BP01-032', 'BP01-003', 'BP01-017', 'BP01-020', 'BP01-026', 'BP01-013', 'BP01-009', 'BP01-008', 'SD01-001', 'SD01-005', 'BP01-006', 'BP01-022', 'BP01-011'].includes(
       upCode
     );
 
@@ -865,7 +1124,7 @@ function evaluateUpgradeCandidate(
         (cd) =>
           cd.characterName === charName &&
           cd.level === 2 &&
-          ['SD01-001', 'SD01-005', 'BP01-006'].includes(baseCodeOf(cd.code))
+          ['SD01-001', 'SD01-005', 'BP01-006', 'BP01-011'].includes(baseCodeOf(cd.code))
       );
       if (upCard.level === 1 && hasFieldPassiveLv2InDeck && p.hand.length >= 6) {
         effectValue += 2.2;
@@ -884,7 +1143,7 @@ function evaluateUpgradeCandidate(
           (cd) =>
             cd.characterName === charName &&
             cd.level === 2 &&
-            ['SD01-001', 'SD01-005', 'BP01-006'].includes(baseCodeOf(cd.code))
+            ['SD01-001', 'SD01-005', 'BP01-006', 'BP01-011'].includes(baseCodeOf(cd.code))
         );
         if (nextLScore <= activeLeaderScore && !(upCard.level === 1 && hasFieldPassiveLv2InDeck && p.hand.length >= 5)) {
           return -999; // 리더로 내보내지도 않을 서포터를 무지성으로 레벨업하지 않는다!
@@ -987,7 +1246,28 @@ function clashEV(
     }
   }
 
-  // 연격 종료 디메리트가 있는 카드(BP01-074, BP01-061)는 손에 다른 적색 콤보 카드가 있을 때 대결 오프너로 내면 손해!
+  // 다른 사용 가능한 카드가 손에 있는지 확인
+  const otherPlayableInHand = me.hand.filter((h) => h.id !== c.id && canPlay(me, h));
+  const hasNonComboRedOpener = otherPlayableInHand.some((h) => h.color === 'RED' && !isComboOnlyEffectCard(h) && !isComboTerminator(h));
+
+  // 1) <변주 스킬> 카드는 스피드 0, 데미지 0, 대결 효과 없음! 다른 카드가 있으면 절대 대결 카드로 낭비하지 않고 【콤보】용으로 보존!
+  if (isIntroSkillCard(c) && otherPlayableInHand.length > 0) {
+    winValue -= 18.0;
+  }
+
+  // 2) 【콤보】 전용 효과 카드(넝쿨의 춤 BP01-050, 만물의 정화 SD02-011, 복성재우 BP01-071, 소리의 변화·강공격 BP01-065/067)는
+  //    손에 다른 적색 오프너가 있다면 대결 오프너로 소모하지 않고 연격(COMBO_STEP)에서 터뜨리도록 보존!
+  if (!isIntroSkillCard(c) && isComboOnlyEffectCard(c) && hasNonComboRedOpener) {
+    winValue -= 4.5;
+  }
+
+  // 3) 반대로 【판정】/【배틀】 전용 효과가 있는 적색 카드(1드로우 강공격/공중공격, 점프, 스캔, 피어난 동백꽃 등)는
+  //    연격에서 쓰면 효과가 증발하므로 대결 오프너로 적극 우선 사용!
+  if (isPureClashEffectRedCard(c)) {
+    winValue += 2.2;
+  }
+
+  // 4) 연격 종료 디메리트가 있는 카드(BP01-074, BP01-061)는 손에 다른 적색 콤보 카드가 있을 때 대결 오프너로 내면 손해!
   if (isComboTerminator(c) && me.hand.filter((h) => h.color === 'RED' && h.id !== c.id).length > 0) {
     const d = estimateCardDamage(me, opp, c, me.slots.leader, false, []);
     if (d < opp.hp) {
@@ -1012,6 +1292,9 @@ function clashEV(
     ev += pk * (pWin * winValue - pLose * P.lossCost[k]);
   });
   ev -= comboCostOf(me, c) * P.costPenalty;
+  if (isIntroSkillCard(c) && otherPlayableInHand.length > 0) {
+    ev -= 12.0;
+  }
   return ev;
 }
 
@@ -1290,7 +1573,7 @@ export function selectAiClashCard(state: GameState, idx: 0 | 1 = 1, level: AiLev
 }
 
 // ----------------------------------------------------------
-// ★ 연격 단계 (1회 공격 후 반환 - 시너지 순서 및 OTK 피니셔 최적화)
+// ★ 연격 단계 (1회 공격 후 반환 - 【콤보】 카드 최우선 활용 & 무지성 패 털기 방지)
 // ----------------------------------------------------------
 export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel = DEFAULT_AI_LEVEL): GameState {
   const currentState = { ...state };
@@ -1304,11 +1587,12 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
     return finishComboStep(currentState, idx);
   }
 
+  const actionArea = ai.actionArea || [];
   const redCards = ai.hand.filter(
     (c) =>
       c.color === 'RED' &&
       ai.concertoZone.length >= comboCostOf(ai, c) &&
-      canPlayerUseActionCard(ai.slots, c, ai.actionArea || []).canUse
+      canPlayerUseActionCard(ai.slots, c, actionArea).canUse
   );
   if (redCards.length === 0) return finishComboStep(currentState, idx);
 
@@ -1322,7 +1606,7 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
       opp,
       redCards,
       ai.slots,
-      ai.actionArea || [],
+      actionArea,
       ai.concertoZone.length,
       opp.hp,
       Boolean(ai.actionFlags?.firstNormalAttackBonusUsed)
@@ -1336,22 +1620,105 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
         chosen,
         ai.slots.leader,
         true,
-        ai.actionArea || [],
-        Boolean(ai.actionFlags?.firstNormalAttackBonusUsed)
+        actionArea,
+        Boolean(ai.actionFlags?.firstNormalAttackBonusUsed),
+        ai.slots
       );
       const code = baseCodeOf(chosen.code);
-      const isValueComboCard =
-        cost === 0 ||
-        dmg >= opp.hp ||
-        isIntroSkillCard(chosen) ||
-        code === 'BP01-048' ||
-        code === 'BP01-062' ||
-        code === 'BP01-071' ||
-        (slotHasCode(ai.slots.leader, 'BP01-025') && isNormalAttackCard(chosen));
 
-      // 코스트 대비 효율이 낮고 킬각도 아닌 고코스트 카드는 협주를 아끼기 위해 생략
-      if (!isValueComboCard && cost > 0 && dmg / cost < paramsFor(level).comboMinDmgPerCost) {
-        return finishComboStep(currentState, idx);
+      // 현재 손패의 가용 적색 카드들로 이번 턴 킬각(Lethal)이 나오는지 계산
+      const maxRemainingChainCount = ai.comboUnlimited ? redCards.length : Math.min(ai.comboCount, redCards.length);
+      const sortedEstimates = redCards
+        .map((rc) =>
+          estimateCardDamage(
+            ai,
+            opp,
+            rc,
+            ai.slots.leader,
+            true,
+            actionArea,
+            Boolean(ai.actionFlags?.firstNormalAttackBonusUsed),
+            ai.slots
+          )
+        )
+        .sort((a, b) => b - a);
+      const chixiaEndBonus =
+        slotHasCode(ai.slots.leader, 'BP01-025') &&
+        [...actionArea, ...redCards].filter(isNormalAttackCard).length >= 2
+          ? 3
+          : 0;
+      const totalPotentialDmg =
+        sortedEstimates.slice(0, maxRemainingChainCount).reduce((s, v) => s + v, 0) + chixiaEndBonus;
+      const isLethalTurn = dmg >= opp.hp || totalPotentialDmg >= opp.hp;
+
+      if (!isLethalTurn) {
+        const lastActionCard = actionArea[actionArea.length - 1] || null;
+        const lastWasAerial = isAerialCard(lastActionCard);
+        const hasBp01071InHand = redCards.some((rc) => baseCodeOf(rc.code) === 'BP01-071');
+        const hasScalingInHand = redCards.some((rc) => {
+          const rCode = baseCodeOf(rc.code);
+          return rCode === 'BP01-050' || rCode === 'SD02-011' || rCode === 'BP01-074';
+        });
+        const needsNormalForChixiaLv2 =
+          slotHasCode(ai.slots.leader, 'BP01-025') &&
+          actionArea.filter(isNormalAttackCard).length < 2 &&
+          isNormalAttackCard(chosen);
+
+        // 이 카드가 연격(COMBO_STEP)에서 고유 시너지/어드밴티지를 창출하는 진짜 【콤보】 플레이인지 판별
+        const isTrueComboSynergyPlay =
+          (isIntroSkillCard(chosen) &&
+            (canIntroSkillTriggerBonus(ai, ai.slots, chosen) ||
+              Boolean(ai.introSkillBonusDrawCount && ai.introSkillBonusDrawCount > 0) ||
+              slotHasCode(ai.slots.leader, 'BP01-008'))) ||
+          (code === 'BP01-071' && lastWasAerial) ||
+          (isAerialCard(chosen) && hasBp01071InHand && !lastWasAerial) ||
+          (code === 'BP01-050' && [...actionArea, chosen].filter(isNormalAttackCard).length >= 2) ||
+          (code === 'SD02-011' && actionArea.length + 1 >= 3) ||
+          ((code === 'BP01-065' || code === 'BP01-067') &&
+            ai.hand.some((h) => h.id !== chosen!.id && (h.color !== 'RED' || !canPlay(ai, h)))) ||
+          (code === 'BP01-060' && slotHasCharacterSkill(ai.slots.leader, '앙코') && dmg > 0) ||
+          (isNormalAttackCard(chosen) && (hasScalingInHand || needsNormalForChixiaLv2));
+
+        // 1) 0 데미지이면서 연격 시너지도 없는 카드는 절대 무지성으로 버리지 않음
+        if (dmg <= 0 && !isTrueComboSynergyPlay) {
+          return finishComboStep(currentState, idx);
+        }
+
+        // 2) 코스트를 소모하는 카드는 코스트 대비 딜 효율이 기준 미달이면 협주 보존을 위해 연격 중단
+        if (!isTrueComboSynergyPlay && cost > 0 && dmg / cost < paramsFor(level).comboMinDmgPerCost) {
+          return finishComboStep(currentState, idx);
+        }
+
+        // 3) 다음 턴 대결(Clash)을 위한 스마트 패 보존:
+        //    킬각이 아닐 때 【판정】/【배틀】 전용 효과를 가진 카드(예: 승리 시 1드로우 강공격/공중공격, 피어난 동백꽃, 고속 오프너)나
+        //    손에 남은 마지막 대결 카드를 고작 1~2 데미지 짤짤이로 무지성 소모하지 않고 다음 턴 대결용으로 남긴다!
+        if (!isTrueComboSynergyPlay) {
+          const remainingHandAfter = ai.hand.filter((h) => h.id !== chosen!.id);
+          const remainingGoodClashCards = remainingHandAfter.filter(
+            (h) => !isIntroSkillCard(h) && (h.color !== 'RED' || (h.speed ?? 0) >= 6)
+          );
+
+          // (a) 【판정】/【배틀】 전용 효과 카드이거나 스피드 10 이상 주력 대결 오프너인 경우:
+          //     연격 데미지가 2 이하이고 다음 턴 쓸만한 대결 카드가 1장 이하로 줄어든다면 아낀다!
+          if (
+            (isPureClashEffectRedCard(chosen) || (chosen.speed ?? 0) >= 10) &&
+            dmg <= 2 &&
+            opp.hp > dmg + 3 &&
+            remainingGoodClashCards.length <= 1
+          ) {
+            return finishComboStep(currentState, idx);
+          }
+
+          // (b) 손패의 마지막 1장인데 상대 체력이 여유 있고(HP > 5) 1데미지짜리 일반 카드라면 다음 턴 대결을 위해 세이브!
+          if (
+            remainingHandAfter.length === 0 &&
+            dmg <= 1 &&
+            opp.hp > 5 &&
+            (chosen.speed ?? 0) >= 5
+          ) {
+            return finishComboStep(currentState, idx);
+          }
+        }
       }
     }
   }
@@ -1361,18 +1728,7 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
   // <변주 스킬>인 경우 어느 서포터와 교체할지 최적 슬롯 지정
   let swapSupportSlot: 'leftSupport' | 'rightSupport' | undefined = undefined;
   if (isIntroSkillCard(chosen)) {
-    const targetName = getIntroSkillTargetChar(chosen);
-    const matchedSup = (['leftSupport', 'rightSupport'] as const).find((k) =>
-      doesCharMatchIntroTarget(ai.slots[k], targetName)
-    );
-    if (matchedSup) {
-      swapSupportSlot = matchedSup;
-    } else {
-      // 이미 리더가 변주 대상 캐릭터인 경우: 남은 적색 패와 시너지가 더 높은 서포터로 교체
-      const lScore = ai.slots.leftSupport ? leaderScore(ai, opp, ai.slots.leftSupport, 1) : -999;
-      const rScore = ai.slots.rightSupport ? leaderScore(ai, opp, ai.slots.rightSupport, 1) : -999;
-      swapSupportSlot = lScore >= rScore ? 'leftSupport' : 'rightSupport';
-    }
+    swapSupportSlot = pickIntroSkillSwapSlot(ai, opp, ai.slots, chosen) ?? undefined;
   }
 
   const res = executeComboAttack(currentState, idx, chosen.id, undefined, undefined, swapSupportSlot);

@@ -78,6 +78,7 @@ export interface ActionCard {
   rarity?: string; // 공식 희귀도 (★ ~ ★★★)
   rawOfficial?: any; // 연결된 공식 원본 카드 데이터
   feature?: string; // 카드 특징 (<체공>, <기본 공격>, <공명 해방> 등)
+  isRevealed?: boolean; // 카드 효과(공개 후 패 추가 등)로 상대방에게 공개된 상태로 패에 들어간 카드 여부
 }
 
 export type AnyCard = CharacterCard | ActionCard;
@@ -106,6 +107,7 @@ export interface PlayerState {
   // 대결 준비 카드
   clashCard: ActionCard | null;
   clashCardReady: boolean;
+  pendingSpentConcertoIds?: string[]; // 대결 카드 공개 시 소모할 협주 카드 ID 목록
   // 이번 턴 실행한 행동 (각 1회 제한)
   actionFlags: {
     upgraded: boolean;
@@ -115,6 +117,7 @@ export interface PlayerState {
     firstDamageTakenReducedThisTurn?: boolean;
     damageTakenThisTurn?: boolean;
     shorekeeperLv2HealDrawCount?: number;
+    leaderSwapLockedThisTurn?: boolean;
   };
   // 연격 횟수 및 무제한 여부
   comboCount: number;
@@ -154,6 +157,7 @@ export interface ClashResult {
   winnerColor?: CardColor;
   damageDealt: number;
   comboGranted: number; // 빨강 승리(1) + 추격(X)
+  comboBlockedReason?: string; // 상대 해금 [BP01-058] 우세 효과, 승천하는 용 제약 등으로 연격 봉쇄 시 사유
   logText: string;
   triggeredEffects?: TriggeredEffectEvent[]; // 대결 중 발동된 효과 및 사건 목록
 }
@@ -163,11 +167,46 @@ export interface TriggeredEffectEvent {
   id: string;
   sourceCardName: string; // 효과를 일으킨 카드명 (예: "방랑자(여) [BP01-018]", "진동 소리", "산화 Lv.1", "양양")
   sourceCardArt?: string; // 카드 일러스트 URL
-  effectType: 'BUFF' | 'DRAW' | 'HEAL' | 'CHARGE' | 'COMBO' | 'CANCEL' | 'DAMAGE';
+  effectType: 'BUFF' | 'DRAW' | 'HEAL' | 'CHARGE' | 'COMBO' | 'CANCEL' | 'DAMAGE' | 'DISCARD';
   title: string;          // 효과 타이틀 (예: "녹색 배틀 개시", "생명력 회복", "협주 급속 충전", "빙결 결계")
   description: string;    // 어떤 사건이 일어났는지 설명 (예: "덱 위의 카드를 2장 공개하여 패에 추가했습니다.", "HP를 2 회복했습니다.")
   playerIndex: 0 | 1;
   timestamp: number;
+}
+
+// 전투 로그 시점 전장 스냅샷 (리플레이 100% 동기화용)
+export interface LogBoardSnapshot {
+  turn: number;
+  phase: GamePhase;
+  activePlayerIndex: 0 | 1;
+  p0: {
+    hp: number;
+    maxHp: number;
+    concerto: number;
+    leader: { nameKr: string; characterName?: string; level: number; artUrl: string; element: string };
+    leftSupport?: { nameKr: string; characterName?: string; level: number; artUrl: string; element: string };
+    rightSupport?: { nameKr: string; characterName?: string; level: number; artUrl: string; element: string };
+    handCount: number;
+    deckCount: number;
+    dropCount: number;
+    handCards?: { code: string; nameKr: string; cost: number; color?: string; speed?: number | null; damage?: number; artUrl?: string; description?: string }[];
+  };
+  p1: {
+    hp: number;
+    maxHp: number;
+    concerto: number;
+    leader: { nameKr: string; characterName?: string; level: number; artUrl: string; element: string };
+    leftSupport?: { nameKr: string; characterName?: string; level: number; artUrl: string; element: string };
+    rightSupport?: { nameKr: string; characterName?: string; level: number; artUrl: string; element: string };
+    handCount: number;
+    deckCount: number;
+    dropCount: number;
+    handCards?: { code: string; nameKr: string; cost: number; color?: string; speed?: number | null; damage?: number; artUrl?: string; description?: string }[];
+  };
+  p0ClashCard?: { nameKr: string; artUrl?: string; color?: string; cost?: number; speed?: number | null; damage?: number };
+  p1ClashCard?: { nameKr: string; artUrl?: string; color?: string; cost?: number; speed?: number | null; damage?: number };
+  p0ActionCards?: { nameKr: string; code?: string; artUrl?: string; color?: string; cost?: number; speed?: number | null; damage?: number }[];
+  p1ActionCards?: { nameKr: string; code?: string; artUrl?: string; color?: string; cost?: number; speed?: number | null; damage?: number }[];
 }
 
 // 전투 로그 항목
@@ -183,6 +222,7 @@ export interface LogItem {
   amount?: number; // 데미지량 또는 회복 수치
   effectTag?: string; // '연격', '가드', '드로우', '회복', '충전' 등
   drawnCards?: ActionCard[]; // 드로우된 카드 목록 (호버 시 공개 및 툴팁용)
+  snapshot?: LogBoardSnapshot; // 리플레이 정확도 100% 보장을 위한 실시간 전장 스냅샷
 }
 
 // 전체 게임 상태
@@ -193,6 +233,21 @@ export interface ComboStrikeEffect {
   card: ActionCard;
   damage: number;
   comboCount?: number; // 1, 2, 3, 4, 5, 6... 콤보 단계
+  swappedFromLeader?: CharacterCard; // 변주 스킬 등으로 교체되기 전 리더
+  swappedToLeader?: CharacterCard; // 변주 스킬 등으로 새로 교체된 리더
+  comboEffectTitle?: string; // 콤보 스킬/효과 요약 타이틀
+  comboEffectDesc?: string; // 콤보 스킬/효과 상세 설명
+  isLethal?: boolean; // 이번 연격 타격으로 상대의 HP가 0이 되어 피니시로 연결되는 치명타 여부
+}
+
+// 효과 드로우 애니메이션 연출 데이터
+export interface EffectDrawAnimation {
+  id: string;
+  playerIndex: 0 | 1;
+  cards: ActionCard[];
+  sourceCardName?: string;
+  sourceCardArt?: string;
+  nextPendingChoice?: PendingChoice | null;
 }
 
 export interface UpgradeEffect {
@@ -221,22 +276,53 @@ export interface PendingChoice {
     | 'SET_CONCERTO'
     | 'RECOVER_FROM_DROP'
     | 'DISCARD_FOR_DAMAGE'
+    | 'DISCARD_FROM_HAND'
     | 'VIEW_ONLY'
     | 'SELECT_EFFECT_UPGRADE'
     | 'SWAP_LEADER'
     | 'RECOVER_BP01_069'
-    | 'BP01_022_YANGYANG_SWAP';
+    | 'BP01_022_YANGYANG_SWAP'
+    | 'SHOREKEEPER_SWITCH_PROMPT'
+    | 'SHOREKEEPER_0_DRAW_PROMPT'
+    | 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT'
+    | 'SHOREKEEPER_SWITCH_DRAW'
+    | 'DRAW_THEN_DISCARD_CONFIRM'
+    | 'PAY_CLASH_CONCERTO_COST';
   targetSlot?: 'leader' | 'leftSupport' | 'rightSupport';
+  sourceZone?: 'DECK' | 'DROP' | 'HAND' | 'CONCERTO';
+  isPublicReveal?: boolean; // 양측 플레이어(상대 포함)에게 공개된 카드인지 여부
+  endTurnAfterResolve?: boolean; // 확인 후 엔드 페이즈로 진행 (배틀 없이 턴 종료 시 패 전체 공개 팝업용)
+}
+
+export interface HpHistoryEntry {
+  id: string;
+  turn: number;
+  playerIndex: 0 | 1;
+  type: 'DAMAGE' | 'HEAL';
+  amount: number;
+  prevHp: number;
+  newHp: number;
+  reason: string;
+  sourceCardName?: string;
+  sourceCardArt?: string;
+  timestamp: number;
 }
 
 export interface GameState {
   turn: number;
   activePlayerIndex: 0 | 1; // 턴 플레이어 (0: 플레이어1, 1: 플레이어2/AI)
+  firstPlayerIndex?: 0 | 1; // 게임 시작 시 주사위로 결정된 1턴 선공 플레이어 (0: 플레이어1, 1: 플레이어2/AI)
+  firstTurnDrawCompleted?: boolean; // 공식 룰 602.1.3: 선공 플레이어의 게임 첫 번째 턴(1장 드로우) 완료 여부
   phase: GamePhase;
   players: [PlayerState, PlayerState];
   clashResult: ClashResult | null;
+  lastClashWinnerIndex?: 0 | 1 | -1 | null; // 최근 대결 승자 (우세 판정 보존용)
+  battleStepEffects?: TriggeredEffectEvent[]; // 배틀 스텝(604.1.1)에서 발생한 효과 목록 (치샤/금희 배틀 데미지 등)
   lastComboStrike?: ComboStrikeEffect | null;
   lastUpgrade?: UpgradeEffect | null;
+  lastEffectDraw?: EffectDrawAnimation | null; // 효과 드로우 및 손패 비행 연출
+  deferredEffectDraw?: EffectDrawAnimation | null; // 전투 판정 결과창 종료 후 발동할 보류 드로우 연출
+  deferredEffectDraws?: EffectDrawAnimation[]; // 전투 중 발생한 보류 드로우 연출 큐
   lastEffectEvent?: TriggeredEffectEvent | null; // 최근 발동된 효과 이벤트 (화면 토스트 연출용)
   pendingChoice?: PendingChoice | null;
   pendingChoiceQueue?: PendingChoice[]; // 여러 효과 동시 발동 시 순차 처리 큐
@@ -246,6 +332,7 @@ export interface GameState {
   deferredEffectEvent?: TriggeredEffectEvent | null; // 전투 데미지 결과 후 발동할 보류 알림 이벤트
   winner: 0 | 1 | null;
   logs: LogItem[];
+  hpHistory?: HpHistoryEntry[]; // 체력 변동 상세 기록 (대미지/회복 원인 및 카드 정보)
   gameMode: 'AI' | 'SOLO_DUAL'; // AI 대전 vs 1인 2역 듀얼
   isOpponentHandScanned?: boolean; // 스캔 효과 등으로 상대의 손패가 필드에 공개된 상태
 }

@@ -1,0 +1,81 @@
+export function decideClash(state: GameState, startClash: boolean): GameState {
+  if (state.pendingChoice) {
+    return state; // 발동 중인 카드 효과 선택을 마칠 때까지 배틀 진입 차단
+  }
+  const activeIdx = state.activePlayerIndex;
+  const p0 = clonePlayer(state.players[0]);
+  const p1 = clonePlayer(state.players[1]);
+  let newState: GameState = { ...state, players: [p0, p1] };
+
+  if (startClash) {
+    newState.phase = 'CLASH_SET';
+    newState.clashResult = null;
+    // 양측 대결 카드 초기화
+    newState.players[0].clashCard = null;
+    newState.players[0].clashCardReady = false;
+    newState.players[1].clashCard = null;
+    newState.players[1].clashCardReady = false;
+    newState = addLog(newState, `${newState.players[activeIdx].name}이(가) 대결(배틀)을 선언했습니다!`, 'CLASH', activeIdx);
+
+    // 파수인 Lv.2 [BP01-007]: 【리더】【자신의 배틀 페이즈 시작 시】자신의 패가 5장 미만인 경우 패가 5장이 될 때까지 카드를 뽑는다
+    const activePlayer = newState.players[activeIdx];
+    if (
+      slotHasCharacterSkill(activePlayer.slots.leader, '파수인', 2) &&
+      getAllCardsInSlot(activePlayer.slots.leader).some((c) => c.code === 'BP01-007') &&
+      activePlayer.hand.length < 5
+    ) {
+      const needed = 5 - activePlayer.hand.length;
+      const drawn: ActionCard[] = [];
+      for (let k = 0; k < needed; k++) {
+        const c = drawSingleCardFromDeck(activePlayer);
+        if (c) drawn.push(c);
+      }
+      if (drawn.length > 0) {
+        addCardsToHand(activePlayer, drawn);
+        if (activePlayer.isAi) {
+          newState = addLog(
+            newState,
+            `[효과 드로우] [파수인 Lv.2 BP01-007 효과] 배틀 페이즈 개시 시 덱에서 [${drawn.map((c) => c.nameKr).join(', ')}] 카드를 드로우했습니다! (현재 패: ${activePlayer.hand.length}장)`,
+            'ACTION',
+            activeIdx,
+            { cardArt: drawn[0].artUrl, cardName: drawn[0].nameKr, effectTag: '패 보충 드로우' }
+          );
+        } else {
+          // 카드를 미리 모달로 까발리지 않고 3D 드로우 연출을 통해 패에 드로우
+          const effectDrawObj: EffectDrawAnimation = {
+            id: `eff-draw-${Date.now()}-bp007`,
+            playerIndex: activeIdx,
+            cards: drawn,
+            sourceCardName: '파수인 Lv.2 [BP01-007]',
+            sourceCardArt: activePlayer.slots.leader.artUrl,
+            nextPendingChoice: null,
+          };
+          newState = queueEffectDraw(newState, effectDrawObj);
+          newState = addLog(
+            newState,
+            `[효과 드로우] [파수인 Lv.2 BP01-007 효과] 배틀 개시 시 패가 5장이 되도록 덱에서 ${drawn.length}장의 카드를 드로우합니다! (현재 패: ${activePlayer.hand.length}장)`,
+            'ACTION',
+            activeIdx,
+            { cardArt: activePlayer.slots.leader.artUrl, cardName: '파수인 Lv.2', effectTag: '패 보충 드로우' }
+          );
+        }
+      }
+    }
+  } else {
+    // 상대가 배틀 페이즈를 패스할 경우, 상대방(비활성 플레이어)은 【우세】 획득! (공식 룰 규정)
+    const oppIdx = (activeIdx === 0 ? 1 : 0) as 0 | 1;
+    newState.players[oppIdx].hasDominance = true;
+    newState.players[activeIdx].hasDominance = false;
+    newState = addLog(
+      newState,
+      `${newState.players[activeIdx].name}이(가) 대결을 건너뛰었습니다. (${newState.players[oppIdx].name} 【우세】 획득!)`,
+      'ACTION',
+      activeIdx
+    );
+    return checkHandOverflowOrEndTurn(newState);
+  }
+
+  return newState;
+}
+
+// ==========================================

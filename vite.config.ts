@@ -9,6 +9,7 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
+    host: true, // 외부/다른 기기(동일 공유기·와이파이) 접속 허용 (0.0.0.0)
     proxy: {
       '/api/sldark': {
         target: 'https://mc.sldark.com',

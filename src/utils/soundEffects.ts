@@ -8,6 +8,7 @@ export type WeaponType = '직검' | '대검' | '권총' | '증폭기';
 export type SfxCategory =
   | 'clash'
   | 'clash_reveal' // 카드 오픈 (3D 플립)
+  | 'card_deal' // 패 나눠줄 때 / 카드 딜링 (드로우)
   | 'clash_impact' // 카드 정면 격돌
   | 'draw' // 대결 무승부 / 비김
   | 'damage' // legacy fallback
@@ -25,9 +26,30 @@ export type SfxCategory =
   | 'phase_combo' // 연격 돌입 페이즈
   | 'phase_end' // 턴 종료 페이즈
   | 'combo'
+  | 'combo_1'
+  | 'combo_2'
+  | 'combo_3'
+  | 'combo_sword'
+  | 'combo_sword_1'
+  | 'combo_sword_2'
+  | 'combo_sword_3'
+  | 'combo_broadblade'
+  | 'combo_broadblade_1'
+  | 'combo_broadblade_2'
+  | 'combo_broadblade_3'
+  | 'combo_pistol'
+  | 'combo_pistol_1'
+  | 'combo_pistol_2'
+  | 'combo_pistol_3'
+  | 'combo_rectifier'
+  | 'combo_rectifier_1'
+  | 'combo_rectifier_2'
+  | 'combo_rectifier_3'
   | 'card'
   | 'turn'
   | 'upgrade'
+  | 'card_crack' // 패배 연출 - 카드 균열 효과음
+  | 'card_shatter' // 패배 연출 - 카드 깨짐/파쇄 효과음
   | (string & {});
 
 export interface SfxSpec {
@@ -78,10 +100,10 @@ export function getCharacterKey(nameOrCharacter?: string): string | null {
 export const SFX_SPECIFICATIONS: Record<string, SfxSpec> = {
   clash: {
     category: 'clash',
-    nameKr: '카드 격돌 통합 (CLASH!)',
+    nameKr: '카드 격돌 / 충돌 (CLASH!)',
     recommendedDuration: '0.3초 ~ 0.8초',
     recommendedDurationSec: 0.6,
-    description: '대결 카드 대치 및 충돌 사운드',
+    description: '대결(Clash) 시 양 카드가 중앙에서 정면 격돌 및 충돌할 때의 효과음',
     folderPath: '/audio/sfx/clash/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
@@ -90,17 +112,17 @@ export const SFX_SPECIFICATIONS: Record<string, SfxSpec> = {
     nameKr: '카드 오픈 / 3D 플립 (Reveal)',
     recommendedDuration: '0.2초 ~ 0.5초',
     recommendedDurationSec: 0.35,
-    description: '대결 돌입 시 세트된 카드가 회전하며 앞면으로 뒤집힐 때의 사운드',
+    description: '대결 돌입 시 세트된 카드가 오픈(플립)되거나 필드에서 앞면으로 뒤집힐 때의 사운드',
     folderPath: '/audio/sfx/clash_reveal/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
-  clash_impact: {
-    category: 'clash_impact',
-    nameKr: '카드 정면 격돌 (Impact)',
-    recommendedDuration: '0.3초 ~ 0.8초',
-    recommendedDurationSec: 0.6,
-    description: '양 카드가 중앙에서 정면 충돌할 때의 폭발적인 격돌음',
-    folderPath: '/audio/sfx/clash_impact/',
+  card_deal: {
+    category: 'card_deal',
+    nameKr: '패 나눠줄 때 / 카드 딜링 (Card Deal)',
+    recommendedDuration: '0.08초 ~ 0.25초',
+    recommendedDurationSec: 0.15,
+    description: '게임 시작 시 초기 패를 배분하거나 멀리건 및 카드 드로우 시 덱에서 촥- 배분되는 딜링 사운드',
+    folderPath: '/audio/sfx/card_deal/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
   draw: {
@@ -274,6 +296,150 @@ export const SFX_SPECIFICATIONS: Record<string, SfxSpec> = {
     folderPath: '/audio/sfx/combo_3/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
+  combo_sword: {
+    category: 'combo_sword',
+    nameKr: '연격 - 직검 공통 (Sword Combo)',
+    recommendedDuration: '0.2초 ~ 0.5초',
+    recommendedDurationSec: 0.35,
+    description: '직검 캐릭터(방랑자, 산화, 양양, 카멜리아 등)의 통합 참격음 (단계별 미설정 시 폴백)',
+    folderPath: '/audio/sfx/combo_sword/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_sword_1: {
+    category: 'combo_sword_1',
+    nameKr: '연격 - 직검 1콤보 (Sword Combo 1)',
+    recommendedDuration: '0.2초 ~ 0.4초',
+    recommendedDurationSec: 0.3,
+    description: '직검 캐릭터(방랑자, 산화, 양양, 카멜리아 등)의 날렵한 1단 참격 개시음',
+    folderPath: '/audio/sfx/combo_sword_1/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_sword_2: {
+    category: 'combo_sword_2',
+    nameKr: '연격 - 직검 2콤보 (Sword Combo 2)',
+    recommendedDuration: '0.25초 ~ 0.45초',
+    recommendedDurationSec: 0.35,
+    description: '직검 캐릭터의 한층 고조되는 날카로운 2단 연속 베기음',
+    folderPath: '/audio/sfx/combo_sword_2/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_sword_3: {
+    category: 'combo_sword_3',
+    nameKr: '연격 - 직검 3콤보+ (Sword Combo 3+)',
+    recommendedDuration: '0.35초 ~ 0.6초',
+    recommendedDurationSec: 0.45,
+    description: '직검 캐릭터의 3콤보 이상 폭풍 일섬 최고조 참격음',
+    folderPath: '/audio/sfx/combo_sword_3/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_broadblade: {
+    category: 'combo_broadblade',
+    nameKr: '연격 - 대검 공통 (Broadblade Combo)',
+    recommendedDuration: '0.3초 ~ 0.7초',
+    recommendedDurationSec: 0.45,
+    description: '대검 캐릭터(금희 등)의 통합 파쇄음 (단계별 미설정 시 폴백)',
+    folderPath: '/audio/sfx/combo_broadblade/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_broadblade_1: {
+    category: 'combo_broadblade_1',
+    nameKr: '연격 - 대검 1콤보 (Broadblade Combo 1)',
+    recommendedDuration: '0.3초 ~ 0.5초',
+    recommendedDurationSec: 0.38,
+    description: '대검 캐릭터(금희 등)의 묵직한 지면 강타 1단 파쇄음',
+    folderPath: '/audio/sfx/combo_broadblade_1/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_broadblade_2: {
+    category: 'combo_broadblade_2',
+    nameKr: '연격 - 대검 2콤보 (Broadblade Combo 2)',
+    recommendedDuration: '0.35초 ~ 0.6초',
+    recommendedDurationSec: 0.45,
+    description: '대검 캐릭터의 지진급 충격파와 함께 터지는 2단 헤비 스매시',
+    folderPath: '/audio/sfx/combo_broadblade_2/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_broadblade_3: {
+    category: 'combo_broadblade_3',
+    nameKr: '연격 - 대검 3콤보+ (Broadblade Combo 3+)',
+    recommendedDuration: '0.4초 ~ 0.7초',
+    recommendedDurationSec: 0.55,
+    description: '대검 캐릭터의 3콤보 이상 지면을 가르는 파멸적 대파쇄 피니시음',
+    folderPath: '/audio/sfx/combo_broadblade_3/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_pistol: {
+    category: 'combo_pistol',
+    nameKr: '연격 - 권총 공통 (Pistol Combo)',
+    recommendedDuration: '0.2초 ~ 0.5초',
+    recommendedDurationSec: 0.35,
+    description: '권총 캐릭터(치샤 등)의 통합 속사음 (단계별 미설정 시 폴백)',
+    folderPath: '/audio/sfx/combo_pistol/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_pistol_1: {
+    category: 'combo_pistol_1',
+    nameKr: '연격 - 권총 1콤보 (Pistol Combo 1)',
+    recommendedDuration: '0.15초 ~ 0.35초',
+    recommendedDurationSec: 0.25,
+    description: '권총 캐릭터(치샤 등)의 날렵한 1단 격발 사격음',
+    folderPath: '/audio/sfx/combo_pistol_1/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_pistol_2: {
+    category: 'combo_pistol_2',
+    nameKr: '연격 - 권총 2콤보 (Pistol Combo 2)',
+    recommendedDuration: '0.2초 ~ 0.4초',
+    recommendedDurationSec: 0.3,
+    description: '권총 캐릭터의 리드미컬한 더블 탭 2연타 속사음',
+    folderPath: '/audio/sfx/combo_pistol_2/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_pistol_3: {
+    category: 'combo_pistol_3',
+    nameKr: '연격 - 권총 3콤보+ (Pistol Combo 3+)',
+    recommendedDuration: '0.3초 ~ 0.55초',
+    recommendedDurationSec: 0.4,
+    description: '권총 캐릭터의 3콤보 이상 난사 폭풍 점사 피니시음',
+    folderPath: '/audio/sfx/combo_pistol_3/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_rectifier: {
+    category: 'combo_rectifier',
+    nameKr: '연격 - 증폭기 공통 (Rectifier Combo)',
+    recommendedDuration: '0.3초 ~ 0.6초',
+    recommendedDurationSec: 0.4,
+    description: '증폭기 캐릭터(앙코, 파수인 등)의 통합 공명음 (단계별 미설정 시 폴백)',
+    folderPath: '/audio/sfx/combo_rectifier/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_rectifier_1: {
+    category: 'combo_rectifier_1',
+    nameKr: '연격 - 증폭기 1콤보 (Rectifier Combo 1)',
+    recommendedDuration: '0.25초 ~ 0.45초',
+    recommendedDurationSec: 0.32,
+    description: '증폭기 캐릭터(앙코, 파수인 등)의 신비로운 공명 마법 파동 1단음',
+    folderPath: '/audio/sfx/combo_rectifier_1/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_rectifier_2: {
+    category: 'combo_rectifier_2',
+    nameKr: '연격 - 증폭기 2콤보 (Rectifier Combo 2)',
+    recommendedDuration: '0.3초 ~ 0.55초',
+    recommendedDurationSec: 0.4,
+    description: '증폭기 캐릭터의 에테르 공명이 증폭되는 2단 마법 폭발음',
+    folderPath: '/audio/sfx/combo_rectifier_2/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
+  combo_rectifier_3: {
+    category: 'combo_rectifier_3',
+    nameKr: '연격 - 증폭기 3콤보+ (Rectifier Combo 3+)',
+    recommendedDuration: '0.35초 ~ 0.65초',
+    recommendedDurationSec: 0.48,
+    description: '증폭기 캐릭터의 3콤보 이상 시공간 공명 버스트 피니시음',
+    folderPath: '/audio/sfx/combo_rectifier_3/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
   card: {
     category: 'card',
     nameKr: '카드 세트 / 플레이 스냅',
@@ -346,6 +512,15 @@ export const SFX_SPECIFICATIONS: Record<string, SfxSpec> = {
     folderPath: '/audio/sfx/low_hp/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
+  card_shatter: {
+    category: 'card_shatter',
+    nameKr: '패배 연출 - 리더 카드 균열 및 파쇄 (Card Shatter)',
+    recommendedDuration: '3.5초 ~ 4.5초 (권장 4초)',
+    recommendedDurationSec: 4.2,
+    description: '패배 피니시 연출 시 리더 카드가 지진처럼 쩌적 갈라지며 산산조각으로 폭발하는 통합 효과음',
+    folderPath: '/audio/sfx/card_shatter/',
+    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
+  },
 };
 
 /**
@@ -371,6 +546,10 @@ class SoundEffectsEngine {
   // 캐릭터 보이스(공격/스킬/피격/승패/오프닝 등) 10% 증폭 배율 적용
   private readonly VOICE_VOLUME_MULTIPLIER: number = 1.1;
 
+  // 양양(Yangyang) 캐릭터 사운드 정밀 볼륨 설정 (일반/스킬/공명해방 0.7배, 레벨업 0.5배)
+  private readonly YANGYANG_ATTACK_MULTIPLIER: number = 0.7;
+  private readonly YANGYANG_LEVELUP_MULTIPLIER: number = 0.5;
+
   // 커스텀 오디오 버퍼 캐시 (카테고리/키 -> AudioBuffer[] 다중 음원 랜덤 재생 지원)
   private customAudioBuffers: Map<string, AudioBuffer[]> = new Map();
   // 파일 유무 확인 시도 여부
@@ -385,6 +564,11 @@ class SoundEffectsEngine {
   // 캐릭터 보이스 전용 오디오 채널 (연격/스킬 연속 시 보이스 겹침 방지)
   private activeVoiceSource: AudioBufferSourceNode | null = null;
   private activeVoiceGain: GainNode | null = null;
+
+  // 피니시(카드 파쇄 및 대폭발) 사운드 전용 오디오 채널 및 디바운스 (중복 재생 및 겹침 방지)
+  private activeFinisherSource: AudioBufferSourceNode | null = null;
+  private activeFinisherGain: GainNode | null = null;
+  private lastFinisherTime: number = 0;
 
   constructor() {
     try {
@@ -415,9 +599,9 @@ class SoundEffectsEngine {
   public async preloadAllCustomSounds() {
     const coreCategories: string[] = [
       'card',
+      'card_deal',
       'clash',
       'clash_reveal',
-      'clash_impact',
       'draw',
       'damage',
       'damage_light',
@@ -437,6 +621,22 @@ class SoundEffectsEngine {
       'combo_1',
       'combo_2',
       'combo_3',
+      'combo_sword',
+      'combo_sword_1',
+      'combo_sword_2',
+      'combo_sword_3',
+      'combo_broadblade',
+      'combo_broadblade_1',
+      'combo_broadblade_2',
+      'combo_broadblade_3',
+      'combo_pistol',
+      'combo_pistol_1',
+      'combo_pistol_2',
+      'combo_pistol_3',
+      'combo_rectifier',
+      'combo_rectifier_1',
+      'combo_rectifier_2',
+      'combo_rectifier_3',
       'turn',
       'upgrade',
       'victory',
@@ -444,6 +644,8 @@ class SoundEffectsEngine {
       'match_start',
       'heal',
       'low_hp',
+      'card_crack',
+      'card_shatter',
     ];
 
     try {
@@ -659,15 +861,54 @@ class SoundEffectsEngine {
         directFileBases.push(`/audio/sfx/characters/${charId}/switch`);
         directFileBases.push(`/audio/sfx/characters/${charId}/join_team`);
       }
-      // 6. 카드 오픈 (clash_reveal)
-      else if (key === 'clash_reveal') {
-        folderDirs.push('/audio/sfx/clash_reveal');
-        directFileBases.push('/audio/sfx/clash_reveal/reveal', '/audio/sfx/clash_reveal/flip', '/audio/sfx/clash_reveal/clash_reveal');
+      // 6. 카드 오픈 (clash_reveal / card_open)
+      else if (key === 'clash_reveal' || key === 'card_open') {
+        folderDirs.push('/audio/sfx/clash_reveal', '/audio/sfx/card_open');
+        directFileBases.push('/audio/sfx/clash_reveal/reveal', '/audio/sfx/clash_reveal/flip', '/audio/sfx/clash_reveal/clash_reveal', '/audio/sfx/clash_reveal/1', '/audio/sfx/card_open/1');
       }
-      // 7. 카드 격돌 (clash_impact)
+      // 6.5 패 나눠줄 때 / 카드 딜링 (card_deal / card_draw)
+      else if (key === 'card_deal' || key === 'card_draw') {
+        folderDirs.push('/audio/sfx/card_deal', '/audio/sfx/card_draw');
+        directFileBases.push('/audio/sfx/card_deal/deal', '/audio/sfx/card_deal/draw', '/audio/sfx/card_deal/1', '/audio/sfx/card_deal/card_deal', '/audio/sfx/card_draw/1');
+      }
+      // 6.8 무기군별 세부 연격 사운드 (콤보 1, 2, 3 분리)
+      else if (key.match(/^combo_(sword|broadblade|pistol|rectifier)_([123])$/)) {
+        const match = key.match(/^combo_(sword|broadblade|pistol|rectifier)_([123])$/)!;
+        const weapon = match[1];
+        const stage = match[2];
+        folderDirs.push(`/audio/sfx/combo_${weapon}_${stage}`);
+        folderDirs.push(`/audio/sfx/combo_${weapon}`);
+        folderDirs.push(`/audio/sfx/combo_${stage}`);
+        folderDirs.push(`/audio/sfx/combo`);
+        folderDirs.push(`/audio/sfx/weapon_${weapon}`);
+        directFileBases.push(
+          `/audio/sfx/combo_${weapon}_${stage}/1`,
+          `/audio/sfx/combo_${weapon}/1`,
+          `/audio/sfx/combo_${stage}/1`,
+          `/audio/sfx/combo/1`,
+          `/audio/sfx/weapon_${weapon}/1`
+        );
+      }
+      else if (key.startsWith('combo_sword')) {
+        folderDirs.push('/audio/sfx/combo_sword', '/audio/sfx/combo', '/audio/sfx/weapon_sword');
+        directFileBases.push('/audio/sfx/combo_sword/1', '/audio/sfx/combo/1', '/audio/sfx/weapon_sword/1');
+      }
+      else if (key.startsWith('combo_broadblade')) {
+        folderDirs.push('/audio/sfx/combo_broadblade', '/audio/sfx/weapon_broadblade', '/audio/sfx/combo');
+        directFileBases.push('/audio/sfx/combo_broadblade/1', '/audio/sfx/weapon_broadblade/1', '/audio/sfx/combo/1');
+      }
+      else if (key.startsWith('combo_pistol')) {
+        folderDirs.push('/audio/sfx/combo_pistol', '/audio/sfx/weapon_pistol');
+        directFileBases.push('/audio/sfx/combo_pistol/1', '/audio/sfx/weapon_pistol/1');
+      }
+      else if (key.startsWith('combo_rectifier')) {
+        folderDirs.push('/audio/sfx/combo_rectifier', '/audio/sfx/weapon_rectifier');
+        directFileBases.push('/audio/sfx/combo_rectifier/1', '/audio/sfx/weapon_rectifier/1');
+      }
+      // 7. 카드 격돌 (clash_impact -> clash 폴더로 일원화)
       else if (key === 'clash_impact') {
-        folderDirs.push('/audio/sfx/clash_impact', '/audio/sfx/clash');
-        directFileBases.push('/audio/sfx/clash_impact/impact', '/audio/sfx/clash_impact/clash_impact', '/audio/sfx/clash/clash');
+        folderDirs.push('/audio/sfx/clash');
+        directFileBases.push('/audio/sfx/clash/1', '/audio/sfx/clash/clash');
       }
       // 8. 대전 개시 (match_start)
       else if (key === 'match_start') {
@@ -693,6 +934,21 @@ class SoundEffectsEngine {
       else if (key === 'low_hp') {
         folderDirs.push('/audio/sfx/low_hp');
         directFileBases.push('/audio/sfx/low_hp/low_hp', '/audio/sfx/low_hp/crisis', '/audio/sfx/low_hp/heartbeat');
+      }
+      // 11.6 패배 연출 - 카드 균열 효과음 (card_crack)
+      else if (key === 'card_crack') {
+        folderDirs.push('/audio/sfx/card_crack');
+        directFileBases.push('/audio/sfx/card_crack/1', '/audio/sfx/card_crack/card_crack', '/audio/sfx/card_crack/crack');
+      }
+      // 11.7 패배 연출 - 카드 깨짐/파쇄 효과음 (card_shatter)
+      else if (key === 'card_shatter') {
+        folderDirs.push('/audio/sfx/card_shatter');
+        directFileBases.push(
+          '/audio/sfx/card_shatter/1',
+          '/audio/sfx/card_shatter/card_shatter',
+          '/audio/sfx/card_shatter/shatter',
+          '/audio/sfx/card_shatter/break'
+        );
       }
       // 12. 일반 시스템 카테고리
       else {
@@ -747,23 +1003,12 @@ class SoundEffectsEngine {
       if (manifestUrls && manifestUrls.length > 0) {
         candidateUrls = manifestUrls.slice(0, 3);
       } else {
-        // 매니페스트가 없는 경우에만 폴더 내 기본 파일명(1~3, sound, audio) 가볍게 탐색
-        const folderFileNames = ['1', '2', '3', 'sound', 'audio', 'default'];
-        folderDirs.forEach((dir) => {
-          const folderName = dir.split('/').pop() || '';
-          const namesInFolder = [...folderFileNames, folderName];
-          namesInFolder.forEach((fname) => {
-            formats.forEach((ext) => {
-              candidateUrls.push(`${dir}/${fname}.${ext}`);
-            });
-          });
-        });
-
-        directFileBases.forEach((base) => {
-          formats.forEach((ext) => {
-            candidateUrls.push(`${base}.${ext}`);
-          });
-        });
+        // 매니페스트에 없는 경우 불필요한 404 난발을 방지하기 위해 대표 파일명 1개씩만 최소 탐색
+        if (folderDirs.length > 0) {
+          candidateUrls.push(`${folderDirs[0]}/1.mp3`, `${folderDirs[0]}/1.ogg`);
+        } else if (directFileBases.length > 0) {
+          candidateUrls.push(`${directFileBases[0]}.mp3`, `${directFileBases[0]}.ogg`);
+        }
       }
 
       const uniqueUrls = Array.from(new Set(candidateUrls));
@@ -840,6 +1085,26 @@ class SoundEffectsEngine {
   }
 
   /**
+   * 피니시 사운드 즉시 중단 (스킵 및 언마운트 시 중복 재생 방지)
+   */
+  public stopFinisherSounds() {
+    this.lastFinisherTime = 0;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      if (this.activeFinisherGain && this.activeFinisherSource) {
+        this.activeFinisherGain.gain.cancelScheduledValues(now);
+        this.activeFinisherGain.gain.setValueAtTime(this.activeFinisherGain.gain.value, now);
+        this.activeFinisherGain.gain.linearRampToValueAtTime(0.001, now + 0.04);
+        this.activeFinisherSource.stop(now + 0.04);
+        this.activeFinisherSource = null;
+        this.activeFinisherGain = null;
+      }
+    } catch {}
+  }
+
+  /**
    * 디코딩된 AudioBuffer 재생 도우미
    */
   private playDecodedBuffer(buffer: AudioBuffer, key: string, volumeMultiplier: number = 1.0): boolean {
@@ -850,6 +1115,7 @@ class SoundEffectsEngine {
       const now = ctx.currentTime;
       const isCombo = key.startsWith('combo');
       const isVoice = key.startsWith('char_');
+      const isFinisher = key === 'card_shatter' || key.startsWith('finisher');
 
       // 이전 연격 사운드가 재생 중이면 부드럽게 50ms 페이드아웃 후 새 연격 사운드로 전환 (겹침 방지)
       if (isCombo && this.activeComboGain && this.activeComboSource) {
@@ -875,11 +1141,32 @@ class SoundEffectsEngine {
         this.activeVoiceGain = null;
       }
 
+      // 이전 피니시 사운드가 재생 중이면 부드럽게 50ms 페이드아웃 후 새 피니시 사운드로 전환 (겹침 방지)
+      if (isFinisher && this.activeFinisherGain && this.activeFinisherSource) {
+        try {
+          this.activeFinisherGain.gain.cancelScheduledValues(now);
+          this.activeFinisherGain.gain.setValueAtTime(this.activeFinisherGain.gain.value, now);
+          this.activeFinisherGain.gain.linearRampToValueAtTime(0.001, now + 0.05);
+          this.activeFinisherSource.stop(now + 0.05);
+        } catch {}
+        this.activeFinisherSource = null;
+        this.activeFinisherGain = null;
+      }
+
       const source = ctx.createBufferSource();
       source.buffer = buffer;
 
       // 캐릭터 보이스(char_*) 음원일 경우 가청성 향상을 위해 10% 볼륨 업(1.1x) 적용
-      const finalMultiplier = volumeMultiplier * (isVoice ? this.VOICE_VOLUME_MULTIPLIER : 1.0);
+      let finalMultiplier = volumeMultiplier * (isVoice ? this.VOICE_VOLUME_MULTIPLIER : 1.0);
+
+      // 양양(Yangyang) 캐릭터 사운드 개별 볼륨 정밀 설정
+      if (key.startsWith('char_attack_yangyang_cost')) {
+        // 일반공격(0코), 스킬공격(1코), 공명해방(2코): 0.7배
+        finalMultiplier = this.YANGYANG_ATTACK_MULTIPLIER;
+      } else if (key === 'char_levelup_yangyang') {
+        // 레벨업: 0.5배
+        finalMultiplier = this.YANGYANG_LEVELUP_MULTIPLIER;
+      }
 
       const gain = ctx.createGain();
       gain.gain.setValueAtTime(Math.max(0, Math.min(1.5, this.volume * finalMultiplier)), now);
@@ -904,6 +1191,15 @@ class SoundEffectsEngine {
           if (this.activeVoiceSource === source) {
             this.activeVoiceSource = null;
             this.activeVoiceGain = null;
+          }
+        };
+      } else if (isFinisher) {
+        this.activeFinisherSource = source;
+        this.activeFinisherGain = gain;
+        source.onended = () => {
+          if (this.activeFinisherSource === source) {
+            this.activeFinisherSource = null;
+            this.activeFinisherGain = null;
           }
         };
       }
@@ -951,48 +1247,64 @@ class SoundEffectsEngine {
   }
 
   // =========================================================================
-  // 1. 대결 카드 오픈(플립) 사운드 (REVEAL - 권장 0.2~0.5초)
+  // 1. 대결 카드 오픈(플립) 사운드 (REVEAL / OPEN - 권장 0.2~0.5초)
   // =========================================================================
   public playCardFlip() {
     if (this.isMuted) return;
 
+    // 카드 오픈 전용 커스텀 파일 우선 재생 (절대 card나 card_deal과 혼용되지 않음)
     if (this.playCustomBuffer('clash_reveal')) return;
-    if (this.playCustomBuffer('card')) return;
+    if (this.playCustomBuffer('card_open')) return;
 
     const ctx = this.getAudioContext();
     if (!ctx) return;
 
     const now = ctx.currentTime;
-    const duration = 0.22;
+    const duration = 0.24;
 
     // A. 3D 회전 카드 스위시 바람 소리
-    this.playCinematicWhoosh(0.2, this.volume * 0.45);
+    this.playCinematicWhoosh(0.22, this.volume * 0.5);
 
-    // B. 카드 플립 스냅 톡 (380Hz -> 140Hz)
+    // B. 카드 플립 스냅 톡 (520Hz -> 160Hz)
     const osc = ctx.createOscillator();
     const oscGain = ctx.createGain();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(440, now + 0.04);
-    osc.frequency.exponentialRampToValueAtTime(140, now + duration);
+    osc.frequency.setValueAtTime(520, now + 0.03);
+    osc.frequency.exponentialRampToValueAtTime(160, now + duration);
 
-    oscGain.gain.setValueAtTime(this.volume * 0.35, now + 0.04);
+    oscGain.gain.setValueAtTime(this.volume * 0.45, now + 0.03);
     oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
     osc.connect(oscGain);
     oscGain.connect(ctx.destination);
-    osc.start(now + 0.04);
+    osc.start(now + 0.03);
     osc.stop(now + duration);
+
+    // C. 카드 오픈 홀로그램 시머 공명음
+    const chime = ctx.createOscillator();
+    const chimeGain = ctx.createGain();
+    chime.type = 'sine';
+    chime.frequency.setValueAtTime(960, now + 0.04);
+    chime.frequency.exponentialRampToValueAtTime(1520, now + 0.18);
+
+    chimeGain.gain.setValueAtTime(this.volume * 0.18, now + 0.04);
+    chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+    chime.connect(chimeGain);
+    chimeGain.connect(ctx.destination);
+    chime.start(now + 0.04);
+    chime.stop(now + 0.18);
+  }
+
+  /** 카드 오픈 사운드 (playCardFlip 별칭) */
+  public playCardOpen() {
+    this.playCardFlip();
   }
 
   // =========================================================================
-  // 2. 카드 정면 격돌 사운드 (CLASH IMPACT - 권장 0.3~0.8초)
+  // 2. 카드 정면 격돌 사운드 (CLASH - clash로 통합)
   // =========================================================================
   public playClashImpact() {
-    if (this.isMuted) return;
-
-    if (this.playCustomBuffer('clash_impact')) return;
-    if (this.playCustomBuffer('clash')) return;
-
     this.playClash();
   }
 
@@ -1057,13 +1369,14 @@ class SoundEffectsEngine {
       }
     }
 
-    // 2. 없으면 캐릭터 무기군 타격음으로 자동 폴백 (20% 인하된 볼륨)
-    const weapon = fallbackWeapon || getWeaponByCharacter(characterName);
-    this.playWeaponSound(weapon);
+    // 2. 캐릭터 공격 보이스가 없고 fallbackWeapon이 명시된 경우에만 무기 타격음 재생
+    if (fallbackWeapon) {
+      this.playWeaponSound(fallbackWeapon);
+    }
   }
 
   // =========================================================================
-  // 4. 생명력(HP) 피격 / 대미지 효과음 (리더 캐릭터별 피격 보이스 & 타격음 20% 인하)
+  // 4. 생명력(HP) 피격 / 대미지 효과음 (무기군별 사운드만 재생 & 데미지별 기본 사운드 배제)
   // =========================================================================
   public playCharacterHurt(characterName?: string, _amount: number = 2): boolean {
     if (this.isMuted || !characterName) return false;
@@ -1072,27 +1385,25 @@ class SoundEffectsEngine {
     return this.playCustomBuffer(`char_hurt_${charKey}`);
   }
 
-  public playDamage(amount: number = 2, weapon?: WeaponType, victimLeaderName?: string) {
-    if (this.isMuted) return;
+  /**
+   * 일반 배틀 피격 / 대미지 사운드:
+   * - 데미지별 기본 사운드(damage_light, damage_medium, damage_heavy)를 제거하고
+   *   각 공격자의 무기별 사운드(직검, 대검, 권총, 증폭기)만 단독 재생
+   * - 피격당한 리더의 고유 피격 보이스가 있으면 병렬 재생
+   */
+  public playDamage(amount: number = 2, weapon?: WeaponType | string, victimLeaderName?: string, attackerName?: string) {
+    if (this.isMuted || amount <= 0) return;
 
     // 1. 피격당한 리더 캐릭터의 고유 피격 보이스/신음 우선 병렬 재생
     if (victimLeaderName) {
       this.playCharacterHurt(victimLeaderName, amount);
     }
 
-    // 2. 공격 무기 사운드 병렬 레이어 재생
-    if (weapon) {
-      this.playWeaponSound(weapon);
-    }
+    // 2. 공격 무기군 판별 (직접 전달된 무기 > 공격자 이름 매핑 > 기본 직검)
+    const finalWeapon = (weapon as WeaponType) || (attackerName ? getWeaponByCharacter(attackerName) : '직검');
 
-    // 3. 내장 티어별 물리 및 커스텀 타격음 재생
-    if (amount <= 2) {
-      this.playDamageLight();
-    } else if (amount >= 6) {
-      this.playDamageHeavy(amount);
-    } else {
-      this.playDamageMedium(amount);
-    }
+    // 3. 무기별 고유 사운드만 재생 (데미지 티어별 generic 기본 사운드 완전 배제)
+    this.playWeaponSound(finalWeapon);
   }
 
   /** HP 데미지 기본 공통 사운드 직접 재생 (UI 테스트 또는 일반 피격) */
@@ -1262,13 +1573,14 @@ class SoundEffectsEngine {
   // =========================================================================
   // 5. 무기 직군별 타격 효과음 (직검 / 대검 / 권총 / 증폭기 - 20% 볼륨 감소)
   // =========================================================================
-  public playWeaponSound(weapon: WeaponType) {
+  public playWeaponSound(weapon: WeaponType | string) {
     if (this.isMuted) return;
 
     let cat: SfxCategory = 'weapon_sword';
     if (weapon === '대검') cat = 'weapon_broadblade';
     else if (weapon === '권총') cat = 'weapon_pistol';
     else if (weapon === '증폭기') cat = 'weapon_rectifier';
+    else if (weapon === '직검' || weapon === '직도') cat = 'weapon_sword';
 
     // 커스텀 음원이 지정되어 있으면 우선 재생 (20% 인하 배율 적용)
     if (this.playCustomBuffer(cat, this.HIT_VOLUME_MULTIPLIER)) return;
@@ -1276,6 +1588,7 @@ class SoundEffectsEngine {
     // 없으면 고유 물리 합성음 재생 (20% 인하 배율 적용)
     switch (weapon) {
       case '직검':
+      case '직도':
         this.playWeaponSwordSynth();
         break;
       case '대검':
@@ -1286,6 +1599,9 @@ class SoundEffectsEngine {
         break;
       case '증폭기':
         this.playWeaponRectifierSynth();
+        break;
+      default:
+        this.playWeaponSwordSynth();
         break;
     }
   }
@@ -1634,61 +1950,239 @@ class SoundEffectsEngine {
   }
 
   // =========================================================================
-  // 7. 연격(Combo Strike) 참격/타격 효과음 (1콤보, 2콤보, 3콤보 이상 분리)
+  // 7. 무기군별 연격(Combo Strike) 타격 효과음 (직검 / 대검 / 권총 / 증폭기 분리)
   // =========================================================================
-  public playComboSlash(comboCount: number = 1) {
+  public playComboSlash(
+    comboCount: number = 1,
+    weapon?: WeaponType,
+    characterName?: string
+  ) {
     if (this.isMuted) return;
 
     // 이전 연격 사운드가 재생 중이면 부드럽게 중단하여 1/2/3연격 참격음 겹침 방지
     this.stopComboSounds();
 
-    // 1. 콤보 카테고리 결정: combo_1, combo_2, combo_3
-    const cat = comboCount <= 1 ? 'combo_1' : comboCount === 2 ? 'combo_2' : 'combo_3';
+    // 1. 공격 무기군 판별 (직접 전달되었거나 캐릭터 이름에서 자동 판별, 기본값 '직검')
+    const finalWeapon: WeaponType =
+      weapon || getWeaponByCharacter(characterName) || '직검';
+    const stage = comboCount <= 1 ? 1 : comboCount === 2 ? 2 : 3;
 
-    // 해당 카테고리 커스텀 사운드 시도 -> 없으면 공통 'combo' 시도
-    if (this.playCustomBuffer(cat)) return;
-    if (this.playCustomBuffer('combo')) return;
+    // 무기군 영문 매핑
+    const weaponMap: Record<WeaponType, string> = {
+      직검: 'sword',
+      대검: 'broadblade',
+      권총: 'pistol',
+      증폭기: 'rectifier',
+    };
+    const wKey = weaponMap[finalWeapon] || 'sword';
 
+    // 2. 커스텀 음원 우선 탐색 계층:
+    // A. combo_pistol_1, combo_pistol_2, combo_pistol_3 (무기별 단계별 연격)
+    // B. combo_pistol (무기별 기본 연격)
+    // C. weapon_pistol (무기 기본 타격음)
+    // D. combo_1, combo_2, combo_3 (공통 연격 단계)
+    // E. combo (공통 연격)
+    if (this.playCustomBuffer(`combo_${wKey}_${stage}`, this.HIT_VOLUME_MULTIPLIER)) return;
+    if (this.playCustomBuffer(`combo_${wKey}`, this.HIT_VOLUME_MULTIPLIER)) return;
+    if (this.playCustomBuffer(`weapon_${wKey}`, this.HIT_VOLUME_MULTIPLIER)) return;
+    if (this.playCustomBuffer(`combo_${stage}`, this.HIT_VOLUME_MULTIPLIER)) return;
+    if (this.playCustomBuffer('combo', this.HIT_VOLUME_MULTIPLIER)) return;
+
+    // 3. 내장 Web Audio 물리 합성음으로 무기군별 맞춤 연격 사운드 재생
+    this.playWeaponComboSynth(finalWeapon, comboCount);
+  }
+
+  /** 무기군별 맞춤 물리 합성 연격 사운드 (Web Audio Synthesis) */
+  private playWeaponComboSynth(weapon: WeaponType, comboCount: number) {
     const ctx = this.getAudioContext();
     if (!ctx) return;
 
     const now = ctx.currentTime;
+    const intensity = comboCount <= 1 ? 1.0 : comboCount === 2 ? 1.2 : 1.45;
+    const pitchMultiplier = comboCount <= 1 ? 1.0 : comboCount === 2 ? 1.18 : 1.35;
 
-    // 콤보 단계에 따라 피치와 볼륨 및 배음 강도를 다르게 적용
-    // 1콤보: 기본 날렵한 참격
-    // 2콤보: 1.18배 고조된 더블 참격
-    // 3콤보+: 1.38배 폭발적 최대 콤보 참격
-    const pitchMultiplier = comboCount <= 1 ? 1.0 : comboCount === 2 ? 1.18 : 1.38;
-    const intensity = comboCount <= 1 ? 1.0 : comboCount === 2 ? 1.15 : 1.35;
+    switch (weapon) {
+      // -----------------------------------------------------------------------
+      // [A] 직검 (Sword): 날렵하고 예리한 연속 참격 (Wind Slash & Blade Friction)
+      // -----------------------------------------------------------------------
+      case '직검': {
+        const strikeOsc = ctx.createOscillator();
+        const strikeGain = ctx.createGain();
+        strikeOsc.type = 'triangle';
+        strikeOsc.frequency.setValueAtTime(120 * pitchMultiplier, now);
+        strikeOsc.frequency.exponentialRampToValueAtTime(35, now + 0.22);
 
-    const strikeOsc = ctx.createOscillator();
-    const strikeGain = ctx.createGain();
-    strikeOsc.type = 'triangle';
-    strikeOsc.frequency.setValueAtTime(115 * pitchMultiplier, now);
-    strikeOsc.frequency.exponentialRampToValueAtTime(35, now + 0.24);
+        strikeGain.gain.setValueAtTime(this.volume * 0.7 * intensity, now);
+        strikeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
-    strikeGain.gain.setValueAtTime(this.volume * 0.75 * intensity, now);
-    strikeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        strikeOsc.connect(strikeGain);
+        strikeGain.connect(ctx.destination);
+        strikeOsc.start(now);
+        strikeOsc.stop(now + 0.22);
 
-    strikeOsc.connect(strikeGain);
-    strikeGain.connect(ctx.destination);
-    strikeOsc.start(now);
-    strikeOsc.stop(now + 0.24);
+        // 칼날 절삭 윈드 노이즈
+        this.playWindSlashNoise(0.18 + (comboCount >= 3 ? 0.08 : 0), this.volume * 0.55 * intensity);
 
-    this.playWindSlashNoise(0.18 + (comboCount >= 3 ? 0.08 : 0), this.volume * 0.6 * intensity);
-    if (comboCount >= 3) {
-      // 3콤보 이상일 때는 묵직한 서브 넉 추가
-      this.playDullThudNoise(0.15, this.volume * 0.5, 450);
+        // 칼날 스침 고주파 찰나 쇳소리
+        const friction = ctx.createOscillator();
+        const fGain = ctx.createGain();
+        friction.type = 'sine';
+        friction.frequency.setValueAtTime(1400 * pitchMultiplier, now);
+        friction.frequency.exponentialRampToValueAtTime(420, now + 0.08);
+
+        fGain.gain.setValueAtTime(this.volume * 0.25 * intensity, now);
+        fGain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+        friction.connect(fGain);
+        fGain.connect(ctx.destination);
+        friction.start(now);
+        friction.stop(now + 0.08);
+
+        if (comboCount >= 3) {
+          this.playDullThudNoise(0.14, this.volume * 0.45, 420);
+        }
+        break;
+      }
+
+      // -----------------------------------------------------------------------
+      // [B] 대검 (Broadblade): 묵직하고 파괴적인 지면 강타 & 지진 서브 베이스
+      // -----------------------------------------------------------------------
+      case '대검': {
+        const dur = 0.38;
+        // 서브 베이스 쿵 럼블
+        const subOsc = ctx.createOscillator();
+        const subGain = ctx.createGain();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(85 * pitchMultiplier, now);
+        subOsc.frequency.exponentialRampToValueAtTime(26, now + dur);
+
+        subGain.gain.setValueAtTime(this.volume * 0.95 * intensity, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        subOsc.connect(subGain);
+        subGain.connect(ctx.destination);
+        subOsc.start(now);
+        subOsc.stop(now + dur);
+
+        // 대검 둔탁한 타격 노이즈
+        this.playDullThudNoise(0.24, this.volume * 0.75 * intensity, 260);
+
+        // 무거운 쇠 바디 공명
+        const metalRing = ctx.createOscillator();
+        const mGain = ctx.createGain();
+        metalRing.type = 'triangle';
+        metalRing.frequency.setValueAtTime(210 * pitchMultiplier, now);
+        metalRing.frequency.exponentialRampToValueAtTime(60, now + 0.18);
+
+        mGain.gain.setValueAtTime(this.volume * 0.4 * intensity, now);
+        mGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        metalRing.connect(mGain);
+        mGain.connect(ctx.destination);
+        metalRing.start(now);
+        metalRing.stop(now + 0.18);
+        break;
+      }
+
+      // -----------------------------------------------------------------------
+      // [C] 권총 (Pistol): 속사 총격 & 탄환 격발 (Gunshot Bursts & Mechanical Cycle)
+      // -----------------------------------------------------------------------
+      case '권총': {
+        // 1콤보: 단발 사격 / 2콤보: 더블 탭 2연사 / 3콤보+: 3점사 고속 폭풍 연사
+        const burstCount = comboCount <= 1 ? 1 : comboCount === 2 ? 2 : 3;
+        const burstInterval = 0.055; // 55ms 속사 간격
+
+        for (let b = 0; b < burstCount; b++) {
+          const shotTime = now + b * burstInterval;
+
+          // 1) 고압 총기 격발 노이즈
+          const shotDur = 0.075;
+          const bufSize = Math.floor(ctx.sampleRate * shotDur);
+          const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+          const data = buf.getChannelData(0);
+          for (let i = 0; i < bufSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufSize, 2.5);
+          }
+          const shotSource = ctx.createBufferSource();
+          shotSource.buffer = buf;
+
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(2600 * (1 + b * 0.08), shotTime);
+          filter.Q.value = 1.8;
+
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(this.volume * 0.65 * intensity, shotTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, shotTime + shotDur);
+
+          shotSource.connect(filter);
+          filter.connect(gain);
+          gain.connect(ctx.destination);
+          shotSource.start(shotTime);
+          shotSource.stop(shotTime + shotDur);
+
+          // 2) 탄환 격발 스냅 트랜지언트
+          const snapOsc = ctx.createOscillator();
+          const snapGain = ctx.createGain();
+          snapOsc.type = 'triangle';
+          snapOsc.frequency.setValueAtTime(1800 + b * 120, shotTime);
+          snapOsc.frequency.exponentialRampToValueAtTime(140, shotTime + 0.035);
+
+          snapGain.gain.setValueAtTime(this.volume * 0.45 * intensity, shotTime);
+          snapGain.gain.exponentialRampToValueAtTime(0.001, shotTime + 0.035);
+
+          snapOsc.connect(snapGain);
+          snapGain.connect(ctx.destination);
+          snapOsc.start(shotTime);
+          snapOsc.stop(shotTime + 0.035);
+        }
+        break;
+      }
+
+      // -----------------------------------------------------------------------
+      // [D] 증폭기 (Rectifier): 마법 파동 & 공명 에너지 폭발 (Resonant Energy Explosion)
+      // -----------------------------------------------------------------------
+      case '증폭기': {
+        const dur = 0.32;
+        // 1) 마법 에너지 공명 주파수 비트
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const magicGain = ctx.createGain();
+
+        osc1.type = 'sine';
+        osc2.type = 'sine';
+        osc1.frequency.setValueAtTime(540 * pitchMultiplier, now);
+        osc2.frequency.setValueAtTime(810 * pitchMultiplier, now);
+        osc1.frequency.exponentialRampToValueAtTime(180, now + dur);
+        osc2.frequency.exponentialRampToValueAtTime(270, now + dur);
+
+        magicGain.gain.setValueAtTime(this.volume * 0.5 * intensity, now);
+        magicGain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+
+        osc1.connect(magicGain);
+        osc2.connect(magicGain);
+        magicGain.connect(ctx.destination);
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + dur);
+        osc2.stop(now + dur);
+
+        // 2) 에너지 폭발 솨아- 스파클 노이즈
+        this.playSoftGlassSwoosh(0.24, this.volume * 0.4 * intensity);
+        this.playDullThudNoise(0.12, this.volume * 0.4 * intensity, 480);
+        break;
+      }
     }
   }
 
   // =========================================================================
-  // 8. 카드 세트 / 제출 스냅음
+  // 8. 카드 세트 / 플레이 스냅음 (CARD PLACE - 테이블에 카드를 낼 때)
   // =========================================================================
   public playCardPlace() {
     if (this.isMuted) return;
 
     if (this.playCustomBuffer('card')) return;
+    if (this.playCustomBuffer('card_place')) return;
 
     const ctx = this.getAudioContext();
     if (!ctx) return;
@@ -1712,31 +2206,36 @@ class SoundEffectsEngine {
   }
 
   // =========================================================================
-  // 9. 카드 딜링 및 드로우 효과음
+  // 9. 패 나눠줄 때 / 카드 딜링 및 드로우 효과음 (CARD DEAL / DRAW - 완전히 분리됨)
   // =========================================================================
-  public playCardDraw(pitchMultiplier: number = 1.0) {
+  public playCardDeal(pitchMultiplier: number = 1.0) {
     if (this.isMuted) return;
-    if (this.playCustomBuffer('card')) return;
+
+    // 패 배분 / 딜링 전용 커스텀 파일 확인 (절대 card 세트음이나 clash_reveal 오픈음과 혼용되지 않음)
+    if (this.playCustomBuffer('card_deal', this.volume * 0.9)) return;
+    if (this.playCustomBuffer('card_draw', this.volume * 0.9)) return;
+
     const ctx = this.getAudioContext();
     if (!ctx) return;
 
     const now = ctx.currentTime;
-    const duration = 0.09;
+    const duration = 0.085;
 
+    // A. 덱 표면 카드 마찰 슬라이딩 촥- 노이즈
     const bufferSize = Math.floor(ctx.sampleRate * duration);
     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = buffer.getChannelData(0);
     for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.sin((Math.PI * i) / bufferSize);
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 1.8);
     }
     const noise = ctx.createBufferSource();
     noise.buffer = buffer;
 
     const filter = ctx.createBiquadFilter();
     filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(2200 * pitchMultiplier, now);
-    filter.frequency.exponentialRampToValueAtTime(1200 * pitchMultiplier, now + duration);
-    filter.Q.value = 2.0;
+    filter.frequency.setValueAtTime(3200 * pitchMultiplier, now);
+    filter.frequency.exponentialRampToValueAtTime(1600 * pitchMultiplier, now + duration);
+    filter.Q.value = 2.4;
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(this.volume * 0.45, now);
@@ -1748,19 +2247,25 @@ class SoundEffectsEngine {
     noise.start(now);
     noise.stop(now + duration);
 
+    // B. 패 안착 찰각 틱 (Card Deck Edge Flick)
     const osc = ctx.createOscillator();
     const oscGain = ctx.createGain();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(480 * pitchMultiplier, now + 0.02);
-    osc.frequency.exponentialRampToValueAtTime(120, now + 0.06);
+    osc.frequency.setValueAtTime(560 * pitchMultiplier, now + 0.01);
+    osc.frequency.exponentialRampToValueAtTime(180, now + 0.05);
 
-    oscGain.gain.setValueAtTime(this.volume * 0.25, now + 0.02);
-    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+    oscGain.gain.setValueAtTime(this.volume * 0.28, now + 0.01);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
 
     osc.connect(oscGain);
     oscGain.connect(ctx.destination);
-    osc.start(now + 0.02);
-    osc.stop(now + 0.06);
+    osc.start(now + 0.01);
+    osc.stop(now + 0.05);
+  }
+
+  /** 단일 카드 드로우 사운드 (playCardDeal 별칭) */
+  public playCardDraw(pitchMultiplier: number = 1.0) {
+    this.playCardDeal(pitchMultiplier);
   }
 
   public playCardWhooshOut(pitchMultiplier: number = 1.0) {
@@ -1797,11 +2302,14 @@ class SoundEffectsEngine {
     noise.stop(now + duration);
   }
 
-  public playCardDealSequence(count: number = 5, intervalMs: number = 90) {
+  /**
+   * 패 나눠줄 때 (게임 시작 시 손패 배분, 멀리건) 연속 딜링 사운드 시퀀스
+   */
+  public playCardDealSequence(count: number = 5, intervalMs: number = 85) {
     for (let i = 0; i < count; i++) {
       setTimeout(() => {
-        const pitch = 0.95 + i * 0.03;
-        this.playCardDraw(pitch);
+        const pitch = 0.96 + i * 0.04;
+        this.playCardDeal(pitch);
       }, i * intervalMs);
     }
   }
@@ -1856,57 +2364,55 @@ class SoundEffectsEngine {
     this.lastUpgradeTime = nowMs;
     this.lastUpgradeKey = upgradeKey;
 
-    // 1. 캐릭터 고유 레벨업 사운드 확인 (예: char_levelup_jinhsi)
-    if (charKey) {
-      if (this.playCustomBuffer(`char_levelup_${charKey}`)) {
-        return;
+    // 1. 공통 레벨업 효과음 (커스텀 upgrade 파일 우선 재생: 볼륨 30% 증가 1.3x, 없으면 신성한 상승 아르페지오 합성음 폴백)
+    const playedCustomUpgrade = this.playCustomBuffer('upgrade', 1.3);
+    if (!playedCustomUpgrade) {
+      const ctx = this.getAudioContext();
+      if (ctx) {
+        const now = ctx.currentTime;
+
+        const subOsc = ctx.createOscillator();
+        const subGain = ctx.createGain();
+        subOsc.type = 'sine';
+        subOsc.frequency.setValueAtTime(90, now);
+        subOsc.frequency.exponentialRampToValueAtTime(35, now + 0.6);
+
+        subGain.gain.setValueAtTime(this.volume * 0.91, now);
+        subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+        subOsc.connect(subGain);
+        subGain.connect(ctx.destination);
+        subOsc.start(now);
+        subOsc.stop(now + 0.6);
+
+        const notes = [261.63, 329.63, 392.0, 523.25];
+        notes.forEach((freq, idx) => {
+          const noteOsc = ctx.createOscillator();
+          const noteGain = ctx.createGain();
+          noteOsc.type = 'triangle';
+          noteOsc.frequency.value = freq;
+
+          const noteStart = now + idx * 0.08;
+          const noteDur = 0.55;
+
+          noteGain.gain.setValueAtTime(0.0001, noteStart);
+          noteGain.gain.linearRampToValueAtTime(this.volume * 0.455, noteStart + 0.02);
+          noteGain.gain.exponentialRampToValueAtTime(0.0001, noteStart + noteDur);
+
+          noteOsc.connect(noteGain);
+          noteGain.connect(ctx.destination);
+          noteOsc.start(noteStart);
+          noteOsc.stop(noteStart + noteDur);
+        });
+
+        this.playCinematicWhoosh(0.65, this.volume * 0.52);
       }
     }
 
-    // 2. 공통 커스텀 upgrade 사운드 확인
-    if (this.playCustomBuffer('upgrade')) return;
-
-    // 3. 내장 신성한 상승 아르페지오 각성 합성음 폴백
-    const ctx = this.getAudioContext();
-    if (!ctx) return;
-
-    const now = ctx.currentTime;
-
-    const subOsc = ctx.createOscillator();
-    const subGain = ctx.createGain();
-    subOsc.type = 'sine';
-    subOsc.frequency.setValueAtTime(90, now);
-    subOsc.frequency.exponentialRampToValueAtTime(35, now + 0.6);
-
-    subGain.gain.setValueAtTime(this.volume * 0.7, now);
-    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-
-    subOsc.connect(subGain);
-    subGain.connect(ctx.destination);
-    subOsc.start(now);
-    subOsc.stop(now + 0.6);
-
-    const notes = [261.63, 329.63, 392.0, 523.25];
-    notes.forEach((freq, idx) => {
-      const noteOsc = ctx.createOscillator();
-      const noteGain = ctx.createGain();
-      noteOsc.type = 'triangle';
-      noteOsc.frequency.value = freq;
-
-      const noteStart = now + idx * 0.08;
-      const noteDur = 0.55;
-
-      noteGain.gain.setValueAtTime(0.0001, noteStart);
-      noteGain.gain.linearRampToValueAtTime(this.volume * 0.35, noteStart + 0.02);
-      noteGain.gain.exponentialRampToValueAtTime(0.0001, noteStart + noteDur);
-
-      noteOsc.connect(noteGain);
-      noteGain.connect(ctx.destination);
-      noteOsc.start(noteStart);
-      noteOsc.stop(noteStart + noteDur);
-    });
-
-    this.playCinematicWhoosh(0.65, this.volume * 0.4);
+    // 2. 캐릭터 고유 레벨업 보이스 동시 재생 (캐릭터 음성이 있는 경우 효과음과 함께 겹쳐서 재생: 30% 증폭)
+    if (charKey) {
+      this.playCustomBuffer(`char_levelup_${charKey}`, 1.3);
+    }
   }
 
   // =========================================================================
@@ -2297,6 +2803,97 @@ class SoundEffectsEngine {
 
     // 2. 기본 경쾌한 카드 회전/교대 스우시 효과음 폴백
     this.playCardFlip();
+  }
+
+  // =========================================================================
+  // 20. 치명타 피니시 / 카드 파쇄 (Cinematic Finisher Shatter)
+  // =========================================================================
+  public playFinisherHeartbeat() {
+    if (this.isMuted) return;
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 쿵-쿵 2연타 심장박동 (Deep Heartbeat)
+    [0, 0.22].forEach((offset, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(68, now + offset);
+      osc.frequency.exponentialRampToValueAtTime(32, now + offset + 0.14);
+
+      gain.gain.setValueAtTime(0.001, now + offset);
+      gain.gain.linearRampToValueAtTime(this.volume * (idx === 0 ? 0.6 : 0.8), now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.14);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.14);
+    });
+    this.playDullThudNoise(0.18, this.volume * 0.45, 180);
+  }
+
+  public playFinisherCrack() {
+    // 통합 4초 피니시 사운드(playFinisherShatter)로 일원화되어 개별 균열음은 중복 재생 방지를 위해 no-op 처리
+  }
+
+  public playFinisherShatter() {
+    if (this.isMuted) return;
+
+    // 0. 1500ms 내 중복 호출 디바운스 가드 (배틀 종료 전환 및 리렌더링 시 다중 트리거 방지)
+    const nowMs = Date.now();
+    if (this.lastFinisherTime && nowMs - this.lastFinisherTime < 1500) {
+      return;
+    }
+    this.lastFinisherTime = nowMs;
+
+    // 1. 커스텀 카드 파쇄/깨짐 음원 확인 (/audio/sfx/card_shatter/1.mp3, shatter.mp3 등)
+    if (this.playCustomBuffer('card_shatter')) return;
+
+    const ctx = this.getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // 1. 거대한 서브 베이스 진동 및 충격파 쿵 (Massive Sub-Bass Quake)
+    const subOsc = ctx.createOscillator();
+    const subGain = ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(160, now);
+    subOsc.frequency.exponentialRampToValueAtTime(24, now + 0.85);
+
+    subGain.gain.setValueAtTime(this.volume * 1.0, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+    subOsc.connect(subGain);
+    subGain.connect(ctx.destination);
+    subOsc.start(now);
+    subOsc.stop(now + 0.85);
+
+    // 2. 폭발성 충돌 노이즈 (Explosion Burst)
+    this.playDullThudNoise(0.5, this.volume * 0.9, 320);
+
+    // 3. 산산조각 파편 유리/크리스탈 흩뿌림 차임 (Glass Shatter Shards Ring)
+    const shardFreqs = [1900, 2450, 3100, 3800, 4400, 5200];
+    shardFreqs.forEach((freq, idx) => {
+      const delay = idx * 0.035;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq + (Math.random() * 200 - 100), now + delay);
+
+      gain.gain.setValueAtTime(0.0001, now + delay);
+      gain.gain.linearRampToValueAtTime(this.volume * (0.4 - idx * 0.04), now + delay + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.22);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now + delay);
+      osc.stop(now + delay + 0.22);
+    });
+
+    // 4. 고속 스우시 파편 바람소리
+    this.playSoftGlassSwoosh(0.45, this.volume * 0.6);
   }
 
   // =========================================================================

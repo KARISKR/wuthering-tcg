@@ -2,31 +2,91 @@ import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Lobby } from './components/Lobby';
 import type { CustomDeckConfig } from './components/DeckBuilder';
 import type { BattleReplayData } from './utils/replayManager';
-import { FeedbackWidget } from './components/FeedbackWidget';
 import { bgmManager } from './utils/bgmManager';
+import { MAINTENANCE_CONFIG } from './config/maintenanceConfig';
+import { MaintenanceScreen } from './components/MaintenanceScreen';
 
 const GameBoard = lazy(() => import('./components/GameBoard').then((m) => ({ default: m.GameBoard })));
 const DeckBuilder = lazy(() => import('./components/DeckBuilder').then((m) => ({ default: m.DeckBuilder })));
 const BattleReplayStage = lazy(() => import('./components/BattleReplayStage').then((m) => ({ default: m.BattleReplayStage })));
+const ScriptedTutorialBattle = lazy(() => import('./components/ScriptedTutorialBattle').then((m) => ({ default: m.ScriptedTutorialBattle })));
+const CommunityBoard = lazy(() => import('./components/CommunityBoard').then((m) => ({ default: m.CommunityBoard })));
 
 export function App() {
-  const [currentView, setCurrentView] = useState<'LOBBY' | 'BATTLE' | 'DECK_BUILDER' | 'REPLAY_STAGE'>('LOBBY');
+  const [currentView, setCurrentView] = useState<'LOBBY' | 'BATTLE' | 'DECK_BUILDER' | 'REPLAY_STAGE' | 'BOARD'>('LOBBY');
   const [previousView, setPreviousView] = useState<'LOBBY' | 'BATTLE'>('LOBBY');
   const [battleMode, setBattleMode] = useState<'AI' | 'SOLO_DUAL'>('AI');
+  const [isTutorialBattle, setIsTutorialBattle] = useState(false);
   const [customDeck, setCustomDeck] = useState<CustomDeckConfig | null>(null);
   const [opponentDeck, setOpponentDeck] = useState<CustomDeckConfig | null>(null);
   const [activeReplay, setActiveReplay] = useState<BattleReplayData | null>(null);
 
-  // 뷰 전환에 따라 대기실 BGM vs 배틀 BGM 자동 전환
-  useEffect(() => {
-    if (currentView === 'BATTLE' || currentView === 'REPLAY_STAGE') {
-      bgmManager.setMode('battle');
-    } else {
-      bgmManager.setMode('lobby');
+  // 점검 모드 관리자 우회 상태
+  const [isMaintenanceBypassed, setIsMaintenanceBypassed] = useState<boolean>(() => {
+    if (sessionStorage.getItem('wuthering_maintenance_bypass') === 'true') {
+      return true;
     }
-  }, [currentView]);
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasAdminParam =
+      searchParams.get('admin') === 'true' ||
+      searchParams.get('bypass') === 'true' ||
+      searchParams.get('key') === 'beta20' ||
+      window.location.hash.toLowerCase().includes('admin');
+
+    if (hasAdminParam) {
+      sessionStorage.setItem('wuthering_maintenance_bypass', 'true');
+      return true;
+    }
+    return false;
+  });
+
+  const isMaintenanceActive =
+    MAINTENANCE_CONFIG.enabled &&
+    !isMaintenanceBypassed &&
+    new Date(MAINTENANCE_CONFIG.targetEndTime).getTime() > Date.now();
+
+  // URL 해시 라우팅 지원 (각 화면별 고유 URL 주소 제공)
+  useEffect(() => {
+    const checkHash = () => {
+      const rawHash = window.location.hash.toLowerCase();
+      const hash = rawHash.replace('#/', '#');
+      if (hash === '#board') {
+        setCurrentView('BOARD');
+      } else if (hash === '#deck-builder' || hash === '#deckbuilder') {
+        setCurrentView('DECK_BUILDER');
+      } else if (hash === '#battle-stage' || hash === '#tutorial-battle') {
+        if (hash === '#tutorial-battle') setIsTutorialBattle(true);
+        setCurrentView('BATTLE');
+      } else if (hash === '#replay-stage') {
+        setCurrentView('REPLAY_STAGE');
+      } else {
+        // 빈 해시, #, #battle, #preset, #card-gallery, #shared-decks 등 모든 로비 화면/모달 라우트
+        setCurrentView('LOBBY');
+      }
+    };
+
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
+
+  // 뷰 전환에 따라 대기실 BGM vs 배틀 BGM 자동 전환 (튜토리얼 시 The Sound of Midday Bells 고정)
+  useEffect(() => {
+    if (isTutorialBattle) {
+      bgmManager.lockTrackByTitle('The Sound of Midday Bells');
+    } else {
+      bgmManager.unlockTrack();
+      if (currentView === 'BATTLE' || currentView === 'REPLAY_STAGE') {
+        bgmManager.setMode('battle');
+      } else {
+        bgmManager.setMode('lobby');
+      }
+    }
+  }, [currentView, isTutorialBattle]);
 
   const handleStartGame = (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, oppDeck?: CustomDeckConfig) => {
+    setIsTutorialBattle(false);
+    window.location.hash = '#battle-stage';
     setCustomDeck(myDeck ?? null);
     setOpponentDeck(oppDeck ?? null);
     setBattleMode(mode);
@@ -34,6 +94,7 @@ export function App() {
   };
 
   const handleStartBattleWithCustomDeck = (deck: CustomDeckConfig) => {
+    window.location.hash = '#battle-stage';
     setCustomDeck(deck);
     setOpponentDeck(null);
     setBattleMode('AI');
@@ -41,21 +102,79 @@ export function App() {
   };
 
   const handlePlayBattleReplay = (replay: BattleReplayData) => {
+    window.location.hash = '#replay-stage';
     setPreviousView(currentView === 'BATTLE' ? 'BATTLE' : 'LOBBY');
     setActiveReplay(replay);
     setCurrentView('REPLAY_STAGE');
   };
 
   const handleExitReplay = () => {
+    if (window.location.hash.toLowerCase().includes('replay')) {
+      history.pushState('', document.title, window.location.pathname + window.location.search);
+    }
     setCurrentView(previousView);
   };
+
+  const handleOpenDeckBuilder = () => {
+    window.location.hash = '#deck-builder';
+    setCurrentView('DECK_BUILDER');
+  };
+
+  const handleExitDeckBuilder = () => {
+    if (window.location.hash.toLowerCase().includes('deck')) {
+      history.pushState('', document.title, window.location.pathname + window.location.search);
+    }
+    setCurrentView('LOBBY');
+  };
+
+  const handleOpenBoard = () => {
+    window.location.hash = '#board';
+    setCurrentView('BOARD');
+  };
+
+  const handleBackToLobbyFromBoard = () => {
+    if (window.location.hash.toLowerCase().includes('board')) {
+      history.pushState('', document.title, window.location.pathname + window.location.search);
+    }
+    setCurrentView('LOBBY');
+  };
+
+  
+  const handleStartTutorial = () => {
+    window.location.hash = '#tutorial-battle';
+    setCustomDeck(null);
+    setOpponentDeck(null);
+    setBattleMode('AI');
+    setIsTutorialBattle(true);
+    setCurrentView('BATTLE');
+  };
+
+  const handleExitBattle = () => {
+    if (window.location.hash.toLowerCase().includes('battle')) {
+      history.pushState('', document.title, window.location.pathname + window.location.search);
+    }
+    setCurrentView('LOBBY');
+  };
+
+  if (isMaintenanceActive) {
+    return (
+      <MaintenanceScreen
+        onBypass={() => {
+          sessionStorage.setItem('wuthering_maintenance_bypass', 'true');
+          setIsMaintenanceBypassed(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-[#070a13]">
       {currentView === 'LOBBY' && (
         <Lobby
           onStartGame={handleStartGame}
-          onOpenDeckBuilder={() => setCurrentView('DECK_BUILDER')}
+          onStartTutorial={handleStartTutorial}
+          onOpenDeckBuilder={handleOpenDeckBuilder}
+          onOpenBoard={handleOpenBoard}
           onStartBattleWithCustomDeck={handleStartBattleWithCustomDeck}
           onPlayBattleReplay={handlePlayBattleReplay}
         />
@@ -71,15 +190,23 @@ export function App() {
       >
         {currentView === 'DECK_BUILDER' && (
           <DeckBuilder
-            onBackToLobby={() => setCurrentView('LOBBY')}
+            onBackToLobby={handleExitDeckBuilder}
             onStartBattleWithDeck={handleStartBattleWithCustomDeck}
           />
         )}
 
-        {currentView === 'BATTLE' && (
+        {currentView === 'BATTLE' && isTutorialBattle && (
+          <ScriptedTutorialBattle
+            onExitToLobby={handleExitBattle}
+            onStartRealBattle={() => handleStartGame('AI')}
+          />
+        )}
+
+        {currentView === 'BATTLE' && !isTutorialBattle && (
           <GameBoard
-            onExitToLobby={() => setCurrentView('LOBBY')}
+            onExitToLobby={handleExitBattle}
             initialMode={battleMode}
+            isTutorialMode={false}
             customDeck={customDeck}
             opponentDeck={opponentDeck}
             onPlayBattleReplay={handlePlayBattleReplay}
@@ -92,10 +219,15 @@ export function App() {
             onExit={handleExitReplay}
           />
         )}
+
+        {currentView === 'BOARD' && (
+          <CommunityBoard
+            onBackToLobby={handleBackToLobbyFromBoard}
+            onStartBattleWithCustomDeck={handleStartBattleWithCustomDeck}
+          />
+        )}
       </Suspense>
 
-      {/* 메인 화면(로비) 전용 버그 제보 & 피드백 플로팅 위젯 */}
-      {currentView === 'LOBBY' && <FeedbackWidget currentContextView="LOBBY" />}
     </div>
   );
 }

@@ -5,43 +5,35 @@ import {
   shareNewDeck,
   toggleLikeSharedDeck,
   importSharedDeckToPreset,
-  deleteSharedDeck,
   ShareDeckParams,
 } from '../utils/sharedDecks';
 import {
   getStoredPresets,
   presetToCustomDeck,
   getActiveCustomDeck,
+  saveUserDeck,
 } from '../utils/deckCode';
 import { DEDUPED_LV0_CHARACTERS, ALL_CHARACTERS } from '../data/cards';
-import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
+import { OFFICIAL_CARDS } from '../data/officialCards';
 import {
   X,
-  Share2,
   Heart,
   Copy,
   Check,
   Download,
   Swords,
   Search,
-  Sparkles,
   UserCheck,
   UserX,
   Plus,
   Layers,
-  ChevronDown,
-  ChevronUp,
   Info,
-  Tag,
-  ArrowRight,
   ArrowLeft,
-  Flame,
-  Shield,
-  Zap,
   Clock,
   Send,
-  Trash2,
   Crown,
+  Eye,
+  BookmarkPlus,
 } from 'lucide-react';
 
 interface CommunityDeckModalProps {
@@ -75,7 +67,8 @@ const AVAILABLE_TAGS = [
   'sldark',
 ];
 
-// 상대 시간 표시 헬퍼
+const TILE_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)';
+
 function formatTimeAgo(timestamp: number): string {
   const diffMs = Date.now() - timestamp;
   const mins = Math.floor(diffMs / (1000 * 60));
@@ -100,10 +93,10 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
   const [selectedTag, setSelectedTag] = useState<string>('전체');
   const [sortBy, setSortBy] = useState<'POPULAR' | 'LATEST' | 'NAME'>('POPULAR');
 
-  // 상세 보기 펼치기 (deckId -> boolean)
-  const [expandedDeckId, setExpandedDeckId] = useState<string | null>(null);
+  // 상세 보기 모달 대상 덱 (바뀐 덱 빌더처럼 클릭 시 전체 덱 리스트 상세 표시)
+  const [inspectingDeck, setInspectingDeck] = useState<SharedDeck | null>(null);
 
-  // 복사 피드백
+  // 복사 / 가져오기 피드백
   const [copiedDeckId, setCopiedDeckId] = useState<string | null>(null);
   const [importedDeckId, setImportedDeckId] = useState<string | null>(null);
 
@@ -118,7 +111,6 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
   const [selectedFormTags, setSelectedFormTags] = useState<string[]>(['속공']);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
-  // 데이터 로드
   const reloadData = () => {
     const decks = getSharedDecks();
     setSharedDecks(decks);
@@ -132,12 +124,11 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       reloadData();
-      setExpandedDeckId(null);
+      setInspectingDeck(null);
       setCopiedDeckId(null);
       setImportedDeckId(null);
       setShareFeedback(null);
 
-      // 현재 편집 중인 덱 또는 저장된 활성 덱으로 폼 기본값 세팅
       const activeDeck = currentEditingDeck || getActiveCustomDeck();
       if (activeDeck) {
         setShareDeckName(activeDeck.name || '나만의 커스텀 덱');
@@ -148,7 +139,6 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
     }
   }, [isOpen]);
 
-  // 캐릭터 카드 정보 헬퍼
   const getCharInfo = (code: string) => {
     return (
       DEDUPED_LV0_CHARACTERS.find((c) => c.code === code) ||
@@ -156,49 +146,43 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
     );
   };
 
-  // 필터링 및 정렬된 덱 목록
   const filteredDecks = useMemo(() => {
     return sharedDecks
-      .filter((deck) => {
-        // 태그 필터
-        if (selectedTag !== '전체' && !deck.tags.includes(selectedTag)) {
-          return false;
-        }
-        // 검색 필터
+      .filter((d) => {
+        if (selectedTag !== '전체' && !d.tags.includes(selectedTag)) return false;
         if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase().trim();
-          const matchName = deck.deckName.toLowerCase().includes(q);
-          const matchAuthor = deck.authorName.toLowerCase().includes(q);
-          const matchDesc = deck.description.toLowerCase().includes(q);
-          const matchTag = deck.tags.some((t) => t.toLowerCase().includes(q));
-          const matchLeader = (deck.deckPreset.leaderCode || '').toLowerCase().includes(q);
-          if (!matchName && !matchAuthor && !matchDesc && !matchTag && !matchLeader) {
-            return false;
-          }
+          const q = searchQuery.toLowerCase();
+          const matchName = d.deckName.toLowerCase().includes(q);
+          const matchAuthor = d.authorName.toLowerCase().includes(q);
+          const matchTag = d.tags.some((t) => t.toLowerCase().includes(q));
+          const matchDesc = d.description.toLowerCase().includes(q);
+          if (!matchName && !matchAuthor && !matchTag && !matchDesc) return false;
         }
         return true;
       })
       .sort((a, b) => {
-        if (sortBy === 'POPULAR') {
-          return b.likes - a.likes;
-        } else if (sortBy === 'LATEST') {
-          return b.createdAt - a.createdAt;
-        } else {
-          return a.deckName.localeCompare(b.deckName);
-        }
+        if (sortBy === 'POPULAR') return b.likes - a.likes;
+        if (sortBy === 'LATEST') return b.createdAt - a.createdAt;
+        if (sortBy === 'NAME') return a.deckName.localeCompare(b.deckName);
+        return 0;
       });
   }, [sharedDecks, selectedTag, searchQuery, sortBy]);
 
-  // 좋아요 클릭
   const handleLike = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const result = toggleLikeSharedDeck(id);
     setSharedDecks((prev) =>
       prev.map((d) => (d.id === id ? { ...d, likes: result.likes, likedByMe: result.liked } : d))
     );
+    if (inspectingDeck && inspectingDeck.id === id) {
+      setInspectingDeck({
+        ...inspectingDeck,
+        likes: result.likes,
+        likedByMe: result.liked,
+      });
+    }
   };
 
-  // 덱 코드 복사
   const handleCopyCode = (deck: SharedDeck, e: React.MouseEvent) => {
     e.stopPropagation();
     navigator.clipboard.writeText(deck.deckCode);
@@ -206,15 +190,24 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
     setTimeout(() => setCopiedDeckId(null), 2500);
   };
 
-  // 내 프리셋으로 가져오기
   const handleImport = (deck: SharedDeck, e: React.MouseEvent) => {
     e.stopPropagation();
+    // 1. 프리셋에 추가
     importSharedDeckToPreset(deck);
+    // 2. 보유 덱(userDecks)에도 직접 복사하여 마이 덱에서 바로 사용 가능하게
+    try {
+      const customConfig = presetToCustomDeck(deck.deckPreset);
+      saveUserDeck({
+        ...customConfig,
+        id: `user-deck-${Date.now()}`,
+        name: `[공유] ${deck.deckName}`,
+      });
+    } catch {}
+
     setImportedDeckId(deck.id);
     setTimeout(() => setImportedDeckId(null), 2500);
   };
 
-  // 이 덱으로 바로 대전 시작
   const handleBattleWithDeck = (deck: SharedDeck) => {
     try {
       const customConfig = presetToCustomDeck(deck.deckPreset);
@@ -227,7 +220,6 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
     }
   };
 
-  // 공유 등록 폼 제출
   const handleShareSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -280,57 +272,73 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-slate-950 border-2 border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-slate-100">
+      <div
+        className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-[#090d1c]/95 border-2 border-fuchsia-400/80 shadow-[0_0_50px_rgba(217,70,239,0.28)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
+        style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
+      >
+        {/* 내부 인셋 라인 */}
+        <div className="absolute inset-1.5 border border-fuchsia-400/25 pointer-events-none z-30" />
+
+        {/* 네 모서리 코너 브라켓 장식 */}
+        <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-fuchsia-300 z-30 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-fuchsia-300 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-fuchsia-300 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-fuchsia-300 z-30 pointer-events-none" />
+
         {/* 상단 헤더 */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-800 bg-slate-900/90 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4.5 border-b border-fuchsia-400/20 bg-[#0d1226]/90 shrink-0 relative z-20">
           <div className="flex items-center gap-3.5">
-            {/* 좌상단 대기실로 나가기 버튼 통일 */}
             <button
               onClick={onClose}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
               title="대기실로 나가기"
             >
-              <ArrowLeft className="w-4 h-4 text-amber-400" />
+              <ArrowLeft className="w-4 h-4 text-fuchsia-400" />
               <span>대기실로 나가기</span>
             </button>
-            <div className="h-6 w-px bg-slate-800 hidden sm:block" />
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
-              <Share2 className="w-5 h-5 text-white" />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-indigo-600/20 border border-fuchsia-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-fuchsia-500/20 shrink-0">
+              <img src="/images/menu_icons/shared-decks.png" alt="공유된 덱 리스트" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
             </div>
             <div>
               <div className="flex items-center gap-2.5">
                 <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
                   공유된 덱 리스트
                 </h2>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold">
-                  커뮤니티 실전 공유 레시피
+                <span className="text-xs px-2.5 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 font-bold">
+                  COMMUNITY DECKS
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5 hidden sm:block">
-                mc.sldark 실전 메타 덱 4종 및 다른 플레이어들의 독창적인 덱을 둘러보고, 원클릭 복사/대전을 즐겨보세요!
+                덱을 클릭하면 전체 40장 구성 및 상세 레시피를 확인하고 즉시 내 덱으로 가져올 수 있습니다.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             {/* 탭 전환 버튼 */}
-            <div className="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+            <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/60">
               <button
-                onClick={() => setActiveTab('BROWSE')}
+                onClick={() => {
+                  setActiveTab('BROWSE');
+                  setInspectingDeck(null);
+                }}
                 className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'BROWSE'
-                    ? 'bg-amber-500 text-slate-950 shadow-md font-black'
+                    ? 'bg-fuchsia-600 text-white shadow-md font-black'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
                 <Layers className="w-4 h-4" />
-                <span>공유된 덱 리스트 ({sharedDecks.length})</span>
+                <span>공유된 덱 목록 ({sharedDecks.length})</span>
               </button>
               <button
-                onClick={() => setActiveTab('SHARE')}
+                onClick={() => {
+                  setActiveTab('SHARE');
+                  setInspectingDeck(null);
+                }}
                 className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer ${
                   activeTab === 'SHARE'
-                    ? 'bg-indigo-600 text-white shadow-md font-black'
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -349,11 +357,11 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
           </div>
         </div>
 
-        {/* 탭 1: 공유 덱 둘러보기 */}
+        {/* 탭 1: 공유 덱 둘러보기 (바뀐 덱 빌더 스타일 타일 그리드) */}
         {activeTab === 'BROWSE' && (
-          <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 flex flex-col min-h-0 relative z-20">
             {/* 검색 & 필터 바 */}
-            <div className="p-4 sm:p-5 border-b border-slate-800/80 bg-slate-900/40 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#0d1226]/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
               {/* 검색창 */}
               <div className="relative flex-1 min-w-[240px]">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -362,17 +370,17 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="덱 이름, 작성자(익명 포함), 태그 검색..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-700/70 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
+                  className="w-full pl-10 pr-4 py-2 bg-slate-950/80 border border-slate-700/70 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-400 transition"
                 />
               </div>
 
               {/* 정렬 셀렉트 */}
               <div className="flex items-center gap-2">
-                <span className="text-xs sm:text-sm text-slate-400 font-bold">정렬:</span>
+                <span className="text-xs text-slate-400 font-bold">정렬:</span>
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as any)}
-                  className="bg-slate-950/80 border border-slate-700/70 rounded-xl px-3.5 py-2 text-xs sm:text-sm text-slate-200 focus:outline-none focus:border-amber-400 font-medium"
+                  className="bg-slate-950/80 border border-slate-700/70 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-fuchsia-400 font-medium"
                 >
                   <option value="POPULAR">❤️ 추천 많은 순</option>
                   <option value="LATEST">⏱️ 최신 등록 순</option>
@@ -381,13 +389,13 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
               </div>
 
               {/* 태그 칩 필터 */}
-              <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-1 text-xs sm:text-sm scrollbar-thin">
+              <div className="w-full flex items-center gap-1.5 overflow-x-auto pb-0.5 text-xs scrollbar-none">
                 <button
                   onClick={() => setSelectedTag('전체')}
                   className={`px-3 py-1.5 rounded-lg font-bold shrink-0 transition cursor-pointer ${
                     selectedTag === '전체'
-                      ? 'bg-amber-400 text-slate-950 font-black shadow'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                      ? 'bg-fuchsia-500 text-white font-black shadow'
+                      : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800'
                   }`}
                 >
                   # 전체 ({sharedDecks.length})
@@ -396,10 +404,10 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                   <button
                     key={tag}
                     onClick={() => setSelectedTag(tag)}
-                    className={`px-2.5 py-1 rounded-lg font-medium shrink-0 transition ${
+                    className={`px-2.5 py-1 rounded-lg font-medium shrink-0 transition cursor-pointer ${
                       selectedTag === tag
-                        ? 'bg-amber-400 text-slate-950 font-black'
-                        : 'bg-slate-800/80 text-slate-300 hover:bg-slate-700'
+                        ? 'bg-fuchsia-500 text-white font-black'
+                        : 'bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-800'
                     }`}
                   >
                     #{tag}
@@ -408,8 +416,8 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
               </div>
             </div>
 
-            {/* 공유 덱 카드 리스트 */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+            {/* 마스터듀얼 / 덱 빌더 스타일 덱 타일 그리드 */}
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
               {filteredDecks.length === 0 ? (
                 <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-3">
                   <Info className="w-10 h-10 stroke-1" />
@@ -419,312 +427,90 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                       setSearchQuery('');
                       setSelectedTag('전체');
                     }}
-                    className="text-xs text-amber-400 hover:underline"
+                    className="text-xs text-fuchsia-400 hover:underline cursor-pointer"
                   >
                     필터 초기화
                   </button>
                 </div>
               ) : (
-                filteredDecks.map((deck) => {
-                  const leader = getCharInfo(deck.deckPreset.leaderCode);
-                  const leftSup = getCharInfo(deck.deckPreset.leftSupportCode);
-                  const rightSup = getCharInfo(deck.deckPreset.rightSupportCode);
-                  const isExpanded = expandedDeckId === deck.id;
-                  const isCopied = copiedDeckId === deck.id;
-                  const isImported = importedDeckId === deck.id;
+                <div className="grid gap-5 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(220px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] max-w-[1600px] mx-auto">
+                  {filteredDecks.map((deck) => {
+                    const leader = getCharInfo(deck.deckPreset.leaderCode);
+                    const leftSup = getCharInfo(deck.deckPreset.leftSupportCode);
+                    const rightSup = getCharInfo(deck.deckPreset.rightSupportCode);
+                    const art = leader?.artUrl;
+                    const actionTotal = deck.deckPreset.actionCards.reduce((acc, c) => acc + c.count, 0);
 
-                  return (
-                    <div
-                      key={deck.id}
-                      className="bg-slate-900/60 border border-slate-800 hover:border-slate-700 rounded-2xl p-4 sm:p-5 transition shadow-lg hover:shadow-xl"
-                    >
-                      {/* 카드 상단: 리더 3인 및 덱 타이틀 / 작성자 */}
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                        <div className="flex items-start gap-3.5">
-                          {/* 3인 리더 아바타 스택 */}
-                          <div className="flex -space-x-3 shrink-0 pt-0.5">
-                            {leader && (
-                              <img
-                                src={leader.artUrl}
-                                alt={leader.nameKr}
-                                title={`리더: ${leader.nameKr}`}
-                                className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-400 shadow-md relative z-20 bg-slate-800"
-                              />
-                            )}
-                            {leftSup && (
-                              <img
-                                src={leftSup.artUrl}
-                                alt={leftSup.nameKr}
-                                title={`서포터 1: ${leftSup.nameKr}`}
-                                className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-600 shadow-md relative z-10 bg-slate-800"
-                              />
-                            )}
-                            {rightSup && (
-                              <img
-                                src={rightSup.artUrl}
-                                alt={rightSup.nameKr}
-                                title={`서포터 2: ${rightSup.nameKr}`}
-                                className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-700 shadow-md relative z-0 bg-slate-800"
-                              />
-                            )}
-                          </div>
+                    return (
+                      <div
+                        key={deck.id}
+                        onClick={() => setInspectingDeck(deck)}
+                        className="group relative aspect-[1/1.22] border-2 border-slate-600/80 hover:border-fuchsia-400 bg-[#080d1b]/90 hover:bg-[#150f28] flex flex-col items-center justify-end cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(217,70,239,0.35)]"
+                        style={{ clipPath: TILE_CLIP }}
+                      >
+                        {/* 리더 카드 아트워크 (덱 케이스 대용) */}
+                        {art && (
+                          <img
+                            src={art}
+                            alt=""
+                            draggable={false}
+                            className="absolute inset-x-0 top-0 w-full h-[76%] object-cover object-top opacity-85 group-hover:opacity-100 group-hover:scale-105 transition duration-300"
+                          />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#04060d] via-[#04060d]/75 to-transparent pointer-events-none" />
 
-                          {/* 덱 기본 정보 */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2.5 flex-wrap">
-                              <h3 className="text-lg sm:text-xl font-black text-white">
-                                {deck.deckName}
-                              </h3>
-                              {/* 익명 여부 뱃지 */}
-                              {deck.isAnonymous ? (
-                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-500/40 font-bold">
-                                  <UserX className="w-3.5 h-3.5 text-purple-400" />
-                                  익명 공유
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 border border-cyan-500/40 font-bold">
-                                  <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
-                                  {deck.authorName}
-                                </span>
-                              )}
-                              <span className="text-xs text-slate-500 flex items-center gap-1">
-                                <Clock className="w-3.5 h-3.5" />
-                                {formatTimeAgo(deck.createdAt)}
-                              </span>
-                            </div>
-
-                            {/* 리더 라인업 표기 */}
-                            <p className="text-xs sm:text-sm text-amber-300/90 mt-1 font-semibold">
-                              리더: {leader?.nameKr || '미상'} · 서포터: {leftSup?.nameKr || '미상'}, {rightSup?.nameKr || '미상'}
-                            </p>
-
-                            {/* 덱 설명문 */}
-                            <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed bg-slate-950/60 px-3.5 py-2.5 rounded-xl border border-slate-800/80">
-                              💬 {deck.description}
-                            </p>
-
-                            {/* 태그 리스트 */}
-                            <div className="flex flex-wrap gap-1.5 mt-2.5">
-                              {deck.tags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="text-xs px-2.5 py-0.5 rounded-md bg-slate-800/80 text-slate-300 font-mono"
-                                >
-                                  #{tag}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 우측 상단: 좋아요 & 주요 액션 버튼 */}
-                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-start gap-2.5 shrink-0">
-                          {/* 좋아요 버튼 */}
+                        {/* 상단 뱃지: 추천수(좌) & 작성자(우) */}
+                        <div className="absolute top-2.5 inset-x-2.5 z-10 flex items-center justify-between pointer-events-none">
                           <button
+                            type="button"
                             onClick={(e) => handleLike(deck.id, e)}
-                            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition border shadow cursor-pointer ${
+                            className={`pointer-events-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border backdrop-blur-md cursor-pointer transition ${
                               deck.likedByMe
-                                ? 'bg-rose-500/20 text-rose-300 border-rose-500/60 shadow-rose-500/20'
-                                : 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                                ? 'bg-rose-500/30 text-rose-300 border-rose-500/60 shadow-sm'
+                                : 'bg-black/60 text-slate-300 border-slate-700/80 hover:bg-black/80'
                             }`}
-                            title="이 덱 추천하기"
+                            title="추천하기"
                           >
-                            <Heart
-                              className={`w-4 h-4 ${
-                                deck.likedByMe ? 'fill-rose-500 text-rose-500' : 'text-slate-400'
-                              }`}
-                            />
+                            <Heart className={`w-3 h-3 ${deck.likedByMe ? 'fill-rose-500 text-rose-500' : 'text-slate-400'}`} />
                             <span>{deck.likes}</span>
                           </button>
 
-                          {/* 이 덱으로 배틀 시작 버튼 */}
-                          {onSelectAndBattle && (
-                            <button
-                              onClick={() => handleBattleWithDeck(deck)}
-                              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500 text-slate-950 font-black text-xs sm:text-sm shadow-lg shadow-amber-500/20 transition cursor-pointer"
-                            >
-                              <Swords className="w-4 h-4" />
-                              <span>이 덱으로 배틀</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 하단 툴바: 코드 복사, 내 프리셋 저장, 구성 보기 */}
-                      <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5">
-                        <div className="flex items-center gap-2">
-                          {/* 덱 코드 복사 버튼 */}
-                          <button
-                            onClick={(e) => handleCopyCode(deck, e)}
-                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition border cursor-pointer ${
-                              isCopied
-                                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                            }`}
-                          >
-                            {isCopied ? (
-                              <>
-                                <Check className="w-4 h-4 text-emerald-400" />
-                                <span>덱 코드 복사완료!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-4 h-4 text-slate-400" />
-                                <span>덱 코드 복사</span>
-                              </>
-                            )}
-                          </button>
-
-                          {/* 내 프리셋에 저장 */}
-                          <button
-                            onClick={(e) => handleImport(deck, e)}
-                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition border cursor-pointer ${
-                              isImported
-                                ? 'bg-purple-500/20 text-purple-300 border-purple-500/50'
-                                : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
-                            }`}
-                          >
-                            {isImported ? (
-                              <>
-                                <Check className="w-3.5 h-3.5 text-purple-400" />
-                                <span>내 프리셋에 저장완료!</span>
-                              </>
-                            ) : (
-                              <>
-                                <Download className="w-3.5 h-3.5 text-slate-400" />
-                                <span>내 보관함으로 가져오기</span>
-                              </>
-                            )}
-                          </button>
+                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/60 text-slate-300 border border-slate-700/80 backdrop-blur-md">
+                            {deck.isAnonymous ? '익명' : deck.authorName}
+                          </span>
                         </div>
 
-                        {/* 구성 펼치기 토글 */}
-                        <button
-                          onClick={() => setExpandedDeckId(isExpanded ? null : deck.id)}
-                          className="flex items-center gap-1 text-xs text-slate-400 hover:text-amber-400 transition font-medium"
-                        >
-                          <span>{isExpanded ? '상세 카드 닫기' : '구성 40장 상세보기'}</span>
-                          {isExpanded ? (
-                            <ChevronUp className="w-4 h-4" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-
-                      {/* 펼쳐진 덱 구성 상세 */}
-                      {isExpanded && (
-                        <div className="mt-3 p-3 bg-slate-950/70 border border-slate-800 rounded-xl space-y-3 animate-in fade-in duration-150">
-                          {/* 1. 캐릭터 덱 목록 (3~15장) */}
-                          {(() => {
-                            const charList = (() => {
-                              if (deck.deckPreset.characterDeckCards && deck.deckPreset.characterDeckCards.length > 0) {
-                                const list: typeof OFFICIAL_CARDS = [];
-                                deck.deckPreset.characterDeckCards.forEach(({ code, count }) => {
-                                  const found = OFFICIAL_CARDS.find((c) => c.code === code);
-                                  if (found) {
-                                    for (let i = 0; i < count; i++) list.push(found);
-                                  }
-                                });
-                                return list;
-                              }
-                              const l = getCharInfo(deck.deckPreset.leaderCode);
-                              const s1 = getCharInfo(deck.deckPreset.leftSupportCode);
-                              const s2 = getCharInfo(deck.deckPreset.rightSupportCode);
-                              const result: typeof OFFICIAL_CARDS = [];
-                              [l, s1, s2].filter(Boolean).forEach((c) => {
-                                const cName = c!.characterName || c!.nameKr;
-                                for (let lvl = 0; lvl <= 2; lvl++) {
-                                  const match = OFFICIAL_CARDS.find(
-                                    (ac) =>
-                                      ac.kind === 'CHARACTER' &&
-                                      (ac.nameKr.includes(cName) || ac.characterName?.includes(cName)) &&
-                                      ac.level === lvl
-                                  );
-                                  if (match) result.push(match);
-                                }
-                              });
-                              return result;
-                            })();
-
-                            return (
-                              <div className="space-y-1.5 pb-2 border-b border-slate-800/80">
-                                <div className="flex items-center justify-between text-xs text-slate-300">
-                                  <span className="font-black text-amber-300 flex items-center gap-1.5">
-                                    <Crown className="w-3.5 h-3.5 text-amber-400" />
-                                    캐릭터 덱 목록 ({charList.length} / 15장)
-                                  </span>
-                                  <div className="flex items-center gap-1 text-[11px] text-slate-400">
-                                    <span>출전:</span>
-                                    <span className="text-amber-300 font-bold">{leader?.nameKr} (리더)</span>
-                                    <span>·</span>
-                                    <span>{leftSup?.nameKr}</span>
-                                    <span>·</span>
-                                    <span>{rightSup?.nameKr}</span>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-9 gap-1.5 max-h-[140px] overflow-y-auto">
-                                  {charList.map((c, i) => (
-                                    <div
-                                      key={`${c.code}-${i}`}
-                                      className={`relative aspect-[5/7] rounded-lg overflow-hidden border bg-slate-900 shadow ${
-                                        c.code === deck.deckPreset.leaderCode
-                                          ? 'border-amber-400 ring-1 ring-amber-400/50'
-                                          : 'border-slate-800'
-                                      }`}
-                                      title={`${c.nameKr} (Lv.${c.level})`}
-                                    >
-                                      <img src={c.artUrl} alt={c.nameKr} className="w-full h-full object-cover" />
-                                      <div className="absolute top-0.5 left-0.5 px-1 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[8px]">
-                                        Lv.{c.level}
-                                      </div>
-                                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-0.5 text-center">
-                                        <p className="text-[9px] font-black text-white truncate">{c.nameKr}</p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })()}
-
-                          {/* 2. 메인 액션 덱 리스트 */}
-                          <div className="flex items-center justify-between text-xs text-slate-400">
-                            <span className="font-bold text-slate-300">
-                              메인 액션 덱 리스트 (총 {deck.deckPreset.actionCards.reduce((acc, c) => acc + c.count, 0)}장)
-                            </span>
-                            <span className="font-mono text-[11px] text-slate-500">
-                              코드: {deck.deckCode.substring(0, 24)}...
-                            </span>
-                          </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-1">
-                            {deck.deckPreset.actionCards.map((item) => {
-                              const cardDef = OFFICIAL_CARDS.find((c) => c.code === item.code);
-                              return (
-                                <div
-                                  key={item.code}
-                                  className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800/80 text-xs"
-                                >
-                                  <div className="truncate mr-1">
-                                    <span className="text-[10px] text-slate-500 font-mono block">
-                                      {item.code}
-                                    </span>
-                                    <span className="text-white font-medium truncate block">
-                                      {cardDef?.nameKr || item.code}
-                                    </span>
-                                  </div>
-                                  <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs font-black shrink-0">
-                                    x{item.count}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                        {/* 클릭 시 상세 안내 호버 힌트 */}
+                        <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <div className="px-3 py-1.5 rounded-xl bg-black/80 border border-fuchsia-400 text-fuchsia-300 text-xs font-black flex items-center gap-1.5 shadow-xl">
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>전체 덱 리스트 보기</span>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })
+
+                        {/* 하단 덱 타이틀 플레이트 */}
+                        <div className="relative z-10 w-full px-4 pb-3.5 pt-1 text-center">
+                          <div className="text-base font-black text-white truncate drop-shadow group-hover:text-fuchsia-200 transition-colors">
+                            {deck.deckName}
+                          </div>
+                          <div className="mt-1 flex items-center justify-center gap-2 text-xs font-mono font-bold text-slate-300">
+                            <span className="text-amber-400 truncate max-w-[120px]">
+                              {leader?.nameKr || '리더'}
+                            </span>
+                            <span className="text-slate-500">|</span>
+                            <span className="text-cyan-300">{actionTotal}장</span>
+                            {deck.tags[0] && (
+                              <>
+                                <span className="text-slate-500">|</span>
+                                <span className="text-fuchsia-300">#{deck.tags[0]}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
@@ -734,7 +520,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
         {activeTab === 'SHARE' && (
           <form
             onSubmit={handleShareSubmit}
-            className="flex-1 overflow-y-auto p-6 space-y-5 max-w-2xl mx-auto w-full"
+            className="flex-1 overflow-y-auto p-6 space-y-5 max-w-2xl mx-auto w-full relative z-20 custom-scrollbar"
           >
             {shareFeedback && (
               <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-200 text-xs font-bold flex items-center gap-2">
@@ -752,7 +538,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedSourceType('CURRENT')}
-                  className={`p-3 rounded-xl border text-left transition ${
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                     selectedSourceType === 'CURRENT'
                       ? 'bg-amber-500/15 border-amber-400 text-amber-200 font-black'
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -766,7 +552,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setSelectedSourceType('PRESET')}
-                  className={`p-3 rounded-xl border text-left transition ${
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer ${
                     selectedSourceType === 'PRESET'
                       ? 'bg-indigo-500/15 border-indigo-400 text-indigo-200 font-black'
                       : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
@@ -821,7 +607,6 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                 <label className="text-xs font-bold text-slate-300">
                   3. 작성자 정보 설정
                 </label>
-                {/* 익명 체크박스 */}
                 <label className="flex items-center gap-2 cursor-pointer select-none">
                   <input
                     type="checkbox"
@@ -892,7 +677,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                           setSelectedFormTags([...selectedFormTags, tag]);
                         }
                       }}
-                      className={`text-xs px-2.5 py-1 rounded-lg font-medium transition ${
+                      className={`text-xs px-2.5 py-1 rounded-lg font-medium transition cursor-pointer ${
                         isSelected
                           ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
                           : 'bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700'
@@ -916,6 +701,239 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
               </button>
             </div>
           </form>
+        )}
+
+        {/* 전체 덱 리스트 상세 모달 (덱 타일 클릭 시 노출) */}
+        {inspectingDeck && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
+            onClick={() => setInspectingDeck(null)}
+          >
+            <div
+              className="relative w-full max-w-4xl max-h-[90vh] bg-[#0c1020]/98 border-2 border-fuchsia-400/90 rounded-2xl shadow-[0_0_50px_rgba(217,70,239,0.35)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
+              style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* 내부 인셋 라인 */}
+              <div className="absolute inset-1.5 border border-fuchsia-400/25 pointer-events-none z-30" />
+              <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-fuchsia-300 z-30 pointer-events-none" />
+              <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-fuchsia-300 z-30 pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-fuchsia-300 z-30 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-fuchsia-300 z-30 pointer-events-none" />
+
+              {/* 상세 헤더 */}
+              <div className="px-6 py-4 border-b border-fuchsia-400/20 bg-[#12162e]/90 flex items-center justify-between shrink-0 relative z-20">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg sm:text-xl font-black text-white truncate">
+                        {inspectingDeck.deckName}
+                      </h3>
+                      <span className="text-xs px-2 py-0.5 rounded bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 font-mono">
+                        {inspectingDeck.isAnonymous ? '익명의 방랑자' : inspectingDeck.authorName}
+                      </span>
+                      <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
+                        <Clock className="w-3.5 h-3.5" />
+                        {formatTimeAgo(inspectingDeck.createdAt)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-1 line-clamp-2">
+                      💬 {inspectingDeck.description}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setInspectingDeck(null)}
+                  className="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer shrink-0 ml-3"
+                  title="닫기"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* 상세 본문 (출전 캐릭터 3인 + 캐릭터 덱 + 액션 덱 40장 리스트) */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-4 relative z-20 custom-scrollbar">
+                {/* 1. 출전 캐릭터 3인 라인업 */}
+                {(() => {
+                  const l = getCharInfo(inspectingDeck.deckPreset.leaderCode);
+                  const s1 = getCharInfo(inspectingDeck.deckPreset.leftSupportCode);
+                  const s2 = getCharInfo(inspectingDeck.deckPreset.rightSupportCode);
+
+                  return (
+                    <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+                      <div className="text-xs font-black text-amber-300 flex items-center gap-1.5 mb-3">
+                        <Crown className="w-4 h-4 text-amber-400" />
+                        <span>출전 라인업 (리더 1 + 서포터 2)</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { char: l, role: '리더 (LEADER)', border: 'border-amber-400' },
+                          { char: s1, role: '좌측 서포터', border: 'border-slate-700' },
+                          { char: s2, role: '우측 서포터', border: 'border-slate-700' },
+                        ].map((item, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-2.5 rounded-xl bg-slate-950/80 border ${item.border} flex items-center gap-3`}
+                          >
+                            {item.char?.artUrl ? (
+                              <img
+                                src={item.char.artUrl}
+                                alt={item.char.nameKr}
+                                className="w-12 h-16 rounded-lg object-cover border border-slate-700 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-16 rounded-lg bg-slate-800 border border-slate-700 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-mono text-amber-400 font-bold block truncate">
+                                {item.role}
+                              </span>
+                              <span className="text-sm font-black text-white truncate block">
+                                {item.char?.nameKr || '알 수 없음'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono block">
+                                {item.char?.element || ''}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 2. 전체 액션 덱 40장 그리드 */}
+                <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
+                  <div className="flex items-center justify-between text-xs mb-3">
+                    <span className="font-black text-cyan-300 flex items-center gap-1.5">
+                      <Layers className="w-4 h-4 text-cyan-400" />
+                      <span>메인 액션 덱 카드 리스트 (총 {inspectingDeck.deckPreset.actionCards.reduce((acc, c) => acc + c.count, 0)}장)</span>
+                    </span>
+                    <span className="font-mono text-slate-400 text-[11px]">
+                      {inspectingDeck.tags.map((t) => `#${t}`).join(' ')}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                    {inspectingDeck.deckPreset.actionCards.map((item) => {
+                      const cardDef = OFFICIAL_CARDS.find((c) => c.code === item.code);
+                      const color = cardDef?.color || 'RED';
+                      const colorBg =
+                        color === 'RED'
+                          ? 'border-red-500/40 text-red-300'
+                          : color === 'GREEN'
+                          ? 'border-emerald-500/40 text-emerald-300'
+                          : 'border-cyan-500/40 text-cyan-300';
+
+                      return (
+                        <div
+                          key={item.code}
+                          className="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {cardDef?.artUrl && (
+                              <img
+                                src={cardDef.artUrl}
+                                alt={cardDef.nameKr}
+                                className="w-8 h-10 rounded object-cover border border-slate-700 shrink-0"
+                              />
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-mono text-slate-500 block">
+                                {item.code}
+                              </span>
+                              <span className="text-xs font-bold text-white truncate block">
+                                {cardDef?.nameKr || item.code}
+                              </span>
+                            </div>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-lg bg-slate-900 border ${colorBg} font-mono font-black text-xs shrink-0 ml-1.5`}>
+                            x{item.count}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* 상세 하단 버튼 액션 바 */}
+              <div className="px-6 py-4 border-t border-fuchsia-400/20 bg-[#12162e]/90 flex items-center justify-between gap-3 shrink-0 relative z-20">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => handleLike(inspectingDeck.id, e)}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer ${
+                      inspectingDeck.likedByMe
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/60 shadow-rose-500/20'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Heart className={`w-4 h-4 ${inspectingDeck.likedByMe ? 'fill-rose-500 text-rose-500' : 'text-slate-400'}`} />
+                    <span>추천 {inspectingDeck.likes}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleCopyCode(inspectingDeck, e)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
+                  >
+                    {copiedDeckId === inspectingDeck.id ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-400" />
+                        <span className="text-emerald-300">복사완료!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4 text-slate-400" />
+                        <span>덱 코드 복사</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => handleImport(inspectingDeck, e)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 transition cursor-pointer"
+                  >
+                    {importedDeckId === inspectingDeck.id ? (
+                      <>
+                        <Check className="w-4 h-4 text-purple-400" />
+                        <span className="text-purple-300">내 덱 보관함 저장완료!</span>
+                      </>
+                    ) : (
+                      <>
+                        <BookmarkPlus className="w-4 h-4 text-purple-400" />
+                        <span>내 덱으로 가져오기</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setInspectingDeck(null)}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-bold transition border border-slate-700 cursor-pointer"
+                  >
+                    목록으로
+                  </button>
+
+                  {onSelectAndBattle && (
+                    <button
+                      type="button"
+                      onClick={() => handleBattleWithDeck(inspectingDeck)}
+                      className="flex items-center gap-2 px-6 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 transition cursor-pointer transform hover:scale-[1.02]"
+                    >
+                      <Swords className="w-4 h-4 fill-slate-950" />
+                      <span>이 덱으로 배틀 시작</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

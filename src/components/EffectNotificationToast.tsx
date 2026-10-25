@@ -69,63 +69,64 @@ export const EffectNotificationToast: React.FC<EffectNotificationToastProps> = (
   return (
     <div
       onClick={() => setIsLeaving(true)}
-      className={`fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-auto cursor-pointer select-none transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
+      className={`fixed top-14 left-1/2 -translate-x-1/2 z-[95] pointer-events-auto cursor-pointer select-none transition-all duration-300 hover:scale-[1.02] active:scale-95 ${
         isLeaving
           ? 'opacity-0 -translate-y-4 scale-95 pointer-events-none'
           : 'opacity-100 translate-y-0 scale-100 animate-in slide-in-from-top-4 fade-in duration-300'
       }`}
       title="클릭하여 즉시 닫기"
     >
-      <div className={`p-[2px] rounded-2xl bg-gradient-to-r ${getBorderGradient(visibleEvent.effectType)} shadow-[0_0_30px_rgba(0,0,0,0.8)]`}>
-        <div className="bg-slate-950/95 backdrop-blur-xl rounded-2xl px-4 py-3 flex items-center gap-3.5 max-w-lg shadow-2xl relative overflow-hidden">
-          {/* 배경 발광 블러 */}
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,255,255,0.06),transparent)] pointer-events-none" />
+      <div className="relative bg-[#0c101b]/95 border border-[#f97316]/70 shadow-[0_0_30px_rgba(0,0,0,0.95),0_0_15px_rgba(249,115,22,0.3)] backdrop-blur-xl px-4 py-3 flex items-center gap-3.5 max-w-lg overflow-hidden">
+        {/* 네 모서리 택티컬 'ㄱ'자 코너 브라켓 */}
+        <span className="pointer-events-none absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-cyan-400" />
+        <span className="pointer-events-none absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-cyan-400" />
 
-          {/* 좌측 썸네일 또는 아이콘 */}
-          {visibleEvent.sourceCardArt ? (
-            <div className="relative w-12 h-16 rounded-xl overflow-hidden border border-slate-700 shrink-0 shadow-md">
-              <img
-                src={visibleEvent.sourceCardArt}
-                alt={visibleEvent.sourceCardName}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end justify-center pb-0.5">
-                <span className="text-[9px] font-black text-amber-300">EFFECT</span>
-              </div>
+        {/* 좌측 썸네일 또는 아이콘 */}
+        {visibleEvent.sourceCardArt ? (
+          <div className="relative w-12 h-16 rounded overflow-hidden border border-[#f97316]/50 shrink-0 shadow-md">
+            <img
+              src={visibleEvent.sourceCardArt}
+              alt={visibleEvent.sourceCardName}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent flex items-end justify-center pb-0.5">
+              <span className="text-[9px] font-black text-amber-300">EFFECT</span>
             </div>
-          ) : (
-            <div className="w-11 h-11 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 shadow-inner">
-              {getEffectIcon(visibleEvent.effectType)}
-            </div>
-          )}
-
-          {/* 중앙 효과 및 사건 텍스트 */}
-          <div className="flex flex-col gap-0.5 pr-6 text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-amber-300 uppercase tracking-wider flex items-center gap-1">
-                {getEffectIcon(visibleEvent.effectType)}
-                <span>효과 발동!</span>
-              </span>
-              <span className="text-xs font-black text-slate-300 truncate max-w-[180px]">
-                {visibleEvent.sourceCardName}
-              </span>
-            </div>
-            <h4 className="text-sm font-black text-white tracking-wide">
-              {visibleEvent.title}
-            </h4>
-            <p className="text-xs text-slate-300 font-medium leading-tight mt-0.5">
-              {visibleEvent.description}
-            </p>
           </div>
+        ) : (
+          <div className="w-11 h-11 bg-[#111520] border border-[#f97316]/40 flex items-center justify-center shrink-0 shadow-inner">
+            {getEffectIcon(visibleEvent.effectType)}
+          </div>
+        )}
 
-          {/* 닫기 버튼 */}
-          <button
-            onClick={() => setIsLeaving(true)}
-            className="absolute top-2 right-2 p-1 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-900 transition"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+        {/* 중앙 효과 및 사건 텍스트 */}
+        <div className="flex flex-col gap-0.5 pr-6 text-left">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-[#111520] border border-[#f97316]/40 text-[#f97316] uppercase tracking-wider flex items-center gap-1">
+              {getEffectIcon(visibleEvent.effectType)}
+              <span>효과 발동!</span>
+            </span>
+            <span className="text-xs font-black text-slate-200 truncate max-w-[180px]">
+              {visibleEvent.sourceCardName}
+            </span>
+          </div>
+          <h4 className="text-sm font-black text-white tracking-wide">
+            {visibleEvent.title}
+          </h4>
+          <p className="text-xs text-slate-300 font-medium leading-tight mt-0.5">
+            {visibleEvent.description}
+          </p>
         </div>
+
+        {/* 닫기 버튼 */}
+        <button
+          onClick={() => setIsLeaving(true)}
+          className="absolute top-2 right-2 p-1 text-slate-400 hover:text-white hover:bg-white/10 transition cursor-pointer [clip-path:polygon(2px_0,100%_0,100%_calc(100%-2px),calc(100%-2px)_100%,0_100%,0_2px)]"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

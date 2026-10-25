@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GameState } from '../types/tcg';
+import { GameState, EffectDrawAnimation } from '../types/tcg';
 import {
   createInitialGameState,
   executeMulligan,
@@ -17,9 +17,13 @@ import {
   executeEndPhase,
   forceResolveClash,
   resolveClash,
+  finishClashJudgment,
+  continuePostClashOrBattlePhase,
   resolvePendingChoice,
   canPlayerExecuteCombo,
+  checkGameOver,
   addLog,
+  cloneGameState,
   CustomDeckConfig,
 } from '../engine/gameEngine';
 import {
@@ -37,8 +41,31 @@ export function useGame(
   customDeck?: CustomDeckConfig | null,
   p1CustomDeck?: CustomDeckConfig | null
 ) {
-  const [gameState, setGameState] = useState<GameState>(() =>
+  const [gameState, rawSetGameState] = useState<GameState>(() =>
     createInitialGameState(p0PresetKey, p1PresetKey, initialGameMode, customDeck, p1CustomDeck)
+  );
+
+  // React 19 <StrictMode>는 setState(updater)의 updater(prev)를 2회(EagerState + Render Double Invoke) 호출하므로,
+  // 동일 prev 참조에 대해 1회만 엔진 상태 전이를 실행하고 캐시된 결과(cachedNext)를 반환하여
+  // 인플레이스 변이로 인한 연격 2회 동시 실행(2·3연격 스킵), 배틀 로그 누락, 덱 중복 셔플 버그를 원천 차단합니다.
+  const setGameState = useCallback(
+    (updater: GameState | ((prev: GameState) => GameState)) => {
+      if (typeof updater === 'function') {
+        let cachedPrev: GameState | null = null;
+        let cachedNext: GameState | null = null;
+        rawSetGameState((prev) => {
+          if (cachedPrev === prev && cachedNext !== null) {
+            return cachedNext;
+          }
+          cachedPrev = prev;
+          cachedNext = updater(cloneGameState(prev));
+          return cachedNext;
+        });
+      } else {
+        rawSetGameState(updater);
+      }
+    },
+    []
   );
 
   const [isAiThinking, setIsAiThinking] = useState(false);
@@ -100,6 +127,8 @@ export function useGame(
         return {
           ...prev,
           activePlayerIndex: firstPlayerIndex,
+          firstPlayerIndex,
+          firstTurnDrawCompleted: false,
           logs: [rollLog, ...prev.logs],
         };
       });
@@ -255,14 +284,97 @@ export function useGame(
     setGameState((prev) => (prev.lastUpgrade ? { ...prev, lastUpgrade: null } : prev));
   }, []);
 
-  // 연격 연출 완료 후 lastComboStrike 초기화
+  // 연격 연출 완료 후 lastComboStrike 초기화 및 치명타 피니시(GAME_OVER) 전환
   const clearLastComboStrike = useCallback(() => {
-    setGameState((prev) => (prev.lastComboStrike ? { ...prev, lastComboStrike: null } : prev));
+    setGameState((prev) => {
+      if (!prev.lastComboStrike) return prev;
+      let nextState = { ...prev, lastComboStrike: null };
+      // 만약 어느 한 쪽의 체력이 0 이하인 결정타 상태라면, 연격 연출 확인이 끝났으므로 여기서 GAME_OVER 및 피니시로 진입!
+      if (nextState.players[0].hp <= 0 || nextState.players[1].hp <= 0) {
+        return checkGameOver(nextState);
+      }
+      return nextState;
+    });
   }, []);
 
   // 효과 발동 팝업 닫힘 시 lastEffectEvent 초기화
   const clearLastEffectEvent = useCallback(() => {
     setGameState((prev) => (prev.lastEffectEvent ? { ...prev, lastEffectEvent: null } : prev));
+  }, []);
+
+  // 효과 드로우 및 패 비행 연출 완료 후 정리 및 후속 선택 모달 활성화
+  const handleFinishEffectDraw = useCallback(() => {
+    setGameState((prev) => {
+      if (!prev.lastEffectDraw) return prev;
+      if (
+        !prev.clashResult &&
+        !prev.lastComboStrike &&
+        (prev.phase === 'GAME_OVER' || prev.players[0].hp <= 0 || prev.players[1].hp <= 0)
+      ) {
+        return checkGameOver({ ...prev, lastEffectDraw: null });
+      }
+      const chainedChoice = prev.lastEffectDraw.nextPendingChoice || null;
+
+      // 체인된 선택(예: 파수인 Lv.1 드로우 직후 패 1장 버리기)과 기존 대기 중인 선택들을 무손실 병합
+      const mergedChoices: import('../types/tcg').PendingChoice[] = [];
+      const pushUniqueChoice = (ch: import('../types/tcg').PendingChoice | null | undefined) => {
+        if (!ch) return;
+        if (!mergedChoices.some((existing) => existing.id === ch.id)) {
+          mergedChoices.push(ch);
+        }
+      };
+
+      pushUniqueChoice(chainedChoice);
+      pushUniqueChoice(prev.pendingChoice);
+      for (const qItem of prev.pendingChoiceQueue || []) {
+        pushUniqueChoice(qItem);
+      }
+
+      let remainingDraws = prev.deferredEffectDraws ? [...prev.deferredEffectDraws] : [];
+      let nextDraw: EffectDrawAnimation | null = null;
+
+      // 방금 끝난 드로우에 직결된 후속 선택(chainedChoice, 예: 버릴 카드 선택)이 없는 경우에만 다음 보류 드로우를 즉시 재생
+      if (!chainedChoice && remainingDraws.length > 0) {
+        nextDraw = remainingDraws.shift() || null;
+      }
+
+      const nextChoice = mergedChoices.length > 0 ? mergedChoices[0] : null;
+      const nextQueue = mergedChoices.length > 1 ? mergedChoices.slice(1) : [];
+
+      const newState: GameState = {
+        ...prev,
+        lastEffectDraw: nextDraw,
+        deferredEffectDraws: remainingDraws,
+        deferredEffectDraw: remainingDraws.length > 0 ? remainingDraws[0] : null,
+        pendingChoice: nextChoice,
+        pendingChoiceQueue: nextQueue,
+      };
+
+      if (
+        !nextDraw &&
+        !newState.pendingChoice &&
+        newState.phase === 'CLASH_REVEAL' &&
+        !newState.clashResult &&
+        Boolean(newState.players[0].clashCard || newState.players[1].clashCard)
+      ) {
+        return finishClashJudgment(newState);
+      }
+
+      // 대결 판정(CLASH_REVEAL) 중 보류되었던 효과 드로우가 완료된 경우에만
+      // 게임이 멈추지 않고 계속해서 연격 단계(COMBO_STEP) 또는 배틀 종료 단계로 안전하게 진행!
+      // (이미 연격 단계(COMBO_STEP) 등 후속 페이즈에서 발생한 효과 드로우는 현재 페이즈를 정상 유지)
+      if (!nextDraw && !newState.pendingChoice) {
+        // 턴 시작(START_PHASE)에서 발동한 효과 드로우(예: 방랑자(여) Lv.2 1장 드로우) 확인 완료 시 -> 정규 드로우 단계(DRAW_PHASE)로 진입!
+        if (newState.phase === 'START_PHASE') {
+          return { ...newState, phase: 'DRAW_PHASE' };
+        }
+        if (newState.phase === 'CLASH_REVEAL' || (newState.phase as any) === 'CLASH_JUDGING') {
+          return continuePostClashOrBattlePhase(newState);
+        }
+      }
+
+      return newState;
+    });
   }, []);
 
   // ==========================================
@@ -283,7 +395,8 @@ export function useGame(
       gameState.activePlayerIndex === 1 &&
       gameState.players[1].isAi &&
       !isDrawingInProgress.current &&
-      !gameState.pendingChoice
+      !gameState.pendingChoice &&
+      !gameState.lastEffectDraw
     ) {
       // CenterDrawOverlay가 800ms에 자동 연출을 트리거하고 카드를 패로 보낸 뒤 드로우를 완료합니다.
       // 본 타이머는 혹시 모를 오버레이 미작동 시의 안전 폴백(Watchdog)으로 4000ms로 설정합니다.
@@ -301,8 +414,14 @@ export function useGame(
     const isAiTurn = gameState.activePlayerIndex === 1 && gameState.players[1].isAi;
     const isGameOver = gameState.phase === 'GAME_OVER' || gameState.phase === 'MULLIGAN';
 
-    // 플레이어가 효과 선택 발동 팝업(스캔, 드로우, 버리기 등)을 진행 중일 때는 모든 AI 행동과 턴 진행을 일시 정지!
-    if (isGameOver || Boolean(gameState.pendingChoice)) {
+    // 플레이어가 효과 선택 발동 팝업(스캔, 드로우, 버리기 등), 효과 드로우 애니메이션, 연격 오버레이, 레벨업 연출을 진행 중일 때는 모든 AI 행동과 턴 진행을 일시 정지!
+    if (
+      isGameOver ||
+      Boolean(gameState.pendingChoice) ||
+      Boolean(gameState.lastEffectDraw) ||
+      Boolean(gameState.lastComboStrike) ||
+      Boolean(gameState.lastUpgrade)
+    ) {
       setIsAiThinking(false);
       return;
     }
@@ -325,8 +444,17 @@ export function useGame(
       };
     }
 
-    // 2) AI 대결 카드 세트 단계 (배틀 페이즈 배너 이후 1.8초 동안 고민 후 세트)
-    if (gameState.phase === 'CLASH_SET' && gameState.players[1].isAi && !gameState.players[1].clashCardReady) {
+    // 2) AI 대결 카드 세트 단계 (공식 룰 604.1.1.2: 턴 플레이어가 먼저 세트!)
+    const isAiTurnPlayer = gameState.activePlayerIndex === 1;
+    const isTurnPlayerReady = gameState.players[gameState.activePlayerIndex].clashCardReady;
+    const canAiSetClash = isAiTurnPlayer || isTurnPlayerReady;
+
+    if (
+      gameState.phase === 'CLASH_SET' &&
+      gameState.players[1].isAi &&
+      !gameState.players[1].clashCardReady &&
+      canAiSetClash
+    ) {
       setIsAiThinking(true);
       const timer = setTimeout(() => {
         setGameState((prev) => {
@@ -341,7 +469,7 @@ export function useGame(
           return prev;
         });
         setIsAiThinking(false);
-      }, 1800);
+      }, isAiTurnPlayer ? 1500 : 900);
       return () => {
         clearTimeout(timer);
         setIsAiThinking(false);
@@ -387,6 +515,11 @@ export function useGame(
       (Boolean(gameState.players[0].comboUnlimited) || (gameState.players[0].comboCount ?? 0) > 0);
 
     if (gameState.phase === 'COMBO_STEP' && isAiComboTurn && !isUserComboTurn) {
+      // 화면에 이전 연격 참격 연출(lastComboStrike)이 재생 중이면 연출이 완전히 닫힐 때까지 다음 연격 대기!
+      if (Boolean(gameState.lastComboStrike)) {
+        return;
+      }
+
       const p1HasCombo =
         Boolean(gameState.players[1].comboUnlimited) || (gameState.players[1].comboCount ?? 0) > 0;
       const p1CanCombo = p1HasCombo && canPlayerExecuteCombo(gameState.players[1]);
@@ -395,6 +528,9 @@ export function useGame(
         setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
+            // 실행 직전에도 연격 오버레이가 아직 떠있으면 보류
+            if (Boolean(prev.lastComboStrike)) return prev;
+
             const stillHasCombo =
               Boolean(prev.players[1].comboUnlimited) || (prev.players[1].comboCount ?? 0) > 0;
             if (prev.phase === 'COMBO_STEP' && prev.players[1].isAi && stillHasCombo) {
@@ -407,14 +543,14 @@ export function useGame(
             return prev;
           });
           setIsAiThinking(false);
-        }, 1800);
+        }, 950);
         return () => {
           clearTimeout(timer);
           setIsAiThinking(false);
         };
       } else {
         // AI에게 남은 연격이 없거나 낼 수 있는 적색 카드가 없을 때 -> 연격 정상 종료!
-        // (1350ms 연격 애니메이션 및 보이스가 완전히 끝난 뒤 450ms의 여유를 두고 종료 페이즈 진입)
+        // (연격 오버레이가 완전히 닫힌 뒤 850ms의 여유를 두고 종료 페이즈 진입)
         setIsAiThinking(true);
         const timer = setTimeout(() => {
           setGameState((prev) => {
@@ -424,7 +560,7 @@ export function useGame(
             return prev;
           });
           setIsAiThinking(false);
-        }, 1800);
+        }, 850);
         return () => {
           clearTimeout(timer);
           setIsAiThinking(false);
@@ -463,7 +599,9 @@ export function useGame(
     gameState.players[0].hand.length,
     gameState.players[1].actionArea?.length,
     gameState.lastComboStrike?.id,
+    gameState.lastUpgrade?.id,
     gameState.pendingChoice?.id,
+    gameState.lastEffectDraw?.id,
   ]);
 
   return {
@@ -491,5 +629,6 @@ export function useGame(
     clearLastUpgrade,
     clearLastComboStrike,
     clearLastEffectEvent,
+    handleFinishEffectDraw,
   };
 }

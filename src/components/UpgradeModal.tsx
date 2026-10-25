@@ -26,14 +26,13 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     availableUpgrades.length > 0 ? availableUpgrades[0].id : null
   );
   const [selectedDiscardIds, setSelectedDiscardIds] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const selectedUpgradeCard = availableUpgrades.find((c) => c.id === selectedUpgradeId) || availableUpgrades[0];
   const targetLevel = selectedUpgradeCard ? selectedUpgradeCard.level : ((currentChar.level + 1) as 1 | 2);
 
+  // 공식 룰 603.1.2.1: 중첩할 캐릭터 카드의 레벨 수치만큼 자신의 패를 버린다
   let effectiveRequiredDiscard: number = targetLevel;
-  if (hasYangyangLv2 && effectiveRequiredDiscard > 1) {
-    effectiveRequiredDiscard -= 1;
-  }
   if (initialDiscardCount !== undefined && availableUpgrades.length === 0) {
     effectiveRequiredDiscard = initialDiscardCount;
   }
@@ -42,8 +41,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     setSelectedUpgradeId(cardId);
     const newCard = availableUpgrades.find((c) => c.id === cardId);
     const newLevel = newCard ? newCard.level : targetLevel;
-    let newReq = newLevel;
-    if (hasYangyangLv2 && newReq > 1) newReq -= 1;
+    const newReq = newLevel;
     if (selectedDiscardIds.length > newReq) {
       setSelectedDiscardIds(selectedDiscardIds.slice(0, newReq));
     }
@@ -64,29 +62,35 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     selectedDiscardIds.length === effectiveRequiredDiscard;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
-      <div className="bg-slate-950/95 border-2 border-amber-500/70 rounded-3xl max-w-5xl xl:max-w-6xl w-full p-5 sm:p-7 md:p-8 shadow-[0_0_80px_rgba(245,158,11,0.25)] flex flex-col gap-4 sm:gap-5 text-slate-100 max-h-[96vh] overflow-y-auto custom-scrollbar">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
+      <div className="relative bg-[#0c101b]/95 border border-[#f97316]/60 max-w-5xl xl:max-w-6xl w-full p-5 sm:p-7 md:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-4 sm:gap-5 text-slate-100 max-h-[96vh] overflow-y-auto custom-scrollbar overflow-hidden">
+        {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
+        <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
+        <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
+
         {/* 헤더 */}
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3.5">
+        <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow">
+            <div className="p-2.5 bg-[#111520] text-[#f97316] border border-[#f97316]/40 shadow">
               <Sparkles className="w-6 h-6" />
             </div>
             <div>
               <h3 className="font-black text-xl sm:text-2xl text-white flex items-center gap-2">
                 <span>캐릭터 진화 (레벨업)</span>
-                <span className="text-xs font-mono font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+                <span className="text-xs font-mono font-bold text-[#f97316] bg-[#111520] border border-[#f97316]/40 px-2.5 py-0.5">
                   LEVEL UP
                 </span>
               </h3>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                현재 [<strong className="text-amber-300">Lv.{currentChar.level} {currentChar.characterName}</strong>]에 동일 레벨 또는 상위 레벨 카드를 중첩하여 레벨업합니다.
+                현재 [<strong className="text-[#f97316]">Lv.{currentChar.level} {currentChar.characterName}</strong>]에 동일 레벨 또는 상위 레벨 카드를 중첩하여 레벨업합니다.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+            className="p-2 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white border border-white/15 transition cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
             title="닫기"
           >
             <X className="w-5 h-5" />
@@ -180,10 +184,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
               </span>
             </div>
             <span className="text-xs font-bold text-rose-300 bg-rose-950/60 px-3 py-1 rounded-full border border-rose-500/40 shrink-0">
-              Lv.{targetLevel} 레벨업 비용: 패 {effectiveRequiredDiscard}장 버리기
-              {hasYangyangLv2 && targetLevel > 1 && (
-                <span className="text-emerald-400 ml-1.5 font-normal">(양양 Lv.2 효과: -1장)</span>
-              )}
+              Lv.{targetLevel} 레벨업 비용: 패 {effectiveRequiredDiscard}장 버리기 (공식 룰 603.1.2.1)
             </span>
           </div>
 
@@ -252,12 +253,12 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
         </div>
 
         {/* 하단 푸터 버튼 */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-800 pt-3">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/10 pt-3">
           <div className="text-xs sm:text-sm text-slate-400 font-semibold">
             {!selectedUpgradeId ? (
               <span>진화할 캐릭터 카드를 선택해주세요.</span>
             ) : selectedDiscardIds.length < effectiveRequiredDiscard ? (
-              <span className="text-amber-300">
+              <span className="text-[#f97316]">
                 비용으로 버릴 패를 {effectiveRequiredDiscard - selectedDiscardIds.length}장 더 선택해주세요.
               </span>
             ) : (
@@ -270,21 +271,23 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer border border-slate-800"
+              className="px-5 py-2.5 bg-[#111520] hover:bg-[#1a2234] text-xs sm:text-sm font-bold text-slate-400 hover:text-white transition cursor-pointer border border-white/15 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
             >
               취소
             </button>
             <button
               onClick={() => {
-                if (selectedUpgradeId && canConfirm) {
+                if (selectedUpgradeId && canConfirm && !isSubmitting) {
+                  setIsSubmitting(true);
                   onUpgrade(selectedUpgradeId, selectedDiscardIds);
+                  setTimeout(() => setIsSubmitting(false), 800);
                 }
               }}
-              disabled={!canConfirm}
-              className={`flex items-center justify-center gap-2 px-7 py-2.5 rounded-xl text-xs sm:text-sm font-black shadow-xl transition cursor-pointer ${
-                canConfirm
-                  ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/40 border border-amber-300 animate-pulse transform hover:scale-[1.02] active:scale-95'
-                  : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/60'
+              disabled={!canConfirm || isSubmitting}
+              className={`flex items-center justify-center gap-2 px-7 py-2.5 text-xs sm:text-sm font-black transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] ${
+                canConfirm && !isSubmitting
+                  ? 'bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)] animate-pulse'
+                  : 'bg-slate-800 text-slate-500 cursor-not-allowed border border-white/10'
               }`}
             >
               <ChevronUp className="w-4 h-4 stroke-[3]" />

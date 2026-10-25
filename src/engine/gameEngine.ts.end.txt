@@ -1,0 +1,143 @@
+export function executeEndPhase(state: GameState): GameState {
+  const p0 = clonePlayer(state.players[0]);
+  const p1 = clonePlayer(state.players[1]);
+  let newState: GameState = {
+    ...state,
+    phase: 'END_PHASE' as GamePhase,
+    lastUpgrade: null,
+    lastComboStrike: null,
+    lastEffectEvent: null,
+    players: [p0, p1],
+  };
+
+  // 605.1.1 턴 종료 스킬 발동 (중첩 스킬 지원)
+  for (let i = 0; i < 2; i++) {
+    const pl = i === 0 ? p0 : p1;
+    const opp = i === 0 ? p1 : p0;
+    const lCards = getAllCardsInSlot(pl.slots.leader);
+
+    // 방랑자(남) Lv.2 [SD02-001] 리더: 각 턴 종료 시 카드 1장 드로우
+    if (lCards.some((c) => c.code?.startsWith('SD02-001'))) {
+      const drawn = drawSingleCardFromDeck(pl);
+      if (drawn) {
+        addCardsToHand(pl, [drawn]);
+        newState = addLog(newState, `[효과 드로우] [방랑자(남) Lv.2 턴 종료 효과] 덱에서 [${drawn.nameKr}]을(를) 드로우했습니다.`, 'ACTION', i as 0 | 1);
+      }
+    }
+
+    // 산화 Lv.2 [SD02-003] 리더: 각 턴 종료 시 덱 위 1장 협주 에리어에 배치
+    if (lCards.some((c) => c.code?.startsWith('SD02-003'))) {
+      const charged = drawSingleCardFromDeck(pl);
+      if (charged) {
+        addCardsToConcertoZone(pl, [charged]);
+        newState = addLog(newState, `[협주 충전] [산화 Lv.2 턴 종료 효과] [${charged.nameKr}]을(를) 협주 에리어에 충전했습니다! (현재 협주: ${pl.concertoZone.length}/10)`, 'ACTION', i as 0 | 1);
+      }
+    }
+
+    // 앙코 Lv.2 [BP01-012] 리더: 이번 턴에 상대가 데미지를 받은 경우 트래시에서 앙코 카드 1장 패 추가 가능
+    if (lCards.some((c) => c.code?.startsWith('BP01-012')) && opp.actionFlags.damageTakenThisTurn) {
+      const eligibleAnke = pl.dropZone.filter(
+        (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
+      ) as ActionCard[];
+      if (eligibleAnke.length > 0) {
+        if (pl.isAi) {
+          const dropIdx = pl.dropZone.findIndex(
+            (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
+          );
+          if (dropIdx !== -1) {
+            const [ankeCard] = pl.dropZone.splice(dropIdx, 1);
+            const reclaimed = ankeCard as ActionCard;
+            addCardsToHand(pl, [reclaimed]);
+            newState = addLog(
+              newState,
+              `[트래시 회수] [앙코 Lv.2 BP01-012 턴 종료 효과] 이번 턴 상대가 데미지를 받아 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`,
+              'ACTION',
+              i as 0 | 1
+            );
+          }
+        } else {
+          const ankeLeaderCard = lCards.find((c) => c.code?.startsWith('BP01-012')) || pl.slots.leader;
+          const choice: PendingChoice = {
+            id: `choice-${Date.now()}-anke2-end-${i}`,
+            playerIndex: i as 0 | 1,
+            title: '앙코 Lv.2 — 턴 종료 트래시 회수',
+            sourceCardName: '앙코 Lv.2 [BP01-012]',
+            sourceCardArt: ankeLeaderCard.artUrl,
+            description: '【자신의 턴 종료 시】이번 턴에 상대가 데미지를 받았습니다. 트래시 에리어에서 【앙코】 카드 1장을 선택해 패에 추가할 수 있습니다.',
+            revealedCards: eligibleAnke,
+            minSelect: 0,
+            maxSelect: 1,
+            onResolveType: 'RECOVER_FROM_DROP',
+            sourceZone: 'DROP',
+          };
+          newState = queueChoice(newState, choice, false);
+        }
+      }
+    }
+
+    // 양양 Lv.2 [BP01-022] 턴 종료: 패 1장 버리고 리더를 양양으로 교체 가능
+    if (i === newState.activePlayerIndex && pl.hand.length > 0) {
+      const yangyangSupportKey = (['leftSupport', 'rightSupport'] as const).find((k) =>
+        getAllCardsInSlot(pl.slots[k]).some((c) => c.code?.startsWith('BP01-022'))
+      );
+      if (yangyangSupportKey && pl.slots[yangyangSupportKey]) {
+        const yangyangCard = pl.slots[yangyangSupportKey]!;
+        if (pl.isAi) {
+          // AI는 현재 리더가 Lv.2 주력이 아니며 패가 충분할 때만 선택적으로 교체
+          const shouldAiSwapYangyang = pl.slots.leader.level < 2 && pl.hand.length >= 5;
+          if (shouldAiSwapYangyang) {
+            const discarded = pl.hand.pop();
+            if (discarded) {
+              addCardsToDropZone(pl, [discarded]);
+              const prevLeader = pl.slots.leader;
+              pl.slots.leader = yangyangCard;
+              pl.slots[yangyangSupportKey] = prevLeader;
+              newState.players = [p0, p1];
+              newState = triggerShorekeeperSwitchSkill(newState, i as 0 | 1, pl, prevLeader, yangyangCard);
+              newState = addLog(
+                newState,
+                `[양양 Lv.2 BP01-022 턴 종료 효과] [트래시 이동] 패 [${discarded.nameKr}]을(를) 버리고 리더를 [양양]으로 교체했습니다!`,
+                'ACTION',
+                i as 0 | 1
+              );
+            }
+          }
+        } else {
+          const choice: PendingChoice = {
+            id: `choice-${Date.now()}-yangyang-swap-${i}`,
+            playerIndex: i as 0 | 1,
+            title: '양양 Lv.2 — 리더 교체 선택',
+            sourceCardName: '양양 Lv.2 [BP01-022]',
+            sourceCardArt: yangyangCard.artUrl,
+            description: '【자신의 턴 종료 시】패 1장을 버리고 리더를 [양양]으로 교체하시겠습니까?',
+            revealedCards: pl.hand,
+            minSelect: 0,
+            maxSelect: 1,
+            onResolveType: 'BP01_022_YANGYANG_SWAP',
+          };
+          newState = queueChoice(newState, choice, false);
+        }
+      }
+    }
+  }
+
+  newState.players = [p0, p1];
+
+  if (newState.pendingChoice) {
+    return newState;
+  }
+
+  // 605.1.2 패 상한 체크 (공식 Q&A Q1: 턴 종료 스킬 발동 후 패가 8장을 초과하면 반드시 버려야 함)
+  const activeIdx = newState.activePlayerIndex;
+  const activePlayer = newState.players[activeIdx];
+  if (activePlayer.hand.length > 8) {
+    return {
+      ...newState,
+      phase: 'DISCARD_OVERFLOW',
+    };
+  }
+
+  return finalizeEndPhase(newState);
+}
+
+// 턴 종료 마무리 (605.1.3 & 605.1.4 및 다음 턴 전환)

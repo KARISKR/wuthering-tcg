@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ActionCard } from '../types/tcg';
 import { RefreshCw, CheckCircle2, Sparkles } from 'lucide-react';
 import { soundEffects } from '../utils/soundEffects';
+import { formatEffectText } from '../utils/formatEffectText';
 
 interface MulliganModalProps {
   hand: ActionCard[];
@@ -37,10 +38,10 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
     setSelectedIds((prev) => {
       const exists = prev.includes(id);
       if (exists) {
-        soundEffects.playCardDraw(1.2);
+        soundEffects.playCardPlace();
         return prev.filter((item) => item !== id);
       } else {
-        soundEffects.playCardDraw(0.9);
+        soundEffects.playCardPlace();
         return [...prev, id];
       }
     });
@@ -92,11 +93,17 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
-      <div className="bg-slate-950/95 border-2 border-amber-500/70 rounded-3xl max-w-6xl xl:max-w-7xl w-full p-5 sm:p-7 md:p-8 shadow-[0_0_80px_rgba(245,158,11,0.25)] flex flex-col items-center gap-3.5 text-slate-100 text-center max-h-[96vh] overflow-y-auto custom-scrollbar">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
+      <div className="relative bg-[#0c101b]/95 border border-[#f97316]/60 max-w-6xl xl:max-w-7xl w-full p-5 sm:p-7 md:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center gap-3.5 text-slate-100 text-center max-h-[96vh] overflow-y-auto custom-scrollbar overflow-hidden">
+        {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
+        <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
+        <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
+
         {/* 상단 뱃지 */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/20 text-amber-300 font-extrabold text-xs sm:text-sm uppercase tracking-wider border border-amber-500/50 shadow">
-          <RefreshCw className={`w-4 h-4 text-amber-400 ${mulliganPhase !== 'idle' ? 'animate-spin' : ''}`} />
+        <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#111520] text-[#f97316] font-extrabold text-xs sm:text-sm uppercase tracking-wider border border-[#f97316]/50 shadow [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]">
+          <RefreshCw className={`w-4 h-4 text-[#f97316] ${mulliganPhase !== 'idle' ? 'animate-spin' : ''}`} />
           <span>START PHASE MULLIGAN</span>
         </div>
 
@@ -105,7 +112,7 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-white tracking-wide flex items-center justify-center gap-2">
             <span>초기 패 교체 (멀리건)</span>
             {mulliganPhase === 'entering' && (
-              <Sparkles className="w-6 h-6 text-amber-400 animate-spin" />
+              <Sparkles className="w-6 h-6 text-[#f97316] animate-spin" />
             )}
           </h2>
           <p className="text-xs sm:text-sm md:text-base text-slate-300 max-w-2xl leading-relaxed font-medium mt-1.5">
@@ -225,9 +232,9 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
 
                   {/* 카드 효과 텍스트 */}
                   {card.description && (
-                    <p className="text-[11px] sm:text-xs text-slate-300 leading-snug line-clamp-2 font-medium">
-                      {card.description}
-                    </p>
+                    <div className="text-[11px] sm:text-xs text-slate-300 leading-snug line-clamp-2 font-medium">
+                      {formatEffectText(card.description, 'sm')}
+                    </div>
                   )}
                 </div>
               </div>
@@ -255,17 +262,17 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
           <button
             onClick={() => onConfirm([])}
             disabled={mulliganPhase !== 'idle'}
-            className="w-full sm:w-auto px-6 sm:px-8 py-3.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 font-extrabold text-sm sm:text-base text-slate-200 transition cursor-pointer shadow-lg hover:border-slate-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-6 sm:px-8 py-3.5 border border-white/15 bg-[#111520] hover:bg-[#1a2234] font-extrabold text-sm sm:text-base text-slate-200 transition cursor-pointer shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
           >
             교체 없이 시작 (패 유지)
           </button>
           <button
             onClick={handleExecuteMulligan}
             disabled={selectedIds.length === 0 || mulliganPhase !== 'idle'}
-            className={`w-full sm:w-auto flex items-center justify-center gap-2.5 px-8 sm:px-10 py-3.5 rounded-xl font-black text-sm sm:text-base shadow-2xl transition cursor-pointer ${
+            className={`w-full sm:w-auto flex items-center justify-center gap-2.5 px-8 sm:px-10 py-3.5 font-black text-sm sm:text-base shadow-2xl transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] ${
               selectedIds.length > 0 && mulliganPhase === 'idle'
-                ? 'bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/40 border border-amber-300 animate-pulse transform hover:scale-[1.02] active:scale-95'
-                : 'bg-slate-800/80 text-slate-500 border border-slate-700/60 cursor-not-allowed'
+                ? 'bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)] animate-pulse'
+                : 'bg-slate-800/80 text-slate-500 border border-white/10 cursor-not-allowed'
             }`}
           >
             <CheckCircle2 className="w-5 h-5" />

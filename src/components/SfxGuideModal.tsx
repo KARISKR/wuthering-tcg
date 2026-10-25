@@ -55,8 +55,13 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
     const ok = await soundEffects.setCustomSoundFromFile(key, file);
     if (ok) {
       setUploadedKeys((prev) => new Set(prev).add(key));
-      // 업로드 성공 즉시 1회 테스트 재생
-      soundEffects.playCardDraw(1.1);
+      if (key === 'card_deal') {
+        soundEffects.playCardDealSequence(3, 85);
+      } else if (key === 'clash_reveal') {
+        soundEffects.playCardFlip();
+      } else {
+        soundEffects.playCardDraw(1.1);
+      }
     }
   };
 
@@ -651,10 +656,11 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
                                   case 'clash_reveal':
                                     soundEffects.playCardFlip();
                                     break;
-                                  case 'clash_impact':
-                                    soundEffects.playClashImpact();
+                                  case 'card_deal':
+                                    soundEffects.playCardDealSequence(5, 85);
                                     break;
                                   case 'clash':
+                                  case 'clash_impact':
                                     soundEffects.playClash();
                                     break;
                                   case 'draw':
@@ -722,6 +728,54 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
                                   case 'combo_3':
                                     soundEffects.playComboSlash(3);
                                     break;
+                                  case 'combo_sword':
+                                    soundEffects.playComboSlash(2, '직검');
+                                    break;
+                                  case 'combo_sword_1':
+                                    soundEffects.playComboSlash(1, '직검');
+                                    break;
+                                  case 'combo_sword_2':
+                                    soundEffects.playComboSlash(2, '직검');
+                                    break;
+                                  case 'combo_sword_3':
+                                    soundEffects.playComboSlash(3, '직검');
+                                    break;
+                                  case 'combo_broadblade':
+                                    soundEffects.playComboSlash(2, '대검');
+                                    break;
+                                  case 'combo_broadblade_1':
+                                    soundEffects.playComboSlash(1, '대검');
+                                    break;
+                                  case 'combo_broadblade_2':
+                                    soundEffects.playComboSlash(2, '대검');
+                                    break;
+                                  case 'combo_broadblade_3':
+                                    soundEffects.playComboSlash(3, '대검');
+                                    break;
+                                  case 'combo_pistol':
+                                    soundEffects.playComboSlash(2, '권총');
+                                    break;
+                                  case 'combo_pistol_1':
+                                    soundEffects.playComboSlash(1, '권총');
+                                    break;
+                                  case 'combo_pistol_2':
+                                    soundEffects.playComboSlash(2, '권총');
+                                    break;
+                                  case 'combo_pistol_3':
+                                    soundEffects.playComboSlash(3, '권총');
+                                    break;
+                                  case 'combo_rectifier':
+                                    soundEffects.playComboSlash(2, '증폭기');
+                                    break;
+                                  case 'combo_rectifier_1':
+                                    soundEffects.playComboSlash(1, '증폭기');
+                                    break;
+                                  case 'combo_rectifier_2':
+                                    soundEffects.playComboSlash(2, '증폭기');
+                                    break;
+                                  case 'combo_rectifier_3':
+                                    soundEffects.playComboSlash(3, '증폭기');
+                                    break;
                                   case 'card':
                                     soundEffects.playCardPlace();
                                     break;
@@ -745,6 +799,9 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
                                     break;
                                   case 'low_hp':
                                     soundEffects.playLeaderLowHp();
+                                    break;
+                                  case 'card_shatter':
+                                    soundEffects.playFinisherShatter();
                                     break;
                                 }
                               });

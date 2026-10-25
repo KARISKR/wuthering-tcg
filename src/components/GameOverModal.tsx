@@ -35,6 +35,7 @@ interface GameOverModalProps {
   onExitToLobby?: () => void;
   onOpenReplay?: () => void;
   onPlayBattleReplay?: (replay: BattleReplayData) => void;
+  onReplayFinisher?: () => void;
 }
 
 export const GameOverModal: React.FC<GameOverModalProps> = ({
@@ -46,6 +47,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   onExitToLobby,
   onOpenReplay,
   onPlayBattleReplay,
+  onReplayFinisher,
 }) => {
   const isPlayerWinner = winner === 0;
   const winnerPlayer = players[winner];
@@ -186,41 +188,47 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       )}
 
       {/* 메인 결과 팝업 카드 */}
-      <div className={`relative w-full max-w-2xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-2 rounded-3xl p-6 sm:p-8 shadow-[0_0_80px_rgba(0,0,0,0.9)] flex flex-col items-center text-center text-slate-100 z-10 overflow-hidden ${
-        isPlayerWinner ? 'border-amber-500/60 shadow-amber-500/20' : 'border-rose-500/60 shadow-rose-500/20'
+      <div className={`relative w-full max-w-2xl bg-[#0c101b]/95 border p-6 sm:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center text-center text-slate-100 z-10 overflow-hidden ${
+        isPlayerWinner ? 'border-[#f97316]/70 shadow-[0_0_50px_rgba(249,115,22,0.25)]' : 'border-rose-500/70 shadow-[0_0_50px_rgba(244,63,94,0.25)]'
       }`}>
+        {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
+        <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
+        <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
+        <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
+
         {/* 상단 장식 빛 */}
-        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1.5 rounded-full ${
-          isPlayerWinner ? 'bg-gradient-to-r from-transparent via-amber-400 to-transparent shadow-[0_0_20px_#f59e0b]' : 'bg-gradient-to-r from-transparent via-rose-500 to-transparent shadow-[0_0_20px_#f43f5e]'
+        <div className={`absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-1 ${
+          isPlayerWinner ? 'bg-gradient-to-r from-transparent via-[#f97316] to-transparent shadow-[0_0_20px_#f97316]' : 'bg-gradient-to-r from-transparent via-rose-500 to-transparent shadow-[0_0_20px_#f43f5e]'
         }`} />
 
         {/* 1. 타이틀 & 빅 엠블럼 */}
         <div className="flex flex-col items-center mb-5">
           {/* 배지 */}
-          <div className={`inline-flex items-center gap-1.5 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest mb-3 border shadow-lg ${
+          <div className={`inline-flex items-center gap-1.5 px-3.5 py-1 text-[11px] sm:text-xs font-mono font-bold uppercase tracking-[0.2em] mb-2.5 border shadow-lg ${
             isPlayerWinner
-              ? 'bg-amber-500/20 text-amber-300 border-amber-400/50 shadow-amber-500/20'
-              : 'bg-rose-500/20 text-rose-300 border-rose-500/50 shadow-rose-500/20'
+              ? 'bg-[#111520] text-[#f97316] border-[#f97316]/50 shadow-[0_0_15px_rgba(249,115,22,0.2)] [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]'
+              : 'bg-rose-950/40 text-rose-300 border-rose-500/50 shadow-rose-500/20 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]'
           }`}>
-            <Star className="w-3.5 h-3.5 fill-current" />
+            <Star className="w-3 h-3 fill-current" />
             <span>{isPlayerWinner ? 'KURO TACTICAL VICTORY' : 'TACTICAL DEFEAT'}</span>
-            <Star className="w-3.5 h-3.5 fill-current" />
+            <Star className="w-3 h-3 fill-current" />
           </div>
 
-          {/* 거대 3D 메탈릭 텍스트 슬램 */}
+          {/* 거대 3D 텍스트 슬램 */}
           <h1
-            className={`text-5xl sm:text-7xl font-black tracking-widest uppercase transition-all duration-500 transform ${
+            className={`text-5xl sm:text-7xl font-black tracking-[0.16em] sm:tracking-[0.2em] uppercase transition-all duration-500 transform ${
               animationStep >= 1 ? 'scale-100 opacity-100 translate-y-0' : 'scale-150 opacity-0 -translate-y-6'
             } ${
               isPlayerWinner
-                ? 'text-transparent bg-clip-text bg-gradient-to-b from-yellow-100 via-amber-300 to-amber-600 drop-shadow-[0_10px_25px_rgba(245,158,11,0.6)]'
-                : 'text-transparent bg-clip-text bg-gradient-to-b from-rose-200 via-red-500 to-rose-900 drop-shadow-[0_10px_25px_rgba(244,63,94,0.6)]'
+                ? 'text-transparent bg-clip-text bg-gradient-to-b from-yellow-100 via-amber-300 to-amber-600 drop-shadow-[0_8px_20px_rgba(245,158,11,0.6)]'
+                : 'text-transparent bg-clip-text bg-gradient-to-b from-rose-200 via-red-500 to-rose-900 drop-shadow-[0_8px_20px_rgba(244,63,94,0.6)]'
             }`}
           >
             {isPlayerWinner ? 'VICTORY' : 'DEFEAT'}
           </h1>
 
-          <p className="text-xs sm:text-sm text-slate-400 font-bold mt-1">
+          <p className="text-xs sm:text-sm text-slate-300 font-medium mt-2 leading-relaxed tracking-normal">
             {isPlayerWinner ? '상대 플레이어의 모든 생명력을 제압하고 완승했습니다!' : '아쉽습니다. 다음 전투에서는 상성과 협주 에너지를 더 전략적으로 운용해보세요.'}
           </p>
         </div>
@@ -248,7 +256,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                 alt={activeLeaderCard.nameKr}
                 className={`w-full h-full object-contain ${!isPlayerWinner ? 'grayscale-[20%]' : ''}`}
               />
-              <div className={`absolute bottom-1 left-1 right-1 bg-slate-950/80 px-1 py-0.5 rounded text-[10px] font-black text-center font-mono ${
+              <div className={`absolute bottom-1 left-1 right-1 bg-slate-950/80 px-1 py-0.5 rounded text-[10px] font-mono font-bold text-center ${
                 isPlayerWinner ? 'text-amber-300' : 'text-rose-300'
               }`}>
                 {isPlayerWinner ? 'MVP 리더' : '패배 리더'}
@@ -257,32 +265,32 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
             {/* 리더 캐릭터 정보 및 승리/패배 대사 */}
             <div className="flex-1 text-left">
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black ${
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
                   isPlayerWinner ? 'bg-amber-500 text-slate-950' : 'bg-rose-500 text-white'
                 }`}>
                   Lv.{activeLeaderCard.level}
                 </span>
-                <span className="text-sm sm:text-base font-black text-white">
+                <span className="text-base sm:text-lg font-bold text-white tracking-tight">
                   {activeLeaderCard.nameKr}
                 </span>
-                <span className="text-xs font-mono text-cyan-400 font-bold ml-auto">
+                <span className="text-xs font-bold text-cyan-300 bg-cyan-950/60 px-2 py-0.5 rounded border border-cyan-800/40 ml-auto">
                   {getElementKr(activeLeaderCard.element)}
                 </span>
               </div>
 
-              {/* 전용 대사 말풍선 & 사운드 재생 버튼 */}
-              <div className={`relative bg-slate-950/80 rounded-xl p-3 border text-xs sm:text-sm font-medium leading-relaxed italic shadow-inner flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 ${
-                isPlayerWinner ? 'border-slate-800 text-amber-200/90' : 'border-rose-950 text-rose-200/90'
+              {/* 전용 대사 말풍선 & 사운드 재생 버튼 (정돈된 한글 폰트 & 노-이탤릭) */}
+              <div className={`relative bg-slate-950/80 rounded-xl p-3 border text-xs sm:text-sm font-medium leading-relaxed shadow-inner flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 ${
+                isPlayerWinner ? 'border-slate-800 text-amber-200/90' : 'border-rose-950/80 text-slate-200'
               }`}>
-                <div>
-                  <span className={`${isPlayerWinner ? 'text-amber-400' : 'text-rose-400'} font-bold mr-1`}>“</span>
-                  {quote}
-                  <span className={`${isPlayerWinner ? 'text-amber-400' : 'text-rose-400'} font-bold ml-1`}>”</span>
+                <div className="leading-relaxed">
+                  <span className={`${isPlayerWinner ? 'text-amber-400' : 'text-rose-400'} font-serif font-bold mr-1`}>“</span>
+                  <span>{quote.trim()}</span>
+                  <span className={`${isPlayerWinner ? 'text-amber-400' : 'text-rose-400'} font-serif font-bold ml-1`}>”</span>
                 </div>
                 <button
                   onClick={() => isPlayerWinner ? soundEffects.playVictory(charName) : soundEffects.playDefeat(charName)}
-                  className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold not-italic transition cursor-pointer self-end sm:self-auto ${
+                  className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-semibold transition cursor-pointer self-end sm:self-auto ${
                     isPlayerWinner
                       ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border-amber-500/40'
                       : 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border-rose-500/40'
@@ -304,20 +312,20 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           }`}
         >
           <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex flex-col items-center">
-            <span className="text-[11px] text-slate-400 font-bold mb-0.5">총 턴수</span>
-            <span className="text-base sm:text-lg font-black font-mono text-amber-300">{turn}T</span>
+            <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight">총 턴수</span>
+            <span className="text-base sm:text-lg font-bold font-mono text-amber-300">{turn}T</span>
           </div>
           <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex flex-col items-center">
-            <span className="text-[11px] text-slate-400 font-bold mb-0.5">승자 잔여 HP</span>
-            <span className="text-base sm:text-lg font-black font-mono text-red-400">{winnerPlayer.hp} / 20</span>
+            <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight">승자 잔여 HP</span>
+            <span className="text-base sm:text-lg font-bold font-mono text-red-400">{winnerPlayer.hp} / 20</span>
           </div>
           <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex flex-col items-center">
-            <span className="text-[11px] text-slate-400 font-bold mb-0.5">패자 잔여 HP</span>
-            <span className="text-base sm:text-lg font-black font-mono text-slate-500">{loserPlayer.hp} / 20</span>
+            <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight">패자 잔여 HP</span>
+            <span className="text-base sm:text-lg font-bold font-mono text-slate-400">{loserPlayer.hp} / 20</span>
           </div>
           <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex flex-col items-center">
-            <span className="text-[11px] text-slate-400 font-bold mb-0.5">협주 자원</span>
-            <span className="text-base sm:text-lg font-black font-mono text-cyan-300">{winnerPlayer.concertoZone.length}</span>
+            <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight">협주 자원</span>
+            <span className="text-base sm:text-lg font-bold font-mono text-cyan-300">{winnerPlayer.concertoZone.length}</span>
           </div>
         </div>
 
@@ -332,19 +340,19 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center border border-indigo-500/40 shadow">
                 <Film className="w-4 h-4" />
               </div>
-              <span className="text-xs font-black text-indigo-300 uppercase tracking-wider">
+              <span className="text-xs font-bold text-indigo-300 uppercase tracking-wide">
                 대전 리플레이 저장
               </span>
             </div>
-            <span className="text-[11px] font-mono text-slate-400 bg-slate-900 px-2.5 py-0.5 rounded-full border border-slate-800">
+            <span className="text-[11px] font-mono text-slate-300 bg-slate-900/90 px-2.5 py-0.5 rounded-full border border-slate-700/60">
               총 {turn}턴 • {currentReplay?.totalLogCount || 0}개 액션
             </span>
           </div>
 
-          <p className="text-sm font-bold text-white text-left mb-1">
+          <p className="text-xs sm:text-sm font-bold text-white text-left mb-1">
             이번 배틀의 리플레이를 보관함에 저장하시겠습니까?
           </p>
-          <p className="text-xs text-slate-400 text-left mb-3.5 leading-relaxed">
+          <p className="text-xs text-slate-400 text-left mb-3.5 leading-relaxed font-normal">
             저장 시 관전 모드에서 양측의 손패와 대결(CLASH) 액션을 한 수씩 다시 검증할 수 있습니다.
           </p>
 
@@ -361,16 +369,17 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
               {onPlayBattleReplay && (
                 <button
                   onClick={handleSaveAndWatch}
-                  className="py-2.5 px-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition cursor-pointer shadow-md shadow-amber-900/40"
+                  className="py-2.5 px-1.5 sm:px-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1 transition cursor-pointer shadow-md shadow-amber-900/40 whitespace-nowrap"
+                  title="저장 후 바로 관전 모드로 이동"
                 >
-                  <Play className="w-3.5 h-3.5 fill-slate-950" />
-                  <span>저장 후 바로 보기</span>
+                  <Play className="w-3.5 h-3.5 fill-slate-950 shrink-0" />
+                  <span>저장 후 바로보기</span>
                 </button>
               )}
 
               <button
                 onClick={handleDownloadJson}
-                className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer border border-slate-700"
+                className="py-2.5 px-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer border border-slate-700"
               >
                 <Download className="w-3.5 h-3.5 text-cyan-400" />
                 <span>JSON 파일</span>
@@ -387,7 +396,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
           {replaySaveStatus === 'SAVED' && (
             <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/50">
-              <div className="flex items-center gap-2 text-xs text-emerald-300 font-bold">
+              <div className="flex items-center gap-2 text-xs text-emerald-300 font-medium">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>리플레이 보관함에 안전하게 저장되었습니다!</span>
               </div>
@@ -398,7 +407,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                       const rep = savedReplay || currentReplay;
                       if (rep) onPlayBattleReplay(rep);
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-1 transition cursor-pointer shadow"
+                    className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow"
                   >
                     <Play className="w-3 h-3 fill-slate-950" />
                     <span>지금 바로 관전</span>
@@ -406,7 +415,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
                 )}
                 <button
                   onClick={handleDeleteSavedReplay}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 font-bold text-xs flex items-center gap-1 transition cursor-pointer border border-slate-700 hover:border-rose-500/40"
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 font-semibold text-xs flex items-center gap-1 transition cursor-pointer border border-slate-700 hover:border-rose-500/40"
                   title="저장 취소 및 삭제"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -417,7 +426,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           )}
 
           {replaySaveStatus === 'DISCARDED' && (
-            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-400">
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-400 font-normal">
               <span>이번 배틀 리플레이는 저장되지 않았습니다.</span>
               <button
                 onClick={handleSaveReplay}
@@ -429,37 +438,48 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           )}
         </div>
 
-        {/* 4. 액션 버튼들 */}
+        {/* 4. 액션 버튼들 (2줄 2x2 깔끔한 그리드 정돈) */}
         <div
-          className={`w-full max-w-lg flex flex-col sm:flex-row items-center gap-2.5 transition-all duration-500 ${
+          className={`w-full max-w-md mx-auto grid grid-cols-2 gap-2.5 sm:gap-3 transition-all duration-500 ${
             animationStep >= 3 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
         >
+          {onReplayFinisher && (
+            <button
+              onClick={onReplayFinisher}
+              className="w-full py-3 px-2 sm:px-3 bg-[#111520] hover:bg-[#1a2234] text-amber-300 border border-amber-500/50 font-bold text-xs sm:text-sm tracking-tight transition cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+              title="리더 카드 파쇄 피니시 모션 다시보기"
+            >
+              <Flame className="w-4 h-4 text-orange-400 shrink-0" />
+              <span>피니시 다시보기</span>
+            </button>
+          )}
+
           {onOpenReplay && (
             <button
               onClick={onOpenReplay}
-              className="w-full sm:flex-1 py-3 px-3 rounded-2xl bg-indigo-900/60 hover:bg-indigo-800/80 text-indigo-200 border border-indigo-500/50 font-bold text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-indigo-950/50"
+              className="w-full py-3 px-2 sm:px-3 bg-[#111520] hover:bg-[#1a2234] text-indigo-300 border border-indigo-500/50 font-bold text-xs sm:text-sm tracking-tight transition cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
             >
-              <History className="w-4 h-4 text-indigo-400" />
-              <span>리플레이 보관함 목록</span>
+              <History className="w-4 h-4 text-indigo-400 shrink-0" />
+              <span>리플레이 보관함</span>
             </button>
           )}
 
           {onExitToLobby && (
             <button
               onClick={onExitToLobby}
-              className="w-full sm:flex-1 py-3 px-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer border border-slate-700 flex items-center justify-center gap-2"
+              className="w-full py-3 px-2 sm:px-3 bg-[#111520] hover:bg-[#1a2234] text-slate-200 font-bold text-xs sm:text-sm tracking-tight transition cursor-pointer border border-white/15 flex items-center justify-center gap-1.5 sm:gap-2 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
             >
-              <Home className="w-4 h-4 text-amber-400" />
+              <Home className="w-4 h-4 text-[#f97316] shrink-0" />
               <span>대기실로 나가기</span>
             </button>
           )}
 
           <button
             onClick={onRestart}
-            className="w-full sm:flex-1 py-3 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/40 transition transform hover:scale-102 flex items-center justify-center gap-2 cursor-pointer animate-pulse"
+            className="w-full py-3 px-2 sm:px-4 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-bold text-xs sm:text-sm tracking-tight shadow-[0_0_20px_rgba(249,115,22,0.4)] transition flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer animate-pulse [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
           >
-            <RotateCcw className="w-4 h-4 text-slate-950" />
+            <RotateCcw className="w-4 h-4 text-white shrink-0" />
             <span>새로운 배틀</span>
           </button>
         </div>

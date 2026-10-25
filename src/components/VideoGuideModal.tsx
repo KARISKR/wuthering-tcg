@@ -10,6 +10,7 @@ import {
   ChevronRight,
   Maximize2,
   Volume2,
+  ArrowLeft,
 } from 'lucide-react';
 
 interface VideoGuideModalProps {
@@ -58,155 +59,135 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 w-screen h-screen bg-[#05070d] flex flex-col overflow-hidden text-slate-100 select-none animate-in fade-in duration-200">
-      {/* ========================================================= */}
-      {/* 1. 최상단 헤더 바 */}
-      {/* ========================================================= */}
-      <header className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-800 bg-slate-950/95 flex items-center justify-between shrink-0 z-20">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-red-500 to-amber-500 flex items-center justify-center shadow-lg shadow-red-500/25 text-white font-black">
-            <Film className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm sm:text-base md:text-lg font-black text-white tracking-wide">
-                공식 룰 동영상 가이드
-              </h2>
-              <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                1080p FHD
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 hidden sm:block">
-              『명조: 대결』 10분 완성 공식 플레이 시연 영상과 챕터별 타임스탬프
-            </p>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
+      {/* 명조 택티컬 챔퍼 테두리 모달 컨테이너 */}
+      <div
+        className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-[#090c19]/98 border-2 border-amber-400/80 shadow-[0_0_50px_rgba(245,158,11,0.28)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
+        style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
+      >
+        {/* 내부 인셋 라인 */}
+        <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-30" />
 
-        {/* 우측 액션 버튼 */}
-        <div className="flex items-center gap-2">
-          {onOpenManual && (
+        {/* 네 모서리 코너 브라켓 장식 */}
+        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
+
+        {/* ========================================================= */}
+        {/* 1. 최상단 헤더 바 */}
+        {/* ========================================================= */}
+        <header className="px-6 py-4.5 border-b border-amber-400/20 bg-[#0d1226]/90 flex items-center justify-between shrink-0 z-20">
+          <div className="flex items-center gap-3.5">
             <button
-              onClick={() => {
-                onClose();
-                onOpenManual();
-              }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition cursor-pointer"
+              onClick={onClose}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
+              title="대기실로 나가기"
             >
-              <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-              <span>텍스트 룰북</span>
+              <ArrowLeft className="w-5 h-5 text-amber-400" />
+              <span>대기실로 나가기</span>
             </button>
-          )}
 
-          <button
-            onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition cursor-pointer text-xs font-bold"
-            title="닫기"
-          >
-            <X className="w-4 h-4" />
-            <span>닫기</span>
-          </button>
-        </div>
-      </header>
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/25 shrink-0">
+              <img src="/images/menu_icons/video-guide.png" alt="룰 영상 가이드" className="w-9 h-9 object-contain drop-shadow" />
+            </div>
 
-      {/* ========================================================= */}
-      {/* 2. 전체화면 메인 시네마 뷰 (비디오 플레이어 + 타임스탬프 사이드바) */}
-      {/* ========================================================= */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-black">
-        {/* 좌측: 대형 시네마 영상 플레이어 영역 */}
-        <div className="flex-1 flex flex-col justify-center items-center p-2 sm:p-4 lg:p-6 overflow-y-auto bg-gradient-to-b from-slate-950 via-[#070b16] to-black min-h-0 custom-scrollbar">
-          <div className="w-full max-w-[1500px] flex flex-col items-center gap-3">
-            {/* 비디오 프레임 (대화면 확장) */}
-            <div className="relative aspect-video w-full max-h-[calc(100vh-160px)] rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-amber-500/70 shadow-2xl bg-black shadow-amber-500/10">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">
+                  공식 룰 동영상 가이드
+                </h2>
+                <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+                  1080p FHD
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-400 hidden sm:block mt-0.5">
+                『명조: 대결』 10분 완성 공식 플레이 시연 영상과 챕터별 타임스탬프 바로가기
+              </p>
+            </div>
+          </div>
+
+          {/* 우측 액션 버튼 */}
+          <div className="flex items-center gap-2.5">
+            {onOpenManual && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenManual();
+                }}
+                className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-black transition cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4 text-amber-400" />
+                <span>텍스트 룰북 보기</span>
+              </button>
+            )}
+
+            <button
+              onClick={onClose}
+              className="w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer"
+              title="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </header>
+
+        {/* ========================================================= */}
+        {/* 2. 본문 영역 (비디오 플레이어 + 챕터 목차) */}
+        {/* ========================================================= */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0 bg-[#080d1a] relative z-20">
+          {/* 비디오 재생 플레이어 */}
+          <div className="flex-1 bg-black flex flex-col justify-center items-center p-4 sm:p-6 min-h-0 relative">
+            <div className="w-full h-full max-h-[640px] aspect-video bg-slate-950 rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-800 relative flex items-center justify-center">
               <video
                 ref={videoRef}
-                src="https://github.com/KARISKR/wuthering-tcg/releases/download/v1.0-video/rules_tutorial_1080p_original.mp4"
                 controls
                 playsInline
                 preload="metadata"
                 className="w-full h-full object-contain"
-              />
+                poster="/images/bg-battle-rovers.webp"
+              >
+                <source src="/videos/rule_guide.mp4" type="video/mp4" />
+                브라우저가 HTML5 비디오 재생을 지원하지 않습니다.
+              </video>
+            </div>
+          </div>
+
+          {/* 우측: 챕터별 타임스탬프 목차 */}
+          <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-slate-800 bg-[#0a0f20]/95 flex flex-col shrink-0">
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between text-sm">
+              <span className="font-black text-slate-200 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-400" />
+                <span>챕터별 타임스탬프</span>
+              </span>
+              <span className="text-xs font-mono text-amber-400 font-bold">
+                총 {CHAPTER_BOOKMARKS.length}개 구간
+              </span>
             </div>
 
-            {/* 비디오 하단 메타 정보 바 */}
-            <div className="w-full p-3 sm:p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between flex-wrap gap-2.5">
-              <div>
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[11px] font-black text-amber-400 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-full">
-                    공식 한국어 튜토리얼
-                  </span>
-                  <span className="text-[11px] font-mono font-bold text-slate-400">
-                    1080p FHD · 총 10분 05초
-                  </span>
-                </div>
-                <h3 className="text-sm sm:text-base font-black text-white">
-                  『명조: 대결』 공식 배틀 TCG 룰 설명 & 플레이 시연
-                </h3>
-              </div>
-
-              <div className="flex items-center gap-2">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar">
+              {CHAPTER_BOOKMARKS.map((bm, idx) => (
                 <button
-                  onClick={handleFullScreen}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border border-slate-700 shadow"
-                  title="전체화면"
+                  key={idx}
+                  onClick={() => handleSeekVideo(bm.time)}
+                  className="w-full p-3.5 rounded-xl bg-slate-900/70 hover:bg-slate-900 border border-slate-800 hover:border-amber-400/70 text-left transition cursor-pointer flex items-start gap-3 group shadow"
                 >
-                  <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-                  <span>전체화면</span>
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                    <Play className="w-4 h-4 fill-amber-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-black text-sm text-white group-hover:text-amber-200 transition">
+                      {bm.label}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-1 leading-relaxed font-medium">
+                      {bm.desc}
+                    </div>
+                  </div>
                 </button>
-                <button
-                  onClick={() => handleSeekVideo(0)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5 border border-slate-700 shadow"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>처음부터</span>
-                </button>
-              </div>
+              ))}
             </div>
           </div>
         </div>
-
-        {/* 우측 사이드바: 챕터별 타임스탬프 원클릭 바로가기 */}
-        <aside className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-slate-800 bg-slate-950/95 p-4 flex flex-col gap-3 overflow-y-auto shrink-0 custom-scrollbar">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-xs font-black text-amber-400 tracking-wider uppercase block">
-                TIMESTAMPS
-              </span>
-              <h4 className="text-base font-black text-white flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-400" />
-                챕터별 바로가기
-              </h4>
-            </div>
-            <span className="text-[11px] text-slate-500">클릭 시 즉시 이동</span>
-          </div>
-
-          <div className="space-y-2">
-            {CHAPTER_BOOKMARKS.map((bm, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleSeekVideo(bm.time)}
-                className="w-full p-3.5 rounded-2xl bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-amber-400/80 transition-all text-left group cursor-pointer shadow"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="font-black text-xs text-amber-300 group-hover:text-amber-200 transition">
-                    {bm.label}
-                  </span>
-                  <Play className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400 fill-transparent group-hover:fill-amber-400 transition" />
-                </div>
-                <p className="text-[11px] text-slate-400 group-hover:text-slate-300 leading-snug">
-                  {bm.desc}
-                </p>
-              </button>
-            ))}
-          </div>
-
-          {/* 팁 안내 */}
-          <div className="mt-auto p-4 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 text-[11px] text-slate-400 space-y-1.5">
-            <span className="font-bold text-slate-200 block">💡 팁</span>
-            <p>
-              동영상을 시청하면서 궁금한 점이 생기면 언제든 텍스트 룰북 탭이나 공식 FAQ를 통해 교차 확인할 수 있습니다.
-            </p>
-          </div>
-        </aside>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 import { ALL_CHARACTERS, DEDUPED_LV0_CHARACTERS, getRarityScore } from '../data/cards';
 import type { CharacterCard, ActionCard, CardColor } from '../types/tcg';
 import { getElementKr } from '../types/tcg';
+import { formatEffectText } from '../utils/formatEffectText';
 import {
   Sparkles,
   ArrowLeft,
@@ -28,6 +29,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { DeckPresetModal } from './DeckPresetModal';
+import { DeckListScreen, MAX_USER_DECKS } from './DeckListScreen';
 import { DeckExportModal } from './DeckExportModal';
 import { CommunityDeckModal } from './CommunityDeckModal';
 import type { CustomDeckConfig } from '../types/tcg';
@@ -41,6 +43,7 @@ import {
   customDeckToPreset,
   savePreset,
 } from '../utils/deckCode';
+import { soundEffects } from '../utils/soundEffects';
 export type { CustomDeckConfig };
 
 interface DeckBuilderProps {
@@ -52,6 +55,8 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isCommunityModalOpen, setIsCommunityModalOpen] = useState(false);
+  // 마스터듀얼식 흐름: 보유 덱 리스트(LIST) → 덱 에디터(EDIT)
+  const [screen, setScreen] = useState<'LIST' | 'EDIT'>('LIST');
 
   // 보유 중인 내 덱 리스트 상태
   const [userDecks, setUserDecks] = useState<CustomDeckConfig[]>([]);
@@ -90,35 +95,39 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       speed: c.speed ?? undefined,
       damage: c.damage ?? 2,
       pursuitCount: c.pursuitCount ?? undefined,
-      characterExclusive: c.characterExclusive ?? undefined,
+      characterExclusive: (c.characterExclusive === '일반' || c.characterExclusive === '-' ? undefined : c.characterExclusive) ?? undefined,
       description: c.description,
       artUrl: c.artUrl,
       rarity: c.rarity,
+      feature: c.feature,
       rawOfficial: c,
     }));
   }, []);
 
-  // 공식 캐릭터 카드 풀: 동일 코드 중 가장 높은 성급 1장씩 선별 (총 45종 - Lv.0, Lv.1, Lv.2 전체)
+  // 공식 캐릭터 카드 풀: PR 카드와 일반(1~2성 및 3~5성) 카드를 분리하여 별도 등록 (총 52종 - Lv.0 일반/PR 분리 수록)
   const availableCharacterCards = useMemo(() => {
     const charCards = OFFICIAL_CARDS.filter((c) => c.kind === 'CHARACTER');
     const charMap = new Map<string, OfficialCardData>();
     charCards.forEach((c) => {
-      const existing = charMap.get(c.code);
+      // PR 카드와 일반 카드를 분리하여 키 생성
+      const isPr = Boolean(c.rarity?.startsWith('PR'));
+      const key = `${c.code}_${isPr ? 'PR' : 'STD'}`;
+      const existing = charMap.get(key);
       if (!existing || getRarityScore(c.rarity) > getRarityScore(existing.rarity)) {
-        charMap.set(c.code, c);
+        charMap.set(key, c);
       }
     });
     return Array.from(charMap.values());
   }, []);
 
-  // OfficialCardData -> CharacterCard 변환 헬퍼
+  // OfficialCardData -> CharacterCard 변환 헬퍼 (카드별 성급과 일러스트를 온전히 보존)
   const officialCardToCharacterCard = (c: OfficialCardData): CharacterCard => {
     let charName = c.characterName || c.nameKr;
     if (c.nameKr.includes('방랑자(여)')) charName = '방랑자(여)';
     else if (c.nameKr.includes('방랑자(남)')) charName = '방랑자(남)';
 
     return {
-      id: `char-${c.code}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      id: `char-${c.code}-${c.rarity || 'std'}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       kind: 'CHARACTER',
       code: c.code,
       characterName: charName,
@@ -219,9 +228,81 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedColor, setSelectedColor] = useState<'ALL' | 'RED' | 'GREEN' | 'BLUE'>('ALL');
   const [selectedChar, setSelectedChar] = useState<string>('ALL');
+  // 캐릭터 전용 성급/구분 필터 ('ALL' | 'STANDARD' (일반 1~2성) | 'PR' (프로모))
+  const [charRarityFilter, setCharRarityFilter] = useState<'ALL' | 'STANDARD' | 'PR'>('ALL');
 
   // 좌측 패널에 표시할 현재 활성/선택된 카드 (초대형 상세 뷰어)
   const [activeCard, setActiveCard] = useState<OfficialCardData | null>(null);
+
+  // 드래그 앤 드롭 상태 관리 (덱에 카드 드래그로 넣기 & 빼기)
+  interface DragCardData {
+    source: 'ACTION_POOL' | 'ACTION_DECK' | 'CHAR_POOL' | 'CHAR_DECK';
+    code: string;
+    index?: number;
+  }
+  const [dragItem, setDragItem] = useState<DragCardData | null>(null);
+  const [isOverActionDeck, setIsOverActionDeck] = useState(false);
+  const [isOverCharDeck, setIsOverCharDeck] = useState(false);
+  const [isOverRemovalZone, setIsOverRemovalZone] = useState(false);
+
+  const handleDragStart = (e: React.DragEvent, item: DragCardData) => {
+    e.dataTransfer.setData('application/json', JSON.stringify(item));
+    e.dataTransfer.setData('text/plain', item.code);
+    e.dataTransfer.effectAllowed = item.source.endsWith('_DECK') ? 'move' : 'copy';
+    setDragItem(item);
+  };
+
+  const handleDragEnd = () => {
+    setDragItem(null);
+    setIsOverActionDeck(false);
+    setIsOverCharDeck(false);
+    setIsOverRemovalZone(false);
+  };
+
+  const handleDropOnActionDeck = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsOverActionDeck(false);
+    if (!dragItem) return;
+
+    if (dragItem.source === 'ACTION_POOL') {
+      const card = availableActionCards.find((c) => c.code === dragItem.code);
+      if (card) {
+        addCardToDeck(card);
+        try { soundEffects.playCardPlace(); } catch {}
+      }
+    }
+    setDragItem(null);
+  };
+
+  const handleDropOnCharDeck = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsOverCharDeck(false);
+    if (!dragItem) return;
+
+    if (dragItem.source === 'CHAR_POOL') {
+      const card = OFFICIAL_CARDS.find((c) => c.code === dragItem.code);
+      if (card) {
+        addCharacterToDeck(card);
+        try { soundEffects.playCardPlace(); } catch {}
+      }
+    }
+    setDragItem(null);
+  };
+
+  const handleDropOnRemovalZone = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsOverRemovalZone(false);
+    if (!dragItem) return;
+
+    if (dragItem.source === 'ACTION_DECK' && dragItem.index !== undefined) {
+      removeCardAtIndex(dragItem.index);
+      try { soundEffects.playCardWhooshOut(); } catch {}
+    } else if (dragItem.source === 'CHAR_DECK' && dragItem.index !== undefined) {
+      removeCharacterAtIndex(dragItem.index);
+      try { soundEffects.playCardWhooshOut(); } catch {}
+    }
+    setDragItem(null);
+  };
 
   // 덱 로컬스토리지 로드 (저장된 내 덱 리스트를 불러오고 최고 성급 카드로 자동 동기화)
   useEffect(() => {
@@ -249,8 +330,8 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     });
     setActionDeck(upgradedDeck);
 
-    // 캐릭터 덱 동기화
-    if (deck.characterDeck && deck.characterDeck.length > 0) {
+    // 캐릭터 덱 동기화 (빈 배열인 경우 빈 덱 그대로 적용)
+    if (Array.isArray(deck.characterDeck)) {
       const upgradedCharDeck: CharacterCard[] = deck.characterDeck.map((c) => {
         const off = availableCharacterCards.find((a) => a.code === c.code);
         return off
@@ -291,30 +372,22 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
 
   // 새 덱 생성
   const handleCreateNewDeck = () => {
+    if (userDecks.length >= MAX_USER_DECKS) {
+      alert(`덱은 최대 ${MAX_USER_DECKS}개까지 만들 수 있습니다.`);
+      return;
+    }
     const newId = `user-deck-${Date.now()}`;
     const newName = `나만의 커스텀 덱 ${userDecks.length + 1}`;
-    // 기본 스타터 덱 카드로 40장 구성
-    const initialAction: ActionCard[] = [];
-    let idx = 0;
-    while (initialAction.length < 40 && availableActionCards.length > 0) {
-      const card = availableActionCards[idx % availableActionCards.length];
-      const count = initialAction.filter((c) => c.code === card.code).length;
-      if (count < 3) {
-        initialAction.push({ ...card, id: `deck-${card.code}-${initialAction.length}` });
-      }
-      idx++;
-    }
-
-    const initialChars = generateDefaultCharacterDeck(['방랑자(여)', '양양', '치샤']);
-
+    
+    // 신규 덱 생성 시 아예 아무것도 들어있지 않은 빈 덱 상태로 생성
     const newDeck: CustomDeckConfig = {
       id: newId,
       name: newName,
       leader: lv0Characters.find((c) => c.characterName.includes('방랑자')) || lv0Characters[0],
       leftSupport: lv0Characters.find((c) => c.characterName.includes('양양')) || lv0Characters[1],
       rightSupport: lv0Characters.find((c) => c.characterName.includes('치샤')) || lv0Characters[2],
-      characterDeck: initialChars,
-      actionCards: initialAction,
+      characterDeck: [],
+      actionCards: [],
     };
 
     const updated = [...userDecks, newDeck];
@@ -323,6 +396,28 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     setSelectedDeckId(newId);
     applyDeckToEditor(newDeck);
     setActiveCustomDeck(newDeck);
+    setScreen('EDIT');
+  };
+
+  // 덱 코드로 불러온 덱을 새 유저 덱으로 등록
+  const handleImportDeckFromConfig = (imported: CustomDeckConfig) => {
+    if (userDecks.length >= MAX_USER_DECKS) {
+      alert(`덱은 최대 ${MAX_USER_DECKS}개까지 만들 수 있습니다.`);
+      return;
+    }
+    const newId = `user-deck-${Date.now()}`;
+    const newDeck: CustomDeckConfig = {
+      ...imported,
+      id: newId,
+      name: imported.name || `불러온 덱 ${userDecks.length + 1}`,
+    };
+    const updated = [...userDecks, newDeck];
+    setUserDecks(updated);
+    saveAllUserDecks(updated);
+    setSelectedDeckId(newId);
+    applyDeckToEditor(newDeck);
+    setActiveCustomDeck(newDeck);
+    setScreen('EDIT');
   };
 
   // 덱 삭제
@@ -367,9 +462,11 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   };
 
   const addCharacterToDeck = (card: OfficialCardData | CharacterCard) => {
+    const isPr = Boolean(card.rarity?.startsWith('PR'));
     const off: OfficialCardData | null =
-      getOfficialCardByCode(card.code) ||
-      (OFFICIAL_CARDS.find((c) => c.code === card.code) ?? null);
+      OFFICIAL_CARDS.find((c) => (card as any).id && c.id === (card as any).id) ||
+      OFFICIAL_CARDS.find((c) => c.code === card.code && Boolean(c.rarity?.startsWith('PR')) === isPr) ||
+      (card as OfficialCardData);
     if (off) setActiveCard(off);
 
     if (characterDeck.length >= 15) {
@@ -394,7 +491,10 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       return;
     }
 
-    const officialObj = OFFICIAL_CARDS.find((c) => c.code === card.code) || card;
+    const officialObj =
+      OFFICIAL_CARDS.find((c) => (card as any).id && c.id === (card as any).id) ||
+      OFFICIAL_CARDS.find((c) => c.code === card.code && Boolean(c.rarity?.startsWith('PR')) === isPr) ||
+      card;
     const charCard = officialCardToCharacterCard(officialObj as OfficialCardData);
 
     const nextDeck = [...characterDeck, charCard];
@@ -406,11 +506,11 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   };
 
   // 캐릭터 카드 덱 제거 (1장)
-  const removeCharacterFromDeck = (code: string) => {
-    const off = getOfficialCardByCode(code);
-    if (off) setActiveCard(off);
-
-    const index = characterDeck.findLastIndex((c) => c.code === code);
+  const removeCharacterFromDeck = (code: string, rarity?: string) => {
+    const isPr = rarity ? Boolean(rarity.startsWith('PR')) : undefined;
+    const index = isPr !== undefined
+      ? characterDeck.findLastIndex((c) => c.code === code && Boolean(c.rarity?.startsWith('PR')) === isPr)
+      : characterDeck.findLastIndex((c) => c.code === code);
     if (index !== -1) {
       const copy = [...characterDeck];
       copy.splice(index, 1);
@@ -603,9 +703,21 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     });
 
     // 7. 캐릭터 전용 카드 검사 (현재 캐릭터 덱에 편성된 3종류 캐릭터 대상)
+    // 주의: '일반' 및 에코 카드는 특정 캐릭터 전용이 아니므로 어떤 덱에도 자유롭게 투입 가능
     const invalidExclusives = new Map<string, { cardName: string; exclusiveFor: string }>();
     actionDeck.forEach((c) => {
-      if (c.characterExclusive) {
+      const isEchoOrGeneric =
+        !c.characterExclusive ||
+        c.characterExclusive === '일반' ||
+        c.characterExclusive === '-' ||
+        c.characterExclusive === '공용' ||
+        c.characterExclusive === '전체' ||
+        c.characterExclusive === '에코' ||
+        Boolean(c.feature && c.feature.includes('에코')) ||
+        Boolean(c.rawOfficial?.feature && c.rawOfficial.feature.includes('에코')) ||
+        Boolean(c.description && c.description.includes('<에코>'));
+
+      if (!isEchoOrGeneric && c.characterExclusive) {
         const match = uniqueCharacterNames.some(
           (n) => n && (n.includes(c.characterExclusive!) || c.characterExclusive!.includes(n))
         );
@@ -693,6 +805,10 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   // 필터링된 캐릭터 카드 풀
   const filteredCharacterCards = useMemo(() => {
     return availableCharacterCards.filter((c) => {
+      // 1. 성급 / 구분 필터 (일반 1~2성 vs PR 프로모)
+      if (charRarityFilter === 'STANDARD' && c.rarity?.startsWith('PR')) return false;
+      if (charRarityFilter === 'PR' && !c.rarity?.startsWith('PR')) return false;
+
       if (selectedChar !== 'ALL') {
         let matches = false;
         if (selectedChar === '방랑자(남)') {
@@ -715,7 +831,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       }
       return true;
     });
-  }, [availableCharacterCards, selectedChar, searchTerm]);
+  }, [availableCharacterCards, charRarityFilter, selectedChar, searchTerm]);
 
   // 덱 통계
   const redCount = actionDeck.filter((c) => c.color === 'RED').length;
@@ -782,19 +898,57 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     actionCards: actionDeck,
   }), [selectedDeckId, deckName, leader, leftSupport, rightSupport, characterDeck, actionDeck]);
 
+  // 저장본과 현재 에디터 내용이 다른지 (목록으로 돌아갈 때 확인용)
+  const isDirty = useMemo(() => {
+    const saved = userDecks.find((d) => d.id === selectedDeckId);
+    if (!saved) return false;
+    if (saved.name !== deckName) return true;
+    const sig = (arr?: { code: string }[]) => (arr || []).map((c) => c.code).sort().join(',');
+    if (sig(saved.actionCards) !== sig(actionDeck)) return true;
+    if (saved.characterDeck && saved.characterDeck.length > 0 && sig(saved.characterDeck) !== sig(characterDeck)) return true;
+    return false;
+  }, [userDecks, selectedDeckId, deckName, actionDeck, characterDeck]);
+
+  const handleOpenDeck = (deckId: string) => {
+    handleSelectDeck(deckId);
+    setScreen('EDIT');
+  };
+
+  const handleBackToDeckList = () => {
+    if (isDirty && !window.confirm('저장하지 않은 변경사항이 있습니다. 저장하지 않고 덱 목록으로 돌아갈까요?')) return;
+    // 저장하지 않은 편집 내용을 버리고 저장본으로 되돌림
+    const saved = userDecks.find((d) => d.id === selectedDeckId);
+    if (saved) applyDeckToEditor(saved);
+    setScreen('LIST');
+  };
+
   const charOptions = ['ALL', '방랑자(남)', '방랑자(여)', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
 
   return (
     <div className="h-screen w-full bg-[#05070d] text-slate-100 flex flex-col overflow-hidden select-none">
+      {screen === 'LIST' ? (
+        <DeckListScreen
+          decks={userDecks}
+          activeDeckId={selectedDeckId}
+          onBack={onBackToLobby}
+          onSelect={handleOpenDeck}
+          onCreate={handleCreateNewDeck}
+          onImportCode={handleImportDeckFromConfig}
+          onDelete={handleDeleteCurrentDeck}
+          onOpenPreset={() => setIsPresetModalOpen(true)}
+          onOpenShared={() => setIsCommunityModalOpen(true)}
+        />
+      ) : (
+      <>
       {/* 1. 상단 헤더 바 */}
       <header className="h-16 border-b border-slate-800 bg-slate-950/95 px-5 flex items-center justify-between shrink-0 z-30">
         <div className="flex items-center gap-4">
           <button
-            onClick={onBackToLobby}
+            onClick={handleBackToDeckList}
             className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 text-amber-400" />
-            대기실로 나가기
+            내 덱 목록
           </button>
           <div className="flex items-center gap-2">
             <h2 className="text-base font-black text-white flex items-center gap-2 tracking-wide">
@@ -806,43 +960,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
 
         {/* 덱 선택 드롭다운, 이름 변경, 프리셋/코드 및 저장/완료 버튼 */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* 내 보유 덱 리스트 셀렉터 & 신규 생성/삭제 */}
-          <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-700/80 rounded-xl p-1 shadow-inner">
-            <span className="text-xs font-black text-amber-400 pl-2 pr-1 flex items-center gap-1 shrink-0">
-              <Layers className="w-3.5 h-3.5" />
-              <span className="hidden xl:inline">보유 덱:</span>
-            </span>
-            <select
-              value={selectedDeckId}
-              onChange={(e) => handleSelectDeck(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white font-bold focus:outline-none focus:border-amber-400 cursor-pointer max-w-[160px] sm:max-w-[200px] truncate"
-              title="내가 보유 중인 덱 리스트에서 전환"
-            >
-              {userDecks.map((d, idx) => (
-                <option key={d.id} value={d.id}>
-                  #{idx + 1} {d.name} ({d.actionCards?.length ?? 0}/40)
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleCreateNewDeck}
-              className="p-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer flex items-center gap-1 shrink-0"
-              title="새 덱 만들기"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">새 덱</span>
-            </button>
-            {userDecks.length > 1 && (
-              <button
-                onClick={() => handleDeleteCurrentDeck(selectedDeckId)}
-                className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold transition cursor-pointer shrink-0"
-                title="현재 덱 삭제"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-
           <input
             type="text"
             value={deckName}
@@ -857,14 +974,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           >
             <BookmarkCheck className="w-4 h-4 text-purple-400" />
             <span className="hidden sm:inline">프리셋 & 코드</span>
-          </button>
-          <button
-            onClick={() => setIsCommunityModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-sm font-bold transition cursor-pointer shadow"
-            title="공유된 덱 리스트 둘러보기 및 내 덱 공유"
-          >
-            <Share2 className="w-4 h-4 text-indigo-400" />
-            <span>공유된 덱 리스트</span>
           </button>
           <button
             onClick={() => setIsExportModalOpen(true)}
@@ -907,17 +1016,48 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       {/* 2. 유희왕 마스터 듀얼식 3단 패널 */}
       <div className="flex-1 flex flex-col lg:flex-row gap-0 overflow-hidden min-h-0">
         {/* ========================================================= */}
-        {/* [패널 1] 좌측: 화면을 꽉 채우는 초대형 카드 상세 패널 (Card Detail Panel) */}
+        {/* [패널 1] 좌측: 화면을 꽉 채우는 초대형 카드 상세 패널 (Card Detail Panel & 드롭 시 덱에서 제거) */}
         {/* ========================================================= */}
-        <div className="w-full lg:w-[380px] xl:w-[420px] 2xl:w-[460px] shrink-0 border-r border-slate-800/80 bg-slate-950 p-4 sm:p-5 flex flex-col justify-between overflow-y-auto min-h-0">
+        <div
+          onDragOver={(e) => {
+            if (dragItem?.source === 'ACTION_DECK' || dragItem?.source === 'CHAR_DECK') {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              setIsOverRemovalZone(true);
+            }
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setIsOverRemovalZone(false);
+            }
+          }}
+          onDrop={handleDropOnRemovalZone}
+          className={`w-full lg:w-[380px] xl:w-[420px] 2xl:w-[460px] shrink-0 border-r border-slate-800/80 bg-slate-950 p-4 sm:p-5 flex flex-col justify-between overflow-y-auto min-h-0 transition-all ${
+            isOverRemovalZone && (dragItem?.source === 'ACTION_DECK' || dragItem?.source === 'CHAR_DECK')
+              ? 'ring-2 ring-red-500 ring-dashed bg-red-950/20'
+              : ''
+          }`}
+        >
           {activeCard ? (
             <div className="flex flex-col gap-3.5">
-              {/* 카드 이미지 컨테이너: 원본 비율 100% 보존 & 초대형 표시 & 상하 잘림 방지 */}
-              <div className="relative w-full max-w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-2xl p-1 overflow-hidden ring-2 ring-amber-500/30 group mx-auto">
+              {/* 카드 이미지 컨테이너: 원본 비율 100% 보존 & 초대형 표시 & 드래그하여 덱에 투입 가능 */}
+              <div
+                draggable={true}
+                onDragStart={(e) => {
+                  if (activeCard.kind === 'ACTION') {
+                    handleDragStart(e, { source: 'ACTION_POOL', code: activeCard.code });
+                  } else if (activeCard.kind === 'CHARACTER') {
+                    handleDragStart(e, { source: 'CHAR_POOL', code: activeCard.code });
+                  }
+                }}
+                onDragEnd={handleDragEnd}
+                className="relative w-full max-w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-2xl p-1 overflow-hidden ring-2 ring-amber-500/30 group mx-auto cursor-grab active:cursor-grabbing select-none"
+                title="이 카드를 중앙 덱 영역으로 드래그하여 바로 추가할 수 있습니다"
+              >
                 <img
                   src={activeCard.artUrl}
                   alt={activeCard.nameKr}
-                  className="w-full h-auto object-contain rounded-xl shadow-2xl drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)] transition-transform duration-300 group-hover:scale-[1.01]"
+                  className="w-full h-auto object-contain rounded-xl shadow-2xl drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)] transition-transform duration-300 group-hover:scale-[1.01] pointer-events-none"
                 />
               </div>
 
@@ -1000,9 +1140,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                   <Info className="w-4 h-4 text-amber-400" />
                   공식 효과 텍스트 원문
                 </span>
-                <p className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line font-medium">
-                  {activeCard.description}
-                </p>
+                <div className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line font-medium">
+                  {formatEffectText(activeCard.description, 'md')}
+                </div>
               </div>
 
               {/* 덱 조작 버튼 (액션 카드인 경우: 덱 추가 / 제거) */}
@@ -1117,8 +1257,29 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
               </div>
             </div>
 
-            {/* 캐릭터 덱 15장 슬롯 그리드 */}
-            <div className="grid grid-cols-5 sm:grid-cols-7 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-15 gap-1.5 overflow-x-auto pb-1 max-h-[170px] sm:max-h-[190px] overflow-y-auto pr-1">
+            {/* 캐릭터 덱 15장 슬롯 그리드 (드래그 앤 드롭 지원) */}
+            <div
+              onDragOver={(e) => {
+                if (dragItem?.source === 'CHAR_POOL') {
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect = 'copy';
+                  setIsOverCharDeck(true);
+                }
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setIsOverCharDeck(false);
+                }
+              }}
+              onDrop={handleDropOnCharDeck}
+              className={`relative grid grid-cols-5 sm:grid-cols-7 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-15 gap-1.5 overflow-x-auto pb-1 max-h-[170px] sm:max-h-[190px] overflow-y-auto pr-1 rounded-xl p-1 transition-all ${
+                isOverCharDeck
+                  ? 'bg-amber-500/15 ring-2 ring-amber-400 ring-dashed shadow-[0_0_20px_rgba(245,158,11,0.3)]'
+                  : dragItem?.source === 'CHAR_POOL'
+                  ? 'ring-1 ring-amber-400/40 ring-dashed bg-slate-900/40'
+                  : ''
+              }`}
+            >
               {characterDeck.map((charCard, idx) => {
                 const isSelected = activeCard?.code === charCard.code;
                 const isLeaderCard = charCard.characterName === designatedLeaderName && charCard.level === 0;
@@ -1126,6 +1287,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                 return (
                   <div
                     key={`${charCard.id || charCard.code}-${idx}`}
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, { source: 'CHAR_DECK', code: charCard.code, index: idx })}
+                    onDragEnd={handleDragEnd}
                     onClick={() => {
                       const off = getOfficialCardByCode(charCard.code);
                       if (off) setActiveCard(off);
@@ -1134,14 +1298,14 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                       e.preventDefault();
                       removeCharacterAtIndex(idx);
                     }}
-                    className={`relative group aspect-[5/7] rounded-xl overflow-hidden border transition-all cursor-pointer shadow-md shrink-0 bg-slate-900 ${
+                    className={`relative group aspect-[5/7] rounded-xl overflow-hidden border transition-all cursor-grab active:cursor-grabbing shadow-md shrink-0 bg-slate-900 select-none ${
                       isSelected
                         ? 'border-amber-400 ring-2 ring-amber-400 scale-102 z-10'
                         : isLeaderCard
                         ? 'border-amber-400/80 shadow-amber-500/20'
                         : 'border-slate-700 hover:border-slate-500'
                     }`}
-                    title={`${charCard.nameKr} (Lv.${charCard.level}) - 클릭: 상세 보기 / 우클릭 또는 X: 제거`}
+                    title={`${charCard.nameKr} (Lv.${charCard.level}) - 드래그하여 덱 밖으로 빼기 (제거) / 클릭: 상세 보기`}
                   >
                     <img
                       src={charCard.artUrl}
@@ -1240,12 +1404,33 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
             </div>
           </div>
 
-          {/* 3. 40장 메인 액션 덱 뷰 (개별 40장 슬롯 그리드 or 텍스트 리스트) */}
-          <div className="flex-1 bg-slate-950/90 border border-slate-800 rounded-2xl p-3 overflow-y-auto min-h-0">
+          {/* 3. 40장 메인 액션 덱 뷰 (드래그 앤 드롭 지원) */}
+          <div
+            onDragOver={(e) => {
+              if (dragItem?.source === 'ACTION_POOL') {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                setIsOverActionDeck(true);
+              }
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setIsOverActionDeck(false);
+              }
+            }}
+            onDrop={handleDropOnActionDeck}
+            className={`relative flex-1 bg-slate-950/90 border rounded-2xl p-3 overflow-y-auto min-h-0 transition-all ${
+              isOverActionDeck
+                ? 'border-amber-400 ring-2 ring-amber-400 ring-dashed bg-amber-500/10 shadow-[0_0_25px_rgba(245,158,11,0.25)]'
+                : dragItem?.source === 'ACTION_POOL'
+                ? 'border-amber-500/50 ring-1 ring-amber-400/30 ring-dashed'
+                : 'border-slate-800'
+            }`}
+          >
             {individualDeck.length === 0 ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-500 text-sm gap-2">
                 <Layers className="w-8 h-8 text-slate-600 mb-1" />
-                <span>우측 카드 라이브러리에서 카드를 클릭하여 40장을 채워주세요.</span>
+                <span>우측 카드 라이브러리에서 카드를 드래그하거나 클릭하여 40장을 채워주세요.</span>
                 <span className="text-xs text-slate-600">중복 카드는 묶이지 않고 40장의 개별 슬롯으로 각각 표시됩니다.</span>
               </div>
             ) : deckViewMode === 'IMAGE' ? (
@@ -1258,6 +1443,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                   return (
                     <div
                       key={`${card.id || card.code}-${index}`}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, { source: 'ACTION_DECK', code: card.code, index })}
+                      onDragEnd={handleDragEnd}
                       onClick={() => {
                         if (officialCard) setActiveCard(officialCard);
                       }}
@@ -1269,7 +1457,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                         e.stopPropagation();
                         removeCardAtIndex(index);
                       }}
-                      className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-pointer shadow-md select-none ${
+                      className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-grab active:cursor-grabbing shadow-md select-none ${
                         isSelected
                           ? 'border-amber-400 ring-4 ring-amber-400 scale-102 shadow-amber-500/50 z-10'
                           : card.color === 'RED'
@@ -1278,7 +1466,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                           ? 'border-emerald-500/60 hover:border-emerald-400'
                           : 'border-cyan-500/60 hover:border-cyan-400'
                       }`}
-                      title={`${card.nameKr} (#${index + 1}) - 클릭: 상세 보기 / X: 제거 / 더블클릭·우클릭: 제거`}
+                      title={`${card.nameKr} (#${index + 1}) - 드래그하여 덱 밖으로 빼기 (제거) / 더블클릭·우클릭: 제거`}
                     >
                       {/* 카드 일러스트 (최고 성급 100% 매칭) */}
                       <img
@@ -1352,14 +1540,18 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                   return (
                     <div
                       key={`${card.id || card.code}-${index}`}
+                      draggable={true}
+                      onDragStart={(e) => handleDragStart(e, { source: 'ACTION_DECK', code: card.code, index })}
+                      onDragEnd={handleDragEnd}
                       onClick={() => {
                         if (officialCard) setActiveCard(officialCard);
                       }}
-                      className={`grid grid-cols-12 gap-2 items-center px-3 py-2 rounded-xl transition cursor-pointer border ${
+                      className={`grid grid-cols-12 gap-2 items-center px-3 py-2 rounded-xl transition cursor-grab active:cursor-grabbing border ${
                         isSelected
                           ? 'bg-amber-500/15 border-amber-400 text-white shadow'
                           : 'bg-slate-900/70 hover:bg-slate-800/80 border-slate-800/80 text-slate-200'
                       }`}
+                      title={`${card.nameKr} - 드래그하여 덱 밖으로 빼기 (제거)`}
                     >
                       {/* 슬롯 번호 */}
                       <div className="col-span-1 font-mono font-bold text-xs text-amber-300">
@@ -1383,7 +1575,12 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
 
                       {/* 전용 / 스탯 */}
                       <div className="col-span-3 text-center text-xs text-slate-400 font-semibold truncate">
-                        {card.characterExclusive ? `[${card.characterExclusive}]` : '범용'} · DMG {card.damage}
+                        {card.feature?.includes('에코') || card.rawOfficial?.feature?.includes('에코')
+                          ? '[에코]'
+                          : card.characterExclusive && card.characterExclusive !== '일반'
+                          ? `[${card.characterExclusive}]`
+                          : '범용'}{' '}
+                        · DMG {card.damage}
                       </div>
 
                       {/* 개별 제거 버튼 */}
@@ -1442,9 +1639,39 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         </div>
 
         {/* ========================================================= */}
-        {/* [패널 3] 우측: 카드 라이브러리 브라우저 (너비 및 이미지 대폭 확대 / 뷰 모드 이원화) */}
+        {/* [패널 3] 우측: 카드 라이브러리 브라우저 (드래그하여 덱에 추가 / 덱 카드를 드롭하여 제거) */}
         {/* ========================================================= */}
-        <div className="w-full lg:w-[360px] xl:w-[400px] 2xl:w-[440px] shrink-0 bg-slate-950 p-4 flex flex-col justify-between overflow-hidden min-h-0">
+        <div
+          onDragOver={(e) => {
+            if (dragItem?.source === 'ACTION_DECK' || dragItem?.source === 'CHAR_DECK') {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              setIsOverRemovalZone(true);
+            }
+          }}
+          onDragLeave={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+              setIsOverRemovalZone(false);
+            }
+          }}
+          onDrop={handleDropOnRemovalZone}
+          className={`w-full lg:w-[360px] xl:w-[400px] 2xl:w-[440px] shrink-0 bg-slate-950 p-4 flex flex-col justify-between overflow-hidden min-h-0 transition-all ${
+            isOverRemovalZone && (dragItem?.source === 'ACTION_DECK' || dragItem?.source === 'CHAR_DECK')
+              ? 'ring-2 ring-red-500 ring-dashed bg-red-950/20'
+              : ''
+          }`}
+        >
+          {/* 덱 카드 드래그 시 제거 드롭 가이드 배너 */}
+          {(dragItem?.source === 'ACTION_DECK' || dragItem?.source === 'CHAR_DECK') && (
+            <div className={`p-2.5 mb-2 rounded-xl border flex items-center justify-center gap-2 text-xs font-black transition-all shrink-0 ${
+              isOverRemovalZone
+                ? 'bg-red-600 text-white border-red-400 scale-102 shadow-lg animate-pulse'
+                : 'bg-red-950/60 text-red-300 border-red-500/50'
+            }`}>
+              <Trash2 className="w-4 h-4 stroke-[2.5]" />
+              <span>여기에 놓으면 덱에서 제거됩니다 (-1장)</span>
+            </div>
+          )}
           {/* 상단 탭 & 뷰 모드 & 검색 & 필터 */}
           <div className="space-y-2 mb-3 shrink-0">
             {/* 상단 액션 카드 vs 에코 카드 vs 캐릭터 카드 탭 전환 */}
@@ -1552,6 +1779,32 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
               </div>
             )}
 
+            {/* 캐릭터 전용 성급/구분 필터 버튼 (일반 1~2성 vs PR 프로모) */}
+            {poolTab === 'CHARACTER' && (
+              <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+                <span className="text-[11px] font-bold text-slate-400 pl-1.5 pr-1 shrink-0">구분:</span>
+                {[
+                  { id: 'ALL', label: '전체' },
+                  { id: 'STANDARD', label: '일반 (1~2★)' },
+                  { id: 'PR', label: '프로모 (PR★★)' },
+                ].map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setCharRarityFilter(item.id as 'ALL' | 'STANDARD' | 'PR')}
+                    className={`flex-1 py-1 rounded-lg font-black text-xs transition cursor-pointer ${
+                      charRarityFilter === item.id
+                        ? item.id === 'PR'
+                          ? 'bg-gradient-to-r from-rose-600 to-amber-600 text-white shadow-md'
+                          : 'bg-amber-500 text-slate-950 font-black shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* 캐릭터 필터 칩 */}
             <div className="flex items-center gap-1 overflow-x-auto pb-1 text-xs">
               {charOptions.map((ch) => (
@@ -1584,6 +1837,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                     return (
                       <div
                         key={card.code}
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, { source: 'ACTION_POOL', code: card.code })}
+                        onDragEnd={handleDragEnd}
                         onClick={() => {
                           if (officialCard) setActiveCard(officialCard);
                         }}
@@ -1599,7 +1855,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                           e.stopPropagation();
                           addCardToDeck(card);
                         }}
-                        className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-pointer shadow-md select-none ${
+                        className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-grab active:cursor-grabbing shadow-md select-none ${
                           isSelected
                             ? 'border-amber-400 ring-4 ring-amber-400 scale-102 shadow-amber-500/50 z-10'
                             : card.color === 'RED'
@@ -1608,7 +1864,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                             ? 'border-emerald-500/50 hover:border-emerald-400'
                             : 'border-cyan-500/50 hover:border-cyan-400'
                         }`}
-                        title={`${card.nameKr} (덱에 ${countInDeck}장) - 클릭: 상세 보기 / 하단 버튼: 수량 조절 / 우클릭: 빠른 추가/제거`}
+                        title={`${card.nameKr} (덱에 ${countInDeck}장) - 드래그하여 덱에 추가 / 클릭: 상세 보기 / 더블클릭: 추가`}
                       >
                         {/* 카드 일러스트 */}
                         <img
@@ -1680,14 +1936,18 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                     return (
                       <div
                         key={card.code}
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, { source: 'ACTION_POOL', code: card.code })}
+                        onDragEnd={handleDragEnd}
                         onClick={() => {
                           if (officialCard) setActiveCard(officialCard);
                         }}
-                        className={`flex items-center justify-between p-2 rounded-xl transition cursor-pointer border ${
+                        className={`flex items-center justify-between p-2 rounded-xl transition cursor-grab active:cursor-grabbing border ${
                           isSelected
                             ? 'bg-amber-500/15 border-amber-400 text-white shadow'
                             : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-slate-200'
                         }`}
+                        title={`${card.nameKr} - 드래그하여 덱에 추가`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
@@ -1726,12 +1986,16 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
               libraryViewMode === 'IMAGE' ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {filteredCharacterCards.map((charCard) => {
-                    const isSelected = activeCard?.code === charCard.code;
-                    const countInCharDeck = characterDeck.filter((c) => c.code === charCard.code).length;
+                    const isPrCard = Boolean(charCard.rarity?.startsWith('PR'));
+                    const isSelected = activeCard?.code === charCard.code && (activeCard?.rarity ? Boolean(activeCard.rarity?.startsWith('PR')) === isPrCard : true);
+                    const countInCharDeck = characterDeck.filter((c) => c.code === charCard.code && (isPrCard ? Boolean(c.rarity?.startsWith('PR')) : !c.rarity?.startsWith('PR'))).length;
 
                     return (
                       <div
-                        key={charCard.code}
+                        key={charCard.id || `${charCard.code}-${charCard.rarity}`}
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, { source: 'CHAR_POOL', code: charCard.code })}
+                        onDragEnd={handleDragEnd}
                         onClick={() => {
                           setActiveCard(charCard);
                         }}
@@ -1742,19 +2006,19 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                         onContextMenu={(e) => {
                           e.preventDefault();
                           if (countInCharDeck > 0) {
-                            removeCharacterFromDeck(charCard.code);
+                            removeCharacterFromDeck(charCard.code, charCard.rarity);
                           } else {
                             addCharacterToDeck(charCard);
                           }
                         }}
-                        className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-pointer shadow-md bg-slate-900 select-none ${
+                        className={`relative group aspect-[5/7] rounded-xl overflow-hidden border-2 transition-all duration-150 cursor-grab active:cursor-grabbing shadow-md bg-slate-900 select-none ${
                           isSelected
                             ? 'border-amber-400 ring-4 ring-amber-400 scale-102 shadow-amber-500/50 z-10'
                             : countInCharDeck > 0
                             ? 'border-amber-500/80 shadow-amber-500/20'
                             : 'border-slate-800 hover:border-amber-500/60'
                         }`}
-                        title={`${charCard.nameKr} (Lv.${charCard.level}) - 클릭: 상세 보기 / 하단 +/-: 수량 조절 / 더블클릭: 1장 추가`}
+                        title={`${charCard.nameKr} (Lv.${charCard.level} · ${charCard.rarity || '1~2성'}) - 드래그하여 캐릭터 덱에 추가 / 클릭: 상세 보기 / 더블클릭: 1장 추가`}
                       >
                         <img
                           src={charCard.artUrl}
@@ -1767,16 +2031,23 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                           Lv.{charCard.level}
                         </div>
 
-                        {/* 캐릭터 덱 투입 수량 배지 */}
-                        {countInCharDeck > 0 ? (
-                          <div className="absolute top-1.5 right-1.5 z-10 px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-xs shadow">
-                            {countInCharDeck}/3
-                          </div>
-                        ) : (
-                          <div className="absolute top-1.5 right-1.5 z-10 px-2 py-0.5 rounded-full bg-slate-950/90 border border-slate-700 text-amber-400 font-black text-xs shadow">
-                            {charCard.rarity}
-                          </div>
-                        )}
+                        {/* 성급 / PR 배지 & 수량 */}
+                        <div className="absolute top-1.5 right-1.5 z-10 flex items-center gap-1">
+                          {isPrCard ? (
+                            <span className="px-2 py-0.5 rounded-md bg-gradient-to-r from-rose-600 via-red-500 to-amber-500 text-white font-mono font-black text-[10px] shadow-lg border border-red-300/60 ring-1 ring-red-400/40">
+                              PR★★
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded-md bg-slate-950/90 border border-slate-700 text-amber-300 font-mono font-bold text-[10px] shadow">
+                              {charCard.rarity || '★~★★'}
+                            </span>
+                          )}
+                          {countInCharDeck > 0 && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[10px] shadow">
+                              {countInCharDeck}/3
+                            </span>
+                          )}
+                        </div>
 
                         {/* 하단 캐릭터 정보 */}
                         <div className="absolute inset-x-0 bottom-8 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-1.5 pt-3 pointer-events-none">
@@ -1794,7 +2065,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              removeCharacterFromDeck(charCard.code);
+                              removeCharacterFromDeck(charCard.code, charCard.rarity);
                             }}
                             disabled={countInCharDeck <= 0}
                             className="flex-1 flex items-center justify-center gap-1 bg-red-950/50 hover:bg-red-600 disabled:opacity-25 disabled:pointer-events-none text-red-200 hover:text-white transition font-black text-xs cursor-pointer active:scale-95"
@@ -1825,18 +2096,23 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                 /* 캐릭터 카드 [텍스트 리스트 뷰] */
                 <div className="space-y-1.5">
                   {filteredCharacterCards.map((charCard) => {
-                    const countInCharDeck = characterDeck.filter((c) => c.code === charCard.code).length;
-                    const isSelected = activeCard?.code === charCard.code;
+                    const isPrCard = Boolean(charCard.rarity?.startsWith('PR'));
+                    const countInCharDeck = characterDeck.filter((c) => c.code === charCard.code && (isPrCard ? Boolean(c.rarity?.startsWith('PR')) : !c.rarity?.startsWith('PR'))).length;
+                    const isSelected = activeCard?.code === charCard.code && (activeCard?.rarity ? Boolean(activeCard.rarity?.startsWith('PR')) === isPrCard : true);
 
                     return (
                       <div
-                        key={charCard.code}
+                        key={charCard.id || `${charCard.code}-${charCard.rarity}`}
+                        draggable={true}
+                        onDragStart={(e) => handleDragStart(e, { source: 'CHAR_POOL', code: charCard.code })}
+                        onDragEnd={handleDragEnd}
                         onClick={() => setActiveCard(charCard)}
-                        className={`flex items-center justify-between p-2 rounded-xl transition cursor-pointer border ${
+                        className={`flex items-center justify-between p-2 rounded-xl transition cursor-grab active:cursor-grabbing border ${
                           isSelected
                             ? 'bg-amber-500/15 border-amber-400 text-white shadow'
                             : 'bg-slate-900/70 hover:bg-slate-800 border-slate-800 text-slate-200'
                         }`}
+                        title={`${charCard.nameKr} - 드래그하여 캐릭터 덱에 추가`}
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-black text-[10px]">
@@ -1845,6 +2121,15 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                           <span className="text-xs font-bold truncate">
                             {charCard.nameKr}
                           </span>
+                          {isPrCard ? (
+                            <span className="px-1.5 py-0.5 rounded bg-gradient-to-r from-rose-600 via-red-500 to-amber-500 text-white font-mono font-black text-[9px] shadow border border-red-300/60">
+                              PR★★
+                            </span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-amber-300 font-mono font-bold text-[9px]">
+                              {charCard.rarity || '★~★★'}
+                            </span>
+                          )}
                           <span className="text-[10px] text-slate-400">
                             ({getElementKr(charCard.element)})
                           </span>
@@ -1857,11 +2142,21 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              removeCharacterFromDeck(charCard.code, charCard.rarity);
+                            }}
+                            disabled={countInCharDeck <= 0}
+                            className="p-1 rounded-lg bg-red-950/60 hover:bg-red-600 disabled:opacity-20 text-red-200 hover:text-white text-xs cursor-pointer shadow transition"
+                            title="1장 제거"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
                               addCharacterToDeck(charCard);
                             }}
                             disabled={countInCharDeck >= 3 || characterDeck.length >= 15}
                             className="px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-yellow-400 disabled:opacity-30 text-slate-950 font-black text-xs cursor-pointer shadow transition"
-                            title="캐릭터 덱에 1장 추가"
                           >
                             + 담기
                           </button>
@@ -1875,6 +2170,8 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* 덱 프리셋 & 코드 보관함 모달 */}
       <DeckPresetModal
@@ -1889,11 +2186,13 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           applyDeckToEditor(deck);
         }}
         onSelectAndEdit={(deck) => {
+          setIsPresetModalOpen(false);
           saveUserDeck(deck);
           const list = getUserDecks();
           setUserDecks(list);
           setSelectedDeckId(deck.id);
           applyDeckToEditor(deck);
+          setScreen('EDIT');
         }}
         onSelectAndBattle={(deck) => {
           onStartBattleWithDeck(deck);
@@ -1923,6 +2222,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           setUserDecks(list);
           setSelectedDeckId(deck.id);
           applyDeckToEditor(deck);
+          setScreen('EDIT');
         }}
       />
 

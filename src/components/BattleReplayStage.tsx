@@ -7,6 +7,11 @@ import { CharacterSlot } from './CharacterSlot';
 import { CardView } from './CardView';
 import { HandView } from './HandView';
 import { BgmPlayer } from './BgmPlayer';
+import { DeckStack } from './DeckStack';
+import { ZoneCardStack } from './ZoneCardStack';
+import { EvolutionTreeModal } from './EvolutionTreeModal';
+import { CardListModal } from './CardListModal';
+import { formatEffectText, formatBattleLogText } from '../utils/formatEffectText';
 import { CharacterCard, ActionCard, AnyCard, getElementKr } from '../types/tcg';
 import { OFFICIAL_CARDS, getOfficialCardByCode, OfficialCardData } from '../data/officialCards';
 import {
@@ -17,29 +22,24 @@ import {
   RotateCcw,
   Volume2,
   VolumeX,
-  ArrowLeft,
-  Crown,
-  Heart,
   Sparkles,
   Zap,
   Swords,
-  Shield,
   Layers,
   ChevronRight,
   Info,
-  Clock,
-  History,
   FastForward,
   Trash2,
-  BatteryCharging,
   Bot,
   User,
   Home,
-  Eye,
   ZoomIn,
   ZoomOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Heart,
+  Flame,
+  ExternalLink,
 } from 'lucide-react';
 
 interface BattleReplayStageProps {
@@ -88,7 +88,6 @@ function toCharacterCard(slot?: ReplaySlotSnapshot): CharacterCard | null {
     }
   }
 
-  // 공식 카드의 현재 레벨에 일치하는 아트를 최우선 적용하여 시작 시 최고 레벨 아트로 보이는 현상 방지
   const resolvedArtUrl = official?.artUrl || slot.artUrl || '/cards/card_images/BP01-001_방랑자(남)_1985.webp';
 
   return {
@@ -153,6 +152,20 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
   const [arenaZoom, setArenaZoom] = useState<number>(() => {
     const saved = localStorage.getItem('wuthering_arena_zoom');
     return saved ? parseFloat(saved) : 1.0;
+  });
+
+  // 모달 상태
+  const [evolutionModalChar, setEvolutionModalChar] = useState<CharacterCard | null>(null);
+  const [cardListModalState, setCardListModalState] = useState<{
+    isOpen: boolean;
+    title: string;
+    type: 'TRASH' | 'CONCERTO';
+    cards: AnyCard[];
+  }>({
+    isOpen: false,
+    title: '',
+    type: 'TRASH',
+    cards: [],
   });
 
   const changeLeftPanelSize = (size: LeftPanelSize) => {
@@ -228,6 +241,10 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
     // 프리뷰 카드 동기화 (발동된 카드가 있으면 우선 표시)
     if (snap.actionCard) {
       setPreviewCard(toActionCard(snap.actionCard));
+    } else if (snap.p0ActionCards && snap.p0ActionCards.length > 0) {
+      setPreviewCard(toActionCard(snap.p0ActionCards[snap.p0ActionCards.length - 1]));
+    } else if (snap.p1ActionCards && snap.p1ActionCards.length > 0) {
+      setPreviewCard(toActionCard(snap.p1ActionCards[snap.p1ActionCards.length - 1]));
     } else if (snap.p0ActionCard) {
       setPreviewCard(toActionCard(snap.p0ActionCard));
     } else if (snap.p1ActionCard) {
@@ -245,7 +262,8 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
       } else if (snap.soundTrigger === 'upgrade') {
         soundEffects.playUpgrade();
       } else if (snap.soundTrigger === 'combo') {
-        soundEffects.playComboSlash();
+        const weapon = snap.damageEvent?.weapon as WeaponType | undefined;
+        soundEffects.playComboSlash(1, weapon);
       } else if (snap.soundTrigger === 'card') {
         soundEffects.playCardPlace();
       } else if (snap.soundTrigger === 'phase') {
@@ -297,23 +315,28 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
   const p1LeftChar = toCharacterCard(p1.leftSupport);
   const p1RightChar = toCharacterCard(p1.rightSupport);
 
-  // 액션 에리어 대결 카드
-  const currentActionCardObj = toActionCard(activeSnapshot.actionCard, 'active');
+  // P0 / P1 액션 에리어 카드 목록 (실제 GameBoard와 100% 동일한 다중 카드 배열)
+  const p0ActionCards: ActionCard[] = useMemo(() => {
+    if (activeSnapshot.p0ActionCards && activeSnapshot.p0ActionCards.length > 0) {
+      return activeSnapshot.p0ActionCards.map((c, idx) => toActionCard(c, `p0-act-${idx}`)!).filter(Boolean);
+    }
+    if (activeSnapshot.p0ActionCard) {
+      const single = toActionCard(activeSnapshot.p0ActionCard, 'p0-clash');
+      return single ? [single] : [];
+    }
+    return [];
+  }, [activeSnapshot.p0ActionCards, activeSnapshot.p0ActionCard]);
 
-  // P0 / P1 대결 존에 올릴 카드 (동시 대결 연출 및 상태 반영)
-  const p0ClashCard = toActionCard(
-    activeSnapshot.p0ActionCard ||
-    (activeSnapshot.clash?.p0CardName ? { nameKr: activeSnapshot.clash.p0CardName, artUrl: activeSnapshot.clash.p0CardArt } : null) ||
-    (isP0Turn ? activeSnapshot.actionCard : null),
-    'p0-clash'
-  );
-
-  const p1ClashCard = toActionCard(
-    activeSnapshot.p1ActionCard ||
-    (activeSnapshot.clash?.p1CardName ? { nameKr: activeSnapshot.clash.p1CardName, artUrl: activeSnapshot.clash.p1CardArt } : null) ||
-    (!isP0Turn ? activeSnapshot.actionCard : null),
-    'p1-clash'
-  );
+  const p1ActionCards: ActionCard[] = useMemo(() => {
+    if (activeSnapshot.p1ActionCards && activeSnapshot.p1ActionCards.length > 0) {
+      return activeSnapshot.p1ActionCards.map((c, idx) => toActionCard(c, `p1-act-${idx}`)!).filter(Boolean);
+    }
+    if (activeSnapshot.p1ActionCard) {
+      const single = toActionCard(activeSnapshot.p1ActionCard, 'p1-clash');
+      return single ? [single] : [];
+    }
+    return [];
+  }, [activeSnapshot.p1ActionCards, activeSnapshot.p1ActionCard]);
 
   // 손패(Hand) 실제 타임라인 스냅샷 기반 데이터 (1P & 2P)
   const p0HandCards: ActionCard[] = useMemo(() => {
@@ -336,52 +359,125 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
     ).slice(0, Math.max(1, p1.handCount || 5)).map((m, idx) => toActionCard({ nameKr: m.nameKr, artUrl: m.artUrl, code: m.code }, `p1-fallback-${idx}`)!);
   }, [activeSnapshot.p1.handCards, p1.leader.nameKr, p1.handCount]);
 
+  // 더미 존 카드 (ZoneCardStack 규격)
+  const p0TrashCards: AnyCard[] = useMemo(() => {
+    return Array.from({ length: p0.dropCount }).map((_, i) => ({
+      id: `p0-drop-${i}`,
+      code: 'BP01-044',
+      nameKr: `버려진 카드 (${i + 1})`,
+      kind: 'ACTION' as const,
+      color: 'RED' as const,
+      cost: 1,
+      speed: 0,
+      damage: 0,
+      artUrl: '/cards/card_back_action.png',
+      description: '트래시 영역에 위치한 액션 카드입니다.',
+    }));
+  }, [p0.dropCount]);
+
+  const p1TrashCards: AnyCard[] = useMemo(() => {
+    return Array.from({ length: p1.dropCount }).map((_, i) => ({
+      id: `p1-drop-${i}`,
+      code: 'BP01-044',
+      nameKr: `버려진 카드 (${i + 1})`,
+      kind: 'ACTION' as const,
+      color: 'RED' as const,
+      cost: 1,
+      speed: 0,
+      damage: 0,
+      artUrl: '/cards/card_back_action.png',
+      description: '트래시 영역에 위치한 액션 카드입니다.',
+    }));
+  }, [p1.dropCount]);
+
+  const p0ConcertoCards: AnyCard[] = useMemo(() => {
+    return Array.from({ length: p0.concerto }).map((_, i) => ({
+      id: `p0-concerto-${i}`,
+      code: 'CONCERTO-01',
+      nameKr: `협주 에너지 (${i + 1})`,
+      kind: 'ACTION' as const,
+      color: 'BLUE' as const,
+      cost: 1,
+      speed: 0,
+      damage: 0,
+      artUrl: '/cards/card_back_action.png',
+      description: '협주 에리어에 충전된 공명 에너지입니다.',
+    }));
+  }, [p0.concerto]);
+
+  const p1ConcertoCards: AnyCard[] = useMemo(() => {
+    return Array.from({ length: p1.concerto }).map((_, i) => ({
+      id: `p1-concerto-${i}`,
+      code: 'CONCERTO-01',
+      nameKr: `협주 에너지 (${i + 1})`,
+      kind: 'ACTION' as const,
+      color: 'BLUE' as const,
+      cost: 1,
+      speed: 0,
+      damage: 0,
+      artUrl: '/cards/card_back_action.png',
+      description: '협주 에리어에 충전된 공명 에너지입니다.',
+    }));
+  }, [p1.concerto]);
+
   const officialPreview = previewCard ? getOfficialCardByCode(previewCard.code) : null;
+
+  const openCardList = (type: 'TRASH' | 'CONCERTO', playerIdx: 0 | 1) => {
+    const isP0 = playerIdx === 0;
+    const cards = type === 'TRASH' ? (isP0 ? p0TrashCards : p1TrashCards) : (isP0 ? p0ConcertoCards : p1ConcertoCards);
+    const title = `${isP0 ? p0.name : p1.name}의 ${type === 'TRASH' ? '트래시' : '협주'} 에리어 (${cards.length}장)`;
+    setCardListModalState({
+      isOpen: true,
+      title,
+      type,
+      cards,
+    });
+  };
 
   return (
     <div className="relative h-screen max-h-screen w-full bg-[#060810] text-slate-100 flex flex-col justify-between overflow-hidden select-none">
       {/* ========================================================= */}
-      {/* 1. 상단 마스터 듀얼 네비게이션 & 리플레이 컨트롤 헤더 */}
+      {/* 1. 상단 택티컬 마스터 헤더 & 리플레이 컨트롤러 바 */}
       {/* ========================================================= */}
-      <header className="h-14 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md px-4 flex items-center justify-between z-30 shrink-0">
+      <header className="h-13 bg-[#0c101b]/95 backdrop-blur-md border-b border-white/10 px-3 sm:px-4 flex items-center justify-between z-30 shrink-0">
         <div className="flex items-center gap-3">
           <button
             onClick={onExit}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer"
-            title="리플레이 종료 및 대기실로 나가기"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-200 border border-white/10 hover:border-[#f97316]/60 text-xs font-bold transition cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
+            title="리플레이 종료 및 나가기"
           >
-            <Home className="w-3.5 h-3.5 text-amber-400" />
+            <Home className="w-3.5 h-3.5 text-[#f97316]" />
             <span>나가기</span>
           </button>
 
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-600 flex items-center justify-center shadow-lg shadow-amber-500/20 font-black text-slate-950 text-sm">
+            <div className="w-7 h-7 bg-gradient-to-br from-[#ea580c] via-[#f97316] to-[#fb923c] flex items-center justify-center font-black text-slate-950 text-xs shadow-[0_0_12px_rgba(249,115,22,0.4)] [clip-path:polygon(3px_0,100%_0,100%_calc(100%-3px),calc(100%-3px)_100%,0_100%,0_3px)]">
               鳴
             </div>
             <div>
-              <h1 className="text-base sm:text-lg font-black tracking-wider text-white flex items-center gap-2">
-                명조: 대결 <span className="text-xs text-amber-400 font-mono font-bold tracking-widest">MASTER DUEL REPLAY</span>
+              <h1 className="text-sm sm:text-base font-black tracking-wider text-white flex items-center gap-2">
+                명조: 대결 <span className="text-[11px] text-[#f97316] font-mono font-bold tracking-widest">TACTICAL REPLAY</span>
               </h1>
-              <div className="flex items-center gap-2.5 text-xs sm:text-sm text-slate-300 font-medium">
-                <span className="font-mono text-amber-300 font-bold">TURN {activeSnapshot.turn} / {replay.totalTurns}</span>
+              <div className="flex items-center gap-2 text-[11px] text-slate-300 font-medium">
+                <span className="font-mono text-[#f97316] font-bold">TURN {activeSnapshot.turn} / {replay.totalTurns}</span>
                 <span>•</span>
-                <span className="font-extrabold text-slate-100">{activeSnapshot.phaseText}</span>
+                <span className="font-extrabold text-slate-200">{activeSnapshot.phaseText}</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* 중앙: 대전 리플레이 통합 컨트롤러 바 */}
-        <div className="flex items-center gap-2.5 bg-slate-900/90 border border-slate-700/80 px-4 py-2 rounded-full shadow-2xl backdrop-blur-sm">
+        {/* 중앙: 택티컬 리플레이 통합 컨트롤러 바 */}
+        <div className="flex items-center gap-2 bg-[#090d16]/95 border border-[#f97316]/50 px-3.5 py-1.5 shadow-[0_0_25px_rgba(0,0,0,0.85)] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]">
           <button
             onClick={() => {
               setIsPlaying(false);
               setCurrentStep(0);
             }}
-            className="p-1.5 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800"
-            title="처음으로"
+            className="p-1 text-slate-400 hover:text-white transition hover:bg-white/5 cursor-pointer"
+            title="처음으로 (Home)"
           >
-            <SkipBack className="w-4 h-4" />
+            <SkipBack className="w-3.5 h-3.5" />
           </button>
 
           <button
@@ -389,25 +485,25 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
               setIsPlaying(false);
               setCurrentStep((prev) => Math.max(0, prev - 1));
             }}
-            className="p-1.5 text-slate-300 hover:text-white transition rounded-lg hover:bg-slate-800"
+            className="p-1 text-slate-300 hover:text-white transition hover:bg-white/5 cursor-pointer"
             title="이전 수 (← 방향키)"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCcw className="w-3.5 h-3.5" />
           </button>
 
           <button
             onClick={() => setIsPlaying((prev) => !prev)}
-            className="px-4 py-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm flex items-center gap-2 transition shadow-lg shadow-amber-500/20"
+            className="px-3.5 py-1 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:opacity-90 text-white font-black text-xs flex items-center gap-1.5 transition shadow-[0_0_12px_rgba(249,115,22,0.4)] cursor-pointer [clip-path:polygon(3px_0,100%_0,100%_calc(100%-3px),calc(100%-3px)_100%,0_100%,0_3px)]"
             title="재생 / 일시정지 (스페이스바)"
           >
             {isPlaying ? (
               <>
-                <Pause className="w-4 h-4 fill-current" />
+                <Pause className="w-3.5 h-3.5 fill-current" />
                 <span>일시정지</span>
               </>
             ) : (
               <>
-                <Play className="w-4 h-4 fill-current" />
+                <Play className="w-3.5 h-3.5 fill-current" />
                 <span>자동재생</span>
               </>
             )}
@@ -418,7 +514,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
               setIsPlaying(false);
               setCurrentStep((prev) => Math.min(timeline.length - 1, prev + 1));
             }}
-            className="p-1.5 text-slate-300 hover:text-white transition rounded-lg hover:bg-slate-800"
+            className="p-1 text-slate-300 hover:text-white transition hover:bg-white/5 cursor-pointer"
             title="다음 수 (→ 방향키)"
           >
             <ChevronRight className="w-4 h-4" />
@@ -429,80 +525,81 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
               setIsPlaying(false);
               setCurrentStep(timeline.length - 1);
             }}
-            className="p-1.5 text-slate-400 hover:text-white transition rounded-lg hover:bg-slate-800"
+            className="p-1 text-slate-400 hover:text-white transition hover:bg-white/5 cursor-pointer"
             title="마지막 수로"
           >
-            <SkipForward className="w-4 h-4" />
+            <SkipForward className="w-3.5 h-3.5" />
           </button>
 
-          <div className="w-[1px] h-4 bg-slate-700 mx-1" />
+          <div className="w-[1px] h-4 bg-white/10 mx-0.5" />
 
           {/* 배속 토글 */}
           <button
             onClick={() => {
               setPlaybackSpeed((prev) => (prev === 0.8 ? 1.2 : prev === 1.2 ? 2.0 : 0.8));
             }}
-            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-black text-amber-300 border border-amber-500/30 transition flex items-center gap-1 shadow-sm"
+            className="px-2 py-0.5 bg-[#111520] hover:bg-[#1a2234] text-[11px] font-mono font-black text-cyan-300 border border-cyan-500/40 transition flex items-center gap-1 cursor-pointer"
             title="재생 속도 변경"
           >
-            <FastForward className="w-3.5 h-3.5 text-amber-400" />
+            <FastForward className="w-3 h-3 text-cyan-400" />
             <span>{playbackSpeed}x</span>
           </button>
 
           {/* 사운드 토글 */}
           <button
             onClick={() => setSoundEnabled((prev) => !prev)}
-            className={`p-1.5 rounded-lg transition ${
-              soundEnabled ? 'text-amber-400 hover:text-amber-300' : 'text-slate-500 hover:text-slate-400'
+            className={`p-1 transition cursor-pointer ${
+              soundEnabled ? 'text-[#f97316] hover:text-orange-300' : 'text-slate-500 hover:text-slate-400'
             }`}
             title={soundEnabled ? '효과음 끄기' : '효과음 켜기'}
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
           </button>
         </div>
 
         {/* 우측 전장 배율, BGM 및 스텝 인디케이터 */}
         <div className="flex items-center gap-2">
           {/* 전장 배율 줌 컨트롤러 */}
-          <div className="flex items-center gap-0.5 bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-800 shadow-md">
+          <div className="flex items-center gap-0.5 bg-[#090d16] px-2 py-0.5 border border-white/10">
             <button
               onClick={() => changeArenaZoom(-0.1)}
               disabled={arenaZoom <= 0.75}
-              className="p-1 rounded-lg hover:bg-slate-800 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
-              title="전장 축소 (-10%) - 작은 화면에서 스크롤 없이 보기"
+              className="p-0.5 hover:bg-white/5 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
+              title="전장 축소 (-10%)"
             >
-              <ZoomOut className="w-3.5 h-3.5 text-amber-400" />
+              <ZoomOut className="w-3.5 h-3.5 text-[#f97316]" />
             </button>
             <button
               onClick={resetArenaZoom}
-              className="px-1.5 py-0.5 rounded-lg text-xs font-mono font-black text-amber-300 hover:bg-slate-800 transition cursor-pointer"
-              title="클릭 시 기본 배율(100%)로 복원"
+              className="px-1.5 text-xs font-mono font-black text-cyan-300 hover:bg-white/5 transition cursor-pointer"
+              title="기본 배율(100%) 복원"
             >
               {Math.round(arenaZoom * 100)}%
             </button>
             <button
               onClick={() => changeArenaZoom(0.1)}
               disabled={arenaZoom >= 1.25}
-              className="p-1 rounded-lg hover:bg-slate-800 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
-              title="전장 확대 (+10%) - 대형 모니터에서 크게 보기"
+              className="p-0.5 hover:bg-white/5 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
+              title="전장 확대 (+10%)"
             >
-              <ZoomIn className="w-3.5 h-3.5 text-amber-400" />
+              <ZoomIn className="w-3.5 h-3.5 text-[#f97316]" />
             </button>
           </div>
 
-          <div className="hidden lg:block mr-2">
+          <div className="hidden lg:block">
             <BgmPlayer />
           </div>
-          <span className="text-sm font-mono font-bold text-slate-200 bg-slate-900 px-3 py-1 rounded-xl border border-slate-700 shadow">
-            {currentStep + 1} <span className="text-slate-500">/</span> {timeline.length}
+
+          <span className="text-xs font-mono font-bold text-slate-200 bg-[#090d16] px-2.5 py-1 border border-white/10">
+            스텝 <strong className="text-[#f97316]">{currentStep + 1}</strong> <span className="text-slate-500">/</span> {timeline.length}
           </span>
         </div>
       </header>
 
       {/* 타임라인 진행도 프로그레스 바 */}
-      <div className="w-full bg-slate-900 h-1.5 relative cursor-pointer group" title="클릭하여 해당 액션으로 이동">
+      <div className="w-full bg-[#070a12] h-1 relative cursor-pointer group" title="클릭하여 해당 액션으로 이동">
         <div
-          className="h-full bg-gradient-to-r from-amber-600 via-amber-400 to-yellow-300 transition-all duration-200"
+          className="h-full bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#22d3ee] transition-all duration-200"
           style={{ width: `${((currentStep + 1) / timeline.length) * 100}%` }}
         />
         <input
@@ -519,38 +616,37 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
       </div>
 
       {/* ========================================================= */}
-      {/* 2. 메인 3컬럼 레이아웃 (좌측 카드 패널, 중앙 전장 매트, 우측 콘솔/로그) */}
+      {/* 2. 메인 3컬럼 레이아웃 (좌측 단말기, 중앙 4단 전장 보드, 우측 콘솔/로그) */}
       {/* ========================================================= */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         {/* ======================================================= */}
-        {/* [좌측 패널] 실제 배틀과 100% 동일 규격 카드 상세 패널 */}
+        {/* [좌측 패널] 실제 배틀과 100% 동일 규격 카드 상세 단말기 */}
         {/* ======================================================= */}
         {isLeftPanelCollapsed ? (
-          <div className="w-12 shrink-0 bg-slate-950 border-r border-slate-800 py-3 flex flex-col items-center justify-between h-full select-none z-20">
+          <div className="w-12 shrink-0 bg-[#090d16]/95 border-r border-white/10 py-3 flex flex-col items-center justify-between h-full select-none z-20">
             <div className="flex flex-col items-center gap-3">
               <button
                 onClick={toggleLeftPanelCollapsed}
-                className="w-8 h-8 rounded-xl bg-slate-900 hover:bg-amber-500/20 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-500/50 flex items-center justify-center transition cursor-pointer shadow"
-                title="카드 상세 패널 펼치기"
+                className="w-8 h-8 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-[#f97316] border border-white/10 flex items-center justify-center transition cursor-pointer"
+                title="카드 상세 단말기 펼치기"
               >
-                <PanelLeftOpen className="w-4 h-4" />
+                <PanelLeftOpen className="w-4 h-4 text-[#f97316]" />
               </button>
 
               <div
                 onClick={toggleLeftPanelCollapsed}
-                className="cursor-pointer text-xs font-black tracking-widest text-slate-400 hover:text-amber-300 py-4 transition flex items-center gap-2"
+                className="cursor-pointer text-xs font-black tracking-widest text-slate-400 hover:text-[#f97316] py-4 transition flex items-center gap-2 font-mono"
                 style={{ writingMode: 'vertical-rl' }}
               >
-                <span>카드 상세 정보</span>
-                <Layers className="w-3.5 h-3.5 transform -rotate-90 text-amber-400" />
+                <span>✦ CARD TERMINAL</span>
               </div>
             </div>
 
             {previewCard && (
               <div
                 onClick={toggleLeftPanelCollapsed}
-                className="w-8 h-11 rounded-lg overflow-hidden border border-amber-500/40 shadow cursor-pointer hover:scale-110 transition"
-                title={`${previewCard.nameKr} (클릭하여 패널 펼치기)`}
+                className="w-7 h-10 overflow-hidden border border-[#f97316]/50 shadow cursor-pointer hover:scale-110 transition"
+                title={`${previewCard.nameKr} (클릭하여 단말기 펼치기)`}
               >
                 <img
                   src={(previewCard as any).artUrl}
@@ -561,201 +657,209 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
             )}
           </div>
         ) : (
-          <div className={`${leftPanelWidthClass} shrink-0 bg-slate-950 border-r border-slate-800 p-3.5 sm:p-4 flex flex-col justify-start overflow-y-auto overflow-x-hidden custom-scrollbar select-text relative h-full min-h-0 transition-all duration-200`}>
-            {/* 패널 상단: 크기 조절 버튼 & 접기 버튼 */}
-            <div className="flex items-center justify-between gap-1.5 mb-2.5">
-              <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-[11px] font-bold text-slate-400">
-                <span className="text-[10px] text-slate-500 px-1 font-mono hidden sm:inline">패널</span>
+          <div className={`${leftPanelWidthClass} shrink-0 bg-[#090d16]/95 border-r border-white/10 p-3.5 sm:p-4 flex flex-col justify-start overflow-y-auto overflow-x-hidden custom-scrollbar select-text relative h-full min-h-0 transition-all duration-200 z-20`}>
+            {/* 단말기 상단 헤더 바 */}
+            <div className="flex items-center justify-between gap-1.5 mb-2.5 pb-2 border-b border-white/10 shrink-0">
+              <div className="flex items-center gap-1.5 text-sm font-mono font-black text-[#f97316]">
+                <span>✦</span>
+                <span>카드 상세 단말기</span>
+              </div>
+
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => changeLeftPanelSize('compact')}
-                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
-                    leftPanelSize === 'compact' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  className={`px-2 py-0.5 text-xs font-mono font-bold transition cursor-pointer border ${
+                    leftPanelSize === 'compact' ? 'bg-[#f97316] text-slate-950 border-[#f97316]' : 'bg-[#111520] text-slate-400 border-white/10 hover:text-white'
                   }`}
-                  title="작게 (노트북 화면용 300px)"
+                  title="작게 (S)"
                 >
                   S
                 </button>
                 <button
                   onClick={() => changeLeftPanelSize('normal')}
-                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
-                    leftPanelSize === 'normal' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  className={`px-2 py-0.5 text-xs font-mono font-bold transition cursor-pointer border ${
+                    leftPanelSize === 'normal' ? 'bg-[#f97316] text-slate-950 border-[#f97316]' : 'bg-[#111520] text-slate-400 border-white/10 hover:text-white'
                   }`}
-                  title="기본 (표준 화면용 400px)"
+                  title="보통 (M)"
                 >
                   M
                 </button>
                 <button
                   onClick={() => changeLeftPanelSize('wide')}
-                  className={`px-2 py-0.5 rounded-lg transition cursor-pointer font-black text-xs ${
-                    leftPanelSize === 'wide' ? 'bg-amber-500 text-slate-950 shadow' : 'hover:bg-slate-800 text-slate-400'
+                  className={`px-2 py-0.5 text-xs font-mono font-bold transition cursor-pointer border ${
+                    leftPanelSize === 'wide' ? 'bg-[#f97316] text-slate-950 border-[#f97316]' : 'bg-[#111520] text-slate-400 border-white/10 hover:text-white'
                   }`}
-                  title="크게 (대형 모니터용 500px)"
+                  title="크게 (L)"
                 >
                   L
                 </button>
+                <button
+                  onClick={toggleLeftPanelCollapsed}
+                  className="p-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white border border-white/10 text-xs transition cursor-pointer ml-1"
+                  title="단말기 접기"
+                >
+                  <PanelLeftClose className="w-3.5 h-3.5 text-[#f97316]" />
+                </button>
               </div>
-
-              <button
-                onClick={toggleLeftPanelCollapsed}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-slate-900/90 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs font-bold transition cursor-pointer shadow"
-                title="좌측 패널 접어서 전장(플레이매트) 넓게 보기"
-              >
-                <PanelLeftClose className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">접기</span>
-              </button>
             </div>
 
-            <div className="flex flex-col space-y-3">
+            {/* 카드 상세 본문 */}
+            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-1 custom-scrollbar space-y-3">
               {previewCard ? (
                 <>
-                  {/* 실물 일러스트 대형 카드 */}
-                  <div className="relative w-full max-w-[420px] bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl border-2 border-amber-500/80 shadow-2xl p-1 overflow-hidden ring-2 ring-amber-500/30 group mx-auto shrink-0">
+                  {/* 홀로그램 카드 프리뷰 프레임 */}
+                  <div
+                    data-no-lod="true"
+                    className="card-detail-view relative w-full max-w-[340px] lg:max-w-[380px] bg-[#0c101b] border border-[#f97316]/70 p-2 mx-auto shrink-0 shadow-[0_0_30px_rgba(0,0,0,0.9)]"
+                  >
+                    <span className="pointer-events-none absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-[#f97316]" />
+                    <span className="pointer-events-none absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-[#f97316]" />
+                    <span className="pointer-events-none absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-[#22d3ee]" />
+                    <span className="pointer-events-none absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-[#22d3ee]" />
                     <img
                       src={(previewCard as any).artUrl}
                       alt={previewCard.nameKr}
-                      className="w-full h-auto object-contain rounded-xl shadow-2xl drop-shadow-[0_15px_30px_rgba(0,0,0,0.9)] transition-transform duration-300 group-hover:scale-[1.01]"
+                      data-no-lod="true"
+                      className="w-full h-auto max-h-[360px] lg:max-h-[420px] object-contain mx-auto drop-shadow-[0_12px_24px_rgba(0,0,0,0.9)]"
                     />
                   </div>
 
-                  {/* 카드 타이틀 & 배지 */}
-                  <div className="shrink-0">
+                  {/* 카드 타이틀 & 태그 배지 */}
+                  <div className="shrink-0 border-b border-white/10 pb-2">
                     <div className="flex items-center justify-between mb-1">
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-xs font-black tracking-wide ${
+                        className={`px-2 py-0.5 text-xs font-mono font-black tracking-wide [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)] ${
                           previewCard.kind === 'CHARACTER'
-                            ? 'bg-amber-500 text-slate-950'
+                            ? 'bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] text-white'
                             : previewCard.color === 'RED'
-                            ? 'bg-red-500 text-white'
+                            ? 'bg-red-600 text-white'
                             : previewCard.color === 'GREEN'
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-cyan-500 text-white'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-cyan-500 text-slate-950'
                         }`}
                       >
                         {previewCard.kind === 'CHARACTER'
-                          ? `캐릭터 Lv.${(previewCard as CharacterCard).level}`
-                          : `${(previewCard as ActionCard).color} 액션`}
+                          ? `Lv.${(previewCard as CharacterCard).level} CHARACTER`
+                          : `${(previewCard as ActionCard).color} ACTION`}
                       </span>
-                      <span className="text-[11px] font-mono font-bold text-amber-300 bg-slate-900 border border-slate-700 px-2 py-0.5 rounded shadow">
+                      <span className="text-xs font-mono font-bold text-[#f97316] bg-[#111520] border border-[#f97316]/30 px-2 py-0.5">
                         {previewCard.code}
                       </span>
                     </div>
 
-                    <h3 className="text-xl sm:text-2xl font-black text-white leading-tight">
-                      {previewCard.nameKr}
+                    <h3 className="text-base sm:text-lg font-black text-white leading-snug flex items-center gap-1.5">
+                      <span className="text-[#f97316] text-xs">✦</span>
+                      <span>{previewCard.nameKr}</span>
                     </h3>
 
                     {'characterExclusive' in previewCard && previewCard.characterExclusive && (
-                      <p className="text-xs text-amber-400 font-bold mt-0.5">
-                        전용: {previewCard.characterExclusive}
+                      <p className="text-xs text-[#22d3ee] font-bold mt-0.5">
+                        전용 공명자: {previewCard.characterExclusive}
                       </p>
                     )}
                   </div>
 
-                  {/* 스탯 바 */}
-                  <div className="bg-slate-900 rounded-xl p-2.5 border border-slate-800 grid grid-cols-3 gap-1.5 text-center shrink-0">
+                  {/* 택티컬 스탯 그리드 */}
+                  <div className="bg-[#0c101b] p-2 border border-white/10 grid grid-cols-3 gap-1 text-center shrink-0">
                     {previewCard.kind === 'ACTION' ? (
                       <>
                         <div className="flex flex-col">
-                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">비용 (COST)</span>
-                          <strong className="text-lg sm:text-xl text-amber-400 font-black">{previewCard.cost}</strong>
+                          <span className="text-[10px] font-mono font-bold text-slate-400">COST</span>
+                          <strong className="text-base text-[#f97316] font-mono font-black">{previewCard.cost}</strong>
+                        </div>
+                        <div className="flex flex-col border-x border-white/10">
+                          <span className="text-[10px] font-mono font-bold text-slate-400">SPEED</span>
+                          <strong className="text-base text-[#22d3ee] font-mono font-black">{previewCard.speed ?? '-'}</strong>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">속도 (SPEED)</span>
-                          <strong className="text-lg sm:text-xl text-amber-300 font-black">{previewCard.speed ?? '-'}</strong>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">피해 (DMG)</span>
-                          <strong className="text-lg sm:text-xl text-red-400 font-black">{previewCard.damage}</strong>
+                          <span className="text-[10px] font-mono font-bold text-slate-400">DAMAGE</span>
+                          <strong className="text-base text-red-400 font-mono font-black">{previewCard.damage}</strong>
                         </div>
                       </>
                     ) : (
                       <>
                         <div className="flex flex-col">
-                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">레벨</span>
-                          <strong className="text-lg sm:text-xl text-amber-400 font-black">Lv.{previewCard.level}</strong>
+                          <span className="text-[10px] font-mono font-bold text-slate-400">LEVEL</span>
+                          <strong className="text-base text-[#f97316] font-mono font-black">Lv.{previewCard.level}</strong>
+                        </div>
+                        <div className="flex flex-col border-x border-white/10">
+                          <span className="text-[10px] font-mono font-bold text-slate-400">ELEMENT</span>
+                          <strong className="text-base text-[#22d3ee] font-black">{getElementKr(previewCard.element)}</strong>
                         </div>
                         <div className="flex flex-col">
-                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">속성</span>
-                          <strong className="text-lg sm:text-xl text-cyan-400 font-black">{getElementKr(previewCard.element)}</strong>
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-[11px] text-slate-400 font-bold mb-0.5">무기</span>
-                          <strong className="text-lg sm:text-xl text-slate-200 font-black">{officialPreview?.weaponType || '직검'}</strong>
+                          <span className="text-[10px] font-mono font-bold text-slate-400">WEAPON</span>
+                          <strong className="text-base text-slate-200 font-black">{officialPreview?.weaponType || '직검'}</strong>
                         </div>
                       </>
                     )}
                   </div>
 
-                  {/* 공식 효과 텍스트 원문 */}
-                  <div className="bg-slate-900/90 rounded-xl p-3 border border-slate-800 space-y-1 shrink-0">
-                    <span className="text-xs font-black text-amber-300 flex items-center gap-1">
-                      <Info className="w-3.5 h-3.5 text-amber-400" />
-                      공식 효과 텍스트 {previewCard.kind === 'CHARACTER' ? `(Lv.${previewCard.level} 현재 레벨)` : ''}
+                  {/* 공명 스킬 텍스트 */}
+                  <div className="relative bg-[#0c101b] p-2.5 border border-[#f97316]/40 space-y-1 shrink-0">
+                    <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#f97316]" />
+                    <span className="pointer-events-none absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[#22d3ee]" />
+                    <span className="text-xs font-black text-[#f97316] flex items-center gap-1.5">
+                      <Info className="w-3.5 h-3.5 text-[#22d3ee]" />
+                      <span>공식 효과 텍스트 {previewCard.kind === 'CHARACTER' ? `(Lv.${previewCard.level})` : ''}</span>
                     </span>
-                    <p className="text-xs sm:text-sm text-slate-100 leading-relaxed whitespace-pre-line font-medium max-h-[140px] overflow-y-auto pr-1">
-                      {previewCard.description}
-                    </p>
+                    <div className="text-xs text-slate-200 leading-relaxed font-medium max-h-[140px] overflow-y-auto pr-1 custom-scrollbar">
+                      {formatEffectText(previewCard.description, 'md')}
+                    </div>
                   </div>
 
-                  {/* 캐릭터 레벨업 진화 스택 & 누적 상속 스킬 (공식 룰: 하위 카드 효과 영구 보유) */}
+                  {/* 캐릭터 레벨업 진화 스택 & 누적 상속 스킬 */}
                   {previewCard.kind === 'CHARACTER' && (
-                    <div className="bg-slate-900/95 rounded-xl p-3 border border-amber-500/40 space-y-2 shrink-0 shadow-lg">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-                        <span className="text-xs font-black text-amber-300 flex items-center gap-1.5">
-                          <Layers className="w-4 h-4 text-amber-400" />
-                          <span>진화 스택 & 누적 상속 스킬</span>
+                    <div className="bg-[#0c101b] p-2.5 border border-white/10 space-y-2 shrink-0">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-1">
+                        <span className="text-xs font-black text-[#f97316] flex items-center gap-1.5">
+                          <Layers className="w-3.5 h-3.5 text-[#f97316]" />
+                          <span>진화 스택 & 상속 스킬</span>
                         </span>
-                        <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">
-                          {previewCard.underlyingCards && previewCard.underlyingCards.length > 0
-                            ? `스택: 총 ${previewCard.underlyingCards.length + 1}장 보유`
-                            : `Lv.${previewCard.level} 단일`}
-                        </span>
+                        {previewCard.underlyingCards && previewCard.underlyingCards.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setEvolutionModalChar(previewCard as CharacterCard)}
+                            className="text-xs bg-[#f97316]/20 hover:bg-[#f97316]/30 text-[#f97316] font-bold px-2 py-0.5 border border-[#f97316]/40 transition flex items-center gap-1 cursor-pointer"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>계보 보기</span>
+                          </button>
+                        )}
                       </div>
 
-                      {/* 하위 카드 스택이 있는 경우 */}
                       {previewCard.underlyingCards && previewCard.underlyingCards.length > 0 ? (
-                        <div className="space-y-2">
-                          <div className="text-[11px] text-amber-200/90 bg-amber-950/40 border border-amber-500/20 p-2 rounded-lg leading-relaxed flex items-start gap-1.5">
-                            <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-                            <span>
-                              공식 룰: 레벨업한 캐릭터는 하위에 겹쳐진 <strong>이전 레벨의 모든 스킬 효과를 영구 상속하여 함께 보유</strong>합니다.
-                            </span>
-                          </div>
-
-                          {/* 상속된 이전 레벨 스킬 카드 목록 */}
+                        <div className="space-y-1.5">
                           {previewCard.underlyingCards.map((underCard, idx) => (
                             <div
                               key={underCard.id || idx}
                               onClick={() => setPreviewCard({ ...underCard, underlyingCards: previewCard.underlyingCards })}
-                              className="p-2.5 rounded-lg bg-slate-950/80 border border-slate-700 hover:border-amber-400 transition cursor-pointer group"
-                              title="클릭하여 이 카드의 대형 일러스트와 원문 스탯 보기"
+                              className="p-2 bg-[#090d16] border border-white/10 hover:border-[#f97316] transition cursor-pointer"
                             >
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 font-black text-[10px] border border-amber-400/30 flex items-center gap-1">
-                                  <Crown className="w-2.5 h-2.5" />
-                                  <span>Lv.{underCard.level} 상속 효과</span>
+                              <div className="flex items-center justify-between mb-0.5">
+                                <span className="text-[11px] font-mono font-black text-[#f97316]">
+                                  ✦ Lv.{underCard.level} 상속 효과
                                 </span>
-                                <span className="text-[10px] text-slate-400 font-mono group-hover:text-amber-300">
+                                <span className="text-[11px] text-cyan-300 font-mono font-bold">
                                   {underCard.nameKr}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-line font-medium pl-1">
-                                {underCard.description}
-                              </p>
+                              <div className="text-[11px] text-slate-200 leading-relaxed">
+                                {formatEffectText(underCard.description, 'md')}
+                              </div>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <p className="text-[11px] text-slate-400 leading-relaxed">
-                          캐릭터가 레벨업되면 기존 카드가 하위 스택으로 누적되며, 이전 레벨의 모든 스킬 효과가 이곳에 표시되고 함께 발동됩니다.
+                          레벨업 시 하위 레벨 스킬 효과가 영구 상속되어 함께 발동됩니다.
                         </p>
                       )}
                     </div>
                   )}
                 </>
               ) : (
-                <div className="my-auto text-center text-slate-500 text-sm py-12">
-                  필드나 손패의 카드에 마우스를 올리면<br />상세 정보와 대형 일러스트가 여기에 표시됩니다.
+                <div className="my-auto text-center text-slate-400 text-xs sm:text-sm py-12 font-mono leading-relaxed">
+                  ✦ 카드에 마우스를 올리면<br />상세 단말기 정보가 표시됩니다.
                 </div>
               )}
             </div>
@@ -763,516 +867,557 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
         )}
 
         {/* ======================================================= */}
-        {/* [중앙 배틀 컬럼] 실제 배틀과 100% 동일 규격 공식 플레이매트 */}
+        {/* [중앙 메인 보드] GameBoard와 100% 동일한 100vh 4단 전장 */}
         {/* ======================================================= */}
-        <div className="flex-1 flex flex-col overflow-hidden min-h-0 relative bg-[#060810]">
-          {/* 중앙 아레나 스크롤 영역 */}
-          <div
-            ref={centerArenaRef}
-            className="flex-1 flex flex-col items-center py-2 px-3 overflow-y-auto min-h-0 custom-scrollbar"
-          >
-            <div
-              className="w-full max-w-[1360px] flex flex-col items-center gap-3.5 mx-auto py-1 transition-all duration-200"
-              style={{
-                zoom: arenaZoom,
-              }}
-            >
-              {/* ----------------------------------------------------- */}
-              {/* 1. 상대방(P1) 공식 플레이매트 (상단 - 대칭 마주보기 구조) */}
-              {/* ----------------------------------------------------- */}
-              <div className="relative w-full rounded-3xl bg-gradient-to-b from-slate-950/95 via-[#0b1020]/90 to-slate-950/90 border-2 border-cyan-500/30 p-3 sm:p-4 shadow-2xl backdrop-blur-md overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_0%,rgba(6,182,212,0.08),transparent)] pointer-events-none" />
+        <div
+          ref={centerArenaRef}
+          className="flex-1 flex flex-col justify-between min-h-0 py-1.5 px-2.5 sm:px-4 gap-1.5 overflow-hidden relative bg-[#060810]"
+          style={{ zoom: Math.round(arenaZoom * 100) / 100 }}
+        >
+          {/* 배경 은은한 마법진 & 방사형 광원 */}
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_50%_at_50%_50%,rgba(249,115,22,0.03),transparent_80%)]" />
 
-                {/* 상대방 상태 바 (HP & 스탯 대형화) */}
-                <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-800/80">
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex items-center gap-2 font-black text-lg sm:text-xl text-cyan-300">
-                      {replay.gameMode === 'AI' ? <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" /> : <User className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-400" />}
-                      <span>{p1.name}</span>
-                    </div>
+          {/* ------------------------------------------------------- */}
+          {/* [1단: 상대방 진영 - 상단] */}
+          {/* ------------------------------------------------------- */}
+          <div className="relative z-10 w-full flex flex-col gap-1 shrink-0">
+            {/* 상대 상태바: 이름 + 평행사변형(-skew-x-12) HP바 + 마름모 10칸 협주 게이지 + 손패 수 */}
+            <div className="h-9.5 w-full bg-[#0c101b]/90 backdrop-blur-md border border-white/10 px-3 flex items-center justify-between gap-2 relative">
+              <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-cyan-400/80" />
+              <span className="pointer-events-none absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-cyan-400/80" />
 
-                    {/* HP 바 */}
-                    <div className="flex items-center gap-2.5 bg-slate-950 px-4 py-2 rounded-full border border-slate-800 shadow-inner">
-                      <Heart className="w-5 h-5 text-red-400 fill-red-400" />
-                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p1.hp} / {p1.maxHp || 20}</span>
-                      <div className="w-28 sm:w-40 bg-slate-800 h-3 rounded-full overflow-hidden ml-1 border border-slate-700/50">
-                        <div
-                          className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
-                          style={{ width: `${Math.max(0, (p1.hp / (p1.maxHp || 20)) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-sm sm:text-base text-slate-200 font-bold">
-                    {/* 상대 손패 검증 버튼 */}
-                    <button
-                      onClick={() => setSelectedHandPlayer(1)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border shadow ${
-                        selectedHandPlayer === 1
-                          ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400 ring-2 ring-cyan-400/40'
-                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
-                      }`}
-                      title="하단 손패 뷰어에서 상대방(2P) 손패 확인하기"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>패 <strong className="text-white text-sm font-black">{p1HandCards.length}장</strong> (클릭하여 패 보기)</span>
-                    </button>
-
-                    {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
-                    <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-full border border-cyan-500/40 shadow-inner">
-                      <BatteryCharging className="w-4 h-4 text-cyan-400" />
-                      <span className="text-xs sm:text-sm text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
-                      <div className="flex items-center gap-0.5">
-                        {Array.from({ length: 10 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-1.5 sm:w-2 h-3 rounded-xs transition-all ${
-                              i < p1.concerto
-                                ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
-                                : 'bg-slate-800'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <strong className="text-sm font-black text-cyan-300 font-mono ml-0.5">
-                        {p1.concerto} / 10
-                      </strong>
-                    </div>
-                  </div>
+              {/* 좌측: 상대 이름 & 택티컬 HP 게이지 */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 font-black text-xs sm:text-sm text-cyan-300">
+                  {replay.gameMode === 'AI' ? <Bot className="w-4 h-4 text-[#22d3ee]" /> : <User className="w-4 h-4 text-[#22d3ee]" />}
+                  <span>{p1.name}</span>
                 </div>
 
-                {/* 상대방(P1) 오픈 핸드 미니 스트립 */}
-                <div className="mb-3 px-3 py-1.5 rounded-2xl bg-slate-950/80 border border-cyan-500/30 flex items-center justify-between gap-2 overflow-x-auto shadow-inner">
-                  <div className="flex items-center gap-1.5 text-xs text-cyan-300 font-black shrink-0">
-                    <Eye className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>상대({p1.name}) 손패 오픈:</span>
+                <div className="flex items-center gap-2 select-none">
+                  <Heart className="w-4 h-4 text-red-400 fill-red-400" />
+                  <span className="font-black text-sm sm:text-base font-mono tracking-wider text-white">
+                    {p1.hp}<span className="text-xs text-slate-400">/{p1.maxHp || 20}</span>
+                  </span>
+                  {/* 평행사변형(-skew-x-12) 택티컬 게이지 바 */}
+                  <div className="w-28 sm:w-36 h-3 -skew-x-12 bg-[#070a12] border border-cyan-400/40 p-0.5 overflow-hidden shadow-inner">
+                    <div
+                      className="h-full bg-gradient-to-r from-red-600 via-rose-500 to-[#f97316] transition-all duration-300"
+                      style={{ width: `${Math.max(0, Math.min(100, (p1.hp / (p1.maxHp || 20)) * 100))}%` }}
+                    />
                   </div>
-                  <div className="flex items-center gap-2 overflow-x-auto py-0.5 custom-scrollbar">
-                    {p1HandCards.map((card, idx) => (
-                      <button
-                        key={card.id || idx}
-                        onMouseEnter={() => setPreviewCard(card)}
-                        onClick={() => {
-                          setPreviewCard(card);
-                          setSelectedHandPlayer(1);
-                        }}
-                        className="group flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-700/80 hover:border-cyan-400 hover:bg-cyan-950/40 transition shrink-0 cursor-pointer shadow text-left"
+                  {p1.hasDominance && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-sans tracking-tight rounded-xs shadow-[0_0_8px_rgba(251,191,36,0.7)] border border-yellow-200 animate-pulse shrink-0 select-none"
+                      title="【우세】 상태"
+                    >
+                      👑 우세
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* 우측: 10칸 마름모(rotate-45) 협주 게이지 & 상대 남은 손패 */}
+              <div className="flex items-center gap-3">
+                {/* 명조 공명 회로 10칸 마름모(rotate-45) 크리스탈 슬롯 */}
+                <div className="flex items-center gap-2 bg-[#080b13] px-2.5 py-1 border border-white/10">
+                  <Zap className="w-3.5 h-3.5 text-[#22d3ee]" />
+                  <span className="text-xs text-slate-300 font-bold hidden md:inline">협주</span>
+                  <div className="flex items-center gap-1.5 px-1">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-2.5 h-2.5 rotate-45 border transition-all duration-200 ${
+                          i < p1.concerto
+                            ? 'bg-[#22d3ee] border-white shadow-[0_0_8px_#22d3ee]'
+                            : 'bg-[#0c101b] border-slate-700'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <strong className="text-xs sm:text-sm font-black text-[#22d3ee] font-mono">
+                    {p1.concerto}/10
+                  </strong>
+                </div>
+
+                {/* 상대 손패 카운트 & 미니 카드 뒷면/스캔 */}
+                <div
+                  onClick={() => setSelectedHandPlayer(1)}
+                  className={`flex items-center gap-2 bg-[#080b13] px-2.5 py-0.5 border cursor-pointer transition ${
+                    selectedHandPlayer === 1 ? 'border-cyan-400 ring-1 ring-cyan-400/40' : 'border-white/10 hover:border-cyan-400/60'
+                  }`}
+                  title="클릭하여 하단 뷰어에서 2P 손패 열람"
+                >
+                  <span className="text-xs font-bold text-slate-300 flex items-center gap-1">
+                    <span>🂠 패</span>
+                    <strong className="text-white font-mono text-xs sm:text-sm">{p1HandCards.length}장</strong>
+                  </span>
+                  <div className="flex items-center -space-x-2 py-0.5 pl-1">
+                    {p1HandCards.map((c, i) => (
+                      <div
+                        key={c.id || i}
+                        style={{ zIndex: i + 1 }}
+                        onMouseEnter={() => setPreviewCard(c)}
+                        className="relative w-4.5 h-6.5 rounded-xs overflow-hidden border border-cyan-400/50 hover:scale-150 hover:z-30 transition-transform"
+                        title={`${c.nameKr} (${c.color})`}
                       >
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${card.color === 'RED' ? 'bg-red-400' : card.color === 'GREEN' ? 'bg-emerald-400' : 'bg-cyan-400'}`} />
-                        <span className="text-xs font-bold text-slate-200 group-hover:text-cyan-200 max-w-[110px] truncate">{card.nameKr}</span>
-                        <span className="text-[10px] font-mono text-slate-400 shrink-0">({card.color})</span>
-                      </button>
+                        <img
+                          src={c.artUrl || '/cards/card_back_action.png'}
+                          alt="상대 패"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
 
-                {/* 상대 공식 플레이매트 3열 구조 (넓은 컬럼 너비로 오버플로우 방지) */}
-                <div className="grid grid-cols-[130px_1fr_130px] sm:grid-cols-[145px_1fr_145px] md:grid-cols-[155px_1fr_155px] gap-3 sm:gap-4 items-stretch">
-                  {/* [상대 좌측] 액션 덱 + 트래시 */}
-                  <div className="flex flex-col gap-2.5">
-                    <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs font-mono text-slate-300 font-black">액션 덱</span>
-                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
-                        <Sparkles className="w-4 h-4 text-cyan-400/60" />
-                      </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-slate-100">{p1.deckCount}장</span>
-                    </div>
+            {/* 상대 필드 가로 1열: 좌측(캐릭터덱/협주) - 중앙(서포트 + 리더 + 서포트) - 우측(액션덱/트래시) */}
+            <div className="w-full max-w-[1580px] mx-auto grid grid-cols-[270px_1fr_270px] sm:grid-cols-[285px_1fr_285px] xl:grid-cols-[305px_1fr_305px] gap-2 sm:gap-2.5 items-center">
+              {/* 좌측 끝: 상대 캐릭터덱 + 협주 존 */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <DeckStack
+                  type="CHARACTER"
+                  count={3}
+                  playerTheme="p1"
+                  compact={true}
+                />
+                <ZoneCardStack
+                  cards={p1ConcertoCards}
+                  zoneType="CONCERTO"
+                  compact={true}
+                  onOpenModal={() => openCardList('CONCERTO', 1)}
+                  onHoverCard={(c) => setPreviewCard(c)}
+                />
+              </div>
 
-                    <div className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[115px] relative shadow-lg">
-                      <div className="flex items-center justify-between w-full px-1">
-                        <span className="text-xs font-mono text-slate-300 font-black">트래시</span>
-                        <span className="text-xs font-mono font-bold text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">
-                          {p1.dropCount}장
-                        </span>
-                      </div>
-                      <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-600 my-0.5">
-                        <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
-                        <span className="text-[10px] font-bold">비어있음</span>
-                      </div>
-                      <span className="text-[9px] text-slate-500 font-semibold">묘지</span>
-                    </div>
-                  </div>
+              {/* 중앙: 상대 서포트 2장 + 리더 1장 */}
+              <div className="flex items-center justify-center gap-4 sm:gap-7">
+                <CharacterSlot
+                  card={p1LeftChar}
+                  role="leftSupport"
+                  isOwnerActive={!isP0Turn}
+                  canUpgrade={false}
+                  canSwitch={false}
+                  onMouseEnter={() => p1LeftChar && setPreviewCard(p1LeftChar)}
+                  onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                  onHoverUnderlyingCard={(c) => setPreviewCard(c)}
+                  isAi={replay.gameMode === 'AI'}
+                  isOpponent={true}
+                />
 
-                  {/* [상대 중앙] 캐릭터 3인 진형 [백 / 리더 / 백] + 액션 에리어 */}
-                  <div className="flex flex-col justify-between gap-3 flex-1">
-                    <div className="grid grid-cols-3 gap-3 sm:gap-5 items-center justify-items-center w-full">
-                      {/* 백 (서포터 1) */}
-                      <div className="flex flex-col items-center">
-                        <CharacterSlot
-                          card={p1LeftChar}
-                          role="leftSupport"
-                          isOwnerActive={!isP0Turn}
-                          canUpgrade={false}
-                          canSwitch={false}
-                          onMouseEnter={() => p1LeftChar && setPreviewCard(p1LeftChar)}
+                <CharacterSlot
+                  card={p1LeaderChar}
+                  role="leader"
+                  isOwnerActive={!isP0Turn}
+                  canUpgrade={false}
+                  canSwitch={false}
+                  onMouseEnter={() => p1LeaderChar && setPreviewCard(p1LeaderChar)}
+                  onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                  onHoverUnderlyingCard={(c) => setPreviewCard(c)}
+                  isAi={replay.gameMode === 'AI'}
+                  isOpponent={true}
+                />
+
+                <CharacterSlot
+                  card={p1RightChar}
+                  role="rightSupport"
+                  isOwnerActive={!isP0Turn}
+                  canUpgrade={false}
+                  canSwitch={false}
+                  onMouseEnter={() => p1RightChar && setPreviewCard(p1RightChar)}
+                  onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                  onHoverUnderlyingCard={(c) => setPreviewCard(c)}
+                  isAi={replay.gameMode === 'AI'}
+                  isOpponent={true}
+                />
+              </div>
+
+              {/* 우측 끝: 상대 액션덱 + 트래시 */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <DeckStack
+                  type="ACTION"
+                  count={p1.deckCount}
+                  playerTheme="p1"
+                  compact={true}
+                />
+                <ZoneCardStack
+                  cards={p1TrashCards}
+                  zoneType="TRASH"
+                  compact={true}
+                  onOpenModal={() => openCardList('TRASH', 1)}
+                  onHoverCard={(c) => setPreviewCard(c)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ------------------------------------------------------- */}
+          {/* [2단: 중앙 공용 배틀 아레나 (CLASH ARENA)] */}
+          {/* ------------------------------------------------------- */}
+          <div className="relative z-10 w-full max-w-[1540px] mx-auto h-[178px] sm:h-[198px] shrink-0 bg-[#0c101b]/80 backdrop-blur-md border border-white/10 px-3.5 py-2 flex items-center justify-between gap-3 overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.85)]">
+            {/* 네 모서리 브라켓 */}
+            <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#f97316]" />
+            <span className="pointer-events-none absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-[#f97316]" />
+            <span className="pointer-events-none absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-[#22d3ee]" />
+            <span className="pointer-events-none absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[#22d3ee]" />
+
+            {/* 배경 공명 주파수 마법진 */}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-25">
+              <div className="w-56 h-56 rounded-full border border-[#f97316]/40 animate-spin" style={{ animationDuration: '24s' }} />
+              <div className="absolute w-40 h-40 rounded-full border border-[#22d3ee]/40 animate-pulse" />
+              <span className="absolute text-5xl text-[#f97316]/20 select-none">✦</span>
+            </div>
+
+            {/* [좌측: 🤖 상대 출전 액션 슬롯] */}
+            <div className="relative flex-1 h-full bg-[#090d16]/75 border border-white/10 px-3 py-1 flex flex-col justify-center overflow-hidden">
+              <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#22d3ee]/80" />
+              <span className="pointer-events-none absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-[#22d3ee]/80" />
+              <span className="pointer-events-none absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-[#22d3ee]/80" />
+              <span className="pointer-events-none absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[#22d3ee]/80" />
+
+              <div className="absolute top-1.5 left-3 right-3 flex items-center justify-between z-10 pointer-events-none">
+                <span className="text-xs font-black text-[#22d3ee] tracking-wider uppercase flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>상대 출전 액션 슬롯</span>
+                </span>
+                {activeSnapshot.clash?.winner === 1 && (
+                  <span className="text-[10px] font-black px-2 py-0.5 bg-amber-400 text-slate-950 border border-yellow-200 animate-bounce">
+                    대결 승리!
+                  </span>
+                )}
+                {activeSnapshot.clash?.winner === 0 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-900 text-red-400 border border-red-500/50">
+                    대결 패배
+                  </span>
+                )}
+              </div>
+
+              {p1ActionCards.length > 0 ? (
+                <div className="w-full h-full flex items-center justify-center gap-2.5 overflow-x-auto pt-3 custom-scrollbar">
+                  {p1ActionCards.map((card, idx) => {
+                    const isLastCard = idx === p1ActionCards.length - 1;
+                    return (
+                      <div
+                        key={card.id ? `${card.id}-${idx}` : `p1-replay-act-${idx}`}
+                        onMouseEnter={() => setPreviewCard(card)}
+                        onClick={() => setPreviewCard(card)}
+                        className={`shrink-0 transition-transform hover:scale-105 cursor-pointer relative ${
+                          isLastCard && activeSnapshot.clash?.winner === 1
+                            ? 'ring-2 ring-cyan-400 shadow-[0_0_20px_rgba(34,211,238,0.5)]'
+                            : isLastCard && activeSnapshot.clash?.winner === 0
+                            ? 'opacity-70 grayscale-[20%]'
+                            : 'opacity-90'
+                        }`}
+                      >
+                        <CardView
+                          card={card}
+                          customSizeClass="w-[104px] h-[148px] sm:w-[116px] sm:h-[164px] text-xs"
+                          badge={idx === 0 ? '대결' : `연격 ${idx}`}
                         />
-                        <span className="text-xs sm:text-sm font-black text-slate-400 mt-1">백 (SUPPORT)</span>
                       </div>
-
-                      {/* 리더 (LEADER) */}
-                      <div className="flex flex-col items-center">
-                        <CharacterSlot
-                          card={p1LeaderChar}
-                          role="leader"
-                          isOwnerActive={!isP0Turn}
-                          canUpgrade={false}
-                          canSwitch={false}
-                          onMouseEnter={() => p1LeaderChar && setPreviewCard(p1LeaderChar)}
-                        />
-                        <span className="text-xs sm:text-sm font-black text-cyan-300 mt-1">리더 (LEADER)</span>
-                      </div>
-
-                      {/* 백 (서포터 2) */}
-                      <div className="flex flex-col items-center">
-                        <CharacterSlot
-                          card={p1RightChar}
-                          role="rightSupport"
-                          isOwnerActive={!isP0Turn}
-                          canUpgrade={false}
-                          canSwitch={false}
-                          onMouseEnter={() => p1RightChar && setPreviewCard(p1RightChar)}
-                        />
-                        <span className="text-xs sm:text-sm font-black text-slate-400 mt-1">백 (SUPPORT)</span>
-                      </div>
-                    </div>
-
-                    {/* 상대 액션 에리어 (대결 존) */}
-                    <div
-                      onMouseEnter={() => p1ClashCard && setPreviewCard(p1ClashCard)}
-                      className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-cyan-500/40 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
-                    >
-                      <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-cyan-400/80 uppercase tracking-widest z-10 flex items-center gap-1.5">
-                        <Swords className="w-3.5 h-3.5" />
-                        액션 에리어 (상대 {p1.name})
-                      </span>
-                      {p1ClashCard ? (
-                        <div className={`animate-card-slam max-h-full relative transition-all duration-300 ${
-                          activeSnapshot.clash?.winner === 1
-                            ? 'ring-4 ring-amber-400 rounded-xl shadow-[0_0_25px_rgba(251,191,36,0.8)] scale-105'
-                            : activeSnapshot.clash?.winner === 0
-                            ? 'opacity-65 scale-95 grayscale-[20%]'
-                            : ''
-                        }`}>
-                          <CardView card={p1ClashCard} size="md" />
-                          {activeSnapshot.clash?.winner === 1 && (
-                            <div className="absolute -top-3 right-1 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 text-xs font-black px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-20 animate-bounce">
-                              <Sparkles className="w-3 h-3 fill-slate-950" /> 대결 승리!
-                            </div>
-                          )}
-                          {activeSnapshot.clash?.winner === 0 && (
-                            <div className="absolute -top-3 right-1 bg-slate-900/90 text-red-400 border border-red-500/50 text-[11px] font-bold px-2 py-0.5 rounded-full shadow z-20">
-                              대결 패배
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="w-40 h-56 rounded-xl border-2 border-dashed border-cyan-500/30 bg-cyan-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
-                          <Swords className="w-7 h-7 text-cyan-500/40" />
-                          <span className="text-xs font-bold text-slate-400">대결 대기</span>
-                        </div>
-                      )}
-                    </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center relative">
+                  <div className="w-16 h-16 rounded-full border border-[#22d3ee]/20 flex items-center justify-center animate-pulse">
+                    <span className="text-xl text-[#22d3ee]/35">✦</span>
                   </div>
+                  <span className="absolute text-xs font-bold text-slate-400 tracking-wider">
+                    대결 대기
+                  </span>
+                </div>
+              )}
+            </div>
 
-                  {/* [상대 우측] 협주 에리어 + 캐릭터 덱 */}
-                  <div className="flex flex-col gap-2">
-                    <div className="flex-1 rounded-2xl border border-cyan-500/50 bg-slate-950/85 p-1.5 flex flex-col items-center justify-between text-center min-h-[110px] relative shadow-lg">
-                      <div className="flex items-center justify-between w-full px-0.5">
-                        <span className="text-[10px] font-mono text-cyan-400 font-black">협주 게이지</span>
-                        <span className="text-[9px] font-mono font-black text-cyan-300 bg-cyan-950/80 px-1 py-0.2 rounded border border-cyan-500/50">
-                          {p1.concerto} / 10
-                        </span>
-                      </div>
-                      <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-600 my-0.5">
-                        <BatteryCharging className="w-4 h-4 mb-0.5 text-cyan-500/40" />
-                        <span className="text-[10px] font-bold text-slate-500">{p1.concerto}</span>
-                      </div>
-                      <span className="text-[9px] text-cyan-400/80 font-semibold">협주 게이지</span>
-                    </div>
+            {/* [정중앙: ⚔️ CLASH ARENA 원형 TURN 엠블럼] */}
+            <div className="relative z-10 w-48 sm:w-56 h-full flex flex-col items-center justify-between py-1 text-center shrink-0">
+              <div className="flex items-center gap-1.5 text-xs font-black tracking-widest text-[#f97316] uppercase">
+                <span>✦</span>
+                <span>CLASH ARENA</span>
+                <span>✦</span>
+              </div>
 
-                    <div className="h-24 sm:h-26 rounded-2xl border border-slate-800 bg-slate-950/80 p-1.5 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-[11px] font-mono text-slate-400 font-black">캐릭터 덱</span>
-                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/50 to-slate-900 border border-amber-500/30 flex items-center justify-center shadow">
-                        <Crown className="w-4 h-4 text-amber-400/70" />
-                      </div>
-                      <span className="text-[11px] font-mono font-black text-amber-300">3장</span>
-                    </div>
-                  </div>
+              {/* 중앙 원형 TURN 엠블럼 */}
+              <div className="relative flex items-center justify-center my-0.5">
+                <div className="w-13 h-13 sm:w-14 sm:h-14 rounded-full border border-[#f97316]/60 bg-[#090d16] shadow-[0_0_20px_rgba(249,115,22,0.3)] flex flex-col items-center justify-center">
+                  <span className="text-[10px] font-bold text-slate-400 tracking-wider leading-none">TURN</span>
+                  <span className="text-base sm:text-lg font-black text-[#f97316] leading-tight mt-0.5">
+                    {String(activeSnapshot.turn).padStart(2, '0')}
+                  </span>
                 </div>
               </div>
 
-              {/* ----------------------------------------------------- */}
-              {/* 2. 중앙 전장 경계선 (디바이더) */}
-              {/* ----------------------------------------------------- */}
-              <div className="h-11 sm:h-12 w-full rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900/90 to-slate-950 border border-amber-500/30 shadow-lg flex items-center justify-between px-3 sm:px-4 shrink-0 overflow-hidden">
-                <div className="flex items-center gap-1 text-[11px] font-black px-2.5 py-1 rounded-xl bg-slate-950/90 border border-slate-800/80 shadow-inner shrink-0">
-                  <span className="text-red-400">RED</span>
-                  <span className="text-slate-600">&gt;</span>
-                  <span className="text-emerald-400">GREEN</span>
-                  <span className="text-slate-600">&gt;</span>
-                  <span className="text-cyan-400">BLUE</span>
-                  <span className="text-slate-600">&gt;</span>
-                  <span className="text-red-400">RED</span>
+              {/* 실시간 턴 소유자 & 상태 안내 */}
+              <div className="flex flex-col items-center gap-1 w-full">
+                <div className={`flex items-center justify-center gap-1.5 text-xs font-black px-3 py-0.5 border shadow-md [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)] ${
+                  isP0Turn
+                    ? 'bg-[#f97316]/20 text-[#f97316] border-[#f97316]/70 shadow-[0_0_12px_rgba(249,115,22,0.35)]'
+                    : 'bg-cyan-500/20 text-cyan-300 border-cyan-400/70 shadow-[0_0_12px_rgba(34,211,238,0.35)]'
+                }`}>
+                  <span>{isP0Turn ? `${p0.name}의 턴` : `${p1.name}의 턴`}</span>
+                </div>
+                <span className="text-xs font-bold text-slate-200 text-center max-w-full leading-tight truncate">
+                  {activeSnapshot.clash
+                    ? `⚔️ ${activeSnapshot.clash.resultText || '동시 액션 대결'}`
+                    : activeSnapshot.phaseText}
+                </span>
+              </div>
+            </div>
+
+            {/* [우측: 👤 내 출전 액션 슬롯] */}
+            <div className="relative flex-1 h-full bg-[#090d16]/75 border border-white/10 px-3 py-1 flex flex-col justify-center overflow-hidden">
+              <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#f97316]/80" />
+              <span className="pointer-events-none absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-[#f97316]/80" />
+              <span className="pointer-events-none absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-[#f97316]/80" />
+              <span className="pointer-events-none absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[#f97316]/80" />
+
+              <div className="absolute top-1.5 left-3 right-3 flex items-center justify-between z-10 pointer-events-none">
+                <span className="text-xs font-black text-[#f97316] tracking-wider uppercase flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5" />
+                  <span>내 출전 액션 슬롯</span>
+                </span>
+                {activeSnapshot.clash?.winner === 0 && (
+                  <span className="text-[10px] font-black px-2 py-0.5 bg-amber-400 text-slate-950 border border-yellow-200 animate-bounce">
+                    대결 승리!
+                  </span>
+                )}
+                {activeSnapshot.clash?.winner === 1 && (
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-900 text-red-400 border border-red-500/50">
+                    대결 패배
+                  </span>
+                )}
+              </div>
+
+              {p0ActionCards.length > 0 ? (
+                <div className="w-full h-full flex items-center justify-center gap-2.5 overflow-x-auto pt-3 custom-scrollbar">
+                  {p0ActionCards.map((card, idx) => {
+                    const isLastCard = idx === p0ActionCards.length - 1;
+                    return (
+                      <div
+                        key={card.id ? `${card.id}-${idx}` : `p0-replay-act-${idx}`}
+                        onMouseEnter={() => setPreviewCard(card)}
+                        onClick={() => setPreviewCard(card)}
+                        className={`shrink-0 transition-transform hover:scale-105 cursor-pointer relative ${
+                          isLastCard && activeSnapshot.clash?.winner === 0
+                            ? 'ring-2 ring-[#f97316] shadow-[0_0_20px_rgba(249,115,22,0.5)]'
+                            : isLastCard && activeSnapshot.clash?.winner === 1
+                            ? 'opacity-70 grayscale-[20%]'
+                            : 'opacity-90'
+                        }`}
+                      >
+                        <CardView
+                          card={card}
+                          customSizeClass="w-[104px] h-[148px] sm:w-[116px] sm:h-[164px] text-xs"
+                          badge={idx === 0 ? '대결' : `연격 ${idx}`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center relative">
+                  <div className="w-16 h-16 rounded-full border border-[#f97316]/25 flex items-center justify-center animate-pulse">
+                    <span className="text-xl text-[#f97316]/35">✦</span>
+                  </div>
+                  <span className="absolute text-xs font-bold text-slate-400 tracking-wider">
+                    대결 대기
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ------------------------------------------------------- */}
+          {/* [3단: 플레이어(1P) 진영 - 중하단] */}
+          {/* ------------------------------------------------------- */}
+          <div className="relative z-10 w-full flex flex-col gap-1 shrink-0">
+            {/* 내 필드 가로 1열: 좌측(캐릭터덱/협주) - 중앙(서포트 + 리더 + 서포트) - 우측(트래시/액션덱) */}
+            <div className="w-full max-w-[1580px] mx-auto grid grid-cols-[270px_1fr_270px] sm:grid-cols-[285px_1fr_285px] xl:grid-cols-[305px_1fr_305px] gap-2 sm:gap-2.5 items-center">
+              {/* 좌측 끝: 캐릭터 덱 + 협주 존 */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <DeckStack
+                  type="CHARACTER"
+                  count={3}
+                  playerTheme="p0"
+                  compact={true}
+                />
+                <ZoneCardStack
+                  cards={p0ConcertoCards}
+                  zoneType="CONCERTO"
+                  compact={true}
+                  onOpenModal={() => openCardList('CONCERTO', 0)}
+                  onHoverCard={(c) => setPreviewCard(c)}
+                />
+              </div>
+
+              {/* 중앙: 내 서포트 2장 + 내 리더 1장 */}
+              <div className="flex items-center justify-center gap-4 sm:gap-7">
+                <CharacterSlot
+                  card={p0LeftChar}
+                  role="leftSupport"
+                  isOwnerActive={isP0Turn}
+                  canUpgrade={false}
+                  canSwitch={false}
+                  onMouseEnter={() => p0LeftChar && setPreviewCard(p0LeftChar)}
+                  onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                  onHoverUnderlyingCard={(c) => setPreviewCard(c)}
+                  isAi={false}
+                />
+
+                <CharacterSlot
+                  card={p0LeaderChar}
+                  role="leader"
+                  isOwnerActive={isP0Turn}
+                  canUpgrade={false}
+                  canSwitch={false}
+                  onMouseEnter={() => p0LeaderChar && setPreviewCard(p0LeaderChar)}
+                  onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                  onHoverUnderlyingCard={(c) => setPreviewCard(c)}
+                  isAi={false}
+                />
+
+                <CharacterSlot
+                  card={p0RightChar}
+                  role="rightSupport"
+                  isOwnerActive={isP0Turn}
+                  canUpgrade={false}
+                  canSwitch={false}
+                  onMouseEnter={() => p0RightChar && setPreviewCard(p0RightChar)}
+                  onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                  onHoverUnderlyingCard={(c) => setPreviewCard(c)}
+                  isAi={false}
+                />
+              </div>
+
+              {/* 우측 끝: 트래시 + 액션 덱 */}
+              <div className="grid grid-cols-2 gap-1.5">
+                <ZoneCardStack
+                  cards={p0TrashCards}
+                  zoneType="TRASH"
+                  compact={true}
+                  onOpenModal={() => openCardList('TRASH', 0)}
+                  onHoverCard={(c) => setPreviewCard(c)}
+                />
+                <DeckStack
+                  type="ACTION"
+                  count={p0.deckCount}
+                  playerTheme="p0"
+                  compact={true}
+                />
+              </div>
+            </div>
+
+            {/* 내 상태바: 이름 + 평행사변형(-skew-x-12) HP 게이지 + 마름모 10칸 협주 게이지 */}
+            <div className="h-10 w-full max-w-[1340px] mx-auto bg-[#0c101b]/90 backdrop-blur-md border border-white/10 px-3.5 flex items-center justify-between gap-2 relative">
+              <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#f97316]" />
+              <span className="pointer-events-none absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-[#f97316]" />
+              <span className="pointer-events-none absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-[#f97316]" />
+              <span className="pointer-events-none absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[#f97316]" />
+
+              {/* 좌측: 플레이어 이름 & 평행사변형 HP 게이지 */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5 font-black text-xs sm:text-sm text-[#f97316]">
+                  <User className="w-4 h-4 text-[#f97316]" />
+                  <span>{p0.name}</span>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                  <span className="text-xs font-black text-amber-300 tracking-wider">
-                    {activeSnapshot.clash ? '⚔️ 동시 액션 대결 (CLASH) 진행 중' : `REPLAY ARENA • ${activeSnapshot.phaseText}`}
+                <div className="flex items-center gap-2 select-none">
+                  <Heart className="w-4 h-4 text-red-400 fill-red-400" />
+                  <span className="font-black text-sm sm:text-base font-mono tracking-wider text-white">
+                    {p0.hp}<span className="text-xs text-slate-400">/{p0.maxHp || 20}</span>
                   </span>
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono tracking-widest text-slate-500 font-bold hidden sm:inline">
-                    KURO GAMES
-                  </span>
-                  <span className="text-[10px] text-amber-400 font-bold bg-amber-500/15 px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                    전투 관전 모드
-                  </span>
+                  {/* 평행사변형(-skew-x-12) 택티컬 게이지 바 */}
+                  <div className="w-32 sm:w-44 h-3.5 -skew-x-12 bg-[#070a12] border border-[#f97316]/60 p-0.5 overflow-hidden shadow-inner">
+                    <div
+                      className="h-full bg-gradient-to-r from-red-600 via-rose-500 to-[#f97316] transition-all duration-300"
+                      style={{ width: `${Math.max(0, Math.min(100, (p0.hp / (p0.maxHp || 20)) * 100))}%` }}
+                    />
+                  </div>
+                  {p0.hasDominance && (
+                    <span
+                      className="inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-sans tracking-tight rounded-xs shadow-[0_0_8px_rgba(251,191,36,0.7)] border border-yellow-200 animate-pulse shrink-0 select-none"
+                      title="【우세】 상태"
+                    >
+                      👑 우세
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* ----------------------------------------------------- */}
-              {/* 3. 플레이어(P0) 공식 플레이매트 (하단 - 상대와 100% 동일 규격 대칭) */}
-              {/* ----------------------------------------------------- */}
-              <div className="relative w-full rounded-3xl bg-gradient-to-t from-slate-950/95 via-[#0b1020]/90 to-slate-950/90 border-2 border-amber-500/40 p-3 sm:p-4 shadow-2xl backdrop-blur-md overflow-hidden">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_50%_100%,rgba(245,158,11,0.08),transparent)] pointer-events-none" />
-
-                {/* 플레이어 상태 바 (HP & 스탯) */}
-                <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-slate-800/80">
-                  <div className="flex items-center gap-3.5">
-                    <div className="flex items-center gap-2 font-black text-lg sm:text-xl text-amber-300">
-                      <User className="w-5 h-5 sm:w-6 sm:h-6 text-amber-400" />
-                      <span>{p0.name}</span>
-                    </div>
-
-                    {/* HP 바 */}
-                    <div className="flex items-center gap-2.5 bg-slate-950 px-4 py-2 rounded-full border border-slate-800 shadow-inner">
-                      <Heart className="w-5 h-5 text-red-400 fill-red-400" />
-                      <span className="font-black text-lg sm:text-xl text-red-400 font-mono tracking-wider">{p0.hp} / {p0.maxHp || 20}</span>
-                      <div className="w-28 sm:w-40 bg-slate-800 h-3 rounded-full overflow-hidden ml-1 border border-slate-700/50">
-                        <div
-                          className="bg-gradient-to-r from-red-600 via-rose-500 to-amber-400 h-full transition-all duration-300"
-                          style={{ width: `${Math.max(0, (p0.hp / (p0.maxHp || 20)) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
+              {/* 우측: 추격 카운트 & 명조 공명 회로 10칸 마름모 협주 게이지 */}
+              <div className="flex items-center gap-3">
+                {activeSnapshot.combo && activeSnapshot.combo.playerIndex === 0 && (
+                  <div className="flex items-center gap-1.5 bg-red-950/90 px-2.5 py-0.5 border border-red-500 text-xs font-mono font-black text-orange-300 animate-pulse">
+                    <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400" />
+                    <span>추격 {activeSnapshot.combo.comboCount}회</span>
                   </div>
+                )}
 
-                  <div className="flex items-center gap-3 text-sm sm:text-base text-slate-200 font-bold">
-                    <button
-                      onClick={() => setSelectedHandPlayer(0)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer border shadow ${
-                        selectedHandPlayer === 0
-                          ? 'bg-amber-500/25 text-amber-200 border-amber-400 ring-2 ring-amber-400/40'
-                          : 'bg-slate-900 text-slate-300 border-slate-700 hover:bg-slate-800'
-                      }`}
-                      title="하단 손패 뷰어에서 내(1P) 손패 확인하기"
-                    >
-                      <Eye className="w-3.5 h-3.5 text-amber-400" />
-                      <span>패 <strong className="text-white text-sm font-black">{p0HandCards.length}장</strong> (클릭하여 패 보기)</span>
-                    </button>
-
-                    {/* 협주 게이지 (10칸 세그먼트 배터리 바 + 명확한 숫자 카운트) */}
-                    <div className="flex items-center gap-2 bg-slate-950 px-3 py-1.5 rounded-full border border-cyan-500/40 shadow-inner">
-                      <BatteryCharging className="w-4 h-4 text-cyan-400" />
-                      <span className="text-xs sm:text-sm text-cyan-300 font-bold hidden sm:inline">협주 게이지</span>
-                      <div className="flex items-center gap-0.5">
-                        {Array.from({ length: 10 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={`w-1.5 sm:w-2 h-3 rounded-xs transition-all ${
-                              i < p0.concerto
-                                ? 'bg-cyan-400 shadow-[0_0_6px_rgba(34,211,238,0.8)]'
-                                : 'bg-slate-800'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <strong className="text-sm font-black text-cyan-300 font-mono ml-0.5">
-                        {p0.concerto} / 10
-                      </strong>
-                    </div>
+                {/* 명조 공명 회로 10칸 마름모(rotate-45) 크리스탈 슬롯 */}
+                <div className="flex items-center gap-2 bg-[#080b13] px-3 py-1 border border-white/10">
+                  <Zap className="w-3.5 h-3.5 text-[#22d3ee]" />
+                  <span className="text-xs text-slate-200 font-bold hidden sm:inline">협주</span>
+                  <div className="flex items-center gap-1.5 px-1">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-2.5 h-2.5 rotate-45 border transition-all duration-200 ${
+                          i < p0.concerto
+                            ? 'bg-[#22d3ee] border-white shadow-[0_0_8px_#22d3ee]'
+                            : 'bg-[#0c101b] border-slate-700'
+                        }`}
+                      />
+                    ))}
                   </div>
-                </div>
-
-                {/* 플레이어 공식 플레이매트 3열 구조 */}
-                <div className="grid grid-cols-[130px_1fr_130px] sm:grid-cols-[145px_1fr_145px] md:grid-cols-[155px_1fr_155px] gap-3 sm:gap-4 items-stretch">
-                  {/* [내 좌측] 협주 에리어 + 캐릭터 덱 */}
-                  <div className="flex flex-col gap-2.5">
-                    <div className="flex-1 rounded-2xl border border-cyan-500/50 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[115px] relative shadow-lg">
-                      <div className="flex items-center justify-between w-full px-1">
-                        <span className="text-xs font-mono text-cyan-300 font-black">협주 게이지</span>
-                        <span className="text-xs font-mono font-black text-cyan-300 bg-cyan-950/80 px-1.5 py-0.5 rounded border border-cyan-500/50">
-                          {p0.concerto} / 10
-                        </span>
-                      </div>
-                      <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-cyan-500/30 flex flex-col items-center justify-center text-slate-500 my-0.5">
-                        <BatteryCharging className="w-5 h-5 mb-0.5 text-cyan-400" />
-                        <span className="text-xs font-bold text-slate-400">{p0.concerto}</span>
-                      </div>
-                      <span className="text-xs text-cyan-400/90 font-bold">협주 게이지</span>
-                    </div>
-
-                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs font-mono text-amber-300 font-black">캐릭터 덱</span>
-                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-amber-950/60 to-slate-900 border border-amber-500/40 flex items-center justify-center shadow">
-                        <Crown className="w-5 h-5 text-amber-400" />
-                      </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-amber-300">3장</span>
-                    </div>
-                  </div>
-
-                  {/* [내 중앙] 액션 에리어 + 캐릭터 3인 진형 [백 / 리더 / 백] */}
-                  <div className="flex flex-col justify-between gap-3 flex-1">
-                    {/* 내 액션 에리어 (내 대결 존) */}
-                    <div
-                      onMouseEnter={() => p0ClashCard && setPreviewCard(p0ClashCard)}
-                      className="h-[250px] sm:h-[270px] w-full rounded-2xl border-2 border-dashed border-amber-500/50 bg-slate-950/80 p-2 flex items-center justify-center relative shadow-inner cursor-pointer overflow-hidden"
-                    >
-                      <span className="absolute top-2 left-3 text-xs sm:text-sm font-mono font-black text-amber-400/80 uppercase tracking-widest z-10 flex items-center gap-1.5">
-                        <Swords className="w-3.5 h-3.5" />
-                        액션 에리어 ({p0.name} 대결 존)
-                      </span>
-                      {p0ClashCard ? (
-                        <div className={`animate-card-slam max-h-full relative transition-all duration-300 ${
-                          activeSnapshot.clash?.winner === 0
-                            ? 'ring-4 ring-amber-400 rounded-xl shadow-[0_0_25px_rgba(251,191,36,0.8)] scale-105'
-                            : activeSnapshot.clash?.winner === 1
-                            ? 'opacity-65 scale-95 grayscale-[20%]'
-                            : ''
-                        }`}>
-                          <CardView card={p0ClashCard} size="md" />
-                          {activeSnapshot.clash?.winner === 0 && (
-                            <div className="absolute -top-3 right-1 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 text-xs font-black px-2.5 py-0.5 rounded-full shadow-lg flex items-center gap-1 z-20 animate-bounce">
-                              <Sparkles className="w-3 h-3 fill-slate-950" /> 대결 승리!
-                            </div>
-                          )}
-                          {activeSnapshot.clash?.winner === 1 && (
-                            <div className="absolute -top-3 right-1 bg-slate-900/90 text-red-400 border border-red-500/50 text-[11px] font-bold px-2 py-0.5 rounded-full shadow z-20">
-                              대결 패배
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="w-40 h-56 rounded-xl border-2 border-dashed border-amber-500/30 bg-amber-950/20 flex flex-col items-center justify-center gap-2 text-slate-500">
-                          <Swords className="w-7 h-7 text-amber-500/40" />
-                          <span className="text-xs font-bold text-slate-400">대결 대기</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 캐릭터 3인 진형 */}
-                    <div className="grid grid-cols-3 gap-3 sm:gap-5 items-center justify-items-center w-full">
-                      {/* 백 (서포터 1) */}
-                      <div className="flex flex-col items-center">
-                        <CharacterSlot
-                          card={p0LeftChar}
-                          role="leftSupport"
-                          isOwnerActive={isP0Turn}
-                          canUpgrade={false}
-                          canSwitch={false}
-                          onMouseEnter={() => p0LeftChar && setPreviewCard(p0LeftChar)}
-                        />
-                        <span className="text-xs sm:text-sm font-black text-slate-400 mt-1">백 (SUPPORT)</span>
-                      </div>
-
-                      {/* 리더 (LEADER) */}
-                      <div className="flex flex-col items-center">
-                        <CharacterSlot
-                          card={p0LeaderChar}
-                          role="leader"
-                          isOwnerActive={isP0Turn}
-                          canUpgrade={false}
-                          canSwitch={false}
-                          onMouseEnter={() => p0LeaderChar && setPreviewCard(p0LeaderChar)}
-                        />
-                        <span className="text-xs sm:text-sm font-black text-amber-300 mt-1">리더 (LEADER)</span>
-                      </div>
-
-                      {/* 백 (서포터 2) */}
-                      <div className="flex flex-col items-center">
-                        <CharacterSlot
-                          card={p0RightChar}
-                          role="rightSupport"
-                          isOwnerActive={isP0Turn}
-                          canUpgrade={false}
-                          canSwitch={false}
-                          onMouseEnter={() => p0RightChar && setPreviewCard(p0RightChar)}
-                        />
-                        <span className="text-xs sm:text-sm font-black text-slate-400 mt-1">백 (SUPPORT)</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* [내 우측] 트래시 + 액션 덱 */}
-                  <div className="flex flex-col gap-2.5">
-                    <div className="flex-1 rounded-2xl border border-slate-700 bg-slate-950/85 p-2 flex flex-col items-center justify-between text-center min-h-[115px] relative shadow-lg">
-                      <div className="flex items-center justify-between w-full px-1">
-                        <span className="text-xs font-mono text-slate-300 font-black">트래시</span>
-                        <span className="text-xs font-mono font-bold text-amber-300 bg-slate-900 px-1.5 py-0.5 rounded border border-slate-700">
-                          {p0.dropCount}장
-                        </span>
-                      </div>
-                      <div className="w-16 h-22 sm:w-18 sm:h-24 rounded-lg border border-dashed border-slate-800 flex flex-col items-center justify-center text-slate-500 my-0.5">
-                        <Trash2 className="w-4 h-4 mb-0.5 opacity-40" />
-                        <span className="text-xs font-bold">비어있음</span>
-                      </div>
-                      <span className="text-xs text-slate-400 font-semibold">묘지</span>
-                    </div>
-
-                    <div className="h-24 sm:h-26 rounded-2xl border border-amber-500/30 bg-slate-950/80 p-2 flex flex-col items-center justify-between text-center relative shadow">
-                      <span className="text-xs font-mono text-slate-300 font-black">액션 덱</span>
-                      <div className="w-14 h-16 sm:w-16 sm:h-18 rounded-xl bg-gradient-to-br from-slate-900 to-indigo-950 border border-slate-700 flex items-center justify-center shadow">
-                        <Sparkles className="w-4 h-4 text-amber-400/70" />
-                      </div>
-                      <span className="text-xs sm:text-sm font-mono font-black text-slate-100">{p0.deckCount}장</span>
-                    </div>
-                  </div>
+                  <strong className="text-xs sm:text-sm font-black text-[#22d3ee] font-mono ml-0.5">
+                    {p0.concerto}/10
+                  </strong>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 중앙 컬럼 하단: 손패 (HandView - 실제 배틀과 100% 동일 배치 + 1P / 2P 토글 탭) */}
-          <div className="w-full shrink-0 z-20 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+          {/* ------------------------------------------------------- */}
+          {/* [4단: 핸드(손패) 도킹 바 - 하단 뷰어] */}
+          {/* ------------------------------------------------------- */}
+          <div className="w-full shrink-0 z-30 overflow-visible">
             {/* 1P / 2P 손패 전환 탭 바 */}
-            <div className="flex items-center justify-between px-4 pt-2 pb-1 border-b border-slate-800/60 bg-slate-950/60">
+            <div className="flex items-center justify-between px-3 py-1 border-t border-b border-white/10 bg-[#090d16]/90 backdrop-blur-md">
               <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-slate-400 uppercase tracking-wider mr-1">
-                  손패 검증 뷰어:
+                <span className="text-xs font-black text-[#f97316] font-mono tracking-wider mr-1">
+                  ✦ 손패 검증 뷰어:
                 </span>
                 <button
                   onClick={() => setSelectedHandPlayer(0)}
-                  className={`flex items-center gap-2 px-3 py-1 rounded-xl font-bold text-xs transition cursor-pointer border ${
+                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold transition cursor-pointer border [clip-path:polygon(3px_0,100%_0,100%_calc(100%-3px),calc(100%-3px)_100%,0_100%,0_3px)] ${
                     selectedHandPlayer === 0
-                      ? 'bg-amber-500/20 text-amber-300 border-amber-500 shadow-md shadow-amber-500/20 ring-1 ring-amber-400'
-                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                      ? 'bg-[#f97316]/25 text-[#f97316] border-[#f97316] shadow-[0_0_12px_rgba(249,115,22,0.3)] font-black'
+                      : 'bg-[#111520] text-slate-400 border-white/10 hover:text-white'
                   }`}
                 >
-                  <User className="w-3.5 h-3.5 text-amber-400" />
+                  <User className="w-3.5 h-3.5 text-[#f97316]" />
                   <span>1P {p0.name}의 패 ({p0HandCards.length}장)</span>
-                  {isP0Turn && <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" title="현재 턴 플레이어" />}
+                  {isP0Turn && <span className="w-1.5 h-1.5 rounded-full bg-[#f97316] animate-pulse" title="현재 턴" />}
                 </button>
 
                 <button
                   onClick={() => setSelectedHandPlayer(1)}
-                  className={`flex items-center gap-2 px-3 py-1 rounded-xl font-bold text-xs transition cursor-pointer border ${
+                  className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold transition cursor-pointer border [clip-path:polygon(3px_0,100%_0,100%_calc(100%-3px),calc(100%-3px)_100%,0_100%,0_3px)] ${
                     selectedHandPlayer === 1
-                      ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400 shadow-md shadow-cyan-500/20 ring-1 ring-cyan-400'
-                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:bg-slate-800 hover:text-slate-200'
+                      ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(34,211,238,0.3)] font-black'
+                      : 'bg-[#111520] text-slate-400 border-white/10 hover:text-white'
                   }`}
                 >
                   {replay.gameMode === 'AI' ? <Bot className="w-3.5 h-3.5 text-cyan-400" /> : <User className="w-3.5 h-3.5 text-cyan-400" />}
                   <span>2P {p1.name}의 패 ({p1HandCards.length}장)</span>
-                  {!isP0Turn && <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" title="현재 턴 플레이어" />}
+                  {!isP0Turn && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" title="현재 턴" />}
                 </button>
               </div>
 
-              <div className="flex items-center gap-2 text-xs text-slate-400">
-                <span className="hidden sm:inline">카드에 마우스를 올리면 좌측에서 전체 일러스트와 효과를 확인합니다</span>
+              <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+                <span>카드에 마우스를 올리면 좌측 단말기에서 상세 정보가 표시됩니다</span>
               </div>
             </div>
 
@@ -1312,53 +1457,53 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
         </div>
 
         {/* ======================================================= */}
-        {/* [우측 패널] 실제 배틀과 100% 동일 규격 콘솔 & 배틀 로그 */}
+        {/* [우측 패널] 택티컬 리플레이 콘솔 & 실시간 전투 로그 */}
         {/* ======================================================= */}
-        <div className="w-80 lg:w-88 xl:w-96 h-full max-h-full min-h-0 shrink-0 bg-slate-950 border-l border-slate-800 flex flex-col justify-between overflow-hidden select-text z-20">
+        <div className="w-80 lg:w-88 xl:w-96 h-full max-h-full min-h-0 shrink-0 bg-[#090d16]/95 border-l border-white/10 flex flex-col justify-between overflow-hidden select-text z-20">
           {/* 상단: 리플레이 마스터 콘솔 */}
-          <div className="p-4 border-b border-slate-800 bg-gradient-to-b from-slate-900/90 to-slate-950/95 shrink-0 flex flex-col gap-3.5">
+          <div className="p-3.5 border-b border-white/10 bg-[#0c101b] shrink-0 flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shadow">
-                  <Swords className="w-4.5 h-4.5 text-amber-400" />
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 bg-[#f97316]/20 border border-[#f97316]/50 flex items-center justify-center shadow">
+                  <Swords className="w-4 h-4 text-[#f97316]" />
                 </div>
                 <div>
-                  <h3 className="font-black text-sm sm:text-base text-white tracking-wide">
+                  <h3 className="font-black text-xs sm:text-sm text-white tracking-wide">
                     리플레이 관전 콘솔
                   </h3>
-                  <span className="text-xs text-amber-400/80 font-mono font-bold">
-                    REPLAY STAGE CONTROLLER
+                  <span className="text-[10px] text-[#f97316] font-mono font-bold">
+                    REPLAY CONTROLLER
                   </span>
                 </div>
               </div>
-              <span className="text-xs sm:text-sm font-mono font-black text-amber-300 bg-slate-900 border border-slate-700 px-3 py-1 rounded-xl shadow">
+              <span className="text-xs font-mono font-black text-[#f97316] bg-[#111520] border border-[#f97316]/40 px-2.5 py-0.5">
                 TURN {activeSnapshot.turn}
               </span>
             </div>
 
-            {/* 현재 턴 플레이어 상태 */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-inner">
-              <div className="flex items-center gap-2.5">
-                <span className={`w-3 h-3 rounded-full ${isP0Turn ? 'bg-amber-400 animate-ping' : 'bg-cyan-400 animate-ping'}`} />
-                <span className="text-sm font-black text-slate-100">
+            {/* 현재 턴 상태 */}
+            <div className="flex items-center justify-between p-2.5 bg-[#090d16] border border-white/10">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${isP0Turn ? 'bg-[#f97316] animate-pulse' : 'bg-cyan-400 animate-pulse'}`} />
+                <span className="text-xs font-black text-slate-100">
                   {isP0Turn ? `${p0.name}의 턴` : `${p1.name}의 턴`}
                 </span>
               </div>
-              <span className="text-xs font-bold text-amber-400 font-mono">
+              <span className="text-xs font-mono font-bold text-cyan-300">
                 스텝 #{currentStep + 1}
               </span>
             </div>
 
-            {/* 빠른 조작 버튼 */}
-            <div className="grid grid-cols-2 gap-2.5 pt-1">
+            {/* 빠른 스텝 조작 버튼 */}
+            <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => {
                   setIsPlaying(false);
                   setCurrentStep((prev) => Math.max(0, prev - 1));
                 }}
-                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer shadow"
+                className="py-1.5 px-2 bg-[#111520] hover:bg-[#1a2234] text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 border border-white/10 transition cursor-pointer"
               >
-                <RotateCcw className="w-4 h-4 text-amber-400" />
+                <RotateCcw className="w-3.5 h-3.5 text-[#f97316]" />
                 <span>이전 수 (←)</span>
               </button>
 
@@ -1367,27 +1512,27 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                   setIsPlaying(false);
                   setCurrentStep((prev) => Math.min(timeline.length - 1, prev + 1));
                 }}
-                className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 border border-slate-700 transition cursor-pointer shadow"
+                className="py-1.5 px-2 bg-[#111520] hover:bg-[#1a2234] text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 border border-white/10 transition cursor-pointer"
               >
                 <span>다음 수 (→)</span>
-                <ChevronRight className="w-4 h-4 text-amber-400" />
+                <ChevronRight className="w-3.5 h-3.5 text-[#f97316]" />
               </button>
             </div>
           </div>
 
-          {/* 하단: 실시간 배틀 로그 (클릭하여 시점 이동) */}
-          <div className="flex-1 flex flex-col min-h-0 bg-slate-950/60 p-3.5">
-            <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-800 text-sm">
-              <span className="font-black text-amber-400 flex items-center gap-1.5">
-                <History className="w-4 h-4" />
-                실시간 전투 로그
+          {/* 하단: 실시간 전투 로그 (클릭하여 시점 이동) */}
+          <div className="flex-1 flex flex-col min-h-0 bg-[#090d16]/80 p-3">
+            <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs">
+              <span className="font-black text-[#f97316] flex items-center gap-1.5 font-mono">
+                <span>✦</span>
+                <span>실시간 전투 로그</span>
               </span>
-              <span className="text-xs text-slate-500 font-medium">클릭하여 해당 수로 이동</span>
+              <span className="text-[10px] text-slate-500 font-mono">클릭 시 해당 수로 이동</span>
             </div>
 
             <div
               ref={logContainerRef}
-              className="flex-1 overflow-y-auto space-y-2.5 pr-1 select-none custom-scrollbar"
+              className="flex-1 overflow-y-auto space-y-1.5 pr-1 select-none custom-scrollbar"
             >
               {timeline.map((step, idx) => {
                 const isActive = idx === currentStep;
@@ -1399,17 +1544,17 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                       setIsPlaying(false);
                       setCurrentStep(idx);
                     }}
-                    className={`p-3 rounded-2xl text-xs sm:text-sm transition-all cursor-pointer border ${
+                    className={`p-2.5 text-xs transition-all cursor-pointer border ${
                       isActive
-                        ? 'bg-amber-500/20 border-amber-400 text-white font-bold shadow-lg shadow-amber-500/15 ring-1 ring-amber-400/50'
-                        : 'bg-slate-900/60 border-slate-800/80 text-slate-300 hover:bg-slate-800/60 hover:text-white'
+                        ? 'bg-[#f97316]/20 border-[#f97316] text-white font-bold shadow-[0_0_12px_rgba(249,115,22,0.3)] ring-1 ring-[#f97316]/50'
+                        : 'bg-[#0c101b]/80 border-white/10 text-slate-300 hover:bg-[#111520] hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-                      <span className="font-mono font-bold text-amber-400">#{idx + 1}</span>
-                      <span className="font-mono">턴 {step.turn}</span>
+                    <div className="flex items-center justify-between text-[11px] text-slate-400 mb-0.5">
+                      <span className="font-mono font-bold text-[#f97316]">#{idx + 1}</span>
+                      <span className="font-mono text-[10px]">TURN {step.turn}</span>
                     </div>
-                    <p className="line-clamp-2 leading-relaxed font-medium">{step.logText}</p>
+                    <p className="line-clamp-2 leading-relaxed font-medium">{formatBattleLogText(step.logText)}</p>
                   </div>
                 );
               })}
@@ -1417,6 +1562,30 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
           </div>
         </div>
       </div>
+
+      {/* 진화 계보 모달 */}
+      {evolutionModalChar && (
+        <EvolutionTreeModal
+          isOpen={Boolean(evolutionModalChar)}
+          onClose={() => setEvolutionModalChar(null)}
+          character={evolutionModalChar}
+        />
+      )}
+
+      {/* 트래시/협주 카드 목록 모달 */}
+      {cardListModalState.isOpen && (
+        <CardListModal
+          isOpen={cardListModalState.isOpen}
+          onClose={() => setCardListModalState((prev) => ({ ...prev, isOpen: false }))}
+          title={cardListModalState.title}
+          type={cardListModalState.type}
+          cards={cardListModalState.cards}
+          onSelectCard={(c) => {
+            setPreviewCard(c);
+            setCardListModalState((prev) => ({ ...prev, isOpen: false }));
+          }}
+        />
+      )}
     </div>
   );
 };

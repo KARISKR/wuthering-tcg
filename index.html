@@ -2,16 +2,34 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>명조: 대결 (Wuthering Waves TCG)</title>
-    <!-- Sun – SUITE Variable Font (https://sun.fo/suite/) -->
+    <!-- Sun – SUITE Font (명조 공식 인게임 폰트 - 비동기 렌더 블로킹 해소) -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
-    <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/variable/woff2/SUITE-Variable.css" rel="stylesheet" />
+    <link rel="preload" as="style" href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/static/woff2/SUITE.css" />
+    <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/static/woff2/SUITE.css" rel="stylesheet" media="print" onload="this.media='all'" />
+    <noscript><link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/static/woff2/SUITE.css" rel="stylesheet" /></noscript>
+    <style>
+      *, *::before, *::after {
+        font-family: 'SUITE', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      }
+      body {
+        font-family: 'SUITE', sans-serif;
+      }
+      /* 메인화면 덱 선택, 도감, 인게임 등 모든 크기 조절/축소 카드 이미지 자글거림(모아레) 완벽 방지 */
+      img, picture, canvas, svg {
+        image-rendering: auto !important;
+        image-rendering: smooth !important;
+        image-rendering: high-quality !important;
+        -webkit-backface-visibility: hidden !important;
+        backface-visibility: hidden !important;
+        -webkit-transform: translateZ(0) !important;
+        transform: translateZ(0) !important;
+        outline: 1px solid transparent !important;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

@@ -9,6 +9,7 @@ interface PhaseBannerOverlayProps {
   activePlayerIndex: 0 | 1;
   isAiTurn: boolean;
   disabled?: boolean;
+  drawCount?: number;
 }
 
 interface BannerData {
@@ -26,6 +27,7 @@ export const PhaseBannerOverlay: React.FC<PhaseBannerOverlayProps> = React.memo(
   activePlayerIndex,
   isAiTurn,
   disabled = false,
+  drawCount,
 }) => {
   const [currentBanner, setCurrentBanner] = useState<BannerData | null>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -91,11 +93,11 @@ export const PhaseBannerOverlay: React.FC<PhaseBannerOverlayProps> = React.memo(
 
     // 1. 드로우 페이즈 (플레이어가 덱을 클릭하여 뽑을 때까지 대기)
     if (eventKey.startsWith('draw-')) {
-      const drawCount = turn === 1 && activePlayerIndex === 0 ? 1 : 2;
+      const bannerDrawCount = drawCount ?? (turn === 1 && activePlayerIndex === 0 ? 1 : 2);
       const drawData: BannerData = isAiTurn
         ? {
             title: "OPPONENT'S TURN",
-            sub: `TURN ${turn} · 상대(AI) 드로우 단계 (${drawCount}장 드로우)`,
+            sub: `TURN ${turn} · 상대(AI) 드로우 단계 (${bannerDrawCount}장 드로우)`,
             badge: 'ENEMY TURN · DRAW',
             color: 'border-rose-500/90 text-rose-300',
             gradient: 'from-rose-950/95 via-slate-900/95 to-rose-950/95',
@@ -103,7 +105,7 @@ export const PhaseBannerOverlay: React.FC<PhaseBannerOverlayProps> = React.memo(
           }
         : {
             title: 'DRAW PHASE',
-            sub: `TURN ${turn} · 덱을 클릭하여 카드를 드로우하세요 (${drawCount}장)`,
+            sub: `TURN ${turn} · 덱을 클릭하여 카드를 드로우하세요 (${bannerDrawCount}장)`,
             badge: 'YOUR TURN · DRAW PHASE',
             color: 'border-cyan-400/90 text-cyan-300',
             gradient: 'from-cyan-950/95 via-slate-900/95 to-cyan-950/95',

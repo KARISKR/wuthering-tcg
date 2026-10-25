@@ -23,6 +23,7 @@ import {
   Check,
   ArrowUpDown,
 } from 'lucide-react';
+import { formatEffectText } from '../utils/formatEffectText';
 
 interface CardCatalogModalProps {
   isOpen: boolean;
@@ -473,7 +474,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   { key: '★★★★', label: '★★★★', special: 'purple' },
                   { key: '★★★', label: '★★★' },
                   { key: '★~★★', label: '★~★★ (1~2성)' },
-                  { key: 'PR', label: 'PR' },
+                  { key: 'PR', label: 'PR (프로모)' },
                 ] as const
               ).map((r) => {
                 const isSelected = selectedRarity === r.key;
@@ -663,6 +664,13 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                       loading="lazy"
                       className="w-full h-full object-contain rounded-xl drop-shadow-md group-hover:scale-105 transition-transform duration-300"
                     />
+
+                    {/* PR 카드 명확한 뱃지 표시 */}
+                    {card.rarity?.startsWith('PR') && (
+                      <span className="absolute top-1.5 right-1.5 z-10 px-1.5 py-0.5 rounded bg-gradient-to-r from-rose-600 via-red-500 to-amber-500 text-white font-mono font-black text-[9px] shadow-md border border-red-300/60 ring-1 ring-red-400/40">
+                        PR★★
+                      </span>
+                    )}
 
                     {/* 은은한 호버 글로우 & 레어도 인디케이터 오버레이 */}
                     <div className="absolute inset-0 rounded-xl bg-gradient-to-t from-slate-950/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none flex items-end justify-between p-2">
@@ -1057,9 +1065,9 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   <Info className="w-4 h-4 text-amber-400" />
                   공식 효과 텍스트 원문
                 </div>
-                <p className="text-slate-200 leading-relaxed text-xs sm:text-sm whitespace-pre-line font-medium">
-                  {detailCard.description}
-                </p>
+                <div className="text-slate-200 leading-relaxed text-xs sm:text-sm whitespace-pre-line font-medium">
+                  {formatEffectText(detailCard.description, 'md')}
+                </div>
               </div>
             </div>
           </div>

@@ -31,38 +31,140 @@ function base64ToUtf8(b64: string): string {
   return new TextDecoder().decode(bytes);
 }
 
-// 덱을 공유 가능한 단일 문자열 덱 코드로 직렬화
-export function encodeDeckCode(deck: CustomDeckConfig): string {
-  // 액션 카드 그룹화 (코드별 수량)
-  const countMap = new Map<string, number>();
-  deck.actionCards.forEach((c) => {
-    countMap.set(c.code, (countMap.get(c.code) || 0) + 1);
-  });
+// Base64URL 헬퍼 (짧고 URL 및 복사 친화적인 무패딩 Base64)
+const PREFIX_LIST = ['BP01', 'SD01', 'SD02', 'BP02', 'SD03', 'PR', 'OTHER'];
 
-  const cardsArray: [string, number][] = Array.from(countMap.entries()).sort((a, b) =>
-    a[0].localeCompare(b[0])
-  );
-
-  const payload: any = {
-    v: 1,
-    name: deck.name.trim() || '공유 덱',
-    l: deck.leader.code,
-    s1: deck.leftSupport.code,
-    s2: deck.rightSupport.code,
-    cards: cardsArray,
-  };
-
-  if (deck.characterDeck && deck.characterDeck.length > 0) {
-    const charMap = new Map<string, number>();
-    deck.characterDeck.forEach((c) => {
-      charMap.set(c.code, (charMap.get(c.code) || 0) + 1);
-    });
-    payload.chars = Array.from(charMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+function cardCodeToId(code: string): number {
+  if (!code) return 0;
+  const m = String(code).match(/^([A-Za-z]+)(\d*)-?(\d+)$/);
+  let prefix = 'OTHER';
+  let num = 1;
+  if (m) {
+    const rawPre = (m[1] + m[2]).toUpperCase();
+    num = parseInt(m[3], 10) || 1;
+    prefix = rawPre;
   }
+  let pIdx = PREFIX_LIST.indexOf(prefix);
+  if (pIdx === -1) pIdx = PREFIX_LIST.length - 1;
+  return ((pIdx & 0x0f) << 10) | (num & 0x03ff);
+}
 
-  const jsonStr = JSON.stringify(payload);
-  const encoded = utf8ToBase64(jsonStr);
-  return `WWTCG1_${encoded}`;
+function idToCardCode(id: number): string {
+  const pIdx = (id >> 10) & 0x0f;
+  const num = id & 0x03ff;
+  const prefix = PREFIX_LIST[pIdx] || 'BP01';
+  const numStr = String(num).padStart(3, '0');
+  return prefix === 'PR' ? `PR-${numStr}` : `${prefix}-${numStr}`;
+}
+
+function bytesToBase64Url(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+function base64UrlToBytes(b64url: string): Uint8Array {
+  let b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) {
+    b64 += '=';
+  }
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// 덱을 공유 가능한 초단축(50자 내외) 덱 코드로 직렬화 (V2 압축 바이트 인코딩)
+export function encodeDeckCode(deck: CustomDeckConfig): string {
+  try {
+    const leaderCode = deck.leader?.code || (deck as any).leaderCode || 'BP01-022';
+    const s1Code = deck.leftSupport?.code || (deck as any).leftSupportCode || 'BP01-018';
+    const s2Code = deck.rightSupport?.code || (deck as any).rightSupportCode || 'BP01-027';
+
+    // 액션 카드 그룹화 (코드별 수량)
+    const countMap = new Map<string, number>();
+    const actions = deck.actionCards || (deck as any).actionDeck || [];
+    actions.forEach((c: any) => {
+      const code = c?.code || (typeof c === 'string' ? c : '');
+      if (code) {
+        countMap.set(code, (countMap.get(code) || 0) + 1);
+      }
+    });
+
+    const cardsArray: [string, number][] = Array.from(countMap.entries()).sort((a, b) =>
+      a[0].localeCompare(b[0])
+    );
+
+    const charMap = new Map<string, number>();
+    if (deck.characterDeck && deck.characterDeck.length > 0) {
+      deck.characterDeck.forEach((c: any) => {
+        const code = c?.code || (typeof c === 'string' ? c : '');
+        if (code) {
+          charMap.set(code, (charMap.get(code) || 0) + 1);
+        }
+      });
+    }
+    const charsArray = Array.from(charMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+
+    const u16s: number[] = [
+      cardCodeToId(leaderCode),
+      cardCodeToId(s1Code),
+      cardCodeToId(s2Code),
+    ];
+
+    for (const [code, count] of charsArray) {
+      const qty = Math.min(Math.max(1, count), 3);
+      u16s.push(((qty - 1) << 14) | cardCodeToId(code));
+    }
+
+    for (const [code, count] of cardsArray) {
+      const qty = Math.min(Math.max(1, count), 3);
+      u16s.push(((qty - 1) << 14) | cardCodeToId(code));
+    }
+
+    const bytes = new Uint8Array(2 + u16s.length * 2);
+    bytes[0] = 2; // version 2
+    bytes[1] = charsArray.length;
+    for (let i = 0; i < u16s.length; i++) {
+      bytes[2 + i * 2] = u16s[i] & 0xff;
+      bytes[2 + i * 2 + 1] = (u16s[i] >> 8) & 0xff;
+    }
+
+    return `WW2_${bytesToBase64Url(bytes)}`;
+  } catch (err) {
+    console.warn('초단축 V2 덱 코드 인코딩 예외, V1 대체 인코딩 시도:', err);
+    // V1 레거시 JSON Base64 대체
+    try {
+      const leaderCode = deck.leader?.code || (deck as any).leaderCode || 'BP01-022';
+      const s1Code = deck.leftSupport?.code || (deck as any).leftSupportCode || 'BP01-018';
+      const s2Code = deck.rightSupport?.code || (deck as any).rightSupportCode || 'BP01-027';
+
+      const countMap = new Map<string, number>();
+      const actions = deck.actionCards || (deck as any).actionDeck || [];
+      actions.forEach((c: any) => {
+        if (c?.code) countMap.set(c.code, (countMap.get(c.code) || 0) + 1);
+      });
+
+      const payload: any = {
+        v: 1,
+        name: (deck.name || '공유 덱').trim(),
+        l: leaderCode,
+        s1: s1Code,
+        s2: s2Code,
+        cards: Array.from(countMap.entries()),
+      };
+      return `WWTCG1_${utf8ToBase64(JSON.stringify(payload))}`;
+    } catch {
+      return '';
+    }
+  }
 }
 
 import { COMMUNITY_DECK_PRESETS } from '../data/communityDecks';
@@ -105,6 +207,83 @@ export function generateCharacterDeckFor3(
 export function decodeDeckCode(codeStr: string): CustomDeckConfig | null {
   try {
     let clean = codeStr.trim();
+
+    // 0. 초단축 V2 바이너리 덱 코드 (WW2_...)
+    if (clean.startsWith('WW2_')) {
+      const b64 = clean.substring('WW2_'.length);
+      const bytes = base64UrlToBytes(b64);
+      const charDeckLen = bytes[1];
+      const u16s: number[] = [];
+      for (let i = 2; i < bytes.length; i += 2) {
+        u16s.push(bytes[i] | (bytes[i + 1] << 8));
+      }
+      const leaderCode = idToCardCode(u16s[0]);
+      const s1Code = idToCardCode(u16s[1]);
+      const s2Code = idToCardCode(u16s[2]);
+
+      const resolveChar = (code: string, fallbackIdx: number): CharacterCard => {
+        return (
+          DEDUPED_LV0_CHARACTERS.find((c) => c.code === code) ||
+          ALL_CHARACTERS.find((c) => c.code === code && c.level === 0) ||
+          DEDUPED_LV0_CHARACTERS[fallbackIdx] ||
+          DEDUPED_LV0_CHARACTERS[0]
+        );
+      };
+
+      const leader = resolveChar(leaderCode, 0);
+      const leftSupport = resolveChar(s1Code, 1);
+      const rightSupport = resolveChar(s2Code, 2);
+
+      let idx = 3;
+      const characterDeck: CharacterCard[] = [];
+      for (let i = 0; i < charDeckLen; i++) {
+        const entry = u16s[idx++];
+        const count = ((entry >> 14) & 0x03) + 1;
+        const code = idToCardCode(entry & 0x3fff);
+        const match = ALL_CHARACTERS.find((c) => c.code === code);
+        if (match) {
+          for (let k = 0; k < count; k++) {
+            characterDeck.push({
+              ...match,
+              id: `char-${match.code}-${Date.now()}-${characterDeck.length}`,
+            });
+          }
+        }
+      }
+
+      if (characterDeck.length === 0) {
+        characterDeck.push(...generateCharacterDeckFor3(leader, leftSupport, rightSupport));
+      }
+
+      const actionCards: ActionCard[] = [];
+      while (idx < u16s.length) {
+        const entry = u16s[idx++];
+        const count = ((entry >> 14) & 0x03) + 1;
+        const code = idToCardCode(entry & 0x3fff);
+        const template =
+          ACTION_CARD_TEMPLATES.find((c) => c.code === code) ||
+          ACTION_CARD_TEMPLATES[0];
+        if (template) {
+          for (let k = 0; k < count; k++) {
+            actionCards.push({
+              ...template,
+              id: `deck-${template.code}-${Date.now()}-${actionCards.length}-${Math.random().toString(36).substring(2, 7)}`,
+            });
+          }
+        }
+      }
+
+      const deckName = `${leader.characterName || leader.nameKr} 덱`;
+      return {
+        id: `custom-deck-${Date.now()}`,
+        name: deckName,
+        leader,
+        leftSupport,
+        rightSupport,
+        characterDeck: characterDeck.length > 0 ? characterDeck : undefined,
+        actionCards,
+      };
+    }
 
     // 1. mc.sldark.com 공유 코드 (SLD-XXXX) 패턴 매칭 (덱 코드: SLD-... 등 접두사/공백 유연 허용)
     const sldMatch = clean.match(/SLD\s*[-_]?\s*([A-Za-z0-9]{6,12})/i);
@@ -516,6 +695,51 @@ export function getUserDecks(): CustomDeckConfig[] {
 // 보유 중인 내 덱 리스트 전체 저장
 export function saveAllUserDecks(decks: CustomDeckConfig[]): void {
   localStorage.setItem(USER_DECKS_STORAGE_KEY, JSON.stringify(decks));
+}
+
+// 사용자가 보유 중인 모든 덱 (덱 빌더 커스텀 덱 + 내 프리셋 + 활성 덱 통합 및 중복 제거)
+export function getAllAvailableUserDecks(): CustomDeckConfig[] {
+  const result: CustomDeckConfig[] = [];
+  const seenNames = new Set<string>();
+
+  // 1. 덱 빌더 커스텀 덱 목록
+  try {
+    const userDecks = getUserDecks();
+    userDecks.forEach((d) => {
+      if (d && d.name && !seenNames.has(d.name.trim())) {
+        seenNames.add(d.name.trim());
+        result.push(d);
+      }
+    });
+  } catch (e) {
+    console.error('Failed to get userDecks:', e);
+  }
+
+  // 2. 사용자가 저장한 덱 프리셋 (커스텀 및 추천 프리셋 포함)
+  try {
+    const presets = getStoredPresets();
+    presets.forEach((p) => {
+      if (p && p.name && !seenNames.has(p.name.trim())) {
+        seenNames.add(p.name.trim());
+        result.push(presetToCustomDeck(p));
+      }
+    });
+  } catch (e) {
+    console.error('Failed to get presets:', e);
+  }
+
+  // 3. 현재 활성 덱
+  try {
+    const active = getActiveCustomDeck();
+    if (active && active.name && !seenNames.has(active.name.trim())) {
+      seenNames.add(active.name.trim());
+      result.unshift(active);
+    }
+  } catch (e) {
+    console.error('Failed to get active deck:', e);
+  }
+
+  return result;
 }
 
 // 특정 내 덱 저장/업데이트
