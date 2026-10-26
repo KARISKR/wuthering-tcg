@@ -74,7 +74,7 @@ import type { CustomDeckConfig } from '../types/tcg';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 
 
-function renderFormattedContent(rawContent: string): string {
+export function renderFormattedContent(rawContent: string, postImages: string[] = []): string {
   if (!rawContent) return '';
   // 줄바꿈 정규화 (CRLF -> LF) 및 악성 스크립트/이벤트 차단
   let safe = rawContent
@@ -85,20 +85,71 @@ function renderFormattedContent(rawContent: string): string {
     .replace(/on\w+='[^']*'/gi, '')
     .replace(/javascript:[^"']*/gi, '');
 
-  // 마크다운 이미지 파싱: ![설명](url) -> 인라인 이미지 렌더링 (클릭 확대 지원)
+  // 1. 단축 태그: [사진1], [사진2], [이미지1] 등 치환 (업로드 사진 매핑)
+  const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
+  safe = safe.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)\]/gi, (match, prefix, numStr) => {
+    const idx = parseInt(numStr, 10) - 1;
+    const url = uploadedPhotos[idx] || postImages[idx];
+    if (url) {
+      return (
+        `<div class="my-3.5 max-w-2xl">` +
+        `<img src="${url}" alt="사진 ${numStr}" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />` +
+        `<span class="block text-[11px] text-slate-400 mt-1 font-sans">📸 사진 ${numStr}</span></div>`
+      );
+    }
+    return match;
+  });
+
+  // 2. 단축 태그: [카드:카드명], [카드:코드] 치환 (192종 도감 카드 매핑)
+  safe = safe.replace(/\[카드\s*:\s*([^\]]+)\]/gi, (match, cardQuery) => {
+    const q = cardQuery.trim();
+    let card = OFFICIAL_CARDS.find((c) => c.nameKr === q || c.code === q || c.characterName === q);
+    if (!card) {
+      card = OFFICIAL_CARDS.find((c) => c.nameKr.toLowerCase() === q.toLowerCase() || c.code.toLowerCase() === q.toLowerCase());
+    }
+    const cardArt = card ? card.artUrl : postImages.find((u) => u.includes(q));
+    if (cardArt) {
+      const name = card ? card.nameKr : q;
+      return (
+        `<div class="my-3.5 max-w-xs sm:max-w-sm">` +
+        `<img src="${cardArt}" alt="${name}" class="rounded-xl border-2 border-amber-500/40 bg-black/60 max-h-[380px] object-contain shadow-xl cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />` +
+        `<span class="block text-[11px] text-amber-300 font-bold mt-1.5 font-sans">🃏 ${name}</span></div>`
+      );
+    }
+    return match;
+  });
+
+  // 3. 단축 태그: [카드1], [카드2] 순서형 치환
+  const cardImages = postImages.filter((u) => u.startsWith('/cards/'));
+  safe = safe.replace(/\[카드\s*#?([0-9]+)\]/gi, (match, numStr) => {
+    const idx = parseInt(numStr, 10) - 1;
+    const url = cardImages[idx];
+    if (url) {
+      const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
+      const name = foundCard ? foundCard.nameKr : `카드 ${numStr}`;
+      return (
+        `<div class="my-3.5 max-w-xs sm:max-w-sm">` +
+        `<img src="${url}" alt="${name}" class="rounded-xl border-2 border-amber-500/40 bg-black/60 max-h-[380px] object-contain shadow-xl cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />` +
+        `<span class="block text-[11px] text-amber-300 font-bold mt-1.5 font-sans">🃏 ${name}</span></div>`
+      );
+    }
+    return match;
+  });
+
+  // 4. 마크다운 이미지 파싱: ![설명](url) -> 하위 호환
   safe = safe.replace(
     /!\[(.*?)\]\((.*?)\)/g,
     '<div class="my-3.5 max-w-2xl"><img src="$2" alt="$1" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />' +
       '<span class="block text-[11px] text-slate-400 mt-1 font-sans">$1</span></div>'
   );
 
-  // HTML <img> 태그 안전 스타일 래핑
+  // 5. HTML <img> 태그 안전 스타일 래핑
   safe = safe.replace(
     /<img\s+([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
     '<div class="my-3.5 max-w-2xl"><img src="$2" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" /></div>'
   );
 
-  // 마크다운 볼드 변환
+  // 6. 마크다운 볼드 변환
   safe = safe.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
   return safe;
 }
@@ -171,25 +222,53 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     }, 10);
   };
 
-  // 본문 커서 위치에 이미지/카드 즉시 삽입 핸들러
+  // 본문 커서 위치에 깔끔한 단축 태그([사진1], [카드:이름]) 즉시 삽입 핸들러 (50KB base64 난도질 차단)
   const insertImageIntoContent = (url: string, label = '이미지') => {
+    const isCard = url.startsWith('/cards/');
+    let tag = '';
+    if (isCard) {
+      const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
+      const cardName = foundCard ? foundCard.nameKr : label;
+      tag = `\n[카드:${cardName}]\n`;
+    } else {
+      const uploadedPhotos = images.filter((u) => !u.startsWith('/cards/'));
+      let photoIdx = uploadedPhotos.indexOf(url) + 1;
+      if (photoIdx <= 0) photoIdx = uploadedPhotos.length + 1;
+      tag = `\n[사진${photoIdx}]\n`;
+    }
+
     const textarea = contentTextareaRef.current;
-    const imgTag = `\n![${label}](${url})\n`;
     if (!textarea) {
-      setContent((prev) => prev + imgTag);
-      showToast(`📸 [${label}] 이미지가 본문에 삽입되었습니다.`);
+      setContent((prev) => prev + tag);
+      showToast(`📸 ${tag.trim()} 태그가 본문에 삽입되었습니다.`);
       return;
     }
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const newContent = content.substring(0, start) + imgTag + content.substring(end);
+    const newContent = content.substring(0, start) + tag + content.substring(end);
     setContent(newContent);
     setTimeout(() => {
       textarea.focus();
-      const newPos = start + imgTag.length;
+      const newPos = start + tag.length;
       textarea.setSelectionRange(newPos, newPos);
     }, 20);
-    showToast(`📸 [${label}] 이미지가 본문 커서 위치에 삽입되었습니다!`);
+    showToast(`📸 ${tag.trim()} 태그가 커서 위치에 깔끔하게 삽입되었습니다!`);
+  };
+
+  // 본문에 이미 들어간 지저분한 base64 문자열(![...](data:image/...))을 깔끔한 [사진N] 태그로 자동 정돈하는 헬퍼
+  const cleanupBase64Tags = (raw: string, currentImages: string[]) => {
+    let newImages = [...currentImages];
+    const cleaned = raw.replace(/!\[(.*?)\]\((data:image\/[^)]+)\)/g, (match, alt, dataUrl) => {
+      let idx = newImages.indexOf(dataUrl);
+      if (idx === -1) {
+        newImages.push(dataUrl);
+        idx = newImages.length - 1;
+      }
+      const uploadedPhotos = newImages.filter((u) => !u.startsWith('/cards/'));
+      const photoIdx = uploadedPhotos.indexOf(dataUrl) + 1;
+      return `\n[사진${photoIdx}]\n`;
+    });
+    return { cleaned, newImages };
   };
   const [contact, setContact] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
   const [deckCode, setDeckCode] = useState('');
@@ -1183,10 +1262,32 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     : selectedPost.imageUrl
                     ? [selectedPost.imageUrl]
                     : [];
-                // 이미 본문 텍스트 내에 인라인으로 삽입된 이미지는 상단 갤러리에서 중복 표시하지 않음
-                const unEmbeddedImages = postImages.filter(
-                  (url) => !selectedPost.content.includes(url)
-                );
+                // 이미 본문 텍스트 내에 태그([사진1], [카드:...])나 URL로 인라인 삽입된 이미지는 상단 갤러리에서 중복 표시하지 않음
+                const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
+                const unEmbeddedImages = postImages.filter((url) => {
+                  if (selectedPost.content.includes(url)) return false;
+                  const isCard = url.startsWith('/cards/');
+                  if (!isCard) {
+                    const photoIdx = uploadedPhotos.indexOf(url) + 1;
+                    if (
+                      selectedPost.content.includes(`[사진${photoIdx}]`) ||
+                      selectedPost.content.includes(`[사진 ${photoIdx}]`) ||
+                      selectedPost.content.includes(`[이미지${photoIdx}]`)
+                    ) {
+                      return false;
+                    }
+                  } else {
+                    const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
+                    if (
+                      (foundCard && selectedPost.content.includes(`[카드:${foundCard.nameKr}]`)) ||
+                      (foundCard && selectedPost.content.includes(`[카드:${foundCard.code}]`))
+                    ) {
+                      return false;
+                    }
+                  }
+                  return true;
+                });
+
                 if (unEmbeddedImages.length === 0) return null;
                 return (
                   <div className="my-4 space-y-3">
@@ -1232,7 +1333,16 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   }
                 }}
                 className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans min-h-[140px] select-text"
-                dangerouslySetInnerHTML={{ __html: renderFormattedContent(selectedPost.content) }}
+                dangerouslySetInnerHTML={{
+                  __html: renderFormattedContent(
+                    selectedPost.content,
+                    selectedPost.images && selectedPost.images.length > 0
+                      ? selectedPost.images
+                      : selectedPost.imageUrl
+                      ? [selectedPost.imageUrl]
+                      : []
+                  ),
+                }}
               />
 
               {/* 아카라이브 시그니처 대형 추천(개추) / 비추 박스 */}
@@ -2050,41 +2160,44 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-2 border-t border-[#222838]">
                     {images.map((imgUrl, idx) => {
                       const isCard = imgUrl.startsWith('/cards/');
-                      const isEmbedded = content.includes(imgUrl);
+                      const foundCard = isCard ? OFFICIAL_CARDS.find((c) => c.artUrl === imgUrl) : null;
+                      const uploadedPhotos = images.filter((u) => !u.startsWith('/cards/'));
+                      const photoIdx = !isCard ? uploadedPhotos.indexOf(imgUrl) + 1 : 0;
+                      const tag = isCard ? `[카드:${foundCard ? foundCard.nameKr : '카드'}]` : `[사진${photoIdx}]`;
+                      const isEmbedded = content.includes(tag) || content.includes(imgUrl);
                       return (
                         <div
                           key={idx}
                           className={`relative aspect-square rounded-lg overflow-hidden border transition group shadow ${
-                            isEmbedded ? 'border-emerald-500/60 ring-1 ring-emerald-500/40' : 'border-[#2d354a] bg-black/40'
+                            isEmbedded ? 'border-emerald-500/70 ring-1 ring-emerald-500/50' : 'border-[#2d354a] bg-black/40'
                           }`}
                         >
                           <img src={imgUrl} alt="" className="w-full h-full object-cover" />
-                          {isCard && (
-                            <span className="absolute bottom-1 left-1 px-1 rounded bg-amber-500/90 text-[9px] text-slate-950 font-black">
-                              CARD
-                            </span>
-                          )}
+                          <span className={`absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-black ${isCard ? 'bg-amber-500/95 text-slate-950' : 'bg-blue-600/95 text-white'}`}>
+                            {tag}
+                          </span>
                           {isEmbedded ? (
                             <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-emerald-600/90 text-[9px] font-bold text-white shadow">
-                              본문 삽입됨
+                              ✓ 삽입됨
                             </span>
                           ) : (
                             <button
                               type="button"
-                              onClick={() => insertImageIntoContent(imgUrl, isCard ? '공식 카드' : `사진 ${idx + 1}`)}
+                              onClick={() => insertImageIntoContent(imgUrl, isCard ? (foundCard ? foundCard.nameKr : '카드') : `사진 ${photoIdx}`)}
                               className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-blue-600/90 hover:bg-blue-500 text-[9px] font-bold text-white shadow transition cursor-pointer active:scale-95"
-                              title="현재 본문 커서 위치에 이 이미지를 삽입합니다"
+                              title={`현재 본문 커서 위치에 ${tag} 태그를 삽입합니다`}
                             >
-                              + 본문 삽입
+                              + 삽입
                             </button>
                           )}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-1.5">
+                          <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-1.5">
                             <button
                               type="button"
-                              onClick={() => insertImageIntoContent(imgUrl, isCard ? '공식 카드' : `사진 ${idx + 1}`)}
-                              className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] shadow active:scale-95 cursor-pointer w-full text-center"
+                              onClick={() => insertImageIntoContent(imgUrl, isCard ? (foundCard ? foundCard.nameKr : '카드') : `사진 ${photoIdx}`)}
+                              className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] shadow active:scale-95 cursor-pointer w-full text-center truncate"
+                              title={`본문 커서 위치에 ${tag} 삽입`}
                             >
-                              {isEmbedded ? '✓ 본문 재삽입' : '+ 본문 삽입'}
+                              {tag} 삽입
                             </button>
                             <button
                               type="button"
@@ -2264,12 +2377,33 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   </div>
                 )}
 
+                {content.includes('data:image/') && (
+                  <div className="mb-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2 text-xs text-amber-200">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base">⚠️</span>
+                      <span>본문에 긴 base64 이미지 코드가 들어가 있습니다. [사진] 단축 태그로 깔끔하게 정리할 수 있습니다.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const { cleaned, newImages } = cleanupBase64Tags(content, images);
+                        setContent(cleaned);
+                        setImages(newImages);
+                        showToast('✨ 긴 이미지 코드를 깔끔한 [사진] 태그로 정돈했습니다!');
+                      }}
+                      className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow transition active:scale-95 shrink-0 cursor-pointer"
+                    >
+                      🧹 [사진] 태그로 자동 정리
+                    </button>
+                  </div>
+                )}
+
                 {isPreviewMode ? (
                   <div
                     className="w-full min-h-[200px] px-4 py-3 rounded-xl bg-[#141824] border border-amber-500/40 text-sm sm:text-base text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans"
                     dangerouslySetInnerHTML={{
                       __html: content.trim()
-                        ? renderFormattedContent(content)
+                        ? renderFormattedContent(content, images)
                         : '<span class="text-slate-500">작성된 내용이 없습니다.</span>',
                     }}
                   />
