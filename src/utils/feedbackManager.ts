@@ -1,6 +1,6 @@
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 
-export type FeedbackCategory = 'BUG' | 'DECK' | 'RULE' | 'FEATURE' | 'GENERAL';
+export type FeedbackCategory = 'NOTICE' | 'BUG' | 'DECK' | 'RULE' | 'FEATURE' | 'GENERAL';
 
 export interface CommentItem {
   id: string;
@@ -46,6 +46,14 @@ export const CATEGORY_INFO: Record<
   FeedbackCategory,
   { label: string; icon: string; color: string; badgeClass: string; desc: string }
 > = {
+  NOTICE: {
+    label: '공지사항',
+    icon: '📢',
+    color: '#f59e0b',
+    badgeClass: 'bg-amber-500/25 text-amber-300 border-amber-500/50',
+    desc: '운영자 공식 공지사항 및 시스템 업데이트 안내 (관리자 전용)',
+  },
+  
   BUG: {
     label: '버그제보',
     icon: '🐛',
@@ -501,4 +509,44 @@ export function clearDraft(): void {
   } catch (err) {
     console.warn('[feedbackManager] Failed to clear draft:', err);
   }
+}
+
+export const ADMIN_MASTER_PASSWORDS = ['rover777!', 'wuthering2026!', 'admin777', '1234'];
+
+export function isUserAdmin(): boolean {
+  try {
+    return localStorage.getItem('wuthering_is_admin_verified') === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function setAdminVerified(verified: boolean): void {
+  try {
+    if (verified) {
+      localStorage.setItem('wuthering_is_admin_verified', 'true');
+    } else {
+      localStorage.removeItem('wuthering_is_admin_verified');
+    }
+  } catch {}
+}
+
+export function getLatestNotice(posts?: FeedbackItem[]): FeedbackItem | null {
+  const list = posts || getFeedbackList();
+  const notices = list.filter((p) => p.isNotice || p.category === 'NOTICE');
+  if (notices.length === 0) return null;
+  return [...notices].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  )[0];
+}
+
+export function hasNewPosts(posts?: FeedbackItem[], hours = 24): boolean {
+  const list = posts || getFeedbackList();
+  const threshold = Date.now() - hours * 3600 * 1000;
+  return list.some((p) => new Date(p.createdAt).getTime() > threshold);
+}
+
+export function isPostNew(post: FeedbackItem, hours = 24): boolean {
+  const threshold = Date.now() - hours * 3600 * 1000;
+  return new Date(post.createdAt).getTime() > threshold;
 }

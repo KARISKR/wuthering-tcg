@@ -20,6 +20,7 @@ export function App() {
   const [customDeck, setCustomDeck] = useState<CustomDeckConfig | null>(null);
   const [opponentDeck, setOpponentDeck] = useState<CustomDeckConfig | null>(null);
   const [activeReplay, setActiveReplay] = useState<BattleReplayData | null>(null);
+  const [boardInitialPostId, setBoardInitialPostId] = useState<string | null>(null);
 
   // 점검 모드 관리자 우회 상태
   const [isMaintenanceBypassed, setIsMaintenanceBypassed] = useState<boolean>(() => {

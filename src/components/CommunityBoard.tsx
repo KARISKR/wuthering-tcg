@@ -69,6 +69,7 @@ import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 interface CommunityBoardProps {
   onBackToLobby: () => void;
   onStartBattleWithCustomDeck?: (deck: CustomDeckConfig) => void;
+  initialPostId?: string | null;
 }
 
 type FilterTab = 'ALL' | 'BEST' | 'NOTICE' | FeedbackCategory;
@@ -76,6 +77,7 @@ type FilterTab = 'ALL' | 'BEST' | 'NOTICE' | FeedbackCategory;
 export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   onBackToLobby,
   onStartBattleWithCustomDeck,
+  initialPostId,
 }) => {
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
@@ -85,7 +87,13 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const pageSize = 12;
 
   // Selected post detail view (ArcaLive article view)
-  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(initialPostId || null);
+
+  useEffect(() => {
+    if (initialPostId) {
+      setSelectedPostId(initialPostId);
+    }
+  }, [initialPostId]);
 
   // Write modal state & edit state
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);

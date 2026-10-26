@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BgmPlayer } from './BgmPlayer';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
@@ -40,6 +40,12 @@ import {
 
 import { BattleReplayData } from '../utils/replayManager';
 import {
+  fetchGlobalFeedbackList,
+  getLatestNotice,
+  hasNewPosts,
+  FeedbackItem,
+} from '../utils/feedbackManager';
+import {
   LobbyLayoutEditor,
   loadLobbyLayout,
   saveLobbyLayout,
@@ -50,7 +56,7 @@ import {
 interface LobbyProps {
   onStartGame: (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, opponentDeck?: CustomDeckConfig) => void;
   onOpenDeckBuilder: () => void;
-  onOpenBoard?: () => void;
+  onOpenBoard?: (postId?: string) => void;
   onStartTutorial?: () => void;
   onStartBattleWithCustomDeck?: (deck: CustomDeckConfig) => void;
   onPlayBattleReplay?: (replay: BattleReplayData) => void;
@@ -72,6 +78,18 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isInteractiveTutorialOpen, setIsInteractiveTutorialOpen] = useState(false);
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
+  const [boardPosts, setBoardPosts] = useState<FeedbackItem[]>([]);
+
+  useEffect(() => {
+    fetchGlobalFeedbackList().then((posts) => {
+      if (Array.isArray(posts)) {
+        setBoardPosts(posts);
+      }
+    });
+  }, []);
+
+  const latestNotice = useMemo(() => getLatestNotice(boardPosts), [boardPosts]);
+  const hasNewBoardPosts = useMemo(() => hasNewPosts(boardPosts), [boardPosts]);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
@@ -262,12 +280,15 @@ export const Lobby: React.FC<LobbyProps> = ({
             <span>카드 도감</span>
           </button>
           <button
-            onClick={onOpenBoard}
+            onClick={() => onOpenBoard && onOpenBoard()}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs font-bold transition cursor-pointer shadow-sm"
             title="자유게시판 (덱공유, 소통, 버그제보)"
           >
             <img src="/images/menu_icons/board.png" alt="" className="w-4 h-4 object-contain" />
             <span>자유게시판</span>
+            {hasNewBoardPosts && (
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
+            )}
           </button>
           <button
             onClick={() => setHash('#shared-decks')}
@@ -589,10 +610,41 @@ export const Lobby: React.FC<LobbyProps> = ({
           {/* [3열] 우측: 보조 메뉴 5개 균등 분할 */}
           {/* ========================================================= */}
           <div className="flex flex-col gap-2.5 sm:gap-3 h-full">
+            {/* 0. 최신 공지사항 카드 (최신 공지가 있을 때 상단 노출, 클릭 시 해당 글로 다이렉트 이동) */}
+            {latestNotice && (
+              <div
+                onClick={() => (onOpenBoard ? onOpenBoard(latestNotice.id) : undefined)}
+                className="group relative border-2 border-amber-400/90 hover:border-amber-300 bg-gradient-to-r from-amber-950/70 via-[#1a140d]/95 to-[#0d101a]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-between gap-2.5 shadow-[0_0_20px_rgba(245,158,11,0.35)] hover:shadow-[0_0_32px_rgba(245,158,11,0.6)] transition-all duration-200 cursor-pointer overflow-hidden select-none shrink-0"
+                style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
+                title="공지사항 바로가기"
+              >
+                <div className="absolute inset-1 border border-amber-400/25 pointer-events-none" />
+                <div className="flex items-center gap-2.5 min-w-0 flex-1 z-10">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shrink-0">
+                    <span className="text-base animate-pulse">📢</span>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider shrink-0">
+                        공지
+                      </span>
+                      <span className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-200 truncate transition-colors">
+                        {latestNotice.title}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 group-hover:text-slate-300 truncate mt-0.5 font-sans">
+                      {latestNotice.content}
+                    </p>
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-amber-400 group-hover:text-amber-300 group-hover:translate-x-1 transition-all shrink-0 z-10" />
+              </div>
+            )}
+
             
             {/* 1. 자유게시판 (골드/앰버 네온) */}
             <div
-              onClick={onOpenBoard}
+              onClick={() => onOpenBoard && onOpenBoard()}
               className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.25)] hover:shadow-[0_0_32px_rgba(245,158,11,0.55)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
               style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
             >
@@ -608,9 +660,16 @@ export const Lobby: React.FC<LobbyProps> = ({
                     className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.6)] group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
-                  자유게시판
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
+                    자유게시판
+                  </span>
+                  {hasNewBoardPosts && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white font-black text-[9px] tracking-wider uppercase animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.9)]">
+                      NEW
+                    </span>
+                  )}
+                </div>
               </div>
               <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
             </div>
