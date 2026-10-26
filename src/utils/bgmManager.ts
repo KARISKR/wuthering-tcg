@@ -254,6 +254,7 @@ class BgmManager {
     }
 
     const audio = new Audio();
+    audio.preload = 'metadata';
     this.audio = audio;
 
     const currentTrack = tracks[this.currentTrackIdx] || tracks[0];

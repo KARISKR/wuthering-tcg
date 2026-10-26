@@ -5,12 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>명조: 대결 (Wuthering Waves TCG)</title>
-    <!-- Sun – SUITE Font (명조 공식 인게임 폰트 - 비동기 렌더 블로킹 해소) -->
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
-    <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
-    <link rel="preload" as="style" href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/static/woff2/SUITE.css" />
-    <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/static/woff2/SUITE.css" rel="stylesheet" media="print" onload="this.media='all'" />
-    <noscript><link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/static/woff2/SUITE.css" rel="stylesheet" /></noscript>
+    <!-- 고화질 로비 배경 선행 로딩 -->
+    <link rel="preload" as="image" type="image/webp" href="/images/bg-shorekeeper-piano.webp?v=5k" fetchpriority="high" />
     <style>
       *, *::before, *::after {
         font-family: 'SUITE', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;

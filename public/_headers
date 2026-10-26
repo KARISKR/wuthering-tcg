@@ -1,7 +1,15 @@
 # Cloudflare Pages Custom Headers Configuration
 # https://developers.cloudflare.com/pages/configuration/headers/
 
-# 이미지, 비디오, 오디오 정적 자산 1년 장기 캐시
+# 이미지, 비디오, 오디오, 폰트 정적 자산 1년 장기 캐시
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
+
+/images/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+  Access-Control-Allow-Origin: *
+
 /cards/*
   Cache-Control: public, max-age=31536000, immutable
   Access-Control-Allow-Origin: *

@@ -13,7 +13,10 @@ const preloadedUrls = new Set<string>();
 const inFlightUrls = new Set<string>();
 
 /** 단일 이미지 프리로드 */
-export function preloadImage(url: string | undefined): Promise<boolean> {
+export function preloadImage(
+  url: string | undefined,
+  priority: 'high' | 'low' | 'auto' = 'auto'
+): Promise<boolean> {
   if (!url || typeof url !== 'string' || preloadedUrls.has(url)) {
     return Promise.resolve(true);
   }
@@ -26,6 +29,7 @@ export function preloadImage(url: string | undefined): Promise<boolean> {
   return new Promise((resolve) => {
     const img = new Image();
     img.decoding = 'async';
+    (img as any).fetchPriority = priority;
     img.onload = () => {
       preloadedUrls.add(url);
       inFlightUrls.delete(url);
@@ -40,9 +44,12 @@ export function preloadImage(url: string | undefined): Promise<boolean> {
 }
 
 /** 여러 이미지 병렬 프리로드 */
-export function preloadImages(urls: (string | undefined)[]): Promise<boolean[]> {
+export function preloadImages(
+  urls: (string | undefined)[],
+  priority: 'high' | 'low' | 'auto' = 'auto'
+): Promise<boolean[]> {
   const validUrls = Array.from(new Set(urls.filter((u): u is string => Boolean(u) && !preloadedUrls.has(u!))));
-  return Promise.all(validUrls.map((url) => preloadImage(url)));
+  return Promise.all(validUrls.map((url) => preloadImage(url, priority)));
 }
 
 /** 배틀 매치 시작 시 양측 덱/슬롯/진화 카드 전수 프리로드 */
@@ -112,31 +119,49 @@ export function preloadReplayCards(replay: BattleReplayData) {
   preloadImages(urls);
 }
 
-/** 로비 유휴 시간에 주요 공식 카드 점진적 백그라운드 프리로드 */
-let idlePreloadTimer: any = null;
+/** 로비 유휴 시간에 카드 점진적 백그라운드 프리로드 */
+let idlePreloadStarted = false;
 export function startIdleCardPreload() {
-  if (idlePreloadTimer) return;
+  if (idlePreloadStarted) return;
+  idlePreloadStarted = true;
 
-  const cardsToPreload = OFFICIAL_CARDS.map((c) => c.artUrl).filter(Boolean);
+  // LOD 256px 주소로 변환하여 3MB만 가볍게 프리로드
+  const cardsToPreload = OFFICIAL_CARDS.map((c) => {
+    if (!c.artUrl) return '';
+    const dot = c.artUrl.lastIndexOf('.');
+    const base = dot > -1 ? c.artUrl.slice(0, dot) : c.artUrl;
+    return base.replace('/cards/card_images/', '/cards/card_images_lod/256/') + '.webp';
+  }).filter(Boolean);
+
   let batchIndex = 0;
   const BATCH_SIZE = 8; // 한 번에 8장씩 대역폭 부하 없이 백그라운드 로드
 
-  const loadNextBatch = () => {
+  const scheduleNext = (fn: () => void) => {
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(fn, { timeout: 3000 });
+    } else {
+      setTimeout(fn, 300);
+    }
+  };
+
+  const loadNextBatch = async () => {
     if (batchIndex >= cardsToPreload.length) return;
     const batch = cardsToPreload.slice(batchIndex, batchIndex + BATCH_SIZE);
     batchIndex += BATCH_SIZE;
 
-    preloadImages(batch);
+    // 이전 배치가 완전히 다운로드될 때까지 await 대기
+    await preloadImages(batch, 'low');
 
-    if (batchIndex < cardsToPreload.length) {
-      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        (window as any).requestIdleCallback(loadNextBatch, { timeout: 2000 });
-      } else {
-        idlePreloadTimer = setTimeout(loadNextBatch, 1500);
-      }
-    }
+    scheduleNext(loadNextBatch);
   };
 
-  // 초기 렌더링 완료 1.2초 후 점진적 프리로드 시작
-  idlePreloadTimer = setTimeout(loadNextBatch, 1200);
+  // 페이지 전체 리소스 로드가 완료된 후 여유롭게 시작
+  const begin = () => setTimeout(loadNextBatch, 1200);
+  if (typeof document !== 'undefined') {
+    if (document.readyState === 'complete') {
+      begin();
+    } else {
+      window.addEventListener('load', begin, { once: true });
+    }
+  }
 }

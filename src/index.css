@@ -1,4 +1,9 @@
-@import url('https://cdn.jsdelivr.net/gh/sun-typeface/SUITE@2/fonts/static/woff2/SUITE.css');
+@font-face {
+  font-family: 'SUITE';
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/SUITE-Variable.woff2') format('woff2-variations');
+}
 @import "tailwindcss";
 
 @theme {

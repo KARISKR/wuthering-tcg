@@ -80,12 +80,28 @@ function apply(img: LodImg) {
   probe.src = target;
 }
 
+let sharedRO: ResizeObserver | null = null;
+function getSharedResizeObserver(): ResizeObserver | null {
+  if (typeof window === 'undefined' || typeof ResizeObserver === 'undefined') return null;
+  if (!sharedRO) {
+    sharedRO = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.target instanceof HTMLImageElement) {
+          apply(entry.target as LodImg);
+        }
+      }
+    });
+  }
+  return sharedRO;
+}
+
 function watch(img: LodImg) {
   const attr = img.getAttribute('src') || '';
   if (!attr.includes(ORIG_PREFIX) && !img.__lodOrig) return;
-  if (!img.__lodRO) {
-    img.__lodRO = new ResizeObserver(() => apply(img));
-    img.__lodRO.observe(img);
+  const ro = getSharedResizeObserver();
+  if (ro && !img.__lodRO) {
+    img.__lodRO = ro;
+    ro.observe(img);
   }
   apply(img);
 }

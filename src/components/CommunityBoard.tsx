@@ -32,6 +32,8 @@ import {
   Lock,
   Unlock,
   Key,
+  Edit3,
+  Image as ImageIcon,
 } from 'lucide-react';
 import {
   FeedbackCategory,
@@ -47,6 +49,8 @@ import {
   addCommentToFeedback,
   formatForClipboard,
   exportFeedbackAsJson,
+  updateFeedback,
+  compressImageFile,
 } from '../utils/feedbackManager';
 import {
   getStoredPresets,
@@ -82,18 +86,20 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   // Selected post detail view (ArcaLive article view)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 
-  // Write modal state
+  // Write modal state & edit state
   const [isWriteModalOpen, setIsWriteModalOpen] = useState(false);
+  const [editingPostId, setEditingPostId] = useState<string | null>(null);
 
-  // Form State (새 글 작성)
+  // Form State (새 글 작성 및 수정)
   const [category, setCategory] = useState<FeedbackCategory>('GENERAL');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [contact, setContact] = useState('');
+  const [contact, setContact] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
   const [deckCode, setDeckCode] = useState('');
   const [deckName, setDeckName] = useState('');
   const [isSecret, setIsSecret] = useState(false);
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : ''));
+  const [imageUrl, setImageUrl] = useState<string>('');
 
   // 비밀글 잠금 해제 세션 관리 (해제된 게시글 ID 목록)
   const [unlockedPostIds, setUnlockedPostIds] = useState<Set<string>>(() => new Set());
@@ -106,8 +112,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const [inlinePasswordError, setInlinePasswordError] = useState(false);
 
   // Comment input state for the active view
-  const [commentAuthor, setCommentAuthor] = useState('');
+  const [commentAuthor, setCommentAuthor] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
   const [commentText, setCommentText] = useState('');
+  const [replyingTo, setReplyingTo] = useState<{ id: string; author: string } | null>(null);
 
   // UI Toast State
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -300,11 +307,35 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     showToast('🔗 게시글 주소가 복사되었습니다.');
   };
 
+  const handleEdit = (post: FeedbackItem) => {
+    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
+    if (post.password && post.password !== savedPw) {
+      const input = window.prompt('🔒 게시글을 수정하려면 설정된 비밀번호를 입력해주세요:');
+      if (input === null) return;
+      if (input.trim() !== post.password) {
+        showToast('❌ 비밀번호가 일치하지 않아 수정할 수 없습니다.');
+        return;
+      }
+    }
+    setEditingPostId(post.id);
+    setCategory(post.category);
+    setTitle(post.title);
+    setContent(post.content);
+    setContact(post.contact || '');
+    setDeckCode(post.deckCode || '');
+    setDeckName(post.deckName || '');
+    setIsSecret(Boolean(post.isSecret));
+    setPassword(post.password || savedPw);
+    setImageUrl(post.imageUrl || '');
+    setIsWriteModalOpen(true);
+  };
+
   const handleDelete = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     const post = items.find((i) => i.id === id);
-    if (post?.isSecret) {
-      const input = window.prompt('🔒 비밀글을 삭제하려면 설정된 비밀번호를 입력해주세요:');
+    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
+    if (post?.password && post.password !== savedPw) {
+      const input = window.prompt('🔒 게시글을 삭제하려면 설정된 비밀번호를 입력해주세요:');
       if (input === null) return;
       if (input.trim() !== (post.password || '')) {
         showToast('❌ 비밀번호가 일치하지 않아 삭제할 수 없습니다.');
@@ -329,10 +360,30 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       return;
     }
 
-    addCommentToFeedback(postId, commentAuthor || '방랑자', commentText);
+    const authorToUse = commentAuthor.trim() || '방랑자';
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wuthering_board_author', authorToUse);
+    }
+
+    addCommentToFeedback(postId, authorToUse, commentText, replyingTo?.id, replyingTo?.author);
     setCommentText('');
+    setReplyingTo(null);
     refreshList();
     showToast('💬 댓글이 등록되었습니다.');
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      showToast('🖼️ 이미지 압축 중...');
+      const compressed = await compressImageFile(file, 800, 0.75);
+      setImageUrl(compressed);
+      showToast('✅ 이미지가 첨부되었습니다!');
+    } catch (err) {
+      console.error(err);
+      showToast('❌ 이미지 처리 실패');
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -354,33 +405,58 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       return;
     }
 
-    const created = saveFeedback({
-      category,
-      title: title.trim(),
-      content: content.trim(),
-      contact: contact.trim() || '방랑자',
-      deckCode: deckCode.trim() || undefined,
-      deckName: deckName.trim() || undefined,
-      isSecret,
-      password: isSecret ? password.trim() : undefined,
-      contextView: 'BOARD',
-      appVersion: CURRENT_GAME_VERSION,
-    });
-
-    if (isSecret) {
-      setUnlockedPostIds((prev) => new Set(prev).add(created.id));
+    const authorToUse = contact.trim() || '방랑자';
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('wuthering_board_author', authorToUse);
+      if (password.trim()) {
+        localStorage.setItem('wuthering_board_password', password.trim());
+      }
     }
 
+    if (editingPostId) {
+      updateFeedback(editingPostId, {
+        category,
+        title: title.trim(),
+        content: content.trim(),
+        contact: authorToUse,
+        deckCode: deckCode.trim() || undefined,
+        deckName: deckName.trim() || undefined,
+        imageUrl: imageUrl || undefined,
+        isSecret,
+        password: password.trim() || undefined,
+      });
+      showToast('✨ 게시글이 성공적으로 수정되었습니다!');
+    } else {
+      const created = saveFeedback({
+        category,
+        title: title.trim(),
+        content: content.trim(),
+        contact: authorToUse,
+        deckCode: deckCode.trim() || undefined,
+        deckName: deckName.trim() || undefined,
+        imageUrl: imageUrl || undefined,
+        isSecret,
+        password: password.trim() || undefined,
+        contextView: 'BOARD',
+        appVersion: CURRENT_GAME_VERSION,
+      });
+
+      if (isSecret) {
+        setUnlockedPostIds((prev) => new Set(prev).add(created.id));
+      }
+      setSelectedPostId(created.id);
+      showToast(isSecret ? '🔒 비밀글로 안전하게 보관되었습니다! (작성자 자동 열람)' : '✨ 게시글이 성공적으로 등록되었습니다!');
+    }
+
+    setEditingPostId(null);
     setTitle('');
     setContent('');
     setDeckCode('');
     setDeckName('');
     setIsSecret(false);
-    setPassword('');
+    setImageUrl('');
     setIsWriteModalOpen(false);
     refreshList();
-    setSelectedPostId(created.id);
-    showToast(isSecret ? '🔒 비밀글로 안전하게 보관되었습니다! (작성자 자동 열람)' : '✨ 게시글이 성공적으로 등록되었습니다!');
   };
 
   // Helper date formatter (ArcaLive style: today -> HH:mm, other -> MM.DD)
@@ -549,8 +625,6 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 명조: 워더링 웨이브 배틀 TCG 시뮬레이터 커뮤니티입니다. 덱 편성 공략, 콤보 연구, 대전 피드백 및 버그 제보를 자유롭게 나누세요.
               </p>
               <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-400 mt-1">
-                <span>구독자 <b className="text-slate-200">3,842</b></span>
-                <span>•</span>
                 <span>게시글 <b className="text-slate-200">{items.length}</b></span>
                 <span>•</span>
                 <span className="text-emerald-400 font-bold">온라인 접속 중</span>
@@ -578,7 +652,16 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             </button>
 
             <button
-              onClick={() => setIsWriteModalOpen(true)}
+              onClick={() => {
+                      setEditingPostId(null);
+                      setTitle('');
+                      setContent('');
+                      setDeckCode('');
+                      setDeckName('');
+                      setImageUrl('');
+                      setIsSecret(false);
+                      setIsWriteModalOpen(true);
+                    }}
               className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-blue-500/25 active:scale-95"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
@@ -732,6 +815,15 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   </button>
 
                   <button
+                    onClick={() => handleEdit(selectedPost)}
+                    className="hover:text-amber-300 transition cursor-pointer flex items-center gap-1"
+                    title="게시글 수정"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>수정</span>
+                  </button>
+
+                  <button
                     onClick={(e) => handleDelete(selectedPost.id, e)}
                     className="hover:text-red-400 transition cursor-pointer flex items-center gap-1"
                     title="삭제"
@@ -872,8 +964,20 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 </div>
               )}
 
-              {/* 본문 텍스트 */}
-              <div className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap font-sans min-h-[140px]">
+              {/* 첨부 이미지 렌더링 */}
+              {selectedPost.imageUrl && (
+                <div className="my-4 rounded-xl overflow-hidden border border-[#2e374d] bg-black/40 max-w-2xl">
+                  <img
+                    src={selectedPost.imageUrl}
+                    alt="첨부 이미지"
+                    className="w-full h-auto object-contain max-h-[500px]"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+
+              {/* 본문 텍스트 (텍스트 선택 및 드래그 허용) */}
+              <div className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap font-sans min-h-[140px] select-text">
                 {selectedPost.content}
               </div>
 
@@ -941,22 +1045,40 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 {/* 댓글 목록 */}
                 <div className="space-y-2">
                   {selectedPost.comments && selectedPost.comments.length > 0 ? (
-                    selectedPost.comments.map((c) => (
-                      <div
-                        key={c.id}
-                        className="p-3.5 rounded-lg bg-[#141824] border border-[#23293a] flex flex-col gap-1.5"
-                      >
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-slate-200">{c.author}</span>
-                          <span className="font-mono text-[11px] text-slate-500">
-                            {new Date(c.createdAt).toLocaleString('ko-KR')}
-                          </span>
+                    selectedPost.comments.map((c) => {
+                      const isReply = Boolean(c.replyToId);
+                      return (
+                        <div
+                          key={c.id}
+                          className={`p-3.5 rounded-lg bg-[#141824] border border-[#23293a] flex flex-col gap-1.5 ${
+                            isReply ? 'ml-5 sm:ml-8 border-l-2 border-l-cyan-500/50 bg-[#121622]' : ''
+                          }`}
+                        >
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              {isReply && (
+                                <span className="text-cyan-400 font-bold text-xs">↳ @{c.replyToAuthor || '익명'}</span>
+                              )}
+                              <span className="font-bold text-slate-200">{c.author}</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-mono text-[11px] text-slate-500">
+                                {new Date(c.createdAt).toLocaleString('ko-KR')}
+                              </span>
+                              <button
+                                onClick={() => setReplyingTo({ id: c.id, author: c.author })}
+                                className="text-[11px] text-slate-400 hover:text-cyan-300 font-bold transition cursor-pointer"
+                              >
+                                답글
+                              </button>
+                            </div>
+                          </div>
+                          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans select-text">
+                            {c.text}
+                          </p>
                         </div>
-                        <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
-                          {c.text}
-                        </p>
-                      </div>
-                    ))
+                      );
+                    })
                   ) : (
                     <div className="py-6 text-center text-xs text-slate-500 bg-[#141824]/60 rounded-lg border border-[#23293a]">
                       등록된 댓글이 없습니다. 첫 번째 댓글을 남겨보세요!
@@ -966,6 +1088,18 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
                 {/* 댓글 입력 폼 (아카라이브 스타일) */}
                 <div className="bg-[#141824] border border-[#262c3d] rounded-xl p-3.5 flex flex-col gap-2.5 shadow-md">
+                  {replyingTo && (
+                    <div className="flex items-center justify-between bg-cyan-950/40 border border-cyan-500/30 px-3 py-1.5 rounded-lg text-xs text-cyan-300">
+                      <span>↳ <b>@{replyingTo.author}</b> 님에게 답글 작성 중</span>
+                      <button
+                        onClick={() => setReplyingTo(null)}
+                        className="text-slate-400 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <input
                       type="text"
@@ -983,7 +1117,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     <textarea
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="댓글을 입력하세요..."
+                      placeholder={replyingTo ? `@${replyingTo.author} 님에게 답글을 입력하세요...` : "댓글을 입력하세요..."}
                       rows={2}
                       className="flex-1 px-3 py-2 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 resize-none font-sans"
                     />
@@ -1350,7 +1484,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             <div className="p-5 sm:p-6 border-b border-[#252b3b] bg-[#151924] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-                <h3 className="font-black text-lg sm:text-xl text-white">게시글 작성 - 명조 배틀 채널</h3>
+                <h3 className="font-black text-lg sm:text-xl text-white">
+                  {editingPostId ? '게시글 수정 - 명조 배틀 채널' : '게시글 작성 - 명조 배틀 채널'}
+                </h3>
               </div>
               <button
                 onClick={() => setIsWriteModalOpen(false)}
@@ -1362,8 +1498,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
             {/* 글 작성 폼 */}
             <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5">
-              {/* 말머리 선택 + 작성자 닉네임 */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* 말머리 선택 + 작성자 닉네임 + 비밀번호 */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
                     말머리 (카테고리) <span className="text-red-400">*</span>
@@ -1393,6 +1529,20 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#141824] border border-[#2d354a] text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
+                    비밀번호 (수정/삭제용)
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="비밀번호 설정"
+                    maxLength={20}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#141824] border border-[#2d354a] text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-mono"
+                  />
+                </div>
               </div>
 
               {/* 비밀글 설정 카드 (개인 덱 저장/비공개용) */}
@@ -1406,10 +1556,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     <input
                       type="checkbox"
                       checked={isSecret}
-                      onChange={(e) => {
-                        setIsSecret(e.target.checked);
-                        if (!e.target.checked) setPassword('');
-                      }}
+                      onChange={(e) => setIsSecret(e.target.checked)}
                       className="w-4 h-4 rounded border-slate-600 text-amber-500 focus:ring-amber-400 bg-slate-900 cursor-pointer accent-amber-500"
                     />
                     <div className="flex items-center gap-2">
@@ -1424,21 +1571,6 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       </div>
                     </div>
                   </label>
-
-                  {isSecret && (
-                    <div className="flex items-center gap-2 w-full sm:w-auto animate-in fade-in shrink-0">
-                      <Key className="w-4 h-4 text-amber-400 shrink-0" />
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="비밀번호 설정 (4자리 이상)"
-                        maxLength={20}
-                        required
-                        className="w-full sm:w-52 px-3.5 py-2 rounded-xl bg-[#0e111a] border border-amber-500/60 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono tracking-wider shadow-inner"
-                      />
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -1558,6 +1690,42 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 />
               </div>
 
+              {/* 이미지 첨부 */}
+              <div>
+                <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
+                  이미지 첨부 (선택)
+                </label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="px-4 py-2 rounded-xl bg-[#1b2030] hover:bg-[#252b3b] border border-[#2d354a] text-xs sm:text-sm text-slate-300 font-bold transition cursor-pointer flex items-center gap-2">
+                    <ImageIcon className="w-4 h-4 text-cyan-400" />
+                    <span>이미지 선택</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                    />
+                  </label>
+                  {imageUrl && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-emerald-400 font-bold">✓ 첨부 완료</span>
+                      <button
+                        type="button"
+                        onClick={() => setImageUrl('')}
+                        className="text-xs text-red-400 hover:underline cursor-pointer"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {imageUrl && (
+                  <div className="mt-2.5 max-w-xs rounded-lg overflow-hidden border border-[#2d354a]">
+                    <img src={imageUrl} alt="미리보기" className="w-full h-auto max-h-48 object-cover" />
+                  </div>
+                )}
+              </div>
+
               {/* 본문 내용 */}
               <div>
                 <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
@@ -1568,7 +1736,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   onChange={(e) => setContent(e.target.value)}
                   placeholder="자유롭게 의견, 덱 운용 팁, 버그 재현 경로 등을 작성해주세요."
                   rows={8}
-                  className="w-full px-4 py-3 rounded-xl bg-[#141824] border border-[#2d354a] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-sans resize-y leading-relaxed"
+                  className="w-full px-4 py-3 rounded-xl bg-[#141824] border border-[#2d354a] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-sans resize-y leading-relaxed select-text"
                 />
               </div>
 
@@ -1585,7 +1753,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   type="submit"
                   className="px-6 py-2.5 rounded-xl bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-sm sm:text-base transition cursor-pointer shadow-md shadow-blue-500/20 active:scale-95"
                 >
-                  작성 완료
+                  {editingPostId ? '수정 완료' : '작성 완료'}
                 </button>
               </div>
             </form>

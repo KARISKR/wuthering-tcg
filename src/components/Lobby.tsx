@@ -335,9 +335,9 @@ export const Lobby: React.FC<LobbyProps> = ({
 
       {/* 2. 메인 중앙 콘텐츠 (로고와 하단 인터페이스 간의 여백을 넉넉하게 확보) */}
       <main
-        className="relative z-20 flex-1 max-w-[1480px] 2xl:max-w-[1580px] w-full mx-auto px-4 sm:px-8 pt-2 sm:pt-4 pb-6 sm:pb-8 flex flex-col items-center justify-start transition-transform duration-150"
+        className="relative z-20 flex-1 max-w-[1480px] 2xl:max-w-[1580px] w-full mx-auto px-4 sm:px-8 pt-2 sm:pt-4 pb-16 sm:pb-24 flex flex-col items-center justify-start transition-transform duration-150"
         style={{
-          transform: `scale(${layout.uiScale})`,
+          transform: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `scale(${layout.uiScale})` : 'none',
           transformOrigin: 'top center',
         }}
       >
@@ -720,7 +720,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       </main>
 
       {/* 푸터 영역 */}
-      <footer className="relative z-20 h-14 border-t border-slate-900 bg-slate-950/50 px-6 flex items-center justify-between text-xs text-slate-500">
+      <footer className="relative z-20 shrink-0 min-h-14 py-3 border-t border-slate-900 bg-slate-950/80 px-6 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
         <div>
           <span>Wuthering Waves: Battle TCG Simulator · Complete Official Edition</span>
         </div>

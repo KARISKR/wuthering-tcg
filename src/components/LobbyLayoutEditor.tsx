@@ -18,12 +18,12 @@ export const DEFAULT_LOBBY_LAYOUT: LobbyLayoutConfig = {
   characterY: -50,
   logoScale: 0.88,
   logoGap: 10,
-  uiScale: 1.14,
+  uiScale: 1.0,
   bgDim: 30,
   bgBlur: 0,
 };
 
-export const LOBBY_LAYOUT_STORAGE_KEY = 'wuthering_lobby_layout_v5';
+export const LOBBY_LAYOUT_STORAGE_KEY = 'wuthering_lobby_layout_v6';
 
 export function loadLobbyLayout(): LobbyLayoutConfig {
   try {
