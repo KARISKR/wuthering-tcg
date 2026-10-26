@@ -356,7 +356,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
       {/* 2. 메인 중앙 콘텐츠 (로고와 하단 인터페이스 간의 여백을 넉넉하게 확보) */}
       <main
-        className="relative z-20 flex-1 max-w-[1480px] 2xl:max-w-[1580px] w-full mx-auto px-4 sm:px-8 pt-2 sm:pt-4 pb-16 sm:pb-24 flex flex-col items-center justify-start transition-transform duration-150"
+        className="relative z-20 flex-1 max-w-[1720px] 2xl:max-w-[1860px] w-full mx-auto px-4 sm:px-8 pt-2 sm:pt-4 pb-16 sm:pb-24 flex flex-col items-center justify-start transition-transform duration-150"
         style={{
           transform: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `scale(${layout.uiScale})` : 'none',
           transformOrigin: 'top center',
@@ -400,7 +400,7 @@ export const Lobby: React.FC<LobbyProps> = ({
         {/* ========================================================= */}
         {/* 비대칭 벤토 그리드 [우측 보조메뉴: 아이콘 및 폰트 꽉 차게 확장 (280px~320px)] */}
         {/* ========================================================= */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_300px_280px] xl:grid-cols-[1.05fr_320px_300px] 2xl:grid-cols-[1.1fr_340px_320px] gap-3.5 sm:gap-4.5 lg:h-[500px] xl:h-[520px]">
+        <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_270px_250px_310px] xl:grid-cols-[1fr_290px_270px_340px] 2xl:grid-cols-[1.05fr_310px_280px_360px] gap-3.5 sm:gap-4.5 lg:h-[500px] xl:h-[520px]">
           {/* ========================================================= */}
           {/* [1열] 좌측: 전투 시작 (상단) + 인터랙티브 튜토리얼 (하단) */}
           {/* ========================================================= */}
@@ -775,6 +775,90 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
 
           </div>
+        
+          {/* ========================================================= */}
+          {/* [4열] 최우측: 최신 공식 공지사항 대형 패널 (쇼어키퍼 피아노 위 하늘 공간) */}
+          {/* ========================================================= */}
+          <div
+            onClick={() => (latestNotice && onOpenBoard ? onOpenBoard(latestNotice.id) : onOpenBoard && onOpenBoard())}
+            className="group relative border-2 border-amber-400/80 hover:border-amber-300 bg-[#0b0e18]/90 hover:bg-[#121624]/95 backdrop-blur-2xl p-4 sm:p-5 flex flex-col justify-between shadow-[0_0_24px_rgba(245,158,11,0.25)] hover:shadow-[0_0_40px_rgba(245,158,11,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none h-full min-h-[350px] lg:min-h-0"
+            style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
+          >
+            {/* 챔퍼 코너 장식 */}
+            <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-10" />
+            <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
+            <div className="absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
+            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
+
+            {/* 상단 헤더 */}
+            <div className="relative z-10 flex items-center justify-between border-b border-amber-400/20 pb-2.5">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wider uppercase font-mono flex items-center gap-1.5">
+                  <span>📢</span>
+                  <span>NOTICE // 공식 공지</span>
+                </span>
+              </div>
+              <span className="text-[10px] sm:text-[11px] font-mono text-slate-400 group-hover:text-amber-200 transition-colors flex items-center gap-0.5 font-bold">
+                전체보기 <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+              </span>
+            </div>
+
+            {/* 본문 영역 */}
+            <div className="relative z-10 flex-1 my-3 overflow-hidden flex flex-col justify-start">
+              {latestNotice ? (
+                <div className="space-y-2.5 h-full flex flex-col">
+                  <div>
+                    <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-200 line-clamp-2 leading-snug drop-shadow transition-colors">
+                      {latestNotice.title}
+                    </h3>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
+                    <span className="text-amber-300/90 font-bold">{latestNotice.contact || '운영진'}</span>
+                    <span>•</span>
+                    <span>{new Date(latestNotice.createdAt).toLocaleDateString('ko-KR')}</span>
+                    {latestNotice.comments && latestNotice.comments.length > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="text-cyan-400 font-bold">댓글 {latestNotice.comments.length}</span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* 첨부 이미지가 있을 경우 썸네일 노출 */}
+                  {(() => {
+                    const img = (latestNotice.images && latestNotice.images[0]) || latestNotice.imageUrl;
+                    if (!img) return null;
+                    return (
+                      <div className="h-24 sm:h-28 rounded-lg overflow-hidden border border-[#2d354a] bg-black/50 shrink-0 my-0.5">
+                        <img src={img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                      </div>
+                    );
+                  })()}
+
+                  {/* 공지 본문 내용 (스크롤 및 전체 읽기 지원) */}
+                  <div className="text-xs sm:text-[13px] text-slate-200/90 leading-relaxed overflow-y-auto pr-1 line-clamp-6 font-sans select-text flex-1 whitespace-pre-wrap">
+                    {latestNotice.content}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-4 text-slate-500">
+                  <p className="text-xs">등록된 최신 공지사항이 없습니다.</p>
+                </div>
+              )}
+            </div>
+
+            {/* 하단 푸터 바 */}
+            <div className="relative z-10 pt-2.5 border-t border-amber-400/20 flex items-center justify-between text-[11px] font-mono text-slate-400">
+              <span className="text-amber-400/80 font-bold">WUTHERING TCG</span>
+              <span className="text-amber-300 group-hover:translate-x-1 transition-transform flex items-center gap-1 font-bold">
+                자유게시판 이동 <ChevronRight className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+
         </div>
       </main>
 
