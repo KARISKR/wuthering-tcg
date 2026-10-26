@@ -514,7 +514,7 @@ export function clearDraft(): void {
   }
 }
 
-export const ADMIN_MASTER_PASSWORDS = ['rover777!', 'wuthering2026!', 'admin777', '1234'];
+export const ADMIN_MASTER_PASSWORDS = ['wuwatcg2026'];
 
 export function isUserAdmin(): boolean {
   try {
