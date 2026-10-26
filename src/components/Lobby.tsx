@@ -610,36 +610,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           {/* [3열] 우측: 보조 메뉴 5개 균등 분할 */}
           {/* ========================================================= */}
           <div className="flex flex-col gap-2.5 sm:gap-3 h-full">
-            {/* 0. 최신 공지사항 카드 (최신 공지가 있을 때 상단 노출, 클릭 시 해당 글로 다이렉트 이동) */}
-            {latestNotice && (
-              <div
-                onClick={() => (onOpenBoard ? onOpenBoard(latestNotice.id) : undefined)}
-                className="group relative border-2 border-amber-400/90 hover:border-amber-300 bg-gradient-to-r from-amber-950/70 via-[#1a140d]/95 to-[#0d101a]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl flex items-center justify-between gap-2.5 shadow-[0_0_20px_rgba(245,158,11,0.35)] hover:shadow-[0_0_32px_rgba(245,158,11,0.6)] transition-all duration-200 cursor-pointer overflow-hidden select-none shrink-0"
-                style={{ clipPath: 'polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px)' }}
-                title="공지사항 바로가기"
-              >
-                <div className="absolute inset-1 border border-amber-400/25 pointer-events-none" />
-                <div className="flex items-center gap-2.5 min-w-0 flex-1 z-10">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/50 flex items-center justify-center shrink-0">
-                    <span className="text-base animate-pulse">📢</span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-black text-[9px] uppercase tracking-wider shrink-0">
-                        공지
-                      </span>
-                      <span className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-200 truncate transition-colors">
-                        {latestNotice.title}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-400 group-hover:text-slate-300 truncate mt-0.5 font-sans">
-                      {latestNotice.content}
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-amber-400 group-hover:text-amber-300 group-hover:translate-x-1 transition-all shrink-0 z-10" />
-              </div>
-            )}
+
 
             
             {/* 1. 자유게시판 (골드/앰버 네온) */}
