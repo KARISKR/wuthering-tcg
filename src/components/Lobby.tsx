@@ -809,10 +809,20 @@ export const Lobby: React.FC<LobbyProps> = ({
                     );
                   })()}
 
-                  {/* 공지 본문 내용 (스크롤 및 전체 읽기 지원) */}
-                  <div className="text-xs sm:text-[13px] text-slate-200/90 leading-relaxed overflow-y-auto pr-1 line-clamp-6 font-sans select-text flex-1 whitespace-pre-wrap">
-                    {latestNotice.content}
-                  </div>
+                  {/* 공지 본문 내용 (서식 및 줄바꿈 안전 렌더링) */}
+                  <div
+                    className="text-xs sm:text-[13px] text-slate-200/90 leading-relaxed overflow-y-auto pr-1 line-clamp-6 font-sans select-text flex-1 whitespace-pre-wrap break-words"
+                    dangerouslySetInnerHTML={{
+                      __html: (latestNotice.content || '')
+                        .replace(/\r\n/g, '\n')
+                        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+                        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+                        .replace(/on\w+="[^"]*"/gi, '')
+                        .replace(/on\w+='[^']*'/gi, '')
+                        .replace(/javascript:[^"']*/gi, '')
+                        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>'),
+                    }}
+                  />
                 </div>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center text-center p-4 text-slate-500">

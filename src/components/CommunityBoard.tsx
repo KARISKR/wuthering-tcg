@@ -54,6 +54,10 @@ import {
   compressImageFile,
   updateCommentInFeedback,
   deleteCommentFromFeedback,
+  ADMIN_MASTER_PASSWORDS,
+  isUserAdmin,
+  setAdminVerified,
+  isPostNew,
 } from '../utils/feedbackManager';
 import {
   getStoredPresets,
@@ -72,11 +76,13 @@ import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 
 function renderFormattedContent(rawContent: string): string {
   if (!rawContent) return '';
-  // 악성 스크립트 및 이벤트 차단
+  // 줄바꿈 정규화 (CRLF -> LF) 및 악성 스크립트/이벤트 차단
   let safe = rawContent
+    .replace(/\r\n/g, '\n')
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
     .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
     .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '')
     .replace(/javascript:[^"']*/gi, '');
 
   // 마크다운 볼드 변환
@@ -253,8 +259,22 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     }
   };
 
-  // 말머리 변경 핸들러 (덱 공유 선택 시 내 보유 덱 자동 연동)
+  // 말머리 변경 핸들러 (덱 공유 선택 시 내 보유 덱 자동 연동 / 공지 선택 시 관리자 인증)
   const handleCategoryChange = (newCat: FeedbackCategory) => {
+    if (newCat === 'NOTICE') {
+      if (!isUserAdmin()) {
+        const input = window.prompt('📢 공지사항은 운영자만 작성할 수 있습니다.\n관리자 마스터 암호를 입력해주세요:');
+        if (!input || !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
+          showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
+          return;
+        }
+        setAdminVerified(true);
+        showToast('🔓 관리자 권한이 확인되었습니다.');
+      }
+      if (!contact.trim() || contact === '방랑자') {
+        setContact('운영진');
+      }
+    }
     setCategory(newCat);
     if (newCat === 'DECK') {
       const currentDecks = getAllAvailableUserDecks();
@@ -372,15 +392,27 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   };
 
   const handleEdit = (post: FeedbackItem) => {
-    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
-    if (post.password && post.password !== savedPw) {
-      const input = window.prompt('🔒 게시글을 수정하려면 설정된 비밀번호를 입력해주세요:');
-      if (input === null) return;
-      if (input.trim() !== post.password) {
-        showToast('❌ 비밀번호가 일치하지 않아 수정할 수 없습니다.');
-        return;
+    if (post.isNotice || post.category === 'NOTICE') {
+      if (!isUserAdmin()) {
+        const input = window.prompt('🔒 공지사항 수정을 위해 관리자 마스터 암호를 입력해주세요:');
+        if (!input || !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
+          showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
+          return;
+        }
+        setAdminVerified(true);
+      }
+    } else {
+      const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
+      if (post.password && post.password !== savedPw && !ADMIN_MASTER_PASSWORDS.includes(savedPw)) {
+        const input = window.prompt('🔒 게시글을 수정하려면 설정된 비밀번호를 입력해주세요:');
+        if (input === null) return;
+        if (input.trim() !== post.password && !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
+          showToast('❌ 비밀번호가 일치하지 않아 수정할 수 없습니다.');
+          return;
+        }
       }
     }
+    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
     setEditingPostId(post.id);
     setCategory(post.category);
     setTitle(post.title);
@@ -393,6 +425,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     setImageUrl(post.imageUrl || '');
     const postImages = post.images && post.images.length > 0 ? post.images : (post.imageUrl ? [post.imageUrl] : []);
     setImages(postImages);
+    setIsPreviewMode(false);
+    setShowColorPicker(false);
     setIsWriteModalOpen(true);
   };
 
@@ -400,10 +434,21 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     e?.stopPropagation();
     const post = items.find((i) => i.id === id);
     const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
-    if (post?.password && post.password !== savedPw) {
+    if (post?.isNotice || post?.category === 'NOTICE') {
+      if (!isUserAdmin()) {
+        const input = window.prompt('🔒 공지사항 삭제를 위해 관리자 마스터 암호를 입력해주세요:');
+        if (!input || !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
+          showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
+          return;
+        }
+        setAdminVerified(true);
+      } else if (!window.confirm('정말로 이 공지사항을 삭제하시겠습니까?')) {
+        return;
+      }
+    } else if (post?.password && post.password !== savedPw && !ADMIN_MASTER_PASSWORDS.includes(savedPw)) {
       const input = window.prompt('🔒 게시글을 삭제하려면 설정된 비밀번호를 입력해주세요:');
       if (input === null) return;
-      if (input.trim() !== (post.password || '')) {
+      if (input.trim() !== (post.password || '') && !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
         showToast('❌ 비밀번호가 일치하지 않아 삭제할 수 없습니다.');
         return;
       }
@@ -547,13 +592,31 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       return;
     }
 
-    const authorToUse = contact.trim() || '방랑자';
+    if (category === 'NOTICE') {
+      if (!isUserAdmin()) {
+        if (ADMIN_MASTER_PASSWORDS.includes(password.trim())) {
+          setAdminVerified(true);
+        } else {
+          const input = window.prompt('📢 공지사항 등록을 위해 관리자 마스터 암호를 입력해주세요:');
+          if (!input || !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
+            showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
+            return;
+          }
+          setAdminVerified(true);
+        }
+      }
+    }
+
+    const authorToUse = contact.trim() || (category === 'NOTICE' ? '운영진' : '방랑자');
     if (typeof window !== 'undefined') {
       localStorage.setItem('wuthering_board_author', authorToUse);
       if (password.trim()) {
         localStorage.setItem('wuthering_board_password', password.trim());
       }
     }
+
+    const primaryImage = images.length > 0 ? images[0] : (imageUrl || undefined);
+    const allImages = images.length > 0 ? images : (imageUrl ? [imageUrl] : undefined);
 
     if (editingPostId) {
       updateFeedback(editingPostId, {
@@ -563,7 +626,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         contact: authorToUse,
         deckCode: deckCode.trim() || undefined,
         deckName: deckName.trim() || undefined,
-        imageUrl: imageUrl || undefined,
+        imageUrl: primaryImage,
+        images: allImages,
+        isNotice: category === 'NOTICE',
         isSecret,
         password: password.trim() || undefined,
       });
@@ -576,7 +641,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         contact: authorToUse,
         deckCode: deckCode.trim() || undefined,
         deckName: deckName.trim() || undefined,
-        imageUrl: imageUrl || undefined,
+        imageUrl: primaryImage,
+        images: allImages,
+        isNotice: category === 'NOTICE',
         isSecret,
         password: password.trim() || undefined,
         contextView: 'BOARD',
@@ -597,6 +664,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     setDeckName('');
     setIsSecret(false);
     setImageUrl('');
+    setImages([]);
+    setIsPreviewMode(false);
+    setShowColorPicker(false);
     setIsWriteModalOpen(false);
     refreshList();
   };
@@ -797,15 +867,18 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
             <button
               onClick={() => {
-                      setEditingPostId(null);
-                      setTitle('');
-                      setContent('');
-                      setDeckCode('');
-                      setDeckName('');
-                      setImageUrl('');
-                      setIsSecret(false);
-                      setIsWriteModalOpen(true);
-                    }}
+                setEditingPostId(null);
+                setTitle('');
+                setContent('');
+                setDeckCode('');
+                setDeckName('');
+                setImageUrl('');
+                setImages([]);
+                setIsSecret(false);
+                setIsPreviewMode(false);
+                setShowColorPicker(false);
+                setIsWriteModalOpen(true);
+              }}
               className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-blue-500/25 active:scale-95"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
@@ -1067,22 +1140,54 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 </div>
               )}
 
-              {/* 첨부 이미지 렌더링 */}
-              {selectedPost.imageUrl && (
-                <div className="my-4 rounded-xl overflow-hidden border border-[#2e374d] bg-black/40 max-w-2xl">
-                  <img
-                    src={selectedPost.imageUrl}
-                    alt="첨부 이미지"
-                    className="w-full h-auto object-contain max-h-[500px]"
-                    loading="lazy"
-                  />
-                </div>
-              )}
+              {/* 첨부 이미지 및 공식 카드 갤러리 렌더링 */}
+              {(() => {
+                const postImages =
+                  selectedPost.images && selectedPost.images.length > 0
+                    ? selectedPost.images
+                    : selectedPost.imageUrl
+                    ? [selectedPost.imageUrl]
+                    : [];
+                if (postImages.length === 0) return null;
+                return (
+                  <div className="my-4 space-y-3">
+                    <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+                      <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>첨부된 이미지 / 공식 카드 ({postImages.length}장) · 클릭 시 확대</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                      {postImages.map((imgUrl, idx) => {
+                        const isCard = imgUrl.startsWith('/cards/');
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => setZoomedImage(imgUrl)}
+                            className="relative rounded-xl overflow-hidden border border-[#2e374d] bg-black/50 cursor-zoom-in group shadow-lg hover:border-amber-400/60 transition"
+                          >
+                            <img
+                              src={imgUrl}
+                              alt={`첨부 이미지 ${idx + 1}`}
+                              className="w-full h-auto object-contain max-h-[380px] mx-auto transition-transform duration-300 group-hover:scale-[1.02]"
+                              loading="lazy"
+                            />
+                            {isCard && (
+                              <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-amber-500/90 text-slate-950 font-black text-[10px] shadow">
+                                🃏 공식 카드
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
-              {/* 본문 텍스트 (텍스트 선택 및 드래그 허용) */}
-              <div className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap font-sans min-h-[140px] select-text">
-                {selectedPost.content}
-              </div>
+              {/* 본문 텍스트 (서식 렌더링 + 줄바꿈 + 드래그 허용) */}
+              <div
+                className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans min-h-[140px] select-text"
+                dangerouslySetInnerHTML={{ __html: renderFormattedContent(selectedPost.content) }}
+              />
 
               {/* 아카라이브 시그니처 대형 추천(개추) / 비추 박스 */}
               <div className="py-7 border-y border-[#262c3d] flex flex-col items-center justify-center gap-3.5 select-none">
@@ -1247,15 +1352,23 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     </div>
                   )}
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <input
                       type="text"
                       value={commentAuthor}
                       onChange={(e) => setCommentAuthor(e.target.value)}
                       placeholder="닉네임 (기본: 방랑자)"
-                      className="w-40 px-3 py-1.5 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                      className="w-36 sm:w-40 px-3 py-1.5 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
                     />
-                    <span className="text-[11px] text-slate-500 hidden sm:inline">
+                    <input
+                      type="password"
+                      value={commentPassword}
+                      onChange={(e) => setCommentPassword(e.target.value)}
+                      placeholder="비밀번호 (수정/삭제용)"
+                      maxLength={20}
+                      className="w-36 sm:w-40 px-3 py-1.5 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-mono"
+                    />
+                    <span className="text-[11px] text-slate-500 hidden md:inline">
                       타인을 비방하거나 불쾌감을 주는 댓글은 삭제될 수 있습니다.
                     </span>
                   </div>
@@ -1370,6 +1483,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       <div className="flex items-center gap-2">
                         <Pin className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
                         <span className="truncate text-sm sm:text-base md:text-[17px]">{notice.title}</span>
+                        {isPostNew(notice) && (
+                          <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] tracking-wider uppercase shrink-0 animate-pulse">
+                            NEW
+                          </span>
+                        )}
                         {notice.comments && notice.comments.length > 0 && (
                           <span className="text-cyan-400 font-mono text-xs sm:text-sm shrink-0">
                             [{notice.comments.length}]
@@ -1467,6 +1585,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                             <span className={`truncate text-sm sm:text-base md:text-[17px] ${isCurrentActive ? 'font-black text-amber-200' : ''}`}>
                               {item.title}
                             </span>
+                            {isPostNew(item) && (
+                              <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] tracking-wider uppercase shrink-0 animate-pulse">
+                                NEW
+                              </span>
+                            )}
                             {item.comments && item.comments.length > 0 && (
                               <span className="text-cyan-400 font-mono font-bold text-xs sm:text-sm shrink-0">
                                 [{item.comments.length}]
@@ -1906,18 +2029,158 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 )}
               </div>
 
-              {/* 본문 내용 */}
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
-                  내용 <span className="text-red-400">*</span>
-                </label>
-                <textarea
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  placeholder="자유롭게 의견, 덱 운용 팁, 버그 재현 경로 등을 작성해주세요."
-                  rows={8}
-                  className="w-full px-4 py-3 rounded-xl bg-[#141824] border border-[#2d354a] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-sans resize-y leading-relaxed select-text"
-                />
+              {/* 본문 내용 (서식 툴바 + 실시간 미리보기 지원) */}
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-300">
+                    내용 <span className="text-red-400">*</span>
+                  </label>
+                  <div className="flex items-center gap-1 bg-[#141824] p-1 rounded-lg border border-[#2d354a]">
+                    <button
+                      type="button"
+                      onClick={() => setIsPreviewMode(false)}
+                      className={`px-3 py-1 rounded text-xs font-bold transition cursor-pointer ${
+                        !isPreviewMode ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      ✏️ 편집
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsPreviewMode(true)}
+                      className={`px-3 py-1 rounded text-xs font-bold transition cursor-pointer ${
+                        isPreviewMode ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      👁️ 미리보기
+                    </button>
+                  </div>
+                </div>
+
+                {/* 텍스트 서식 툴바 */}
+                {!isPreviewMode && (
+                  <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#131722] border border-[#2d354a] text-xs select-none">
+                    {/* 글자 크기 조절 */}
+                    <div className="flex items-center gap-1 pr-2 border-r border-[#262c3d]">
+                      <span className="text-[11px] text-slate-400 font-bold mr-1">크기:</span>
+                      <button
+                        type="button"
+                        onClick={() => applyFormat('<span style="font-size: 14px;">', '</span>', '작은 텍스트')}
+                        className="px-2 py-1 rounded bg-[#1d2333] hover:bg-[#283147] text-slate-300 font-bold transition cursor-pointer border border-[#2e374d]"
+                        title="보통 크기 (14px)"
+                      >
+                        보통
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyFormat('<span style="font-size: 18px; font-weight: 700;">', '</span>', '중간 제목')}
+                        className="px-2 py-1 rounded bg-[#1d2333] hover:bg-[#283147] text-slate-200 font-bold transition cursor-pointer border border-[#2e374d]"
+                        title="중간 제목 크기 (18px)"
+                      >
+                        크게
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyFormat('<span style="font-size: 22px; font-weight: 900;">', '</span>', '큰 제목')}
+                        className="px-2 py-1 rounded bg-[#1d2333] hover:bg-[#283147] text-amber-300 font-black transition cursor-pointer border border-[#2e374d]"
+                        title="큰 제목 크기 (22px)"
+                      >
+                        아주 크게
+                      </button>
+                    </div>
+
+                    {/* 굵기 / 밑줄 / 형광펜 / 인용구 */}
+                    <div className="flex items-center gap-1 pr-2 border-r border-[#262c3d]">
+                      <button
+                        type="button"
+                        onClick={() => applyFormat('<b>', '</b>', '굵은 텍스트')}
+                        className="w-7 h-7 rounded bg-[#1d2333] hover:bg-[#283147] text-white font-black transition cursor-pointer border border-[#2e374d] flex items-center justify-center"
+                        title="굵게 (Bold)"
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => applyFormat('<u>', '</u>', '밑줄 텍스트')}
+                        className="w-7 h-7 rounded bg-[#1d2333] hover:bg-[#283147] text-white underline font-bold transition cursor-pointer border border-[#2e374d] flex items-center justify-center"
+                        title="밑줄 (Underline)"
+                      >
+                        U
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          applyFormat(
+                            '<mark style="background: rgba(245,158,11,0.3); color: #fde68a; padding: 0 4px; border-radius: 4px;">',
+                            '</mark>',
+                            '강조 텍스트'
+                          )
+                        }
+                        className="px-2 h-7 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold transition cursor-pointer border border-amber-500/40 flex items-center justify-center"
+                        title="형광펜 하이라이트"
+                      >
+                        형광펜
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          applyFormat(
+                            '<blockquote style="border-left: 3px solid #60a5fa; padding-left: 10px; margin: 6px 0; color: #cbd5e1;">',
+                            '</blockquote>',
+                            '인용 문구'
+                          )
+                        }
+                        className="px-2 h-7 rounded bg-[#1d2333] hover:bg-[#283147] text-cyan-300 font-bold transition cursor-pointer border border-[#2e374d] flex items-center justify-center"
+                        title="인용구 블록"
+                      >
+                        “인용”
+                      </button>
+                    </div>
+
+                    {/* 글자 색상 팔레트 */}
+                    <div className="flex items-center gap-1.5 pl-1">
+                      <span className="text-[11px] text-slate-400 font-bold mr-0.5">색상:</span>
+                      {[
+                        { label: '골드', color: '#fbbf24' },
+                        { label: '하늘', color: '#38bdf8' },
+                        { label: '초록', color: '#34d399' },
+                        { label: '빨강', color: '#f87171' },
+                        { label: '보라', color: '#c084fc' },
+                        { label: '주황', color: '#fb923c' },
+                        { label: '흰색', color: '#f8fafc' },
+                      ].map((c) => (
+                        <button
+                          key={c.color}
+                          type="button"
+                          onClick={() => applyFormat(`<span style="color: ${c.color};">`, '</span>', '색상 텍스트')}
+                          className="w-5 h-5 rounded-full border border-white/30 hover:scale-125 transition cursor-pointer shadow"
+                          style={{ backgroundColor: c.color }}
+                          title={`${c.label} 색상 적용`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {isPreviewMode ? (
+                  <div
+                    className="w-full min-h-[200px] px-4 py-3 rounded-xl bg-[#141824] border border-amber-500/40 text-sm sm:text-base text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans"
+                    dangerouslySetInnerHTML={{
+                      __html: content.trim()
+                        ? renderFormattedContent(content)
+                        : '<span class="text-slate-500">작성된 내용이 없습니다.</span>',
+                    }}
+                  />
+                ) : (
+                  <textarea
+                    ref={contentTextareaRef}
+                    value={content}
+                    onChange={(e) => setContent(e.target.value)}
+                    placeholder="자유롭게 의견, 덱 운용 팁, 버그 재현 경로 등을 작성해주세요. (드래그 후 상단 서식 버튼을 누르면 크기·굵기·색상이 적용됩니다)"
+                    rows={8}
+                    className="w-full px-4 py-3 rounded-xl bg-[#141824] border border-[#2d354a] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-sans resize-y leading-relaxed select-text"
+                  />
+                )}
               </div>
 
               {/* 하단 모달 액션 버튼 */}
