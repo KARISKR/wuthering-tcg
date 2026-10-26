@@ -85,9 +85,23 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
     .replace(/on\w+='[^']*'/gi, '')
     .replace(/javascript:[^"']*/gi, '');
 
+  // 0. 기존 HTML <img> 태그가 있는 경우 data-shortcode 또는 마크다운 형태로 먼저 정규화 (이중 래핑 방지)
+  safe = safe.replace(/<img\s+([^>]*?)>/gi, (match, attrs) => {
+    const shortcodeMatch = attrs.match(/data-shortcode=["']([^"']+)["']/i);
+    if (shortcodeMatch && shortcodeMatch[1]) {
+      return shortcodeMatch[1];
+    }
+    const srcMatch = attrs.match(/src=["']([^"']+)["']/i);
+    const altMatch = attrs.match(/alt=["']([^"']*)["']/i);
+    if (srcMatch && srcMatch[1]) {
+      return `![${altMatch ? altMatch[1] : ''}](${srcMatch[1]})`;
+    }
+    return match;
+  });
+
   // 1. 단축 태그: [사진1], [사진2], [이미지1] 등 치환 (업로드 사진 매핑)
   const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
-  safe = safe.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)\]/gi, (match, prefix, numStr) => {
+  safe = safe.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)\]/gi, (match, _prefix, numStr) => {
     const idx = parseInt(numStr, 10) - 1;
     const url = uploadedPhotos[idx] || postImages[idx];
     if (url) {
@@ -139,17 +153,13 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
   // 4. 마크다운 이미지 파싱: ![설명](url) -> 하위 호환
   safe = safe.replace(
     /!\[(.*?)\]\((.*?)\)/g,
-    '<div class="my-3.5 max-w-2xl"><img src="$2" alt="$1" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />' +
-      '<span class="block text-[11px] text-slate-400 mt-1 font-sans">$1</span></div>'
+    (_match, alt, url) =>
+      `<div class="my-3.5 max-w-2xl"><img src="${url}" alt="${alt}" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />` +
+      (alt ? `<span class="block text-[11px] text-slate-400 mt-1 font-sans">${alt}</span>` : '') +
+      `</div>`
   );
 
-  // 5. HTML <img> 태그 안전 스타일 래핑
-  safe = safe.replace(
-    /<img\s+([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
-    '<div class="my-3.5 max-w-2xl"><img src="$2" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" /></div>'
-  );
-
-  // 6. 마크다운 볼드 변환
+  // 5. 마크다운 볼드 변환
   safe = safe.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
   return safe;
 }
@@ -201,10 +211,171 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const [category, setCategory] = useState<FeedbackCategory>('GENERAL');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [isPreviewMode, setIsPreviewMode] = useState(false); // true = <> 코드보기 모드, false = 아카라이브 위지윅 에디터 모드
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showBgColorPicker, setShowBgColorPicker] = useState(false);
+  const [showFontSizeMenu, setShowFontSizeMenu] = useState(false);
+  const [showAlignMenu, setShowAlignMenu] = useState(false);
+  const [isDeckPanelOpen, setIsDeckPanelOpen] = useState(false);
   const contentTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const wysiwygRef = React.useRef<HTMLDivElement>(null);
+  const savedRangeRef = React.useRef<Range | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [contact, setContact] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
+  const [deckCode, setDeckCode] = useState('');
+  const [deckName, setDeckName] = useState('');
+  const [isSecret, setIsSecret] = useState(false);
+  const [password, setPassword] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : ''));
+  const [imageUrl, setImageUrl] = useState<string>('');
+  const [images, setImages] = useState<string[]>([]);
+  const [isCardPickerOpen, setIsCardPickerOpen] = useState(false);
+  const [cardPickerSearch, setCardPickerSearch] = useState('');
+  const [cardPickerType, setCardPickerType] = useState<'ALL' | 'CHARACTER' | 'ACTION'>('ALL');
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+
+  // 단축 태그/마크다운 본문을 아카라이브 위지윅 에디터용 HTML로 변환
+  const contentToWysiwygHtml = (rawContent: string, postImages: string[] = []): string => {
+    if (!rawContent) return '';
+    let html = rawContent.replace(/\r\n/g, '\n');
+
+    // 1. [사진1], [사진2] 치환
+    const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
+    html = html.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)\]/gi, (match, _prefix, numStr) => {
+      const idx = parseInt(numStr, 10) - 1;
+      const url = uploadedPhotos[idx] || postImages[idx];
+      if (url) {
+        return `<img src="${url}" data-shortcode="[사진${numStr}]" alt="사진 ${numStr}" class="my-2 max-w-full sm:max-w-lg max-h-[380px] rounded-xl border border-[#3b4254] shadow-lg object-contain block" />`;
+      }
+      return match;
+    });
+
+    // 2. [카드:이름] 치환
+    html = html.replace(/\[카드\s*:\s*([^\]]+)\]/gi, (match, cardQuery) => {
+      const q = cardQuery.trim();
+      let card = OFFICIAL_CARDS.find((c) => c.nameKr === q || c.code === q || c.characterName === q);
+      if (!card) {
+        card = OFFICIAL_CARDS.find((c) => c.nameKr.toLowerCase() === q.toLowerCase() || c.code.toLowerCase() === q.toLowerCase());
+      }
+      const cardArt = card ? card.artUrl : postImages.find((u) => u.includes(q));
+      if (cardArt) {
+        const name = card ? card.nameKr : q;
+        return `<img src="${cardArt}" data-shortcode="[카드:${name}]" alt="${name}" class="my-2 max-w-[220px] max-h-[320px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain block" />`;
+      }
+      return match;
+    });
+
+    // 3. [카드1] 순서형 치환
+    const cardImages = postImages.filter((u) => u.startsWith('/cards/'));
+    html = html.replace(/\[카드\s*#?([0-9]+)\]/gi, (match, numStr) => {
+      const idx = parseInt(numStr, 10) - 1;
+      const url = cardImages[idx];
+      if (url) {
+        const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
+        const name = foundCard ? foundCard.nameKr : `카드 ${numStr}`;
+        return `<img src="${url}" data-shortcode="[카드:${name}]" alt="${name}" class="my-2 max-w-[220px] max-h-[320px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain block" />`;
+      }
+      return match;
+    });
+
+    // 4. 마크다운 이미지 ![설명](url) 치환
+    html = html.replace(/!\[(.*?)\]\((.*?)\)/g, (_match, alt, url) => {
+      const isCard = url.startsWith('/cards/');
+      if (isCard) {
+        const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
+        const name = foundCard ? foundCard.nameKr : (alt || '카드');
+        return `<img src="${url}" data-shortcode="[카드:${name}]" alt="${name}" class="my-2 max-w-[220px] max-h-[320px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain block" />`;
+      }
+      const pIdx = uploadedPhotos.indexOf(url);
+      const shortTag = pIdx >= 0 ? `[사진${pIdx + 1}]` : '';
+      return `<img src="${url}" ${shortTag ? `data-shortcode="${shortTag}"` : ''} alt="${alt || '사진'}" class="my-2 max-w-full sm:max-w-lg max-h-[380px] rounded-xl border border-[#3b4254] shadow-lg object-contain block" />`;
+    });
+
+    // 5. 마크다운 볼드 및 줄바꿈 처리
+    html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    html = html.replace(/\n/g, '<br>');
+    return html;
+  };
+
+  // 위지윅 에디터 DOM을 깔끔한 단축 태그([사진1], [카드:이름]) + 서식 문자열로 직렬화
+  const wysiwygDomToContent = (container: HTMLElement, currentImages: string[] = images): string => {
+    const clone = container.cloneNode(true) as HTMLElement;
+    const uploadedPhotos = currentImages.filter((u) => !u.startsWith('/cards/'));
+
+    clone.querySelectorAll('img').forEach((img) => {
+      let shortcode = img.getAttribute('data-shortcode');
+      if (!shortcode) {
+        const src = img.getAttribute('src') || '';
+        if (src.startsWith('/cards/')) {
+          const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === src);
+          shortcode = `[카드:${foundCard ? foundCard.nameKr : '카드'}]`;
+        } else {
+          let pIdx = uploadedPhotos.indexOf(src) + 1;
+          if (pIdx <= 0) pIdx = 1;
+          shortcode = `[사진${pIdx}]`;
+        }
+      }
+      const textNode = document.createTextNode(`\n${shortcode}\n`);
+      img.parentNode?.replaceChild(textNode, img);
+    });
+
+    let raw = clone.innerHTML;
+    raw = raw
+      .replace(/<div><br\s*\/?><\/div>/gi, '\n')
+      .replace(/<p><br\s*\/?><\/p>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/div>\s*<div>/gi, '\n')
+      .replace(/<div>/gi, '\n')
+      .replace(/<\/div>/gi, '')
+      .replace(/<p>/gi, '')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\n{3,}/g, '\n\n');
+
+    return raw.replace(/^\n+/, '');
+  };
+
+  const saveEditorSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && wysiwygRef.current) {
+      const range = sel.getRangeAt(0);
+      if (wysiwygRef.current.contains(range.commonAncestorContainer)) {
+        savedRangeRef.current = range.cloneRange();
+      }
+    }
+  };
+
+  const restoreEditorSelection = () => {
+    if (!wysiwygRef.current) return;
+    wysiwygRef.current.focus();
+    if (savedRangeRef.current) {
+      try {
+        const sel = window.getSelection();
+        if (sel) {
+          sel.removeAllRanges();
+          sel.addRange(savedRangeRef.current);
+        }
+      } catch {
+        // ignore invalid range
+      }
+    }
+  };
+
+  const syncFromWysiwyg = (customImages?: string[]) => {
+    if (!wysiwygRef.current) return;
+    const serialized = wysiwygDomToContent(wysiwygRef.current, customImages || images);
+    setContent(serialized);
+  };
+
+  // 모달 열릴 때나 코드보기 <-> 위지윅 전환 시 에디터 DOM 동기화
+  useEffect(() => {
+    if (isWriteModalOpen && !isPreviewMode && wysiwygRef.current) {
+      const targetHtml = contentToWysiwygHtml(content, images);
+      if (wysiwygRef.current.innerHTML !== targetHtml) {
+        wysiwygRef.current.innerHTML = targetHtml;
+      }
+    }
+  }, [isWriteModalOpen, isPreviewMode, editingPostId]);
 
   const applyFormat = (prefix: string, suffix: string, defaultText = '텍스트') => {
     const textarea = contentTextareaRef.current;
@@ -222,43 +393,106 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     }, 10);
   };
 
-  // 본문 커서 위치에 깔끔한 단축 태그([사진1], [카드:이름]) 즉시 삽입 핸들러 (50KB base64 난도질 차단)
-  const insertImageIntoContent = (url: string, label = '이미지') => {
+  // 아카라이브 스타일 에디터 툴바 커맨드 실행기 (위지윅 & 코드보기 겸용)
+  const execEditorFormat = (cmd: string, value?: string) => {
+    if (isPreviewMode) {
+      // 코드보기(textarea) 모드일 때
+      if (cmd === 'bold') applyFormat('<b>', '</b>', '굵은 텍스트');
+      else if (cmd === 'italic') applyFormat('<i>', '</i>', '기울임 텍스트');
+      else if (cmd === 'underline') applyFormat('<u>', '</u>', '밑줄 텍스트');
+      else if (cmd === 'strikeThrough') applyFormat('<s>', '</s>', '취소선 텍스트');
+      else if (cmd === 'fontSizePx' && value) applyFormat(`<span style="font-size: ${value};">`, '</span>', '텍스트');
+      else if (cmd === 'foreColor' && value) applyFormat(`<span style="color: ${value};">`, '</span>', '색상 텍스트');
+      else if (cmd === 'hiliteColor' && value) applyFormat(`<mark style="background: ${value}; color: #fff; padding: 0 4px; border-radius: 3px;">`, '</mark>', '강조 텍스트');
+      else if (cmd === 'blockquote') applyFormat('<blockquote style="border-left: 3px solid #60a5fa; padding-left: 10px; margin: 6px 0; color: #cbd5e1;">', '</blockquote>', '인용 문구');
+      else if (cmd === 'insertHorizontalRule') applyFormat('\n<hr style="border-color: #2d354a; margin: 12px 0;" />\n', '', '');
+      else if (cmd === 'justifyLeft') applyFormat('<div style="text-align: left;">', '</div>', '텍스트');
+      else if (cmd === 'justifyCenter') applyFormat('<div style="text-align: center;">', '</div>', '텍스트');
+      else if (cmd === 'justifyRight') applyFormat('<div style="text-align: right;">', '</div>', '텍스트');
+      return;
+    }
+
+    // 위지윅(contentEditable) 모드일 때
+    restoreEditorSelection();
+    if (cmd === 'fontSizePx' && value) {
+      const sel = window.getSelection();
+      const selectedText = sel && sel.toString() ? sel.toString() : '텍스트';
+      document.execCommand('insertHTML', false, `<span style="font-size: ${value};">${selectedText}</span>`);
+    } else if (cmd === 'blockquote') {
+      const sel = window.getSelection();
+      const selectedText = sel && sel.toString() ? sel.toString() : '인용 문구를 입력하세요';
+      document.execCommand(
+        'insertHTML',
+        false,
+        `<blockquote style="border-left: 3px solid #60a5fa; padding-left: 12px; margin: 8px 0; color: #cbd5e1;">${selectedText}</blockquote><div><br></div>`
+      );
+    } else {
+      document.execCommand(cmd, false, value);
+    }
+    saveEditorSelection();
+    syncFromWysiwyg();
+  };
+
+  // 본문 커서 위치에 이미지/공식 카드 즉시 삽입 핸들러 (위지윅에서는 실제 이미지로, 코드에서는 [사진1] 단축 태그로!)
+  const insertImageIntoContent = (url: string, label = '이미지', customImagesList?: string[]) => {
+    const activeImages = customImagesList || images;
     const isCard = url.startsWith('/cards/');
-    let tag = '';
+    let shortTag = '';
+    let displayAlt = label;
     if (isCard) {
       const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
       const cardName = foundCard ? foundCard.nameKr : label;
-      tag = `\n[카드:${cardName}]\n`;
+      shortTag = `[카드:${cardName}]`;
+      displayAlt = cardName;
     } else {
-      const uploadedPhotos = images.filter((u) => !u.startsWith('/cards/'));
+      const uploadedPhotos = activeImages.filter((u) => !u.startsWith('/cards/'));
       let photoIdx = uploadedPhotos.indexOf(url) + 1;
       if (photoIdx <= 0) photoIdx = uploadedPhotos.length + 1;
-      tag = `\n[사진${photoIdx}]\n`;
+      shortTag = `[사진${photoIdx}]`;
+      displayAlt = `사진 ${photoIdx}`;
     }
 
+    if (!isPreviewMode && wysiwygRef.current) {
+      restoreEditorSelection();
+      const imgHtml = isCard
+        ? `<img src="${url}" data-shortcode="${shortTag}" alt="${displayAlt}" class="my-2 max-w-[220px] max-h-[320px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain block" /><br>`
+        : `<img src="${url}" data-shortcode="${shortTag}" alt="${displayAlt}" class="my-2 max-w-full sm:max-w-lg max-h-[380px] rounded-xl border border-[#3b4254] shadow-lg object-contain block" /><br>`;
+
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0 && wysiwygRef.current.contains(sel.getRangeAt(0).commonAncestorContainer)) {
+        document.execCommand('insertHTML', false, imgHtml);
+      } else {
+        wysiwygRef.current.insertAdjacentHTML('beforeend', imgHtml);
+      }
+      saveEditorSelection();
+      syncFromWysiwyg(activeImages);
+      showToast(`📸 ${shortTag} 이미지가 본문 커서 위치에 삽입되었습니다!`);
+      return;
+    }
+
+    const tagWithNewline = `\n${shortTag}\n`;
     const textarea = contentTextareaRef.current;
     if (!textarea) {
-      setContent((prev) => prev + tag);
-      showToast(`📸 ${tag.trim()} 태그가 본문에 삽입되었습니다.`);
+      setContent((prev) => prev + tagWithNewline);
+      showToast(`📸 ${shortTag} 태그가 본문에 삽입되었습니다.`);
       return;
     }
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const newContent = content.substring(0, start) + tag + content.substring(end);
+    const newContent = content.substring(0, start) + tagWithNewline + content.substring(end);
     setContent(newContent);
     setTimeout(() => {
       textarea.focus();
-      const newPos = start + tag.length;
+      const newPos = start + tagWithNewline.length;
       textarea.setSelectionRange(newPos, newPos);
     }, 20);
-    showToast(`📸 ${tag.trim()} 태그가 커서 위치에 깔끔하게 삽입되었습니다!`);
+    showToast(`📸 ${shortTag} 태그가 커서 위치에 삽입되었습니다!`);
   };
 
   // 본문에 이미 들어간 지저분한 base64 문자열(![...](data:image/...))을 깔끔한 [사진N] 태그로 자동 정돈하는 헬퍼
   const cleanupBase64Tags = (raw: string, currentImages: string[]) => {
     let newImages = [...currentImages];
-    const cleaned = raw.replace(/!\[(.*?)\]\((data:image\/[^)]+)\)/g, (match, alt, dataUrl) => {
+    const cleaned = raw.replace(/!\[(.*?)\]\((data:image\/[^)]+)\)/g, (_match, _alt, dataUrl) => {
       let idx = newImages.indexOf(dataUrl);
       if (idx === -1) {
         newImages.push(dataUrl);
@@ -270,17 +504,6 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     });
     return { cleaned, newImages };
   };
-  const [contact, setContact] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
-  const [deckCode, setDeckCode] = useState('');
-  const [deckName, setDeckName] = useState('');
-  const [isSecret, setIsSecret] = useState(false);
-  const [password, setPassword] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : ''));
-  const [imageUrl, setImageUrl] = useState<string>('');
-  const [images, setImages] = useState<string[]>([]);
-  const [isCardPickerOpen, setIsCardPickerOpen] = useState(false);
-  const [cardPickerSearch, setCardPickerSearch] = useState('');
-  const [cardPickerType, setCardPickerType] = useState<'ALL' | 'CHARACTER' | 'ACTION'>('ALL');
-  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   // 비밀글 잠금 해제 세션 관리 (해제된 게시글 ID 목록)
   const [unlockedPostIds, setUnlockedPostIds] = useState<Set<string>>(() => new Set());
@@ -650,26 +873,65 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     showToast('🗑️ 댓글이 삭제되었습니다.');
   };
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const processUploadedFiles = async (fileList: File[] | FileList) => {
+    const validFiles = Array.from(fileList).filter((f) => f.type.startsWith('image/'));
+    if (validFiles.length === 0) return;
     try {
-      showToast(`🖼️ ${files.length}장의 이미지를 압축 중...`);
+      showToast(`🖼️ ${validFiles.length}장의 이미지를 압축 및 삽입 중...`);
       const compressedList: string[] = [];
-      for (let i = 0; i < files.length; i++) {
-        const compressed = await compressImageFile(files[i], 800, 0.75);
+      for (let i = 0; i < validFiles.length; i++) {
+        const compressed = await compressImageFile(validFiles[i], 800, 0.75);
         compressedList.push(compressed);
       }
-      setImages((prev) => [...prev, ...compressedList]);
+      const nextImages = [...images, ...compressedList];
+      setImages(nextImages);
       if (!imageUrl && compressedList.length > 0) {
         setImageUrl(compressedList[0]);
       }
-      showToast(`✅ ${compressedList.length}장의 이미지가 추가되었습니다!`);
+      // 업로드한 이미지들을 즉시 본문 커서 위치에 순서대로 삽입
+      for (let i = 0; i < compressedList.length; i++) {
+        insertImageIntoContent(compressedList[i], `사진`, nextImages);
+      }
+      showToast(`✅ ${compressedList.length}장의 사진이 본문에 삽입되었습니다!`);
     } catch (err) {
       console.error(err);
       showToast('❌ 이미지 처리 실패');
-    } finally {
-      e.target.value = '';
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    await processUploadedFiles(files);
+    e.target.value = '';
+  };
+
+  const handleEditorPaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        const f = items[i].getAsFile();
+        if (f) imageFiles.push(f);
+      }
+    }
+    if (imageFiles.length > 0) {
+      e.preventDefault();
+      saveEditorSelection();
+      await processUploadedFiles(imageFiles);
+    }
+  };
+
+  const handleEditorDrop = async (e: React.DragEvent) => {
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const hasImage = Array.from(files).some((f) => f.type.startsWith('image/'));
+      if (hasImage) {
+        e.preventDefault();
+        saveEditorSelection();
+        await processUploadedFiles(files);
+      }
     }
   };
 
@@ -689,11 +951,15 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const finalContent = (!isPreviewMode && wysiwygRef.current)
+      ? wysiwygDomToContent(wysiwygRef.current, images)
+      : content;
+
     if (!title.trim()) {
       showToast('⚠️ 제목을 입력해주세요.');
       return;
     }
-    if (!content.trim()) {
+    if (!finalContent.trim()) {
       showToast('⚠️ 내용을 입력해주세요.');
       return;
     }
@@ -736,7 +1002,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       updateFeedback(editingPostId, {
         category,
         title: title.trim(),
-        content: content.trim(),
+        content: finalContent.trim(),
         contact: authorToUse,
         deckCode: deckCode.trim() || undefined,
         deckName: deckName.trim() || undefined,
@@ -751,7 +1017,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       const created = saveFeedback({
         category,
         title: title.trim(),
-        content: content.trim(),
+        content: finalContent.trim(),
         contact: authorToUse,
         deckCode: deckCode.trim() || undefined,
         deckName: deckName.trim() || undefined,
@@ -1904,125 +2170,103 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       {/* 5. 아카라이브 스타일 '새 글 작성' 모달 (ArcaLive Write Form Modal) */}
       {/* ========================================================================= */}
       {isWriteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="bg-[#181d2a] border border-[#2d354a] rounded-2xl w-full max-w-3xl sm:max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col text-slate-100">
-            {/* 모달 헤더 */}
-            <div className="p-5 sm:p-6 border-b border-[#252b3b] bg-[#151924] flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-150">
+          <div className="bg-[#1b1d24] border border-[#323642] rounded-xl w-full max-w-5xl max-h-[95vh] overflow-y-auto shadow-2xl flex flex-col text-slate-100">
+            {/* 상단 슬림 채널 헤더 */}
+            <div className="px-5 py-3 border-b border-[#2a2e39] bg-[#15171d] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" />
-                <h3 className="font-black text-lg sm:text-xl text-white">
-                  {editingPostId ? '게시글 수정 - 명조 배틀 채널' : '게시글 작성 - 명조 배틀 채널'}
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                <h3 className="font-black text-base sm:text-lg text-white tracking-tight">
+                  {editingPostId ? '글 수정 - 명조 배틀 채널' : '글쓰기 - 명조 배틀 채널'}
                 </h3>
               </div>
               <button
+                type="button"
                 onClick={() => setIsWriteModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1.5 rounded-lg transition cursor-pointer hover:bg-slate-800"
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition cursor-pointer hover:bg-slate-800"
               >
-                <X className="w-6 h-6" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* 글 작성 폼 */}
-            <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5">
-              {/* 말머리 선택 + 작성자 닉네임 + 비밀번호 */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
-                    말머리 (카테고리) <span className="text-red-400">*</span>
-                  </label>
+            {/* 아카라이브 스타일 글 작성 폼 */}
+            <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-2.5">
+              {/* 1행: 카테고리 선택 드롭다운 + 작성자 / 비밀번호 인라인 */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <div className="flex-1">
                   <select
                     value={category}
                     onChange={(e) => handleCategoryChange(e.target.value as FeedbackCategory)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#141824] border border-[#2d354a] text-sm text-white focus:outline-none focus:border-blue-400 cursor-pointer"
+                    className="w-full px-3.5 py-2 rounded bg-[#14161b] border border-[#323642] text-sm font-bold text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    <option value="NOTICE">📢 공지 (관리자 전용)</option>
-                    <option value="GENERAL">💬 일반</option>
+                    <option value="GENERAL">일반</option>
+                    <option value="NOTICE">📢 공지</option>
                     <option value="DECK">🃏 덱공유</option>
-                    <option value="TIP">📖 공략</option>
+                    <option value="TIP">📖 공략/정보</option>
                     <option value="FEEDBACK">🐛 버그 및 피드백</option>
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
-                    작성자 닉네임
-                  </label>
+                <div className="flex items-center gap-2 sm:w-auto">
                   <input
                     type="text"
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
-                    placeholder="방랑자"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#141824] border border-[#2d354a] text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                    placeholder="닉네임 (방랑자)"
+                    className="w-1/2 sm:w-36 px-3 py-2 rounded bg-[#14161b] border border-[#323642] text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
-                </div>
-
-                <div>
-                  <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
-                    비밀번호 (수정/삭제용)
-                  </label>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="비밀번호 설정"
+                    placeholder="비밀번호"
                     maxLength={20}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#141824] border border-[#2d354a] text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-mono"
+                    className="w-1/2 sm:w-36 px-3 py-2 rounded bg-[#14161b] border border-[#323642] text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
               </div>
 
-              {/* 비밀글 설정 카드 (개인 덱 저장/비공개용) */}
-              <div className={`p-4 sm:p-4.5 rounded-2xl border transition-all ${
-                isSecret 
-                  ? 'bg-amber-950/25 border-amber-500/50 shadow-lg shadow-amber-950/30 ring-1 ring-amber-500/30' 
-                  : 'bg-[#141824] border-[#2a3246] hover:border-slate-600'
-              }`}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-                  <label className="flex items-center gap-3 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={isSecret}
-                      onChange={(e) => setIsSecret(e.target.checked)}
-                      className="w-4 h-4 rounded border-slate-600 text-amber-500 focus:ring-amber-400 bg-slate-900 cursor-pointer accent-amber-500"
-                    />
-                    <div className="flex items-center gap-2">
-                      <Lock className={`w-4 h-4 ${isSecret ? 'text-amber-400' : 'text-slate-400'}`} />
-                      <div>
-                        <span className={`text-xs sm:text-sm font-bold ${isSecret ? 'text-amber-200' : 'text-slate-200'}`}>
-                          비밀글로 등록 (나만의 덱 저장용)
-                        </span>
-                        <span className="block text-[11px] text-slate-400">
-                          비밀번호를 설정하여 본문과 덱 리스트를 타인에게 노출하지 않고 비공개로 보관합니다.
-                        </span>
-                      </div>
-                    </div>
-                  </label>
-                </div>
+              {/* 2행: 제목 입력칸 (아카라이브 풀폭 스타일) */}
+              <div>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="제목"
+                  maxLength={256}
+                  className="w-full px-3.5 py-2.5 rounded bg-[#14161b] border border-[#323642] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
               </div>
 
-              {/* 덱 공유 전용 입력 필드 (덱공유 선택 시) */}
+              {/* 덱공유 선택 시 슬림 덱 연동 바 */}
               {category === 'DECK' && (
-                <div className="p-5 sm:p-6 rounded-2xl bg-purple-950/25 border-2 border-purple-500/40 space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2.5">
-                    <span className="text-sm sm:text-base font-black text-purple-200 flex items-center gap-2">
-                      <Layers className="w-5 h-5 text-purple-400" />
-                      <span>내 덱 공유 정보 (원클릭 자동 불러오기)</span>
-                    </span>
+                <div className="p-3 rounded bg-[#181628] border border-purple-500/40 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs sm:text-sm font-black text-purple-200">덱 정보 연동</span>
+                      {userDecks.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setIsDeckPanelOpen((prev) => !prev)}
+                          className="px-2 py-0.5 rounded bg-purple-600/30 hover:bg-purple-600/50 border border-purple-400/40 text-[11px] font-bold text-purple-200 cursor-pointer transition"
+                        >
+                          {isDeckPanelOpen ? '내 덱 목록 접기 ▲' : `내 보유 덱 (${userDecks.length}개) 선택 ▼`}
+                        </button>
+                      )}
+                    </div>
 
-                    {/* 프리셋 선택 드롭다운 */}
                     {storedPresets.length > 0 && (
                       <select
                         onChange={(e) => {
                           const preset = storedPresets.find((p) => p.id === e.target.value);
-                          if (preset) {
-                            handleSelectDeck(preset);
-                          }
+                          if (preset) handleSelectDeck(preset);
                         }}
                         defaultValue=""
-                        className="px-3 py-1.5 rounded-lg bg-purple-900/40 border border-purple-500/40 text-purple-200 text-xs sm:text-sm focus:outline-none cursor-pointer"
+                        className="px-2.5 py-1 rounded bg-purple-900/40 border border-purple-500/40 text-purple-200 text-xs focus:outline-none cursor-pointer"
                       >
                         <option value="" disabled>
-                          추천 프리셋에서 가져오기...
+                          추천 프리셋 불러오기...
                         </option>
                         {storedPresets.map((p) => (
                           <option key={p.id} value={p.id}>
@@ -2033,407 +2277,577 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     )}
                   </div>
 
-                  {/* 내가 보유한 커스텀 덱 원클릭 선택 버튼 그리드 */}
-                  {userDecks.length > 0 ? (
-                    <div>
-                      <div className="text-xs sm:text-sm font-bold text-purple-300/90 mb-2 flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-purple-400" />
-                        <span>보유 중인 덱을 클릭하면 이름/코드/제목이 즉시 자동 반영됩니다:</span>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-48 overflow-y-auto pr-1">
-                        {userDecks.map((d) => {
-                          const isSelected = deckName === d.name;
-                          return (
-                            <button
-                              key={d.id}
-                              type="button"
-                              onClick={() => handleSelectDeck(d)}
-                              className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-1.5 ${
-                                isSelected
-                                  ? 'bg-purple-600/40 border-purple-400 text-white shadow-lg ring-2 ring-purple-400/50'
-                                  : 'bg-[#151a28] border-purple-500/30 text-slate-300 hover:bg-purple-950/40 hover:border-purple-400/60'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-bold text-sm sm:text-base text-white truncate">{d.name}</span>
-                                {isSelected && (
-                                  <span className="px-1.5 py-0.5 rounded bg-purple-500 text-[10px] font-black text-white shrink-0">
-                                    선택됨
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-purple-300/80 truncate">
-                                👑 {d.leader?.characterName || d.leader?.nameKr || (d as any).leaderCode || '리더'} · 액션 {d.actionCards?.length || (d as any).actionDeck?.length || 40}장
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-3.5 rounded-xl bg-purple-900/20 border border-purple-500/30 text-xs sm:text-sm text-purple-300">
-                      💡 덱 빌더에서 저장한 커스텀 덱이 있으면 여기에 카드 형태로 표시됩니다. 위 드롭다운에서 프리셋 덱을 불러오거나 아래에 덱 코드를 직접 입력할 수도 있습니다.
+                  {/* 접이식 또는 기본 보유 덱 칩 목록 */}
+                  {(isDeckPanelOpen || !deckCode) && userDecks.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pt-1">
+                      {userDecks.map((d) => {
+                        const isSelected = deckName === d.name;
+                        return (
+                          <button
+                            key={d.id}
+                            type="button"
+                            onClick={() => {
+                              handleSelectDeck(d);
+                              setIsDeckPanelOpen(false);
+                            }}
+                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold transition cursor-pointer flex items-center gap-1.5 ${
+                              isSelected
+                                ? 'bg-purple-600/50 border-purple-400 text-white shadow'
+                                : 'bg-[#141724] border-purple-500/30 text-slate-300 hover:border-purple-400'
+                            }`}
+                          >
+                            <span>👑 {d.name}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
 
-                  {/* 덱 이름 & 덱 코드 입력창 */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                    <div>
-                      <label className="block text-xs sm:text-sm font-bold text-purple-300 mb-1.5">덱 이름</label>
-                      <input
-                        type="text"
-                        value={deckName}
-                        onChange={(e) => setDeckName(e.target.value)}
-                        placeholder="덱 이름 (예: 회멸 앙코 폭풍 공격덱)"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#121520] border border-purple-500/40 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-bold text-purple-300 mb-1.5">덱 코드 (초단축 코드 자동 생성)</label>
-                      <input
-                        type="text"
-                        value={deckCode}
-                        onChange={(e) => setDeckCode(e.target.value)}
-                        placeholder="덱 코드 (예: WW2_... 또는 SLD-...)"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-[#121520] border border-purple-500/40 text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-purple-400"
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      value={deckName}
+                      onChange={(e) => setDeckName(e.target.value)}
+                      placeholder="덱 이름 (예: 회멸 앙코 폭풍 공격덱)"
+                      className="w-full px-3 py-1.5 rounded bg-[#12141c] border border-purple-500/40 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                    />
+                    <input
+                      type="text"
+                      value={deckCode}
+                      onChange={(e) => setDeckCode(e.target.value)}
+                      placeholder="덱 코드 (예: WW2_...)"
+                      className="w-full px-3 py-1.5 rounded bg-[#12141c] border border-purple-500/40 text-xs sm:text-sm text-white font-mono placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                    />
                   </div>
                 </div>
               )}
 
-              {/* 제목 */}
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
-                  제목 <span className="text-red-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="제목을 입력하세요"
-                  className="w-full px-4 py-2.5 rounded-xl bg-[#141824] border border-[#2d354a] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
-                />
-              </div>
+              {/* 숨겨진 다중 파일 업로드 input */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
 
-              {/* 이미지 및 공식 카드 첨부 섹션 */}
-              <div className="space-y-3 p-4 rounded-xl bg-[#141824] border border-[#2d354a]">
-                <div className="flex flex-wrap items-center justify-between gap-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm font-bold text-slate-300">
-                      이미지 및 카드 첨부 ({images.length}장)
-                    </span>
-                    <span className="text-[11px] text-slate-500 hidden sm:inline">
-                      사진을 여러 장 첨부하거나 게임 내 공식 카드를 불러올 수 있습니다.
-                    </span>
-                  </div>
-
-                    <div className="flex items-center gap-2">
-                    {/* 내 파일 다중 업로드 버튼 */}
-                    <label className="px-3.5 py-1.5 rounded-lg bg-[#1f2637] hover:bg-[#2b354d] border border-[#2d354a] text-xs text-slate-200 font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow">
-                      <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>사진 업로드 (여러 장)</span>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        multiple
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        className="hidden"
-                      />
-                    </label>
-
-                    {/* 공식 카드 불러오기 버튼 */}
-                    <button
-                      type="button"
-                      onClick={() => setIsCardPickerOpen(true)}
-                      className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-xs text-amber-300 font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow"
-                    >
-                      <Layers className="w-3.5 h-3.5 text-amber-400" />
-                      <span>🃏 공식 카드 도감에서 첨부</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* 첨부된 이미지 썸네일 그리드 */}
-                {images.length > 0 && (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-2 border-t border-[#222838]">
-                    {images.map((imgUrl, idx) => {
-                      const isCard = imgUrl.startsWith('/cards/');
-                      const foundCard = isCard ? OFFICIAL_CARDS.find((c) => c.artUrl === imgUrl) : null;
-                      const uploadedPhotos = images.filter((u) => !u.startsWith('/cards/'));
-                      const photoIdx = !isCard ? uploadedPhotos.indexOf(imgUrl) + 1 : 0;
-                      const tag = isCard ? `[카드:${foundCard ? foundCard.nameKr : '카드'}]` : `[사진${photoIdx}]`;
-                      const isEmbedded = content.includes(tag) || content.includes(imgUrl);
-                      return (
-                        <div
-                          key={idx}
-                          className={`relative aspect-square rounded-lg overflow-hidden border transition group shadow ${
-                            isEmbedded ? 'border-emerald-500/70 ring-1 ring-emerald-500/50' : 'border-[#2d354a] bg-black/40'
-                          }`}
-                        >
-                          <img src={imgUrl} alt="" className="w-full h-full object-cover" />
-                          <span className={`absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] font-black ${isCard ? 'bg-amber-500/95 text-slate-950' : 'bg-blue-600/95 text-white'}`}>
-                            {tag}
-                          </span>
-                          {isEmbedded ? (
-                            <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-emerald-600/90 text-[9px] font-bold text-white shadow">
-                              ✓ 삽입됨
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => insertImageIntoContent(imgUrl, isCard ? (foundCard ? foundCard.nameKr : '카드') : `사진 ${photoIdx}`)}
-                              className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-blue-600/90 hover:bg-blue-500 text-[9px] font-bold text-white shadow transition cursor-pointer active:scale-95"
-                              title={`현재 본문 커서 위치에 ${tag} 태그를 삽입합니다`}
-                            >
-                              + 삽입
-                            </button>
-                          )}
-                          <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-1.5">
-                            <button
-                              type="button"
-                              onClick={() => insertImageIntoContent(imgUrl, isCard ? (foundCard ? foundCard.nameKr : '카드') : `사진 ${photoIdx}`)}
-                              className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] shadow active:scale-95 cursor-pointer w-full text-center truncate"
-                              title={`본문 커서 위치에 ${tag} 삽입`}
-                            >
-                              {tag} 삽입
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveImage(idx)}
-                              className="px-2 py-0.5 rounded bg-red-600/80 hover:bg-red-500 text-white font-bold text-[10px] cursor-pointer"
-                            >
-                              삭제
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(idx)}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center text-xs transition cursor-pointer shadow group-hover:hidden"
-                            title="삭제"
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* 본문 내용 (서식 툴바 + 실시간 미리보기 지원) */}
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="block text-xs sm:text-sm font-bold text-slate-300">
-                    내용 <span className="text-red-400">*</span>
-                  </label>
-                  <div className="flex items-center gap-1 bg-[#141824] p-1 rounded-lg border border-[#2d354a]">
-                    <button
-                      type="button"
-                      onClick={() => setIsPreviewMode(false)}
-                      className={`px-3 py-1 rounded text-xs font-bold transition cursor-pointer ${
-                        !isPreviewMode ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      ✏️ 편집
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsPreviewMode(true)}
-                      className={`px-3 py-1 rounded text-xs font-bold transition cursor-pointer ${
-                        isPreviewMode ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      👁️ 미리보기
-                    </button>
-                  </div>
-                </div>
-
-                {/* 텍스트 서식 툴바 */}
-                {!isPreviewMode && (
-                  <div className="flex flex-wrap items-center gap-1.5 p-2.5 rounded-xl bg-[#131722] border border-[#2d354a] text-xs select-none">
-                    {/* 글자 크기 조절 */}
-                    <div className="flex items-center gap-1 pr-2 border-r border-[#262c3d]">
-                      <span className="text-[11px] text-slate-400 font-bold mr-1">크기:</span>
+              {/* =============================================================== */}
+              {/* 3행: 아카라이브 Froala 스타일 통합 에디터 박스 (fr-box 재현) */}
+              {/* =============================================================== */}
+              <div className="rounded border border-[#323642] bg-[#14161b] flex flex-col overflow- visible">
+                {/* 에디터 상단 툴바 (fr-toolbar) */}
+                <div className="bg-[#22252e] border-b border-[#323642] px-2 py-1.5 flex flex-wrap items-center justify-between gap-1 select-none relative z-20">
+                  {/* 좌측 서식 및 삽입 도구 그룹 */}
+                  <div className="flex flex-wrap items-center gap-0.5 sm:gap-1">
+                    {/* 1. 기본 텍스트 스타일: B / I / U / S */}
+                    <div className="flex items-center gap-0.5 pr-1.5 border-r border-[#363b48]">
                       <button
                         type="button"
-                        onClick={() => applyFormat('<span style="font-size: 14px;">', '</span>', '작은 텍스트')}
-                        className="px-2 py-1 rounded bg-[#1d2333] hover:bg-[#283147] text-slate-300 font-bold transition cursor-pointer border border-[#2e374d]"
-                        title="보통 크기 (14px)"
-                      >
-                        보통
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyFormat('<span style="font-size: 18px; font-weight: 700;">', '</span>', '중간 제목')}
-                        className="px-2 py-1 rounded bg-[#1d2333] hover:bg-[#283147] text-slate-200 font-bold transition cursor-pointer border border-[#2e374d]"
-                        title="중간 제목 크기 (18px)"
-                      >
-                        크게
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => applyFormat('<span style="font-size: 22px; font-weight: 900;">', '</span>', '큰 제목')}
-                        className="px-2 py-1 rounded bg-[#1d2333] hover:bg-[#283147] text-amber-300 font-black transition cursor-pointer border border-[#2e374d]"
-                        title="큰 제목 크기 (22px)"
-                      >
-                        아주 크게
-                      </button>
-                    </div>
-
-                    {/* 굵기 / 밑줄 / 형광펜 / 인용구 */}
-                    <div className="flex items-center gap-1 pr-2 border-r border-[#262c3d]">
-                      <button
-                        type="button"
-                        onClick={() => applyFormat('<b>', '</b>', '굵은 텍스트')}
-                        className="w-7 h-7 rounded bg-[#1d2333] hover:bg-[#283147] text-white font-black transition cursor-pointer border border-[#2e374d] flex items-center justify-center"
-                        title="굵게 (Bold)"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => execEditorFormat('bold')}
+                        className="w-8 h-8 rounded hover:bg-[#313644] text-slate-200 hover:text-white font-black text-sm flex items-center justify-center transition cursor-pointer"
+                        title="굵게 (Ctrl+B)"
                       >
                         B
                       </button>
                       <button
                         type="button"
-                        onClick={() => applyFormat('<u>', '</u>', '밑줄 텍스트')}
-                        className="w-7 h-7 rounded bg-[#1d2333] hover:bg-[#283147] text-white underline font-bold transition cursor-pointer border border-[#2e374d] flex items-center justify-center"
-                        title="밑줄 (Underline)"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => execEditorFormat('italic')}
+                        className="w-8 h-8 rounded hover:bg-[#313644] text-slate-200 hover:text-white italic font-serif font-bold text-sm flex items-center justify-center transition cursor-pointer"
+                        title="기울임꼴 (Ctrl+I)"
+                      >
+                        I
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => execEditorFormat('underline')}
+                        className="w-8 h-8 rounded hover:bg-[#313644] text-slate-200 hover:text-white underline font-bold text-sm flex items-center justify-center transition cursor-pointer"
+                        title="밑줄 (Ctrl+U)"
                       >
                         U
                       </button>
                       <button
                         type="button"
-                        onClick={() =>
-                          applyFormat(
-                            '<mark style="background: rgba(245,158,11,0.3); color: #fde68a; padding: 0 4px; border-radius: 4px;">',
-                            '</mark>',
-                            '강조 텍스트'
-                          )
-                        }
-                        className="px-2 h-7 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold transition cursor-pointer border border-amber-500/40 flex items-center justify-center"
-                        title="형광펜 하이라이트"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => execEditorFormat('strikeThrough')}
+                        className="w-8 h-8 rounded hover:bg-[#313644] text-slate-200 hover:text-white line-through font-bold text-sm flex items-center justify-center transition cursor-pointer"
+                        title="취소선 (Ctrl+S)"
                       >
-                        형광펜
+                        S
                       </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          applyFormat(
-                            '<blockquote style="border-left: 3px solid #60a5fa; padding-left: 10px; margin: 6px 0; color: #cbd5e1;">',
-                            '</blockquote>',
-                            '인용 문구'
-                          )
-                        }
-                        className="px-2 h-7 rounded bg-[#1d2333] hover:bg-[#283147] text-cyan-300 font-bold transition cursor-pointer border border-[#2e374d] flex items-center justify-center"
-                        title="인용구 블록"
-                      >
-                        “인용”
-                      </button>
-                    </div>
 
-                    {/* 글자 색상 팔레트 */}
-                    <div className="flex items-center gap-1.5 pl-1 pr-2 border-r border-[#262c3d]">
-                      <span className="text-[11px] text-slate-400 font-bold mr-0.5">색상:</span>
-                      {[
-                        { label: '골드', color: '#fbbf24' },
-                        { label: '하늘', color: '#38bdf8' },
-                        { label: '초록', color: '#34d399' },
-                        { label: '빨강', color: '#f87171' },
-                        { label: '보라', color: '#c084fc' },
-                        { label: '주황', color: '#fb923c' },
-                        { label: '흰색', color: '#f8fafc' },
-                      ].map((c) => (
+                      {/* 폰트 크기 드롭다운 (AA▾) */}
+                      <div className="relative">
                         <button
-                          key={c.color}
                           type="button"
-                          onClick={() => applyFormat(`<span style="color: ${c.color};">`, '</span>', '색상 텍스트')}
-                          className="w-5 h-5 rounded-full border border-white/30 hover:scale-125 transition cursor-pointer shadow"
-                          style={{ backgroundColor: c.color }}
-                          title={`${c.label} 색상 적용`}
-                        />
-                      ))}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            saveEditorSelection();
+                            setShowFontSizeMenu((prev) => !prev);
+                            setShowColorPicker(false);
+                            setShowBgColorPicker(false);
+                            setShowAlignMenu(false);
+                          }}
+                          className="px-2 h-8 rounded hover:bg-[#313644] text-slate-200 hover:text-white font-bold text-xs flex items-center gap-0.5 transition cursor-pointer"
+                          title="폰트 크기"
+                        >
+                          <span className="text-sm font-black">A</span>
+                          <span className="text-[10px] font-bold">A▾</span>
+                        </button>
+                        {showFontSizeMenu && (
+                          <div className="absolute left-0 top-full mt-1 w-28 py-1 rounded-lg bg-[#1d2028] border border-[#383d4b] shadow-2xl z-50 flex flex-col">
+                            {['11px', '12px', '14px', '16px', '18px', '24px', '30px', '36px'].map((sz) => (
+                              <button
+                                key={sz}
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  execEditorFormat('fontSizePx', sz);
+                                  setShowFontSizeMenu(false);
+                                }}
+                                className="px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-blue-600 hover:text-white transition cursor-pointer flex items-center justify-between"
+                              >
+                                <span style={{ fontSize: parseInt(sz, 10) > 20 ? '16px' : sz }}>{sz.replace('px', '')}</span>
+                                <span className="text-[10px] text-slate-400">{sz}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 정렬 드롭다운 */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            saveEditorSelection();
+                            setShowAlignMenu((prev) => !prev);
+                            setShowFontSizeMenu(false);
+                            setShowColorPicker(false);
+                            setShowBgColorPicker(false);
+                          }}
+                          className="px-2 h-8 rounded hover:bg-[#313644] text-slate-200 hover:text-white text-xs font-bold flex items-center gap-0.5 transition cursor-pointer"
+                          title="문단 정렬"
+                        >
+                          <span>≡▾</span>
+                        </button>
+                        {showAlignMenu && (
+                          <div className="absolute left-0 top-full mt-1 w-28 py-1 rounded-lg bg-[#1d2028] border border-[#383d4b] shadow-2xl z-50 flex flex-col text-xs">
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                execEditorFormat('justifyLeft');
+                                setShowAlignMenu(false);
+                              }}
+                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-blue-600 hover:text-white cursor-pointer"
+                            >
+                              ⬅ 왼쪽 정렬
+                            </button>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                execEditorFormat('justifyCenter');
+                                setShowAlignMenu(false);
+                              }}
+                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-blue-600 hover:text-white cursor-pointer"
+                            >
+                              ↔ 가운데 정렬
+                            </button>
+                            <button
+                              type="button"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                execEditorFormat('justifyRight');
+                                setShowAlignMenu(false);
+                              }}
+                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-blue-600 hover:text-white cursor-pointer"
+                            >
+                              ➡ 오른쪽 정렬
+                            </button>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 글자 색상 팔레트 (A) */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            saveEditorSelection();
+                            setShowColorPicker((prev) => !prev);
+                            setShowBgColorPicker(false);
+                            setShowFontSizeMenu(false);
+                            setShowAlignMenu(false);
+                          }}
+                          className="w-8 h-8 rounded hover:bg-[#313644] text-slate-200 hover:text-white font-black text-sm flex flex-col items-center justify-center transition cursor-pointer"
+                          title="텍스트 색상"
+                        >
+                          <span className="leading-none">A</span>
+                          <span className="w-4 h-1 rounded-full bg-gradient-to-r from-amber-400 via-cyan-400 to-rose-400 mt-0.5" />
+                        </button>
+                        {showColorPicker && (
+                          <div className="absolute left-0 top-full mt-1 p-2.5 rounded-xl bg-[#1d2028] border border-[#383d4b] shadow-2xl z-50 w-44">
+                            <div className="text-[10px] font-bold text-slate-400 mb-1.5">글자 색상 선택</div>
+                            <div className="grid grid-cols-5 gap-1.5">
+                              {[
+                                { label: '흰색', color: '#f8fafc' },
+                                { label: '골드', color: '#fbbf24' },
+                                { label: '하늘', color: '#38bdf8' },
+                                { label: '초록', color: '#34d399' },
+                                { label: '빨강', color: '#f87171' },
+                                { label: '보라', color: '#c084fc' },
+                                { label: '주황', color: '#fb923c' },
+                                { label: '핑크', color: '#f472b6' },
+                                { label: '라임', color: '#a3e635' },
+                                { label: '회색', color: '#94a3b8' },
+                              ].map((c) => (
+                                <button
+                                  key={c.color}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    execEditorFormat('foreColor', c.color);
+                                    setShowColorPicker(false);
+                                  }}
+                                  className="w-6 h-6 rounded-full border border-white/25 hover:scale-125 transition cursor-pointer shadow"
+                                  style={{ backgroundColor: c.color }}
+                                  title={c.label}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 배경색 / 형광펜 팔레트 */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            saveEditorSelection();
+                            setShowBgColorPicker((prev) => !prev);
+                            setShowColorPicker(false);
+                            setShowFontSizeMenu(false);
+                            setShowAlignMenu(false);
+                          }}
+                          className="w-8 h-8 rounded hover:bg-[#313644] text-amber-300 hover:text-amber-200 font-bold text-xs flex items-center justify-center transition cursor-pointer"
+                          title="배경색 (형광펜)"
+                        >
+                          🖍️
+                        </button>
+                        {showBgColorPicker && (
+                          <div className="absolute left-0 top-full mt-1 p-2.5 rounded-xl bg-[#1d2028] border border-[#383d4b] shadow-2xl z-50 w-40">
+                            <div className="text-[10px] font-bold text-slate-400 mb-1.5">배경 강조색</div>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {[
+                                { label: '골드 형광', color: '#854d0e' },
+                                { label: '블루 형광', color: '#1e3a8a' },
+                                { label: '그린 형광', color: '#065f46' },
+                                { label: '레드 형광', color: '#7f1d1d' },
+                                { label: '퍼플 형광', color: '#581c87' },
+                                { label: '다크 차콜', color: '#334155' },
+                                { label: '투명(해제)', color: 'transparent' },
+                              ].map((c) => (
+                                <button
+                                  key={c.label}
+                                  type="button"
+                                  onMouseDown={(e) => e.preventDefault()}
+                                  onClick={() => {
+                                    execEditorFormat('hiliteColor', c.color);
+                                    setShowBgColorPicker(false);
+                                  }}
+                                  className="w-6 h-6 rounded border border-white/25 hover:scale-110 transition cursor-pointer shadow flex items-center justify-center text-[9px]"
+                                  style={{ backgroundColor: c.color === 'transparent' ? '#1e293b' : c.color }}
+                                  title={c.label}
+                                >
+                                  {c.color === 'transparent' ? '✕' : ''}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* 이미지 / 공식 카드 본문 커서 삽입 바로가기 버튼 */}
-                    <div className="flex items-center gap-1.5 pl-1">
+                    {/* 2. 미디어 & 공식 카드 삽입 도구 그룹 */}
+                    <div className="flex items-center gap-1 px-1.5 border-r border-[#363b48]">
                       <button
                         type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        className="px-2.5 py-1 rounded bg-[#1e2538] hover:bg-[#28324c] text-cyan-300 font-bold transition cursor-pointer border border-cyan-500/40 flex items-center gap-1 active:scale-95 shadow text-xs"
-                        title="내 기기에서 사진을 선택하여 본문 커서 위치에 바로 삽입합니다"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          saveEditorSelection();
+                          fileInputRef.current?.click();
+                        }}
+                        className="px-2.5 h-8 rounded hover:bg-[#313644] text-cyan-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                        title="이미지 업로드 (현재 커서 위치에 삽입)"
                       >
-                        <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>사진 본문 삽입</span>
+                        <ImageIcon className="w-4 h-4 text-cyan-400" />
+                        <span className="hidden sm:inline">이미지</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          saveEditorSelection();
+                          setIsCardPickerOpen(true);
+                        }}
+                        className="px-2.5 h-8 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold text-xs flex items-center gap-1.5 transition cursor-pointer"
+                        title="공식 카드 도감에서 선택하여 현재 커서 위치에 삽입"
+                      >
+                        <Layers className="w-4 h-4 text-amber-400" />
+                        <span>공식 카드</span>
+                      </button>
+                    </div>
+
+                    {/* 3. 문단 도구: 인용구 / 구분선 / 서식 제거 */}
+                    <div className="flex items-center gap-0.5 pl-0.5">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => execEditorFormat('blockquote')}
+                        className="w-8 h-8 rounded hover:bg-[#313644] text-slate-300 hover:text-white font-serif font-black text-sm flex items-center justify-center transition cursor-pointer"
+                        title="인용구 삽입"
+                      >
+                        “”
                       </button>
                       <button
                         type="button"
-                        onClick={() => setIsCardPickerOpen(true)}
-                        className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold transition cursor-pointer border border-amber-500/40 flex items-center gap-1 active:scale-95 shadow text-xs"
-                        title="공식 카드 도감에서 카드를 골라 본문 커서 위치에 바로 삽입합니다"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => execEditorFormat('insertHorizontalRule')}
+                        className="w-8 h-8 rounded hover:bg-[#313644] text-slate-300 hover:text-white font-bold text-xs flex items-center justify-center transition cursor-pointer"
+                        title="수평선 삽입"
                       >
-                        <Layers className="w-3.5 h-3.5 text-amber-400" />
-                        <span>카드 본문 삽입</span>
+                        ―
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => execEditorFormat('removeFormat')}
+                        className="w-8 h-8 rounded hover:bg-[#313644] text-slate-400 hover:text-white text-xs flex items-center justify-center transition cursor-pointer"
+                        title="선택 영역 서식 지우기"
+                      >
+                        🧹
                       </button>
                     </div>
                   </div>
+
+                  {/* 우측 도구 그룹: 실행취소 / 다시실행 / <> 코드보기 전환 */}
+                  <div className="flex items-center gap-1">
+                    {!isPreviewMode && (
+                      <>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => execEditorFormat('undo')}
+                          className="w-7 h-7 rounded hover:bg-[#313644] text-slate-300 hover:text-white text-sm flex items-center justify-center transition cursor-pointer"
+                          title="실행 취소 (Ctrl+Z)"
+                        >
+                          ↶
+                        </button>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => execEditorFormat('redo')}
+                          className="w-7 h-7 rounded hover:bg-[#313644] text-slate-300 hover:text-white text-sm flex items-center justify-center transition cursor-pointer"
+                          title="되돌리기 (Ctrl+Y)"
+                        >
+                          ↷
+                        </button>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!isPreviewMode && wysiwygRef.current) {
+                          syncFromWysiwyg();
+                        }
+                        setIsPreviewMode((prev) => !prev);
+                      }}
+                      className={`px-2.5 h-7 rounded text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1 border ${
+                        isPreviewMode
+                          ? 'bg-blue-600 border-blue-400 text-white shadow'
+                          : 'bg-[#1a1d24] border-[#363b48] text-slate-300 hover:text-white hover:bg-[#2c313d]'
+                      }`}
+                      title="시각적 편집(위지윅) ⇄ 원본 태그/코드 보기 전환"
+                    >
+                      <span>&lt;&gt;</span>
+                      <span className="font-sans text-[11px]">{isPreviewMode ? '시각편집' : '코드보기'}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 첨부된 이미지/카드 미니 트레이 (첨부 항목이 있을 때만 슬림하게 노출) */}
+                {images.length > 0 && (
+                  <div className="px-3 py-1.5 bg-[#191c24] border-b border-[#292d39] flex items-center gap-2 overflow-x-auto">
+                    <span className="text-[11px] font-bold text-slate-400 shrink-0">
+                      첨부됨 ({images.length}):
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {images.map((imgUrl, idx) => {
+                        const isCard = imgUrl.startsWith('/cards/');
+                        const foundCard = isCard ? OFFICIAL_CARDS.find((c) => c.artUrl === imgUrl) : null;
+                        const uploadedPhotos = images.filter((u) => !u.startsWith('/cards/'));
+                        const photoIdx = !isCard ? uploadedPhotos.indexOf(imgUrl) + 1 : 0;
+                        const tag = isCard ? `[카드:${foundCard ? foundCard.nameKr : '카드'}]` : `[사진${photoIdx}]`;
+                        return (
+                          <div
+                            key={idx}
+                            className="relative w-11 h-11 rounded border border-[#363b48] bg-black/50 overflow-hidden shrink-0 group cursor-pointer"
+                            onClick={() => insertImageIntoContent(imgUrl, isCard ? (foundCard ? foundCard.nameKr : '카드') : `사진 ${photoIdx}`)}
+                            title={`클릭하여 본문 커서 위치에 ${tag} 다시 삽입`}
+                          >
+                            <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                            <span className="absolute bottom-0 inset-x-0 bg-black/80 text-[8px] text-center font-bold text-amber-300 truncate px-0.5">
+                              {tag}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRemoveImage(idx);
+                              }}
+                              className="absolute top-0 right-0 w-4 h-4 bg-red-600/90 hover:bg-red-500 text-white text-[10px] flex items-center justify-center leading-none"
+                              title="첨부 삭제"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <span className="text-[10px] text-slate-500 ml-auto shrink-0 hidden md:inline">
+                      썸네일 클릭 시 커서 위치에 재삽입됩니다
+                    </span>
+                  </div>
                 )}
 
+                {/* 혹시 긴 base64 코드가 텍스트에 들어있는 경우 원클릭 정리 배너 */}
                 {content.includes('data:image/') && (
-                  <div className="mb-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-2 text-xs text-amber-200">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-base">⚠️</span>
-                      <span>본문에 긴 base64 이미지 코드가 들어가 있습니다. [사진] 단축 태그로 깔끔하게 정리할 수 있습니다.</span>
-                    </div>
+                  <div className="px-3 py-2 bg-amber-500/10 border-b border-amber-500/30 flex items-center justify-between gap-2 text-xs text-amber-200">
+                    <span>⚠️ 본문에 긴 base64 이미지 코드가 포함되어 있습니다.</span>
                     <button
                       type="button"
                       onClick={() => {
                         const { cleaned, newImages } = cleanupBase64Tags(content, images);
                         setContent(cleaned);
                         setImages(newImages);
+                        if (wysiwygRef.current && !isPreviewMode) {
+                          wysiwygRef.current.innerHTML = contentToWysiwygHtml(cleaned, newImages);
+                        }
                         showToast('✨ 긴 이미지 코드를 깔끔한 [사진] 태그로 정돈했습니다!');
                       }}
-                      className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow transition active:scale-95 shrink-0 cursor-pointer"
+                      className="px-2.5 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow cursor-pointer shrink-0"
                     >
-                      🧹 [사진] 태그로 자동 정리
+                      🧹 자동 정리
                     </button>
                   </div>
                 )}
 
-                {isPreviewMode ? (
-                  <div
-                    className="w-full min-h-[200px] px-4 py-3 rounded-xl bg-[#141824] border border-amber-500/40 text-sm sm:text-base text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans"
-                    dangerouslySetInnerHTML={{
-                      __html: content.trim()
-                        ? renderFormattedContent(content, images)
-                        : '<span class="text-slate-500">작성된 내용이 없습니다.</span>',
-                    }}
-                  />
-                ) : (
-                  <textarea
-                    ref={contentTextareaRef}
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
-                    placeholder="자유롭게 의견, 덱 운용 팁, 버그 재현 경로 등을 작성해주세요. (드래그 후 상단 서식 버튼을 누르면 크기·굵기·색상이 적용됩니다)"
-                    rows={8}
-                    className="w-full px-4 py-3 rounded-xl bg-[#141824] border border-[#2d354a] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-sans resize-y leading-relaxed select-text"
-                  />
-                )}
+                {/* 에디터 본문 영역 (아카라이브 스타일 대용량 입력창: min-h-[420px] sm:min-h-[480px]) */}
+                <div className="relative flex-1 bg-[#14161b]">
+                  {isPreviewMode ? (
+                    /* <> 코드보기 모드: 단축태그([사진1], [카드:이름]) 및 HTML 직접 편집 */
+                    <textarea
+                      ref={contentTextareaRef}
+                      value={content}
+                      onChange={(e) => setContent(e.target.value)}
+                      placeholder="원본 텍스트 및 단축 태그([사진1], [카드:치샤]) 편집 모드입니다. 우측 상단 [<> 시각편집]을 누르면 실제 이미지가 보이는 에디터로 돌아갑니다."
+                      className="w-full min-h-[420px] sm:min-h-[480px] max-h-[60vh] p-4 sm:p-5 bg-[#12141a] text-sm sm:text-base text-slate-100 placeholder-slate-500 focus:outline-none font-mono resize-y leading-relaxed select-text block"
+                    />
+                  ) : (
+                    /* 아카라이브 스타일 위지윅(WYSIWYG) 리치 에디터 모드: 이미지와 서식을 실시간으로 보면서 장문 작성 */
+                    <div className="relative">
+                      {!content.trim() && (
+                        <div className="pointer-events-none select-none absolute inset-0 p-4 sm:p-5 text-slate-500 text-sm sm:text-[15px] leading-7 space-y-1">
+                          <p>✨ 명조: 워더링 웨이브 배틀 채널 글쓰기 에디터입니다 ✨</p>
+                          <p>🖼️ 상단 툴바의 [이미지] 또는 [공식 카드] 버튼을 누르면 현재 커서 위치에 사진이 바로 삽입됩니다.</p>
+                          <p>💡 클립보드 이미지 붙여넣기(Ctrl+V) 및 마우스 드래그 앤 드롭 업로드도 지원합니다.</p>
+                          <p>✍️ 이미지를 눈으로 직접 확인하면서 위아래로 자유롭게 장문 게시글을 작성해보세요!</p>
+                        </div>
+                      )}
+                      <div
+                        ref={wysiwygRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        onInput={() => {
+                          saveEditorSelection();
+                          syncFromWysiwyg();
+                        }}
+                        onKeyUp={saveEditorSelection}
+                        onMouseUp={saveEditorSelection}
+                        onBlur={saveEditorSelection}
+                        onPaste={handleEditorPaste}
+                        onDrop={handleEditorDrop}
+                        onDragOver={(e) => e.preventDefault()}
+                        className="w-full min-h-[420px] sm:min-h-[480px] max-h-[60vh] overflow-y-auto p-4 sm:p-5 text-sm sm:text-[15px] text-slate-100 focus:outline-none leading-relaxed whitespace-pre-wrap break-words font-sans select-text relative z-10"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 에디터 하단 상태바 (fr-second-toolbar: 문자 수 카운터) */}
+                <div className="px-3.5 py-1.5 bg-[#1a1d24] border-t border-[#2a2e39] flex items-center justify-between text-[11px] text-slate-400">
+                  <span>
+                    {isPreviewMode ? '🔧 코드/단축태그 편집 모드' : '✨ 실시간 에디터 (이미지를 보며 작성 가능)'}
+                  </span>
+                  <span>
+                    문자 : {content.replace(/<[^>]*>/g, '').replace(/\[(사진|카드)[^\]]*\]/g, '').trim().length}
+                  </span>
+                </div>
               </div>
 
-              {/* 하단 모달 액션 버튼 */}
-              <div className="pt-3 flex items-center justify-end gap-3">
+              {/* =============================================================== */}
+              {/* 4행: 하단 액션 버튼 바 (비밀글 체크박스를 취소/작성 버튼 왼쪽에 심플 배치) */}
+              {/* =============================================================== */}
+              <div className="pt-2 flex items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => setIsWriteModalOpen(false)}
-                  className="px-5 py-2.5 rounded-xl bg-[#252b3b] hover:bg-[#2e374c] text-slate-300 text-sm font-bold transition cursor-pointer"
+                  className="px-4 py-2 rounded bg-[#252830] hover:bg-[#2f333d] text-slate-300 text-xs sm:text-sm font-bold border border-[#363a45] transition cursor-pointer"
                 >
-                  취소
+                  돌아가기
                 </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 rounded-xl bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-sm sm:text-base transition cursor-pointer shadow-md shadow-blue-500/20 active:scale-95"
-                >
-                  {editingPostId ? '수정 완료' : '작성 완료'}
-                </button>
+
+                <div className="flex items-center gap-3">
+                  {/* 유저 요청: 비밀글(선택칸)을 취소, 수정완료 버튼 왼쪽으로 심플하게 배치 */}
+                  <label
+                    className="flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1.5 rounded hover:bg-white/5 transition"
+                    title="체크 시 본문과 덱 리스트가 비밀번호로 잠기며 타인에게 노출되지 않습니다"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSecret}
+                      onChange={(e) => setIsSecret(e.target.checked)}
+                      className="w-4 h-4 rounded border-slate-500 bg-[#14161b] text-amber-500 accent-amber-500 cursor-pointer"
+                    />
+                    <span className={`text-xs sm:text-sm font-bold ${isSecret ? 'text-amber-300' : 'text-slate-300'}`}>
+                      비밀글
+                    </span>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsWriteModalOpen(false)}
+                    className="px-4 py-2 rounded bg-[#252830] hover:bg-[#2f333d] text-slate-300 text-xs sm:text-sm font-bold border border-[#363a45] transition cursor-pointer"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-2 rounded bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-md active:scale-95"
+                  >
+                    {editingPostId ? '수정 완료' : '작성'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -2515,7 +2929,12 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 return (
                   <div
                     key={card.id}
-                    onClick={() => handleToggleCardImage(card.artUrl)}
+                    onClick={() => {
+                      const nextImages = images.includes(card.artUrl) ? images : [...images, card.artUrl];
+                      setImages(nextImages);
+                      insertImageIntoContent(card.artUrl, card.nameKr, nextImages);
+                      setIsCardPickerOpen(false);
+                    }}
                     className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 cursor-pointer transition-all flex flex-col group shadow ${
                       isSelected
                         ? 'border-amber-400 bg-amber-950/30 ring-2 ring-amber-400/50 scale-[0.98]'
@@ -2540,10 +2959,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (!images.includes(card.artUrl)) {
-                            setImages((prev) => [...prev, card.artUrl]);
-                          }
-                          insertImageIntoContent(card.artUrl, card.nameKr);
+                          const nextImages = images.includes(card.artUrl) ? images : [...images, card.artUrl];
+                          setImages(nextImages);
+                          insertImageIntoContent(card.artUrl, card.nameKr, nextImages);
                           setIsCardPickerOpen(false);
                         }}
                         className="px-2 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-xs shadow-lg active:scale-95 cursor-pointer w-full text-center"
@@ -2559,7 +2977,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         }}
                         className="px-2 py-1 rounded bg-[#20273a] hover:bg-[#2b354e] text-slate-200 text-[10px] font-bold w-full text-center border border-[#333e59] cursor-pointer"
                       >
-                        {isSelected ? '선택 취소' : '첨부 목록에만 추가'}
+                        {isSelected ? '선택 취소' : '연속 선택(창 유지)'}
                       </button>
                     </div>
 
