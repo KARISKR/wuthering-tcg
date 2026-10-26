@@ -1832,38 +1832,71 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 />
               </div>
 
-              {/* 이미지 첨부 */}
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-300 mb-1.5">
-                  이미지 첨부 (선택)
-                </label>
-                <div className="flex flex-wrap items-center gap-3">
-                  <label className="px-4 py-2 rounded-xl bg-[#1b2030] hover:bg-[#252b3b] border border-[#2d354a] text-xs sm:text-sm text-slate-300 font-bold transition cursor-pointer flex items-center gap-2">
-                    <ImageIcon className="w-4 h-4 text-cyan-400" />
-                    <span>이미지 선택</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className="hidden"
-                    />
-                  </label>
-                  {imageUrl && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-emerald-400 font-bold">✓ 첨부 완료</span>
-                      <button
-                        type="button"
-                        onClick={() => setImageUrl('')}
-                        className="text-xs text-red-400 hover:underline cursor-pointer"
-                      >
-                        삭제
-                      </button>
-                    </div>
-                  )}
+              {/* 이미지 및 공식 카드 첨부 섹션 */}
+              <div className="space-y-3 p-4 rounded-xl bg-[#141824] border border-[#2d354a]">
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm font-bold text-slate-300">
+                      이미지 및 카드 첨부 ({images.length}장)
+                    </span>
+                    <span className="text-[11px] text-slate-500 hidden sm:inline">
+                      사진을 여러 장 첨부하거나 게임 내 공식 카드를 불러올 수 있습니다.
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {/* 내 파일 다중 업로드 버튼 */}
+                    <label className="px-3.5 py-1.5 rounded-lg bg-[#1f2637] hover:bg-[#2b354d] border border-[#2d354a] text-xs text-slate-200 font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow">
+                      <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>사진 업로드 (여러 장)</span>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {/* 공식 카드 불러오기 버튼 */}
+                    <button
+                      type="button"
+                      onClick={() => setIsCardPickerOpen(true)}
+                      className="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-xs text-amber-300 font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-amber-400" />
+                      <span>🃏 공식 카드 도감에서 첨부</span>
+                    </button>
+                  </div>
                 </div>
-                {imageUrl && (
-                  <div className="mt-2.5 max-w-xs rounded-lg overflow-hidden border border-[#2d354a]">
-                    <img src={imageUrl} alt="미리보기" className="w-full h-auto max-h-48 object-cover" />
+
+                {/* 첨부된 이미지 썸네일 그리드 */}
+                {images.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-2 border-t border-[#222838]">
+                    {images.map((imgUrl, idx) => {
+                      const isCard = imgUrl.startsWith('/cards/');
+                      return (
+                        <div
+                          key={idx}
+                          className="relative aspect-square rounded-lg overflow-hidden border border-[#2d354a] bg-black/40 group shadow"
+                        >
+                          <img src={imgUrl} alt="" className="w-full h-full object-cover" />
+                          {isCard && (
+                            <span className="absolute bottom-1 left-1 px-1 rounded bg-amber-500/90 text-[9px] text-slate-950 font-black">
+                              CARD
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(idx)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center text-xs transition cursor-pointer shadow"
+                            title="삭제"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
