@@ -64,6 +64,7 @@ import {
 } from '../utils/deckCode';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
+import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 
 interface CommunityBoardProps {
   onBackToLobby: () => void;
@@ -100,6 +101,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const [isSecret, setIsSecret] = useState(false);
   const [password, setPassword] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : ''));
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [images, setImages] = useState<string[]>([]);
+  const [isCardPickerOpen, setIsCardPickerOpen] = useState(false);
+  const [cardPickerSearch, setCardPickerSearch] = useState('');
+  const [cardPickerType, setCardPickerType] = useState<'ALL' | 'CHARACTER' | 'ACTION'>('ALL');
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   // 비밀글 잠금 해제 세션 관리 (해제된 게시글 ID 목록)
   const [unlockedPostIds, setUnlockedPostIds] = useState<Set<string>>(() => new Set());
@@ -327,6 +333,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     setIsSecret(Boolean(post.isSecret));
     setPassword(post.password || savedPw);
     setImageUrl(post.imageUrl || '');
+    const postImages = post.images && post.images.length > 0 ? post.images : (post.imageUrl ? [post.imageUrl] : []);
+    setImages(postImages);
     setIsWriteModalOpen(true);
   };
 
@@ -373,17 +381,40 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
     try {
-      showToast('🖼️ 이미지 압축 중...');
-      const compressed = await compressImageFile(file, 800, 0.75);
-      setImageUrl(compressed);
-      showToast('✅ 이미지가 첨부되었습니다!');
+      showToast(`🖼️ ${files.length}장의 이미지를 압축 중...`);
+      const compressedList: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const compressed = await compressImageFile(files[i], 800, 0.75);
+        compressedList.push(compressed);
+      }
+      setImages((prev) => [...prev, ...compressedList]);
+      if (!imageUrl && compressedList.length > 0) {
+        setImageUrl(compressedList[0]);
+      }
+      showToast(`✅ ${compressedList.length}장의 이미지가 추가되었습니다!`);
     } catch (err) {
       console.error(err);
       showToast('❌ 이미지 처리 실패');
+    } finally {
+      e.target.value = '';
     }
+  };
+
+  const handleRemoveImage = (indexToRemove: number) => {
+    setImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
+  const handleToggleCardImage = (artUrl: string) => {
+    setImages((prev) => {
+      if (prev.includes(artUrl)) {
+        return prev.filter((url) => url !== artUrl);
+      } else {
+        return [...prev, artUrl];
+      }
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1757,6 +1788,149 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 공식 카드 도감 선택 모달 */}
+      {isCardPickerOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-150">
+          <div className="bg-[#151924] border border-[#2d354a] rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl text-slate-100 overflow-hidden">
+            {/* 헤더 */}
+            <div className="p-4 sm:p-5 border-b border-[#252b3b] bg-[#12151e] flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Layers className="w-5 h-5 text-amber-400" />
+                <h3 className="font-black text-base sm:text-lg text-white">공식 카드 도감에서 첨부</h3>
+                <span className="text-xs text-slate-400">
+                  (현재 선택됨: <b className="text-amber-300 font-mono">{images.filter((u) => u.startsWith('/cards/')).length}장</b>)
+                </span>
+              </div>
+              <button
+                onClick={() => setIsCardPickerOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* 필터 및 검색창 */}
+            <div className="p-3.5 sm:p-4 bg-[#181d2a] border-b border-[#222838] flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-1.5">
+                {(['ALL', 'CHARACTER', 'ACTION'] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setCardPickerType(t)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      cardPickerType === t
+                        ? 'bg-amber-500 text-slate-950 shadow'
+                        : 'bg-[#222838] text-slate-300 hover:bg-[#2b3347]'
+                    }`}
+                  >
+                    {t === 'ALL' ? '전체' : t === 'CHARACTER' ? '캐릭터' : '액션'}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full sm:w-64">
+                <input
+                  type="text"
+                  value={cardPickerSearch}
+                  onChange={(e) => setCardPickerSearch(e.target.value)}
+                  placeholder="카드명 / 캐릭터 / 코드 검색..."
+                  className="w-full px-3.5 py-1.5 rounded-lg bg-[#121520] border border-[#2d354a] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                />
+                {cardPickerSearch && (
+                  <button
+                    onClick={() => setCardPickerSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* 카드 썸네일 그리드 */}
+            <div className="p-4 overflow-y-auto flex-1 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              {OFFICIAL_CARDS.filter((c) => {
+                if (cardPickerType !== 'ALL' && c.kind !== cardPickerType) return false;
+                if (!cardPickerSearch.trim()) return true;
+                const q = cardPickerSearch.toLowerCase().trim();
+                return (
+                  c.nameKr.toLowerCase().includes(q) ||
+                  c.characterName.toLowerCase().includes(q) ||
+                  c.code.toLowerCase().includes(q)
+                );
+              }).map((card) => {
+                const isSelected = images.includes(card.artUrl);
+                return (
+                  <div
+                    key={card.id}
+                    onClick={() => handleToggleCardImage(card.artUrl)}
+                    className={`relative aspect-[3/4] rounded-xl overflow-hidden border-2 cursor-pointer transition-all flex flex-col group shadow ${
+                      isSelected
+                        ? 'border-amber-400 bg-amber-950/30 ring-2 ring-amber-400/50 scale-[0.98]'
+                        : 'border-[#2d354a] bg-[#121520] hover:border-slate-500'
+                    }`}
+                  >
+                    <img
+                      src={card.artUrl}
+                      alt={card.nameKr}
+                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-x-0 bottom-0 p-1 bg-gradient-to-t from-black/90 via-black/60 to-transparent">
+                      <p className="text-[10px] font-bold text-white truncate text-center">
+                        {card.nameKr}
+                      </p>
+                    </div>
+                    {isSelected && (
+                      <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black shadow flex items-center gap-0.5">
+                        <Check className="w-3 h-3" />
+                        <span>첨부됨</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 하단 확인 버튼 */}
+            <div className="p-3.5 bg-[#12151e] border-t border-[#252b3b] flex items-center justify-between">
+              <span className="text-xs text-slate-400">
+                원하는 카드를 클릭하여 자유롭게 추가하거나 제외할 수 있습니다.
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsCardPickerOpen(false)}
+                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm transition cursor-pointer shadow-lg active:scale-95"
+              >
+                선택 완료
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 이미지 확대 뷰어 모달 */}
+      {zoomedImage && (
+        <div
+          onClick={() => setZoomedImage(null)}
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 cursor-zoom-out animate-in fade-in duration-150"
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex items-center justify-center">
+            <img
+              src={zoomedImage}
+              alt="확대 이미지"
+              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-slate-700/60"
+            />
+            <button
+              onClick={() => setZoomedImage(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-white flex items-center justify-center shadow-lg border border-slate-600 transition cursor-pointer"
+            >
+              ✕
+            </button>
           </div>
         </div>
       )}

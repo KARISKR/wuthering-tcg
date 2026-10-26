@@ -22,7 +22,8 @@ export interface FeedbackItem {
   contact?: string; // 작성자 닉네임 (기본값 '방랑자')
   deckCode?: string; // 덱 공유 시 덱 코드
   deckName?: string; // 덱 공유 시 덱 이름
-  imageUrl?: string; // 첨부 이미지 (800px WebP data URL)
+  imageUrl?: string; // 첨부 이미지 (800px WebP data URL, 하위 호환)
+  images?: string[]; // 다중 첨부 이미지 목록 (업로드 이미지 및 정적 카드 이미지)
   likes?: number; // 추천수 (개추)
   dislikes?: number; // 비추천수 (비추)
   views?: number; // 조회수
