@@ -10,10 +10,10 @@ export interface MaintenanceConfig {
 
 export const MAINTENANCE_CONFIG: MaintenanceConfig = {
   enabled: true,
-  version: 'BETA 2.0',
-  title: '서버 정기 점검 및 BETA 2.0 업데이트 안내',
-  subtitle: '명조 TCG 정기 시스템 최적화 및 BETA 2.0 대규모 업데이트 적용 작업이 진행 중입니다.',
-  // 2026년 10월 26일 새벽 01:00:00 (KST) 정밀 종료 설정
-  targetEndTime: '2026-10-26T01:00:00+09:00',
-  notice: '점검 시간 동안에는 서비스 이용이 일시적으로 제한됩니다. 점검 완료 후 더욱 안정된 서비스를 제공해 드리겠습니다.',
+  version: 'v2.1 OPTIMIZATION',
+  title: '서버 정기 점검 및 시스템 최적화 안내',
+  subtitle: '명조 TCG 웹 시뮬레이터 로딩 속도 최적화, 메모리 개선 및 커뮤니티 고도화 점검 작업이 진행 중입니다.',
+  // 2026년 10월 27일 새벽 03:00:00 (KST) 점검 진행 설정
+  targetEndTime: '2026-10-27T03:00:00+09:00',
+  notice: '점검 시간 동안에는 서비스 이용이 일시적으로 제한됩니다. 최적화 작업 완료 후 더욱 쾌적하고 빠른 서비스를 제공해 드리겠습니다.',
 };
