@@ -85,6 +85,19 @@ function renderFormattedContent(rawContent: string): string {
     .replace(/on\w+='[^']*'/gi, '')
     .replace(/javascript:[^"']*/gi, '');
 
+  // 마크다운 이미지 파싱: ![설명](url) -> 인라인 이미지 렌더링 (클릭 확대 지원)
+  safe = safe.replace(
+    /!\[(.*?)\]\((.*?)\)/g,
+    '<div class="my-3.5 max-w-2xl"><img src="$2" alt="$1" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />' +
+      '<span class="block text-[11px] text-slate-400 mt-1 font-sans">$1</span></div>'
+  );
+
+  // HTML <img> 태그 안전 스타일 래핑
+  safe = safe.replace(
+    /<img\s+([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
+    '<div class="my-3.5 max-w-2xl"><img src="$2" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" /></div>'
+  );
+
   // 마크다운 볼드 변환
   safe = safe.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
   return safe;
@@ -140,6 +153,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const [isPreviewMode, setIsPreviewMode] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const contentTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const applyFormat = (prefix: string, suffix: string, defaultText = '텍스트') => {
     const textarea = contentTextareaRef.current;
@@ -155,6 +169,27 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       const newCursorPos = start + prefix.length + (selected ? selected.length : defaultText.length);
       textarea.setSelectionRange(newCursorPos, newCursorPos);
     }, 10);
+  };
+
+  // 본문 커서 위치에 이미지/카드 즉시 삽입 핸들러
+  const insertImageIntoContent = (url: string, label = '이미지') => {
+    const textarea = contentTextareaRef.current;
+    const imgTag = `\n![${label}](${url})\n`;
+    if (!textarea) {
+      setContent((prev) => prev + imgTag);
+      showToast(`📸 [${label}] 이미지가 본문에 삽입되었습니다.`);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newContent = content.substring(0, start) + imgTag + content.substring(end);
+    setContent(newContent);
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = start + imgTag.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 20);
+    showToast(`📸 [${label}] 이미지가 본문 커서 위치에 삽입되었습니다!`);
   };
   const [contact, setContact] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
   const [deckCode, setDeckCode] = useState('');
@@ -1140,7 +1175,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 </div>
               )}
 
-              {/* 첨부 이미지 및 공식 카드 갤러리 렌더링 */}
+              {/* 본문에 삽입되지 않은 별도 첨부 이미지/카드 갤러리 렌더링 */}
               {(() => {
                 const postImages =
                   selectedPost.images && selectedPost.images.length > 0
@@ -1148,15 +1183,19 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     : selectedPost.imageUrl
                     ? [selectedPost.imageUrl]
                     : [];
-                if (postImages.length === 0) return null;
+                // 이미 본문 텍스트 내에 인라인으로 삽입된 이미지는 상단 갤러리에서 중복 표시하지 않음
+                const unEmbeddedImages = postImages.filter(
+                  (url) => !selectedPost.content.includes(url)
+                );
+                if (unEmbeddedImages.length === 0) return null;
                 return (
                   <div className="my-4 space-y-3">
                     <div className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
                       <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>첨부된 이미지 / 공식 카드 ({postImages.length}장) · 클릭 시 확대</span>
+                      <span>첨부 이미지 / 공식 카드 ({unEmbeddedImages.length}장) · 클릭 시 확대</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {postImages.map((imgUrl, idx) => {
+                      {unEmbeddedImages.map((imgUrl, idx) => {
                         const isCard = imgUrl.startsWith('/cards/');
                         return (
                           <div
@@ -1183,8 +1222,15 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 );
               })()}
 
-              {/* 본문 텍스트 (서식 렌더링 + 줄바꿈 + 드래그 허용) */}
+              {/* 본문 텍스트 (인라인 이미지 + 서식 렌더링 + 줄바꿈 + 클릭 시 이미지 확대 지원) */}
               <div
+                onClick={(e) => {
+                  const target = e.target as HTMLElement;
+                  if (target.tagName === 'IMG') {
+                    const src = (target as HTMLImageElement).currentSrc || (target as HTMLImageElement).src;
+                    if (src) setZoomedImage(src);
+                  }
+                }}
                 className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans min-h-[140px] select-text"
                 dangerouslySetInnerHTML={{ __html: renderFormattedContent(selectedPost.content) }}
               />
@@ -1972,12 +2018,13 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                     {/* 내 파일 다중 업로드 버튼 */}
                     <label className="px-3.5 py-1.5 rounded-lg bg-[#1f2637] hover:bg-[#2b354d] border border-[#2d354a] text-xs text-slate-200 font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow">
                       <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
                       <span>사진 업로드 (여러 장)</span>
                       <input
+                        ref={fileInputRef}
                         type="file"
                         multiple
                         accept="image/*"
@@ -2003,10 +2050,13 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-2 border-t border-[#222838]">
                     {images.map((imgUrl, idx) => {
                       const isCard = imgUrl.startsWith('/cards/');
+                      const isEmbedded = content.includes(imgUrl);
                       return (
                         <div
                           key={idx}
-                          className="relative aspect-square rounded-lg overflow-hidden border border-[#2d354a] bg-black/40 group shadow"
+                          className={`relative aspect-square rounded-lg overflow-hidden border transition group shadow ${
+                            isEmbedded ? 'border-emerald-500/60 ring-1 ring-emerald-500/40' : 'border-[#2d354a] bg-black/40'
+                          }`}
                         >
                           <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                           {isCard && (
@@ -2014,10 +2064,40 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                               CARD
                             </span>
                           )}
+                          {isEmbedded ? (
+                            <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-emerald-600/90 text-[9px] font-bold text-white shadow">
+                              본문 삽입됨
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => insertImageIntoContent(imgUrl, isCard ? '공식 카드' : `사진 ${idx + 1}`)}
+                              className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-blue-600/90 hover:bg-blue-500 text-[9px] font-bold text-white shadow transition cursor-pointer active:scale-95"
+                              title="현재 본문 커서 위치에 이 이미지를 삽입합니다"
+                            >
+                              + 본문 삽입
+                            </button>
+                          )}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-1.5">
+                            <button
+                              type="button"
+                              onClick={() => insertImageIntoContent(imgUrl, isCard ? '공식 카드' : `사진 ${idx + 1}`)}
+                              className="px-2 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] shadow active:scale-95 cursor-pointer w-full text-center"
+                            >
+                              {isEmbedded ? '✓ 본문 재삽입' : '+ 본문 삽입'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveImage(idx)}
+                              className="px-2 py-0.5 rounded bg-red-600/80 hover:bg-red-500 text-white font-bold text-[10px] cursor-pointer"
+                            >
+                              삭제
+                            </button>
+                          </div>
                           <button
                             type="button"
                             onClick={() => handleRemoveImage(idx)}
-                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center text-xs transition cursor-pointer shadow"
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-600/90 hover:bg-red-500 text-white flex items-center justify-center text-xs transition cursor-pointer shadow group-hover:hidden"
                             title="삭제"
                           >
                             ×
@@ -2138,7 +2218,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     </div>
 
                     {/* 글자 색상 팔레트 */}
-                    <div className="flex items-center gap-1.5 pl-1">
+                    <div className="flex items-center gap-1.5 pl-1 pr-2 border-r border-[#262c3d]">
                       <span className="text-[11px] text-slate-400 font-bold mr-0.5">색상:</span>
                       {[
                         { label: '골드', color: '#fbbf24' },
@@ -2158,6 +2238,28 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                           title={`${c.label} 색상 적용`}
                         />
                       ))}
+                    </div>
+
+                    {/* 이미지 / 공식 카드 본문 커서 삽입 바로가기 버튼 */}
+                    <div className="flex items-center gap-1.5 pl-1">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="px-2.5 py-1 rounded bg-[#1e2538] hover:bg-[#28324c] text-cyan-300 font-bold transition cursor-pointer border border-cyan-500/40 flex items-center gap-1 active:scale-95 shadow text-xs"
+                        title="내 기기에서 사진을 선택하여 본문 커서 위치에 바로 삽입합니다"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>사진 본문 삽입</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsCardPickerOpen(true)}
+                        className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold transition cursor-pointer border border-amber-500/40 flex items-center gap-1 active:scale-95 shadow text-xs"
+                        title="공식 카드 도감에서 카드를 골라 본문 커서 위치에 바로 삽입합니다"
+                      >
+                        <Layers className="w-3.5 h-3.5 text-amber-400" />
+                        <span>카드 본문 삽입</span>
+                      </button>
                     </div>
                   </div>
                 )}
@@ -2297,8 +2399,38 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         {card.nameKr}
                       </p>
                     </div>
+
+                    {/* 호버 시 본문 커서 위치에 바로 삽입 가능한 액션 오버레이 */}
+                    <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition flex flex-col items-center justify-center gap-1.5 p-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!images.includes(card.artUrl)) {
+                            setImages((prev) => [...prev, card.artUrl]);
+                          }
+                          insertImageIntoContent(card.artUrl, card.nameKr);
+                          setIsCardPickerOpen(false);
+                        }}
+                        className="px-2 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-amber-400 text-slate-950 font-black text-xs shadow-lg active:scale-95 cursor-pointer w-full text-center"
+                        title="에디터의 현재 커서 위치에 이 카드를 즉시 삽입합니다"
+                      >
+                        + 본문 커서에 삽입
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleToggleCardImage(card.artUrl);
+                        }}
+                        className="px-2 py-1 rounded bg-[#20273a] hover:bg-[#2b354e] text-slate-200 text-[10px] font-bold w-full text-center border border-[#333e59] cursor-pointer"
+                      >
+                        {isSelected ? '선택 취소' : '첨부 목록에만 추가'}
+                      </button>
+                    </div>
+
                     {isSelected && (
-                      <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black shadow flex items-center gap-0.5">
+                      <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black shadow flex items-center gap-0.5 group-hover:hidden">
                         <Check className="w-3 h-3" />
                         <span>첨부됨</span>
                       </div>

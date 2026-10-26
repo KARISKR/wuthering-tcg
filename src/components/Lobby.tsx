@@ -820,6 +820,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                         .replace(/on\w+="[^"]*"/gi, '')
                         .replace(/on\w+='[^']*'/gi, '')
                         .replace(/javascript:[^"']*/gi, '')
+                        .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="my-1.5 rounded-lg max-h-24 object-contain border border-[#2d354a]" />')
                         .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>'),
                     }}
                   />
