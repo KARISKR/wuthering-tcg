@@ -38,6 +38,7 @@ import {
 import {
   FeedbackCategory,
   FeedbackItem,
+  CommentItem,
   CATEGORY_INFO,
   getFeedbackList,
   fetchGlobalFeedbackList,
@@ -51,6 +52,8 @@ import {
   exportFeedbackAsJson,
   updateFeedback,
   compressImageFile,
+  updateCommentInFeedback,
+  deleteCommentFromFeedback,
 } from '../utils/feedbackManager';
 import {
   getStoredPresets,
@@ -129,6 +132,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const [commentAuthor, setCommentAuthor] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
   const [commentText, setCommentText] = useState('');
   const [replyingTo, setReplyingTo] = useState<{ id: string; author: string } | null>(null);
+  const [commentPassword, setCommentPassword] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : ''));
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
 
   // UI Toast State
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -379,13 +385,66 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     const authorToUse = commentAuthor.trim() || '방랑자';
     if (typeof window !== 'undefined') {
       localStorage.setItem('wuthering_board_author', authorToUse);
+      if (commentPassword.trim()) {
+        localStorage.setItem('wuthering_board_password', commentPassword.trim());
+      }
     }
 
-    addCommentToFeedback(postId, authorToUse, commentText, replyingTo?.id, replyingTo?.author);
+    addCommentToFeedback(
+      postId,
+      authorToUse,
+      commentText,
+      replyingTo?.id,
+      replyingTo?.author,
+      commentPassword.trim() || undefined
+    );
     setCommentText('');
     setReplyingTo(null);
     refreshList();
     showToast('💬 댓글이 등록되었습니다.');
+  };
+
+  const handleStartEditComment = (comment: CommentItem) => {
+    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
+    if (comment.password && comment.password !== savedPw) {
+      const input = window.prompt('🔒 댓글 수정을 위해 비밀번호를 입력해주세요:');
+      if (input === null) return;
+      if (input.trim() !== comment.password) {
+        showToast('❌ 비밀번호가 일치하지 않습니다.');
+        return;
+      }
+    }
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.text);
+  };
+
+  const handleSaveEditComment = (postId: string, commentId: string) => {
+    if (!editingCommentText.trim()) {
+      showToast('⚠️ 댓글 내용을 입력해주세요.');
+      return;
+    }
+    updateCommentInFeedback(postId, commentId, editingCommentText);
+    setEditingCommentId(null);
+    setEditingCommentText('');
+    refreshList();
+    showToast('✨ 댓글이 수정되었습니다.');
+  };
+
+  const handleDeleteComment = (postId: string, comment: CommentItem) => {
+    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
+    if (comment.password && comment.password !== savedPw) {
+      const input = window.prompt('🔒 댓글 삭제를 위해 비밀번호를 입력해주세요:');
+      if (input === null) return;
+      if (input.trim() !== comment.password) {
+        showToast('❌ 비밀번호가 일치하지 않습니다.');
+        return;
+      }
+    } else {
+      if (!window.confirm('정말로 이 댓글을 삭제하시겠습니까?')) return;
+    }
+    deleteCommentFromFeedback(postId, comment.id);
+    refreshList();
+    showToast('🗑️ 댓글이 삭제되었습니다.');
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1086,10 +1145,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   {selectedPost.comments && selectedPost.comments.length > 0 ? (
                     selectedPost.comments.map((c) => {
                       const isReply = Boolean(c.replyToId);
+                      const isEditingThis = editingCommentId === c.id;
                       return (
                         <div
                           key={c.id}
-                          className={`p-3.5 rounded-lg bg-[#141824] border border-[#23293a] flex flex-col gap-1.5 ${
+                          className={`p-3.5 rounded-lg bg-[#141824] border border-[#23293a] flex flex-col gap-2 ${
                             isReply ? 'ml-5 sm:ml-8 border-l-2 border-l-cyan-500/50 bg-[#121622]' : ''
                           }`}
                         >
@@ -1099,8 +1159,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                 <span className="text-cyan-400 font-bold text-xs">↳ @{c.replyToAuthor || '익명'}</span>
                               )}
                               <span className="font-bold text-slate-200">{c.author}</span>
+                              {c.password && (
+                                <span title="비밀번호 설정됨"><Lock className="w-2.5 h-2.5 text-slate-500" /></span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2.5">
                               <span className="font-mono text-[11px] text-slate-500">
                                 {new Date(c.createdAt).toLocaleString('ko-KR')}
                               </span>
@@ -1110,11 +1173,51 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                               >
                                 답글
                               </button>
+                              <button
+                                onClick={() => handleStartEditComment(c)}
+                                className="text-[11px] text-slate-400 hover:text-amber-300 font-bold transition cursor-pointer"
+                              >
+                                수정
+                              </button>
+                              <button
+                                onClick={() => handleDeleteComment(selectedPost.id, c)}
+                                className="text-[11px] text-slate-400 hover:text-red-400 font-bold transition cursor-pointer"
+                              >
+                                삭제
+                              </button>
                             </div>
                           </div>
-                          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans select-text">
-                            {c.text}
-                          </p>
+
+                          {isEditingThis ? (
+                            <div className="space-y-2 pt-1 animate-in fade-in">
+                              <textarea
+                                value={editingCommentText}
+                                onChange={(e) => setEditingCommentText(e.target.value)}
+                                rows={2}
+                                className="w-full px-3 py-2 rounded-md bg-[#1b2030] border border-amber-400/80 text-xs text-white focus:outline-none resize-none font-sans"
+                              />
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCommentId(null)}
+                                  className="px-2.5 py-1 rounded bg-[#252b3b] hover:bg-[#2e374c] text-slate-300 text-xs font-bold transition cursor-pointer"
+                                >
+                                  취소
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveEditComment(selectedPost.id, c.id)}
+                                  className="px-3 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer shadow active:scale-95"
+                                >
+                                  수정 완료
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans select-text whitespace-pre-wrap">
+                              {c.text}
+                            </p>
+                          )}
                         </div>
                       );
                     })

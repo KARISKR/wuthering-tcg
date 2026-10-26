@@ -9,6 +9,7 @@ export interface CommentItem {
   createdAt: string;
   replyToId?: string;
   replyToAuthor?: string;
+  password?: string;
 }
 
 export interface FeedbackItem {
@@ -341,7 +342,8 @@ export function addCommentToFeedback(
   author: string,
   text: string,
   replyToId?: string,
-  replyToAuthor?: string
+  replyToAuthor?: string,
+  password?: string
 ): CommentItem | null {
   if (!text.trim()) return null;
   const list = getFeedbackList();
@@ -351,6 +353,7 @@ export function addCommentToFeedback(
     text: text.trim(),
     createdAt: new Date().toISOString(),
     ...(replyToId ? { replyToId, replyToAuthor } : {}),
+    ...(password ? { password: password.trim() } : {}),
   };
 
   const updated = list.map((item) => {
@@ -549,4 +552,51 @@ export function hasNewPosts(posts?: FeedbackItem[], hours = 24): boolean {
 export function isPostNew(post: FeedbackItem, hours = 24): boolean {
   const threshold = Date.now() - hours * 3600 * 1000;
   return new Date(post.createdAt).getTime() > threshold;
+}
+
+export function updateCommentInFeedback(
+  postId: string,
+  commentId: string,
+  newText: string
+): boolean {
+  if (!newText.trim()) return false;
+  const list = getFeedbackList();
+  const updated = list.map((item) => {
+    if (item.id === postId) {
+      return {
+        ...item,
+        comments: (item.comments || []).map((c) =>
+          c.id === commentId ? { ...c, text: newText.trim() } : c
+        ),
+      };
+    }
+    return item;
+  });
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.warn('[feedbackManager] Failed to update comment:', err);
+  }
+  syncFeedbackListToCloud(updated);
+  return true;
+}
+
+export function deleteCommentFromFeedback(postId: string, commentId: string): boolean {
+  const list = getFeedbackList();
+  const updated = list.map((item) => {
+    if (item.id === postId) {
+      return {
+        ...item,
+        comments: (item.comments || []).filter((c) => c.id !== commentId),
+      };
+    }
+    return item;
+  });
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.warn('[feedbackManager] Failed to delete comment:', err);
+  }
+  syncFeedbackListToCloud(updated);
+  return true;
 }
