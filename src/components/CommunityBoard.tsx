@@ -69,6 +69,31 @@ import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 
+
+function renderFormattedContent(rawContent: string): string {
+  if (!rawContent) return '';
+  // 악성 스크립트 및 이벤트 차단
+  let safe = rawContent
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/javascript:[^"']*/gi, '');
+
+  // 마크다운 볼드 변환
+  safe = safe.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  return safe;
+}
+
+const BOARD_TABS: { id: FilterTab; label: string; icon?: string }[] = [
+  { id: 'ALL', label: '전체' },
+  { id: 'NOTICE', label: '공지', icon: '📢' },
+  { id: 'GENERAL', label: '일반', icon: '💬' },
+  { id: 'DECK', label: '덱공유', icon: '🃏' },
+  { id: 'TIP', label: '공략', icon: '📖' },
+  { id: 'FEEDBACK', label: '버그 및 피드백', icon: '🐛' },
+  { id: 'BEST', label: '개념글', icon: '🔥' },
+];
+
 interface CommunityBoardProps {
   onBackToLobby: () => void;
   onStartBattleWithCustomDeck?: (deck: CustomDeckConfig) => void;
@@ -106,6 +131,25 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const [category, setCategory] = useState<FeedbackCategory>('GENERAL');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const contentTextareaRef = React.useRef<HTMLTextAreaElement>(null);
+
+  const applyFormat = (prefix: string, suffix: string, defaultText = '텍스트') => {
+    const textarea = contentTextareaRef.current;
+    if (!textarea) return;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = content.substring(start, end);
+    const replacement = selected ? `${prefix}${selected}${suffix}` : `${prefix}${defaultText}${suffix}`;
+    const newContent = content.substring(0, start) + replacement + content.substring(end);
+    setContent(newContent);
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = start + prefix.length + (selected ? selected.length : defaultText.length);
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 10);
+  };
   const [contact, setContact] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
   const [deckCode, setDeckCode] = useState('');
   const [deckName, setDeckName] = useState('');
@@ -584,9 +628,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     return items.filter((item) => {
       // Tab filter
       if (activeTab === 'BEST') {
-        if ((item.likes || 0) < 10) return false;
+        if ((item.likes || 0) < 5) return false;
       } else if (activeTab === 'NOTICE') {
-        if (!item.isNotice) return false;
+        if (!item.isNotice && item.category !== 'NOTICE') return false;
+      } else if (activeTab === 'FEEDBACK') {
+        if (item.category !== 'FEEDBACK' && item.category !== 'BUG' && item.category !== 'FEATURE' && item.category !== 'RULE') return false;
       } else if (activeTab !== 'ALL') {
         if (item.category !== activeTab) return false;
       }
@@ -771,70 +817,29 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         {/* 2.2 아카라이브 말머리(카테고리) 탭 바 */}
         <nav className="flex items-center justify-between border-b border-[#262c3d] pb-2.5 overflow-x-auto scrollbar-none gap-2">
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-            {/* 전체 */}
-            <button
-              onClick={() => {
-                setActiveTab('ALL');
-                setCurrentPage(1);
-              }}
-              className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm md:text-base font-bold transition cursor-pointer ${
-                activeTab === 'ALL'
-                  ? 'bg-[#3b82f6] text-white shadow-md'
-                  : 'bg-[#181d2a] text-slate-400 hover:text-white hover:bg-[#22283a]'
-              }`}
-            >
-              전체
-            </button>
-
-            {/* 개념글 (념글) */}
-            <button
-              onClick={() => {
-                setActiveTab('BEST');
-                setCurrentPage(1);
-              }}
-              className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm md:text-base font-bold transition cursor-pointer ${
-                activeTab === 'BEST'
-                  ? 'bg-amber-500 text-slate-950 font-black shadow-md'
-                  : 'bg-[#181d2a] text-amber-400 hover:text-amber-300 hover:bg-[#22283a]'
-              }`}
-            >
-              <Flame className="w-4 h-4 fill-current" />
-              <span>개념글</span>
-            </button>
-
-            {/* 공지 */}
-            <button
-              onClick={() => {
-                setActiveTab('NOTICE');
-                setCurrentPage(1);
-              }}
-              className={`px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm md:text-base font-bold transition cursor-pointer ${
-                activeTab === 'NOTICE'
-                  ? 'bg-[#2b3347] text-amber-300 border border-amber-400/40 shadow-md'
-                  : 'bg-[#181d2a] text-slate-400 hover:text-white hover:bg-[#22283a]'
-              }`}
-            >
-              공지
-            </button>
-
-            {/* 말머리별 필터 */}
-            {(Object.keys(CATEGORY_INFO) as FeedbackCategory[]).map((cat) => {
-              const info = CATEGORY_INFO[cat];
-              const isSelected = activeTab === cat;
+            {BOARD_TABS.map((tab) => {
+              const isSelected = activeTab === tab.id;
               return (
                 <button
-                  key={cat}
+                  key={tab.id}
                   onClick={() => {
-                    setActiveTab(cat);
+                    setActiveTab(tab.id);
                     setCurrentPage(1);
                   }}
-                  className={`flex items-center gap-1 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm md:text-base font-bold transition cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm md:text-base font-bold transition cursor-pointer ${
                     isSelected
-                      ? 'bg-[#3b82f6] text-white shadow-md'
+                      ? tab.id === 'BEST'
+                        ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                        : tab.id === 'NOTICE'
+                        ? 'bg-[#2b3347] text-amber-300 border border-amber-400/50 shadow-md ring-1 ring-amber-400/30'
+                        : tab.id === 'TIP'
+                        ? 'bg-cyan-600 text-white shadow-md'
+                        : 'bg-[#3b82f6] text-white shadow-md'
                       : 'bg-[#181d2a] text-slate-400 hover:text-white hover:bg-[#22283a]'
                   }`}
                 >
-                  <span>{info.label}</span>
+                  {tab.icon && <span>{tab.icon}</span>}
+                  <span>{tab.label}</span>
                 </button>
               );
             })}
@@ -1651,11 +1656,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     onChange={(e) => handleCategoryChange(e.target.value as FeedbackCategory)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-[#141824] border border-[#2d354a] text-sm text-white focus:outline-none focus:border-blue-400 cursor-pointer"
                   >
-                    {(Object.keys(CATEGORY_INFO) as FeedbackCategory[]).map((cat) => (
-                      <option key={cat} value={cat}>
-                        {CATEGORY_INFO[cat].label}
-                      </option>
-                    ))}
+                    <option value="NOTICE">📢 공지 (관리자 전용)</option>
+                    <option value="GENERAL">💬 일반</option>
+                    <option value="DECK">🃏 덱공유</option>
+                    <option value="TIP">📖 공략</option>
+                    <option value="FEEDBACK">🐛 버그 및 피드백</option>
                   </select>
                 </div>
 

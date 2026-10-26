@@ -1,6 +1,6 @@
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 
-export type FeedbackCategory = 'NOTICE' | 'BUG' | 'DECK' | 'RULE' | 'FEATURE' | 'GENERAL';
+export type FeedbackCategory = 'NOTICE' | 'GENERAL' | 'DECK' | 'TIP' | 'FEEDBACK' | 'BUG' | 'RULE' | 'FEATURE';
 
 export interface CommentItem {
   id: string;
@@ -48,19 +48,18 @@ export const CATEGORY_INFO: Record<
   { label: string; icon: string; color: string; badgeClass: string; desc: string }
 > = {
   NOTICE: {
-    label: '공지사항',
+    label: '공지',
     icon: '📢',
     color: '#f59e0b',
     badgeClass: 'bg-amber-500/25 text-amber-300 border-amber-500/50',
     desc: '운영자 공식 공지사항 및 시스템 업데이트 안내 (관리자 전용)',
   },
-  
-  BUG: {
-    label: '버그제보',
-    icon: '🐛',
-    color: '#ef4444',
-    badgeClass: 'bg-red-500/20 text-red-300 border-red-500/40',
-    desc: '게임 멈춤, 연출 꼬임, 화면 이상 등 버그와 오류를 제보합니다.',
+  GENERAL: {
+    label: '일반',
+    icon: '💬',
+    color: '#6366f1',
+    badgeClass: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
+    desc: '게임 소감, 밸런스 이야기, 자유로운 잡담을 나눕니다.',
   },
   DECK: {
     label: '덱공유',
@@ -69,28 +68,45 @@ export const CATEGORY_INFO: Record<
     badgeClass: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
     desc: '강력한 커스텀 덱 코드와 운용 팁을 공유하고 추천합니다.',
   },
+  TIP: {
+    label: '공략',
+    icon: '📖',
+    color: '#06b6d4',
+    badgeClass: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40',
+    desc: '실전 카드 운용법, 티어 덱 공략 및 연격 콤보 가이드를 공유합니다.',
+  },
+  FEEDBACK: {
+    label: '버그 및 피드백',
+    icon: '🐛',
+    color: '#ef4444',
+    badgeClass: 'bg-red-500/20 text-red-300 border-red-500/40',
+    desc: '게임 오류/버그 제보 및 새로운 기능/시스템 개선안을 제안합니다.',
+  },
+  // 하위 호환
+  BUG: {
+    label: '버그제보',
+    icon: '🐛',
+    color: '#ef4444',
+    badgeClass: 'bg-red-500/20 text-red-300 border-red-500/40',
+    desc: '버그 제보',
+  },
   RULE: {
     label: '룰질문',
     icon: '📜',
     color: '#f59e0b',
     badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-    desc: '공식 텍스트 룰이나 판정 수치 이상 및 질문을 남깁니다.',
+    desc: '룰 질문',
   },
   FEATURE: {
     label: '개선제안',
     icon: '💡',
     color: '#10b981',
     badgeClass: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
-    desc: '신규 기능, 편의성 개선안, 새로운 아이디어를 제안합니다.',
-  },
-  GENERAL: {
-    label: '일반',
-    icon: '💬',
-    color: '#6366f1',
-    badgeClass: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40',
-    desc: '게임 밸런스 소감, 팁, 자유로운 잡담을 나눕니다.',
+    desc: '개선 제안',
   },
 };
+
+export const ACTIVE_CATEGORIES: FeedbackCategory[] = ['NOTICE', 'GENERAL', 'DECK', 'TIP', 'FEEDBACK'];
 
 // 가짜 시드 글을 완전히 비워 유저 실제 글만 표시되도록 함
 const SEED_POSTS: FeedbackItem[] = [];
