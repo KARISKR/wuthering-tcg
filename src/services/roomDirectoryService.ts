@@ -26,6 +26,7 @@ class RoomDirectoryService {
     roomCode: string;
     hostName: string;
     hostLeader?: string;
+    hostLeaderArt?: string;
     deckName?: string;
   }): Promise<void> {
     this.currentRoomCode = info.roomCode;
@@ -50,6 +51,7 @@ class RoomDirectoryService {
     roomCode: string;
     hostName: string;
     hostLeader?: string;
+    hostLeaderArt?: string;
     deckName?: string;
   }) {
     this.stopHeartbeat();

@@ -121,6 +121,7 @@ export interface MultiplayerRoomInfo {
   roomCode: string;
   hostName: string;
   hostLeader?: string;
+  hostLeaderArt?: string;
   deckName?: string;
   status: 'WAITING' | 'PLAYING';
   playerCount: number;

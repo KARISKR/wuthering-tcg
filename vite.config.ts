@@ -25,13 +25,14 @@ function roomsDevPlugin() {
           req.on('end', () => {
             try {
               const data = JSON.parse(body || '{}');
-              const { action, roomCode, hostName, hostLeader, deckName } = data;
+              const { action, roomCode, hostName, hostLeader, hostLeaderArt, deckName } = data;
               const upperCode = (roomCode || '').toUpperCase().trim();
               if (action === 'create') {
                 rooms.set(upperCode, {
                   roomCode: upperCode,
                   hostName: hostName || '방랑자',
                   hostLeader,
+                  hostLeaderArt,
                   deckName,
                   status: 'WAITING',
                   playerCount: 1,
@@ -47,6 +48,7 @@ function roomsDevPlugin() {
                     roomCode: upperCode,
                     hostName: hostName || '방랑자',
                     hostLeader,
+                    hostLeaderArt,
                     deckName,
                     status: 'WAITING',
                     playerCount: 1,

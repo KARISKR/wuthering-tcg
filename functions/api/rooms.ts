@@ -27,6 +27,7 @@ export interface MultiplayerRoomInfo {
   roomCode: string;
   hostName: string;
   hostLeader?: string;
+  hostLeaderArt?: string;
   deckName?: string;
   status: 'WAITING' | 'PLAYING';
   playerCount: number;
@@ -103,6 +104,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         roomCode?: string;
         hostName?: string;
         hostLeader?: string;
+        hostLeaderArt?: string;
         deckName?: string;
       };
 
@@ -145,6 +147,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           roomCode: upperCode,
           hostName: body.hostName || '방랑자',
           hostLeader: body.hostLeader,
+          hostLeaderArt: body.hostLeaderArt,
           deckName: body.deckName,
           status: 'WAITING',
           playerCount: 1,
@@ -161,6 +164,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             roomCode: upperCode,
             hostName: body.hostName || '방랑자',
             hostLeader: body.hostLeader,
+            hostLeaderArt: body.hostLeaderArt,
             deckName: body.deckName,
             status: 'WAITING',
             playerCount: 1,
