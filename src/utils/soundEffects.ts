@@ -602,72 +602,49 @@ class SoundEffectsEngine {
       const unlockAudio = () => {
         this.getAudioContext();
         this.preloadAllCustomSounds();
-        window.removeEventListener('pointerdown', unlockAudio);
-        window.removeEventListener('keydown', unlockAudio);
+        window.removeEventListener('pointerdown', unlockAudio, true);
+        window.removeEventListener('keydown', unlockAudio, true);
       };
-      window.addEventListener('pointerdown', unlockAudio, { once: true });
-      window.addEventListener('keydown', unlockAudio, { once: true });
+      window.addEventListener('pointerdown', unlockAudio, { once: true, capture: true });
+      window.addEventListener('keydown', unlockAudio, { once: true, capture: true });
+
+      // 초기 마운트 시점에도 백그라운드 프리로드 즉시 개시 (첫 클릭 이전에도 디코딩 완료 보장)
+      window.setTimeout(() => {
+        this.preloadAllCustomSounds();
+      }, 50);
     }
   }
 
   /**
-   * 게임 내 모든 필수 시스템 사운드 (총 1.3MB) 사전 비동기 로드
-   * 대결(격돌/대미지/무기/페이즈/연격) 시 끊김이나 합성음 폴백 없이 고음질 오디오 즉시 재생
+   * 게임 내 모든 필수 시스템 사운드 사전 비동기 로드
+   * 대결(카드 오픈/격돌/대미지/무기/페이즈/연격) 시 끊김이나 합성음 폴백 없이 고음질 오디오 즉시 재생
    */
   public async preloadAllCustomSounds() {
-    const coreCategories: string[] = [
+    // 1순위: 카드 오픈(clash_reveal), 격돌(clash), 카드 세트(card), 딜링(card_deal) 등 핵심 대결 사운드 최우선 로드
+    const priorityCategories: string[] = [
+      'clash_reveal',
+      'clash',
       'card',
       'card_deal',
-      'clash',
-      'clash_reveal',
       'draw',
-      'damage',
-      'damage_light',
-      'damage_medium',
-      'damage_heavy',
-      'weapon_sword',
-      'weapon_broadblade',
-      'weapon_pistol',
-      'weapon_rectifier',
-      'phase',
-      'phase_draw',
-      'phase_action',
-      'phase_battle',
-      'phase_combo',
-      'phase_end',
-      'combo',
-      'combo_1',
-      'combo_2',
-      'combo_3',
-      'combo_sword',
-      'combo_sword_1',
-      'combo_sword_2',
-      'combo_sword_3',
-      'combo_broadblade',
-      'combo_broadblade_1',
-      'combo_broadblade_2',
-      'combo_broadblade_3',
-      'combo_pistol',
-      'combo_pistol_1',
-      'combo_pistol_2',
-      'combo_pistol_3',
-      'combo_rectifier',
-      'combo_rectifier_1',
-      'combo_rectifier_2',
-      'combo_rectifier_3',
-      'turn',
       'upgrade',
       'victory',
-      'defeat',
-      'match_start',
-      'heal',
-      'low_hp',
-      'card_crack',
       'card_shatter',
     ];
 
     try {
-      await Promise.allSettled(coreCategories.map((cat) => this.loadCustomServerFile(cat)));
+      await Promise.allSettled(priorityCategories.map((cat) => this.loadCustomServerFile(cat)));
+    } catch {
+      // ignore
+    }
+
+    // 2순위: 매니페스트에 등록된 나머지 시스템 효과음 로드
+    const sysKeys = Object.keys(systemAudioManifest as Record<string, string[]>).filter(
+      (k) => !priorityCategories.includes(k)
+    );
+
+    try {
+      await Promise.allSettled(sysKeys.map((cat) => this.loadCustomServerFile(cat)));
     } catch {
       // ignore
     }
@@ -782,23 +759,74 @@ class SoundEffectsEngine {
   }
 
   /**
+   * 매니페스트(캐릭터/시스템)에서 해당 키에 매핑된 정적 음원 URL 배열 조회
+   */
+  private getManifestUrls(key: string): string[] | undefined {
+    const manifestData = characterAudioManifest as Record<string, Record<string, string[]>>;
+
+    if (key.startsWith('char_levelup_')) {
+      const charId = key.replace('char_levelup_', '');
+      return manifestData[charId]?.['levelup'];
+    } else if (key.startsWith('char_attack_')) {
+      const match = key.match(/^char_attack_(.+)_(cost\d+)$/);
+      const charId = match ? match[1] : '';
+      const costStr = match ? match[2] : '';
+      if (charId && costStr) {
+        return manifestData[charId]?.[`attack_${costStr}`] || manifestData[charId]?.[costStr];
+      }
+    } else if (key.startsWith('char_victory_')) {
+      const charId = key.replace('char_victory_', '');
+      return manifestData[charId]?.['victory'];
+    } else if (key.startsWith('char_defeat_')) {
+      const charId = key.replace('char_defeat_', '');
+      return manifestData[charId]?.['defeat'];
+    } else if (key.startsWith('char_opening_')) {
+      const charId = key.replace('char_opening_', '');
+      return manifestData[charId]?.['opening'];
+    } else if (key.startsWith('char_hurt_')) {
+      const charId = key.replace('char_hurt_', '');
+      return manifestData[charId]?.['hurt'];
+    } else if (key.startsWith('char_idle_')) {
+      const charId = key.replace('char_idle_', '');
+      return manifestData[charId]?.['idle'];
+    } else if (key.startsWith('char_low_hp_')) {
+      const charId = key.replace('char_low_hp_', '');
+      return manifestData[charId]?.['low_hp'];
+    } else if (key.startsWith('char_switch_')) {
+      const charId = key.replace('char_switch_', '');
+      return manifestData[charId]?.['switch'];
+    } else {
+      const sysData = systemAudioManifest as Record<string, string[]>;
+      if (key === 'card_open') return sysData['clash_reveal'];
+      if (key === 'clash_impact') return sysData['clash'];
+      if (key === 'card_draw') return sysData['card_deal'];
+      return sysData[key];
+    }
+    return undefined;
+  }
+
+  /**
    * 서버 정적 폴더 파일 다중 경로 및 다중 음원(_1, _2, _3 넘버링) 탐색 및 로드 시도
    */
   private async loadCustomServerFile(key: string): Promise<AudioBuffer[] | null> {
-    if (this.checkedCustomFiles.has(key)) {
-      return this.customAudioBuffers.get(key) ?? null;
+    const existing = this.customAudioBuffers.get(key);
+    if (existing && existing.length > 0) {
+      return existing;
     }
     if (this.loadingPromises.has(key)) {
       return this.loadingPromises.get(key)!;
     }
+    if (this.checkedCustomFiles.has(key)) {
+      return existing ?? null;
+    }
 
     const loadPromise = (async () => {
-      this.checkedCustomFiles.add(key);
-
       const ctx = this.getAudioContext();
-      if (!ctx) return null;
+      if (!ctx) {
+        this.loadingPromises.delete(key);
+        return null;
+      }
 
-      const formats = ['mp3', 'wav', 'ogg', 'webm'];
       const folderDirs: string[] = [];
       const directFileBases: string[] = [];
 
@@ -980,47 +1008,7 @@ class SoundEffectsEngine {
         directFileBases.push(`/audio/sfx/${key}/${key}`, `/audio/sfx/${key}/sound`, `/audio/sfx/${key}/audio`);
       }
 
-      // 0. 매니페스트에 등록된 정확한 음원 목록이 있다면 우선 추출
-      const manifestData = characterAudioManifest as Record<string, Record<string, string[]>>;
-      let manifestUrls: string[] | undefined;
-
-      if (key.startsWith('char_levelup_')) {
-        const charId = key.replace('char_levelup_', '');
-        manifestUrls = manifestData[charId]?.['levelup'];
-      } else if (key.startsWith('char_attack_')) {
-        const match = key.match(/^char_attack_(.+)_(cost\d+)$/);
-        const charId = match ? match[1] : '';
-        const costStr = match ? match[2] : '';
-        if (charId && costStr) {
-          manifestUrls = manifestData[charId]?.[`attack_${costStr}`] || manifestData[charId]?.[costStr];
-        }
-      } else if (key.startsWith('char_victory_')) {
-        const charId = key.replace('char_victory_', '');
-        manifestUrls = manifestData[charId]?.['victory'];
-      } else if (key.startsWith('char_defeat_')) {
-        const charId = key.replace('char_defeat_', '');
-        manifestUrls = manifestData[charId]?.['defeat'];
-      } else if (key.startsWith('char_opening_')) {
-        const charId = key.replace('char_opening_', '');
-        manifestUrls = manifestData[charId]?.['opening'];
-      } else if (key.startsWith('char_hurt_')) {
-        const charId = key.replace('char_hurt_', '');
-        manifestUrls = manifestData[charId]?.['hurt'];
-      } else if (key.startsWith('char_idle_')) {
-        const charId = key.replace('char_idle_', '');
-        manifestUrls = manifestData[charId]?.['idle'];
-      } else if (key.startsWith('char_low_hp_')) {
-        const charId = key.replace('char_low_hp_', '');
-        manifestUrls = manifestData[charId]?.['low_hp'];
-      } else if (key.startsWith('char_switch_')) {
-        const charId = key.replace('char_switch_', '');
-        manifestUrls = manifestData[charId]?.['switch'];
-      } else {
-        // 시스템 카테고리 매니페스트 확인
-        const sysData = systemAudioManifest as Record<string, string[]>;
-        manifestUrls = sysData[key];
-      }
-
+      const manifestUrls = this.getManifestUrls(key);
       let candidateUrls: string[] = [];
 
       // 매니페스트에 등록된 정확한 음원이 있다면 최대 3개 변형만 선별 로드하여 메모리/네트워크 절약
@@ -1057,12 +1045,19 @@ class SoundEffectsEngine {
         })
       );
 
+      this.loadingPromises.delete(key);
+
       if (loadedBuffers.length > 0) {
         this.customAudioBuffers.set(key, loadedBuffers);
+        this.checkedCustomFiles.add(key);
         return loadedBuffers;
       }
 
-      this.customAudioBuffers.set(key, []);
+      // 매니페스트에 음원이 없는데도 로드되지 않은 경우에만 재탐색 방지 마킹 (매니페스트 음원이 일시적 네트워크/컨텍스트 지연으로 실패한 경우 재시도 허용)
+      if (!manifestUrls || manifestUrls.length === 0) {
+        this.checkedCustomFiles.add(key);
+        this.customAudioBuffers.set(key, []);
+      }
       return null;
     })();
 
@@ -1245,18 +1240,30 @@ class SoundEffectsEngine {
       return this.playDecodedBuffer(buffers[randomIndex], key, volumeMultiplier);
     }
 
+    const manifestUrls = this.getManifestUrls(key);
+    const hasManifestAudio = Boolean(manifestUrls && manifestUrls.length > 0);
+
     // 아직 로드되지 않았거나 로딩 중인 경우 백그라운드 로드 촉발
-    const pending = this.loadingPromises.get(key) || (!this.checkedCustomFiles.has(key) ? this.loadCustomServerFile(key) : null);
+    const pending =
+      this.loadingPromises.get(key) ||
+      (!this.checkedCustomFiles.has(key) ? this.loadCustomServerFile(key) : null);
+
     if (pending) {
-      // 캐릭터 보이스 등 합성음 폴백이 없는 키의 경우, 로드 완료 직후 자동 재생 복구
-      const isVoice = key.startsWith('char_');
-      if (isVoice) {
-        pending.then((loaded) => {
-          if (loaded && loaded.length > 0 && !this.isMuted) {
-            const randomIndex = Math.floor(Math.random() * loaded.length);
-            this.playDecodedBuffer(loaded[randomIndex], key, volumeMultiplier);
-          }
-        }).catch(() => {});
+      // 매니페스트에 등록된 커스텀 사운드(clash, clash_reveal, card 등)나 캐릭터 보이스의 경우
+      // 합성 기본음으로 폴백하지 않고 로드 완료 직후 즉시 커스텀 음원을 재생
+      if (hasManifestAudio || key.startsWith('char_')) {
+        pending
+          .then((loaded) => {
+            if (loaded && loaded.length > 0 && !this.isMuted) {
+              const randomIndex = Math.floor(Math.random() * loaded.length);
+              this.playDecodedBuffer(loaded[randomIndex], key, volumeMultiplier);
+            }
+          })
+          .catch(() => {});
+
+        if (hasManifestAudio) {
+          return true;
+        }
       }
     }
 
@@ -2236,8 +2243,8 @@ class SoundEffectsEngine {
     if (this.isMuted) return;
 
     // 패 배분 / 딜링 전용 커스텀 파일 확인 (절대 card 세트음이나 clash_reveal 오픈음과 혼용되지 않음)
-    if (this.playCustomBuffer('card_deal', this.volume * 0.9)) return;
-    if (this.playCustomBuffer('card_draw', this.volume * 0.9)) return;
+    if (this.playCustomBuffer('card_deal', 0.9)) return;
+    if (this.playCustomBuffer('card_draw', 0.9)) return;
 
     const ctx = this.getAudioContext();
     if (!ctx) return;
