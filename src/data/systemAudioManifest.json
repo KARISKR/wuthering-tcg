@@ -1,85 +1,66 @@
 {
   "card": [
-    "/audio/sfx/card/1.mp3",
-    "/audio/sfx/card/カードをめくる.mp3"
+    "/audio/sfx/card/1.mp3"
   ],
   "card_deal": [
-    "/audio/sfx/card_deal/1.ogg",
-    "/audio/sfx/card_deal/card-place-1.ogg"
+    "/audio/sfx/card_deal/1.ogg"
   ],
   "card_shatter": [
     "/audio/sfx/card_shatter/1.mp3"
   ],
   "clash": [
-    "/audio/sfx/clash/[SHANA]제목 없는 동영상_[cut_1sec].mp3",
     "/audio/sfx/clash/1.mp3"
   ],
   "clash_reveal": [
-    "/audio/sfx/clash_reveal/[SHANA]Desktop 2026.10.20 - 01.21.54.02_[cut_0sec].mp3",
     "/audio/sfx/clash_reveal/1.mp3"
   ],
   "combo": [
-    "/audio/sfx/combo/1.mp3",
-    "/audio/sfx/combo/剣で斬る1 (1).mp3"
+    "/audio/sfx/combo/1.mp3"
   ],
   "combo_1": [
-    "/audio/sfx/combo_1/1.mp3",
-    "/audio/sfx/combo_1/剣で斬る1 (1).mp3"
+    "/audio/sfx/combo_1/1.mp3"
   ],
   "combo_2": [
-    "/audio/sfx/combo_2/1.mp3",
-    "/audio/sfx/combo_2/剣で斬る4 (1).mp3"
+    "/audio/sfx/combo_2/1.mp3"
   ],
   "combo_3": [
-    "/audio/sfx/combo_3/1.mp3",
-    "/audio/sfx/combo_3/剣で斬る5 (1).mp3"
+    "/audio/sfx/combo_3/1.mp3"
   ],
   "combo_broadblade": [
-    "/audio/sfx/combo_broadblade/1.mp3",
-    "/audio/sfx/combo_broadblade/daviddumaisaudio-sword-slash-and-swing-185432.mp3"
+    "/audio/sfx/combo_broadblade/1.mp3"
   ],
   "combo_broadblade_1": [
-    "/audio/sfx/combo_broadblade_1/1.mp3",
-    "/audio/sfx/combo_broadblade_1/daviddumaisaudio-sword-slash-and-swing-185432.mp3"
+    "/audio/sfx/combo_broadblade_1/1.mp3"
   ],
   "combo_broadblade_2": [
-    "/audio/sfx/combo_broadblade_2/1.mp3",
-    "/audio/sfx/combo_broadblade_2/daviddumaisaudio-sword-slash-with-metallic-impact-185435.mp3"
+    "/audio/sfx/combo_broadblade_2/1.mp3"
   ],
   "combo_broadblade_3": [
-    "/audio/sfx/combo_broadblade_3/1.mp3",
-    "/audio/sfx/combo_broadblade_3/daviddumaisaudio-sword-slash-with-a-designed-impact-185434.mp3"
+    "/audio/sfx/combo_broadblade_3/1.mp3"
   ],
   "combo_pistol": [
-    "/audio/sfx/combo_pistol/1.mp3",
-    "/audio/sfx/combo_pistol/拳銃を撃つ.mp3"
+    "/audio/sfx/combo_pistol/1.mp3"
   ],
   "combo_pistol_1": [
-    "/audio/sfx/combo_pistol_1/1.mp3",
-    "/audio/sfx/combo_pistol_1/拳銃を撃つ.mp3"
+    "/audio/sfx/combo_pistol_1/1.mp3"
   ],
   "combo_pistol_2": [
-    "/audio/sfx/combo_pistol_2/1.mp3",
-    "/audio/sfx/combo_pistol_2/狙撃銃発射.mp3"
+    "/audio/sfx/combo_pistol_2/1.mp3"
   ],
   "combo_pistol_3": [
-    "/audio/sfx/combo_pistol_3/1.mp3",
-    "/audio/sfx/combo_pistol_3/大型狙撃銃を発射.mp3"
+    "/audio/sfx/combo_pistol_3/1.mp3"
   ],
   "combo_rectifier": [
     "/audio/sfx/combo_rectifier/1.mp3"
   ],
   "combo_rectifier_1": [
-    "/audio/sfx/combo_rectifier_1/1.mp3",
-    "/audio/sfx/combo_rectifier_1/火炎魔法1.mp3"
+    "/audio/sfx/combo_rectifier_1/1.mp3"
   ],
   "combo_rectifier_2": [
-    "/audio/sfx/combo_rectifier_2/1.mp3",
-    "/audio/sfx/combo_rectifier_2/koiroylers-fireball-impact-351961.mp3"
+    "/audio/sfx/combo_rectifier_2/1.mp3"
   ],
   "combo_rectifier_3": [
-    "/audio/sfx/combo_rectifier_3/1.mp3",
-    "/audio/sfx/combo_rectifier_3/火炎魔法3.mp3"
+    "/audio/sfx/combo_rectifier_3/1.mp3"
   ],
   "combo_sword": [
     "/audio/sfx/combo_sword/1.mp3"
@@ -97,8 +78,7 @@
     "/audio/sfx/damage/1.mp3"
   ],
   "damage_heavy": [
-    "/audio/sfx/damage_heavy/1.mp3",
-    "/audio/sfx/damage_heavy/打撃3 (1).mp3"
+    "/audio/sfx/damage_heavy/1.mp3"
   ],
   "damage_light": [
     "/audio/sfx/damage_light/1.mp3"
@@ -107,52 +87,40 @@
     "/audio/sfx/damage_medium/1.mp3"
   ],
   "draw": [
-    "/audio/sfx/draw/1.mp3",
-    "/audio/sfx/draw/u_fe12rqkbth-sword-clash-241729.mp3"
+    "/audio/sfx/draw/1.mp3"
   ],
   "phase": [
     "/audio/sfx/phase/1.mp3"
   ],
   "phase_action": [
-    "/audio/sfx/phase_action/1.mp3",
-    "/audio/sfx/phase_action/タイトル表示.mp3"
+    "/audio/sfx/phase_action/1.mp3"
   ],
   "phase_battle": [
-    "/audio/sfx/phase_battle/1.mp3",
-    "/audio/sfx/phase_battle/金属タイトル表示1.mp3"
+    "/audio/sfx/phase_battle/1.mp3"
   ],
   "phase_combo": [
-    "/audio/sfx/phase_combo/1.mp3",
-    "/audio/sfx/phase_combo/金属タイトル表示2.mp3"
+    "/audio/sfx/phase_combo/1.mp3"
   ],
   "phase_draw": [
-    "/audio/sfx/phase_draw/1.mp3",
-    "/audio/sfx/phase_draw/ニュースタイトル表示4.mp3"
+    "/audio/sfx/phase_draw/1.mp3"
   ],
   "phase_end": [
-    "/audio/sfx/phase_end/1.mp3",
-    "/audio/sfx/phase_end/プレゼンタイトル表示1.mp3"
+    "/audio/sfx/phase_end/1.mp3"
   ],
   "upgrade": [
-    "/audio/sfx/upgrade/[SHANA]Wuthering Waves 2026.10.19 - 01.49.30.07_[cut_2sec].mp3",
     "/audio/sfx/upgrade/1.mp3"
   ],
   "victory": [
-    "/audio/sfx/victory/1.mp3",
-    "/audio/sfx/victory/Hearthstone Sound of Victory - (320 Kbps) (1)_[cut_8sec].mp3"
+    "/audio/sfx/victory/1.mp3"
   ],
   "weapon_broadblade": [
-    "/audio/sfx/weapon_broadblade/1.mp3",
-    "/audio/sfx/weapon_broadblade/daviddumaisaudio-sword-slash-and-swing-185432.mp3"
+    "/audio/sfx/weapon_broadblade/1.mp3"
   ],
   "weapon_pistol": [
-    "/audio/sfx/weapon_pistol/1.mp3",
-    "/audio/sfx/weapon_pistol/shotgun.mp3",
-    "/audio/sfx/weapon_pistol/ショットガン発射.mp3"
+    "/audio/sfx/weapon_pistol/1.mp3"
   ],
   "weapon_rectifier": [
-    "/audio/sfx/weapon_rectifier/1.mp3",
-    "/audio/sfx/weapon_rectifier/yodguard-fire-magic-4-378637_[cut_1sec].mp3"
+    "/audio/sfx/weapon_rectifier/1.mp3"
   ],
   "weapon_sword": [
     "/audio/sfx/weapon_sword/1.mp3"
