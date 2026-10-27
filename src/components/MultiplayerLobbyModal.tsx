@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ArrowLeft,
   Swords,
@@ -12,13 +12,13 @@ import {
   Layers,
   ArrowRight,
   Crown,
-  Plus,
-  Radio,
   Clock,
   ShieldAlert,
   Hash,
   X,
-  ExternalLink,
+  Lock,
+  CheckCircle2,
+  RotateCcw,
 } from 'lucide-react';
 import {
   multiplayerService,
@@ -92,10 +92,10 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
 
-  // 활성 팝업 창 상태: 'NONE' | 'HOST_WAITING' | 'GUEST_CONNECTING'
+  // 활성 오버레이: 'NONE' | 'HOST_WAITING' | 'GUEST_CONNECTING'
   const [activeOverlay, setActiveOverlay] = useState<'NONE' | 'HOST_WAITING' | 'GUEST_CONNECTING'>('NONE');
 
-  // 덱 선택 상태
+  // 덱 선택 상태 (매칭 완료 후 방 안에서 선택)
   const presets: DeckPreset[] = useMemo(() => getStoredPresets(), [isOpen]);
   const [selectedDeckId, setSelectedDeckId] = useState<string>(() => {
     return presets[0]?.id || 'starter-rover';
@@ -114,6 +114,10 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     multiplayerService.opponentProfile
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // 게스트 준비 상태 및 상대방 덱 비공개 보관 Ref
+  const [isGuestReady, setIsGuestReady] = useState<boolean>(false);
+  const guestDeckRef = useRef<CustomDeckConfig | null>(null);
 
   // 방 목록 조회 함수
   const fetchRoomList = useCallback(async (showSpinner: boolean = false) => {
@@ -171,13 +175,31 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
 
     const unsubMsg = multiplayerService.onMessage((msg: MultiplayerMessage) => {
       if (msg.type === 'LOBBY_JOIN') {
+        // 호스트: 게스트 입장 수신
         setOpponentProfile(msg.profile);
         soundEffects.playCardPlace();
+        // 게스트에게 방장 정보 응답 (덱은 비공개)
+        multiplayerService.send({
+          type: 'LOBBY_ACCEPT',
+          hostProfile: {
+            name: playerName.trim() || '방랑자(호스트)',
+            sessionId: multiplayerService.sessionId,
+            customDeck: null,
+          },
+        });
       } else if (msg.type === 'LOBBY_ACCEPT') {
+        // 게스트: 호스트 수락 수신
         setOpponentProfile(msg.hostProfile);
         soundEffects.playCardPlace();
+      } else if (msg.type === 'LOBBY_READY') {
+        // 호스트: 게스트의 덱 선택 완료 및 준비 신호 수신
+        setIsGuestReady(msg.isReady);
+        if (msg.profile?.customDeck) {
+          guestDeckRef.current = msg.profile.customDeck;
+        }
+        soundEffects.playCardPlace();
       } else if (msg.type === 'GAME_START') {
-        // 호스트가 게임 시작 신호를 보냄
+        // 게스트: 호스트가 게임 시작 신호를 보냄
         soundEffects.playTurnStart();
         onStartMatch(
           'GUEST',
@@ -191,7 +213,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       unsubStatus();
       unsubMsg();
     };
-  }, [isOpen, selectedDeckConfig, onStartMatch]);
+  }, [isOpen, playerName, selectedDeckConfig, onStartMatch]);
 
   const handleNameChange = (name: string) => {
     setPlayerName(name);
@@ -205,30 +227,34 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     roomDirectoryService.closeRoom(createdRoomCode);
     multiplayerService.cleanUp();
     setActiveOverlay('NONE');
+    setIsGuestReady(false);
+    guestDeckRef.current = null;
     onClose();
   };
 
-  // 새 방 만들기 시작 (호스트)
+  // 새 방 만들기 시작 (호스트) - 덱은 공개 목록에 절대 올리지 않음!
   const handleOpenCreateRoom = async () => {
     soundEffects.playCardPlace();
     setErrorMessage(null);
+    setIsGuestReady(false);
+    guestDeckRef.current = null;
     setActiveOverlay('HOST_WAITING');
 
     try {
       const profile: MultiplayerPlayerProfile = {
         name: playerName.trim() || '방랑자',
-        customDeck: selectedDeckConfig,
+        customDeck: null, // 매칭 완료 전 덱 비공개
         sessionId: multiplayerService.sessionId,
       };
       await multiplayerService.createRoom(createdRoomCode, profile);
 
-      // 공개 방 목록 디렉토리에 등록 및 하트비트 시작
+      // 공개 방 목록 디렉토리에 등록 (덱과 리더는 비공개로 등록!)
       await roomDirectoryService.registerRoom({
         roomCode: createdRoomCode,
         hostName: profile.name,
-        hostLeader: selectedDeckConfig?.leader?.nameKr || selectedDeckConfig?.leader?.characterName,
-        hostLeaderArt: selectedDeckConfig?.leader?.artUrl || findLeaderArt(selectedDeckConfig?.leader?.nameKr),
-        deckName: selectedDeckConfig?.name,
+        hostLeader: undefined,
+        hostLeaderArt: undefined,
+        deckName: undefined,
       });
 
       // 목록 즉시 재조회
@@ -245,6 +271,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     const newCode = generateRoomCode();
     setCreatedRoomCode(newCode);
     setOpponentProfile(null);
+    setIsGuestReady(false);
+    guestDeckRef.current = null;
     handleOpenCreateRoom();
   };
 
@@ -253,12 +281,13 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     soundEffects.playCardPlace();
     setErrorMessage(null);
     setInputRoomCode(targetRoomCode);
+    setIsGuestReady(false);
     setActiveOverlay('GUEST_CONNECTING');
 
     try {
       const profile: MultiplayerPlayerProfile = {
         name: playerName.trim() || '방랑자',
-        customDeck: selectedDeckConfig,
+        customDeck: null, // 매칭 완료 전 덱 비공개
         sessionId: multiplayerService.sessionId,
       };
       await multiplayerService.joinRoom(targetRoomCode, profile);
@@ -275,12 +304,13 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     }
     soundEffects.playCardPlace();
     setErrorMessage(null);
+    setIsGuestReady(false);
     setActiveOverlay('GUEST_CONNECTING');
 
     try {
       const profile: MultiplayerPlayerProfile = {
         name: playerName.trim() || '방랑자',
-        customDeck: selectedDeckConfig,
+        customDeck: null, // 매칭 완료 전 덱 비공개
         sessionId: multiplayerService.sessionId,
       };
       await multiplayerService.joinRoom(inputRoomCode.trim(), profile);
@@ -289,25 +319,49 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     }
   };
 
-  // 호스트: 대결 시작
+  // 게스트: 덱 선택 완료 및 준비 상태 토글
+  const handleToggleGuestReady = () => {
+    const nextReady = !isGuestReady;
+    setIsGuestReady(nextReady);
+    soundEffects.playCardPlace();
+
+    multiplayerService.send({
+      type: 'LOBBY_READY',
+      isReady: nextReady,
+      profile: {
+        name: playerName.trim() || '방랑자',
+        customDeck: nextReady ? selectedDeckConfig : null,
+        sessionId: multiplayerService.sessionId,
+      },
+    });
+  };
+
+  // 호스트: 대결 시작 (도전자가 준비 완료했을 때만 작동)
   const handleHostStartGame = () => {
-    if (!opponentProfile) return;
+    if (!opponentProfile || !isGuestReady) return;
     soundEffects.playTurnStart();
 
     // 방 목록에서 '배틀 진행 중' 상태로 전환
     roomDirectoryService.updateRoomToPlaying(createdRoomCode);
+
+    const hostDeck = selectedDeckConfig;
+    const guestDeck = guestDeckRef.current;
 
     multiplayerService.send({
       type: 'GAME_START',
       initialState: {} as any,
       hostProfile: {
         name: playerName.trim() || '방랑자(호스트)',
-        customDeck: selectedDeckConfig,
+        customDeck: hostDeck,
         sessionId: multiplayerService.sessionId,
       },
-      guestProfile: opponentProfile,
+      guestProfile: {
+        name: opponentProfile.name,
+        customDeck: guestDeck,
+        sessionId: opponentProfile.sessionId,
+      },
     });
-    onStartMatch('HOST', selectedDeckConfig, opponentProfile.customDeck || null);
+    onStartMatch('HOST', hostDeck, guestDeck);
   };
 
   // 오버레이 닫기 및 호스트/게스트 취소
@@ -317,6 +371,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     setActiveOverlay('NONE');
     setErrorMessage(null);
     setOpponentProfile(null);
+    setIsGuestReady(false);
+    guestDeckRef.current = null;
     fetchRoomList(false);
   };
 
@@ -337,11 +393,12 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   if (!isOpen) return null;
 
   const waitingRooms = rooms.filter((r) => r.status === 'WAITING');
+  const myLeaderArt = selectedDeckConfig?.leader?.artUrl || findLeaderArt(selectedDeckConfig?.leader?.nameKr);
 
   return (
     <div className="fixed inset-0 z-50 h-screen w-full bg-[#05070d] text-slate-100 flex flex-col overflow-hidden select-none animate-in fade-in duration-200">
       {/* ========================================================= */}
-      {/* 1. 상단 글로벌 헤더 (덱 빌더 마이 덱 스크린 스타일) */}
+      {/* 1. 상단 글로벌 헤더 */}
       {/* ========================================================= */}
       <header className="relative z-10 h-16 sm:h-18 px-5 sm:px-8 flex items-center justify-between border-b border-slate-700/60 shrink-0 bg-slate-950/80 backdrop-blur-md">
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -358,45 +415,29 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
               멀티 배틀 로비
             </h2>
             <span className="hidden sm:inline-block text-[11px] font-mono text-amber-400/80 px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/30 shrink-0">
-              P2P 1v1 BATTLE
+              BLIND PICK 1v1
             </span>
             <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-950/70 border border-emerald-500/40 px-2.5 py-0.5 rounded-full shrink-0">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              LIVE {waitingRooms.length}개 대기
+              LIVE {waitingRooms.length}개 방 대기
             </span>
           </div>
         </div>
 
-        {/* 상단 우측: 닉네임 & 덱 선택 컨트롤 */}
+        {/* 상단 우측: 닉네임 수정 & 새로고침 */}
         <div className="flex items-center gap-3 shrink-0">
           {/* 닉네임 설정 */}
-          <div className="hidden md:flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-xl shadow-inner">
+          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-xl shadow-inner">
             <User className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-            <span className="text-xs font-bold text-slate-400">닉네임:</span>
+            <span className="text-xs font-bold text-slate-400 hidden sm:inline">닉네임:</span>
             <input
               type="text"
               value={playerName}
               onChange={(e) => handleNameChange(e.target.value)}
               maxLength={12}
-              className="bg-transparent text-xs font-black text-white focus:outline-none w-24 text-amber-300"
+              className="bg-transparent text-xs sm:text-sm font-black text-white focus:outline-none w-20 sm:w-28 text-amber-300"
               placeholder="방랑자"
             />
-          </div>
-
-          {/* 사용할 덱 선택 */}
-          <div className="flex items-center gap-1.5 bg-slate-900/90 border border-slate-700/80 px-3 py-1.5 rounded-xl shadow-inner max-w-[200px] sm:max-w-[240px]">
-            <Layers className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-            <select
-              value={selectedDeckId}
-              onChange={(e) => setSelectedDeckId(e.target.value)}
-              className="bg-transparent text-xs font-black text-white focus:outline-none truncate cursor-pointer"
-            >
-              {presets.map((preset) => (
-                <option key={preset.id} value={preset.id} className="bg-slate-900 text-white font-bold">
-                  {preset.name}
-                </option>
-              ))}
-            </select>
           </div>
 
           {/* 새로고침 버튼 */}
@@ -412,7 +453,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       </header>
 
       {/* ========================================================= */}
-      {/* 2. 메인 컨텐츠 영역 (방 타일 카드 그리드) */}
+      {/* 2. 메인 컨텐츠 영역 (공개 방 목록 그리드) */}
       {/* ========================================================= */}
       <main className="relative z-10 flex-1 overflow-y-auto px-5 sm:px-8 py-6 custom-scrollbar bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(245,158,11,0.06),rgba(255,255,255,0))]">
         {errorMessage && (
@@ -445,7 +486,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
               <h3 className="text-lg font-black text-white">현재 개설된 공개 대전 방이 없습니다</h3>
               <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
                 하단의 <strong>[방 만들기]</strong> 버튼을 눌러 먼저 방을 개설하거나,<br />
-                친구에게 방 코드를 받아 <strong>[코드 참가]</strong>해 보세요!
+                친구에게 방 코드를 받아 <strong>[코드 입장]</strong>해 보세요!
               </p>
             </div>
             <button
@@ -457,35 +498,21 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
             </button>
           </div>
         ) : (
-          /* 방 타일 카드 그리드 */
+          /* 방 타일 카드 그리드 (덱 정보는 사전에 절대 노출되지 않음!) */
           <div className="grid gap-4 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(320px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(360px,1fr))] max-w-[1700px] mx-auto pb-4">
             {rooms.map((room) => {
               const isWaiting = room.status === 'WAITING';
-              const leaderArt = room.hostLeaderArt || findLeaderArt(room.hostLeader);
 
               return (
                 <div
                   key={room.roomCode}
-                  className={`group relative border-2 bg-[#080d1b]/95 hover:bg-[#0d1428] p-5 flex flex-col justify-between transition-all duration-300 shadow-xl overflow-hidden min-h-[220px] ${
+                  className={`group relative border-2 bg-[#080d1b]/95 hover:bg-[#0d1428] p-5 flex flex-col justify-between transition-all duration-300 shadow-xl overflow-hidden min-h-[200px] ${
                     isWaiting
                       ? 'border-slate-700/80 hover:border-amber-400 hover:shadow-[0_0_30px_rgba(245,158,11,0.25)]'
                       : 'border-slate-800 opacity-60'
                   }`}
                   style={{ clipPath: TILE_CLIP }}
                 >
-                  {/* 배경 리더 캐릭터 아트 비네트 */}
-                  {leaderArt && (
-                    <div className="absolute right-0 top-0 bottom-0 w-1/2 pointer-events-none overflow-hidden opacity-30 group-hover:opacity-45 transition duration-300">
-                      <img
-                        src={leaderArt}
-                        alt=""
-                        draggable={false}
-                        className="w-full h-full object-cover object-top"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#080d1b] via-[#080d1b]/70 to-transparent" />
-                    </div>
-                  )}
-
                   {/* 카드 상단: 방 번호 & 상태 배지 */}
                   <div className="relative z-10 flex items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
                     <div className="flex items-center gap-2">
@@ -510,8 +537,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                     )}
                   </div>
 
-                  {/* 카드 중단: 호스트 및 덱 정보 */}
-                  <div className="relative z-10 my-4 space-y-1.5">
+                  {/* 카드 중단: 호스트 및 비공개 덱 안내 */}
+                  <div className="relative z-10 my-3.5 space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center text-xs font-black">
                         P1
@@ -521,21 +548,21 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                       </span>
                     </div>
 
+                    {/* 카운터 픽 방지를 위한 비공개 안내 배지 */}
                     <div className="text-xs text-slate-300 font-bold flex flex-wrap items-center gap-2 pl-1">
-                      <span className="text-amber-400/90 font-black">
-                        리더: {room.hostLeader || '방랑자'}
+                      <span className="text-cyan-400 font-black flex items-center gap-1 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-500/30">
+                        <Lock className="w-3 h-3 text-cyan-400" />
+                        <span>덱: 매칭 후 비공개 선택</span>
                       </span>
                       <span className="text-slate-600">•</span>
-                      <span className="text-slate-400 truncate">
-                        덱: {room.deckName || '기본 스타터 덱'}
-                      </span>
+                      <span className="text-slate-400 text-[11px]">블라인드 픽</span>
                     </div>
                   </div>
 
                   {/* 카드 하단: 참가 버튼 */}
                   <div className="relative z-10 pt-2 border-t border-slate-800/80 flex items-center justify-between">
                     <span className="text-[11px] text-slate-400 font-medium">
-                      {isWaiting ? '지금 바로 참가 가능' : '배틀이 진행 중입니다'}
+                      {isWaiting ? '지금 바로 대결 신청' : '배틀이 진행 중입니다'}
                     </span>
 
                     {isWaiting ? (
@@ -563,7 +590,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       </main>
 
       {/* ========================================================= */}
-      {/* 3. 하단 액션 툴바 (방 만들기 + 코드 직접 입력 컨트롤) */}
+      {/* 3. 하단 액션 툴바 */}
       {/* ========================================================= */}
       <footer className="relative z-20 h-20 sm:h-22 px-5 sm:px-8 border-t border-slate-700/60 bg-[#080d1b]/95 backdrop-blur-xl flex flex-wrap items-center justify-between gap-4 shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.6)]">
         {/* 좌측: 6자리 코드 직접 입력 */}
@@ -621,7 +648,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       {/* ========================================================= */}
       {activeOverlay === 'HOST_WAITING' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-xl bg-slate-900 border-2 border-amber-500/70 rounded-3xl p-6 sm:p-7 shadow-[0_0_50px_rgba(245,158,11,0.25)] flex flex-col space-y-5 text-slate-100">
+          <div className="relative w-full max-w-2xl bg-slate-900 border-2 border-amber-500/70 rounded-3xl p-6 sm:p-7 shadow-[0_0_50px_rgba(245,158,11,0.25)] flex flex-col space-y-5 text-slate-100 max-h-[92vh] overflow-y-auto custom-scrollbar">
             {/* 상단 타이틀 */}
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2">
@@ -636,87 +663,163 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
               </button>
             </div>
 
-            {/* 방 코드 및 초대 링크 복사 */}
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 text-center space-y-3">
-              <span className="text-xs font-bold text-slate-400">초대용 6자리 방 코드</span>
-              <div className="flex items-center justify-center gap-3">
-                <span className="font-mono text-3xl sm:text-4xl font-black text-amber-300 tracking-widest bg-slate-900 px-6 py-2 rounded-2xl border-2 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.3)] select-all">
-                  {createdRoomCode}
-                </span>
-                <button
-                  onClick={handleRegenerateCode}
-                  className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer border border-slate-700"
-                  title="새 방 코드 생성"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              </div>
+            {/* 게스트 입장 전: 6자리 코드 및 링크 공유 */}
+            {!opponentProfile && (
+              <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 text-center space-y-3">
+                <span className="text-xs font-bold text-slate-400">초대용 6자리 방 코드</span>
+                <div className="flex items-center justify-center gap-3">
+                  <span className="font-mono text-3xl sm:text-4xl font-black text-amber-300 tracking-widest bg-slate-900 px-6 py-2 rounded-2xl border-2 border-amber-400/80 shadow-[0_0_25px_rgba(245,158,11,0.3)] select-all">
+                    {createdRoomCode}
+                  </span>
+                  <button
+                    onClick={handleRegenerateCode}
+                    className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition cursor-pointer border border-slate-700"
+                    title="새 방 코드 생성"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-                <button
-                  onClick={copyRoomCode}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
-                >
-                  {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-amber-400" />}
-                  <span>{copiedCode ? '코드 복사 완료!' : '방 코드 복사'}</span>
-                </button>
-                <button
-                  onClick={copyInviteLink}
-                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
-                >
-                  {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4 text-cyan-400" />}
-                  <span>{copiedLink ? '초대 링크 복사됨!' : '원클릭 참가 링크 복사'}</span>
-                </button>
-              </div>
-            </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
+                  <button
+                    onClick={copyRoomCode}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
+                  >
+                    {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-amber-400" />}
+                    <span>{copiedCode ? '코드 복사 완료!' : '방 코드 복사'}</span>
+                  </button>
+                  <button
+                    onClick={copyInviteLink}
+                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-200 flex items-center gap-1.5 transition cursor-pointer border border-slate-700"
+                  >
+                    {copiedLink ? <Check className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4 text-cyan-400" />}
+                    <span>{copiedLink ? '초대 링크 복사됨!' : '원클릭 참가 링크 복사'}</span>
+                  </button>
+                </div>
 
-            {/* 게스트 대기 중 안내 */}
-            {connectionStatus === 'WAITING_FOR_GUEST' && (
-              <div className="py-4 px-5 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex flex-col items-center justify-center text-center space-y-2">
-                <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-                <span className="text-sm font-black text-amber-300">
-                  공개 방 목록에 실시간 등록되었습니다! 상대방 대기 중... ⏳
-                </span>
-                <p className="text-xs text-slate-400">
-                  다른 플레이어가 방 목록에서 클릭하여 입장하거나, 위 방 코드를 입력하면 즉시 연결됩니다.
-                </p>
+                <div className="py-4 px-5 rounded-2xl bg-amber-950/40 border border-amber-500/40 flex flex-col items-center justify-center text-center space-y-2 mt-3">
+                  <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-sm font-black text-amber-300">
+                    공개 방 목록에 실시간 등록되었습니다! 도전자 대기 중... ⏳
+                  </span>
+                  <p className="text-xs text-slate-400">
+                    도전자가 방에 입장하면 서로 비공개로 덱을 선택한 뒤 대결을 시작합니다.
+                  </p>
+                </div>
               </div>
             )}
 
-            {/* 게스트 입장 완료 및 배틀 시작 버튼 */}
-            {connectionStatus === 'CONNECTED' && opponentProfile && (
-              <div className="bg-emerald-950/60 border border-emerald-500/60 rounded-2xl p-5 space-y-4 animate-in zoom-in-95">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-black text-emerald-400 flex items-center gap-1.5">
-                    <Check className="w-5 h-5 text-emerald-400" />
-                    <span>도전자가 입장했습니다!</span>
-                  </span>
-                  <span className="text-xs font-mono text-emerald-300 bg-emerald-900/60 px-2.5 py-0.5 rounded-full border border-emerald-500/40 font-bold">
-                    P2P 연결 완료 🟢
+            {/* 게스트 입장 완료: 매칭 성사 후 덱 선택 단계! */}
+            {opponentProfile && (
+              <div className="space-y-4 animate-in zoom-in-95">
+                <div className="p-3 rounded-2xl bg-emerald-950/70 border border-emerald-500/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                    <span className="text-sm font-black text-emerald-300">
+                      대전 상대 매칭 완료! 이번 배틀에 사용할 덱을 선택하세요
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded-full border border-emerald-500/40 font-bold">
+                    P2P 연결됨 🟢
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between bg-slate-900/90 p-4 rounded-xl border border-slate-800">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center font-black text-white text-sm">
-                      P2
+                {/* 2열 덱 선택 섹션: 좌측(호스트 나) | 우측(도전자 - 비공개 블라인드) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* 좌측: 호스트(나)의 덱 선택 */}
+                  <div className="p-4 rounded-2xl bg-slate-950/80 border-2 border-amber-500/60 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-black text-amber-400">P1 호스트 (나)</span>
+                      <span className="text-xs font-bold text-white">{playerName}</span>
                     </div>
+
                     <div>
-                      <div className="font-black text-base text-white">{opponentProfile.name}</div>
-                      <div className="text-xs text-slate-400">
-                        덱: {opponentProfile.customDeck?.name || '기본 덱'} (
-                        {opponentProfile.customDeck?.leader?.nameKr || '선택 리더'})
+                      <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-amber-400" />
+                        <span>출전 덱 선택</span>
+                      </label>
+                      <select
+                        value={selectedDeckId}
+                        onChange={(e) => setSelectedDeckId(e.target.value)}
+                        className="w-full bg-slate-900 border border-amber-400/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-white font-bold focus:outline-none focus:border-amber-400 truncate cursor-pointer"
+                      >
+                        {presets.map((preset) => (
+                          <option key={preset.id} value={preset.id} className="bg-slate-900 text-white font-bold">
+                            {preset.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center gap-3">
+                      {myLeaderArt && (
+                        <img
+                          src={myLeaderArt}
+                          alt=""
+                          className="w-10 h-10 rounded-lg object-cover border border-amber-400/40"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-xs font-black text-amber-300 truncate">
+                          {selectedDeckConfig?.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          리더: {selectedDeckConfig?.leader?.nameKr || '선택 리더'}
+                        </div>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* 우측: 도전자(상대방) 덱 상태 - 완전 비공개 보호 */}
+                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="text-xs font-black text-cyan-400">P2 도전자 (상대)</span>
+                        <span className="text-xs font-bold text-white">{opponentProfile.name}</span>
+                      </div>
+
+                      <div className="mt-4 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-2">
+                        <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto text-cyan-400">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <div className="text-xs font-black text-slate-300">
+                          상대방 덱: 🔒 비공개
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          대결 시작 전까지 상대방의 덱 구성 및 리더는 공개되지 않습니다.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 도전자 준비 상태 표시 */}
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                      <span className="text-slate-400">도전자 상태:</span>
+                      {isGuestReady ? (
+                        <span className="font-black text-emerald-400 flex items-center gap-1 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">
+                          <Check className="w-3.5 h-3.5" />
+                          <span>준비 완료 (READY)</span>
+                        </span>
+                      ) : (
+                        <span className="font-bold text-amber-400 flex items-center gap-1 animate-pulse">
+                          <span>덱 선택 중... ⏳</span>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
+                {/* 대결 시작 버튼 (도전자가 덱 선택을 완료해야 시작 가능) */}
                 <button
                   onClick={handleHostStartGame}
-                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-600 via-amber-500 to-orange-500 hover:brightness-110 text-white font-black text-base shadow-[0_0_30px_rgba(245,158,11,0.4)] transition cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
+                  disabled={!isGuestReady}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-600 via-amber-500 to-orange-500 hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-base shadow-[0_0_30px_rgba(245,158,11,0.4)] transition cursor-pointer flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <Swords className="w-5 h-5" />
-                  <span>대결 시작하기! (BATTLE START)</span>
+                  <span>
+                    {isGuestReady
+                      ? '대결 시작하기! (BATTLE START)'
+                      : '도전자가 덱 선택을 완료할 때까지 대기 중... ⏳'}
+                  </span>
                 </button>
               </div>
             )}
@@ -727,7 +830,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                 onClick={handleCancelOverlay}
                 className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
               >
-                방 닫고 목록으로 나가기
+                방 닫고 나가기
               </button>
             </div>
           </div>
@@ -735,18 +838,30 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       )}
 
       {/* ========================================================= */}
-      {/* 5. [게스트 연결 중 화면 모달 팝업] */}
+      {/* 5. [게스트 연결 및 덱 선택 화면 모달 팝업] */}
       {/* ========================================================= */}
       {activeOverlay === 'GUEST_CONNECTING' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md bg-slate-900 border-2 border-cyan-500/70 rounded-3xl p-6 sm:p-7 shadow-[0_0_50px_rgba(6,182,212,0.25)] flex flex-col space-y-4 text-center text-slate-100">
-            <h3 className="text-lg font-black text-white flex items-center justify-center gap-2">
-              <Users className="w-5 h-5 text-cyan-400" />
-              <span>배틀 룸 #{inputRoomCode} 입장</span>
-            </h3>
+          <div className="relative w-full max-w-2xl bg-slate-900 border-2 border-cyan-500/70 rounded-3xl p-6 sm:p-7 shadow-[0_0_50px_rgba(6,182,212,0.25)] flex flex-col space-y-4 text-slate-100 max-h-[92vh] overflow-y-auto custom-scrollbar">
+            {/* 상단 타이틀 */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-base sm:text-lg font-black text-white">
+                  배틀 룸 #{inputRoomCode} 입장
+                </h3>
+              </div>
+              <button
+                onClick={handleCancelOverlay}
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
+            {/* 연결 시도 중 */}
             {connectionStatus === 'CONNECTING_TO_HOST' && (
-              <div className="py-6 flex flex-col items-center justify-center space-y-3">
+              <div className="py-10 flex flex-col items-center justify-center space-y-3 text-center">
                 <div className="w-10 h-10 border-[3px] border-cyan-400 border-t-transparent rounded-full animate-spin" />
                 <span className="text-sm font-bold text-cyan-300">
                   방장(호스트)에게 실시간 연결 중입니다... ⏳
@@ -757,30 +872,143 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
               </div>
             )}
 
-            {connectionStatus === 'CONNECTED' && (
-              <div className="p-5 rounded-2xl bg-cyan-950/60 border border-cyan-500/50 space-y-2 animate-in zoom-in-95">
-                <div className="text-sm font-black text-cyan-300 flex items-center justify-center gap-1.5">
-                  <Check className="w-5 h-5 text-emerald-400" />
-                  <span>방에 성공적으로 입장했습니다!</span>
+            {/* 연결 완료: 방 안에서 덱 선택 및 준비 완료 단계! */}
+            {connectionStatus === 'CONNECTED' && opponentProfile && (
+              <div className="space-y-4 animate-in zoom-in-95">
+                <div className="p-3 rounded-2xl bg-cyan-950/70 border border-cyan-500/50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-cyan-400" />
+                    <span className="text-sm font-black text-cyan-300">
+                      방장과 매칭되었습니다! 출전할 덱을 선택하고 준비 완료를 누르세요
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-cyan-300 bg-cyan-900/60 px-2 py-0.5 rounded-full border border-cyan-500/40 font-bold">
+                    P2P 연결됨 🟢
+                  </span>
                 </div>
-                <p className="text-xs text-slate-300">
-                  방장(호스트)이 게임을 시작하기를 기다리는 중입니다... ⏳
-                </p>
+
+                {/* 2열 덱 선택 섹션: 좌측(도전자 나) | 우측(방장 - 비공개 블라인드) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* 좌측: 도전자(나)의 덱 선택 */}
+                  <div className="p-4 rounded-2xl bg-slate-950/80 border-2 border-cyan-500/60 space-y-3">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-black text-cyan-400">P2 도전자 (나)</span>
+                      <span className="text-xs font-bold text-white">{playerName}</span>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>출전 덱 선택</span>
+                      </label>
+                      <select
+                        value={selectedDeckId}
+                        disabled={isGuestReady}
+                        onChange={(e) => setSelectedDeckId(e.target.value)}
+                        className="w-full bg-slate-900 border border-cyan-400/60 rounded-xl px-3 py-2 text-xs sm:text-sm text-white font-bold focus:outline-none focus:border-cyan-400 truncate cursor-pointer disabled:opacity-50"
+                      >
+                        {presets.map((preset) => (
+                          <option key={preset.id} value={preset.id} className="bg-slate-900 text-white font-bold">
+                            {preset.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="bg-slate-900/80 p-3 rounded-xl border border-slate-800 flex items-center gap-3">
+                      {myLeaderArt && (
+                        <img
+                          src={myLeaderArt}
+                          alt=""
+                          className="w-10 h-10 rounded-lg object-cover border border-cyan-400/40"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <div className="text-xs font-black text-cyan-300 truncate">
+                          {selectedDeckConfig?.name}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          리더: {selectedDeckConfig?.leader?.nameKr || '선택 리더'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 준비 완료 토글 버튼 */}
+                    <button
+                      onClick={handleToggleGuestReady}
+                      className={`w-full py-3 rounded-xl font-black text-xs sm:text-sm transition cursor-pointer flex items-center justify-center gap-1.5 shadow-lg ${
+                        isGuestReady
+                          ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40'
+                          : 'bg-gradient-to-r from-cyan-600 to-teal-500 hover:from-cyan-500 hover:to-teal-400 text-white shadow-cyan-500/25'
+                      }`}
+                    >
+                      {isGuestReady ? (
+                        <>
+                          <RotateCcw className="w-4 h-4" />
+                          <span>덱 다시 선택하기</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>덱 선택 완료 (준비) ✅</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* 우측: 방장(상대방) 덱 상태 - 완전 비공개 보호 */}
+                  <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <span className="text-xs font-black text-amber-400">P1 방장 (상대)</span>
+                        <span className="text-xs font-bold text-white">{opponentProfile.name}</span>
+                      </div>
+
+                      <div className="mt-4 p-4 rounded-xl bg-slate-900/90 border border-slate-800 text-center space-y-2">
+                        <div className="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto text-amber-400">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <div className="text-xs font-black text-slate-300">
+                          상대방 덱: 🔒 비공개
+                        </div>
+                        <p className="text-[10px] text-slate-500">
+                          대결 시작 전까지 상대방의 덱 구성 및 리더는 공개되지 않습니다.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 방장 상태 표시 */}
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
+                      <span className="text-slate-400">방장 상태:</span>
+                      <span className="font-bold text-cyan-300 flex items-center gap-1">
+                        {isGuestReady ? (
+                          <span className="animate-pulse">방장의 게임 시작 대기 중... ⏳</span>
+                        ) : (
+                          <span>나의 덱 선택 대기 중</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
+            {/* 에러 상태 */}
             {connectionStatus === 'ERROR' && (
               <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/50 text-rose-300 text-xs font-bold">
                 ⚠️ 방에 연결하지 못했습니다. 방 코드 및 호스트 접속 상태를 확인해 주세요.
               </div>
             )}
 
-            <button
-              onClick={handleCancelOverlay}
-              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
-            >
-              연결 취소 및 목록으로 돌아가기
-            </button>
+            {/* 하단 취소 버튼 */}
+            <div className="pt-2 flex justify-end">
+              <button
+                onClick={handleCancelOverlay}
+                className="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition cursor-pointer"
+              >
+                연결 취소 및 목록으로 돌아가기
+              </button>
+            </div>
           </div>
         </div>
       )}
