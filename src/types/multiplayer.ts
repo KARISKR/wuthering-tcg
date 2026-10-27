@@ -116,3 +116,14 @@ export type MultiplayerMessage =
       playerIndex: 0 | 1;
       emote: string;
     };
+
+export interface MultiplayerRoomInfo {
+  roomCode: string;
+  hostName: string;
+  hostLeader?: string;
+  deckName?: string;
+  status: 'WAITING' | 'PLAYING';
+  playerCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
