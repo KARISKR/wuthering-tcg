@@ -1186,10 +1186,10 @@ class SoundEffectsEngine {
       // 양양(Yangyang) 캐릭터 사운드 개별 볼륨 정밀 설정
       if (key.startsWith('char_attack_yangyang_cost')) {
         // 일반공격(0코), 스킬공격(1코), 공명해방(2코): 0.7배
-        finalMultiplier = this.YANGYANG_ATTACK_MULTIPLIER;
+        finalMultiplier = volumeMultiplier * this.YANGYANG_ATTACK_MULTIPLIER;
       } else if (key === 'char_levelup_yangyang') {
-        // 레벨업: 0.5배
-        finalMultiplier = this.YANGYANG_LEVELUP_MULTIPLIER;
+        // 레벨업: 다른 캐릭터들과 동일하게 SFX 볼륨 슬라이더 및 보이스 배율에 맞춰 정상 반응하도록 개선
+        finalMultiplier = volumeMultiplier * this.VOICE_VOLUME_MULTIPLIER;
       }
 
       const gain = ctx.createGain();
@@ -2388,8 +2388,8 @@ class SoundEffectsEngine {
     this.lastUpgradeTime = nowMs;
     this.lastUpgradeKey = upgradeKey;
 
-    // 1. 공통 레벨업 효과음 (커스텀 upgrade 파일 우선 재생: 볼륨 30% 증가 1.3x, 없으면 신성한 상승 아르페지오 합성음 폴백)
-    const playedCustomUpgrade = this.playCustomBuffer('upgrade', 1.3);
+    // 1. 공통 레벨업 효과음 (커스텀 upgrade 파일 우선 재생: 음성 명료도를 위해 적정 1.0x 배율, 없으면 신성한 상승 아르페지오 합성음 폴백)
+    const playedCustomUpgrade = this.playCustomBuffer('upgrade', 1.0);
     if (!playedCustomUpgrade) {
       const ctx = this.getAudioContext();
       if (ctx) {
@@ -2433,9 +2433,18 @@ class SoundEffectsEngine {
       }
     }
 
-    // 2. 캐릭터 고유 레벨업 보이스 동시 재생 (캐릭터 음성이 있는 경우 효과음과 함께 겹쳐서 재생: 30% 증폭)
+    // 2. 캐릭터 고유 레벨업 보이스 동시 재생 (캐릭터 음성이 있는 경우 효과음과 함께 겹쳐서 재생)
     if (charKey) {
-      this.playCustomBuffer(`char_levelup_${charKey}`, 1.3);
+      this.playCustomBuffer(`char_levelup_${charKey}`, 1.2);
+    }
+  }
+
+  /** 캐릭터 개별 레벨업(진화) 보이스만 직접 재생 (SFX 가이드 모달 등) */
+  public playCharacterLevelUp(characterName?: string) {
+    if (this.isMuted) return;
+    const charKey = characterName ? getCharacterKey(characterName) : null;
+    if (charKey) {
+      this.playCustomBuffer(`char_levelup_${charKey}`, 1.2);
     }
   }
 

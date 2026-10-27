@@ -321,7 +321,7 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
                             <button
                               onClick={() =>
                                 handleTestPlay(`char_levelup_${char.id}`, () =>
-                                  soundEffects.playUpgrade(char.nameKr, 2)
+                                  soundEffects.playCharacterLevelUp(char.nameKr)
                                 )
                               }
                               className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition cursor-pointer"

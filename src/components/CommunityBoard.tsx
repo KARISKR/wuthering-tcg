@@ -123,7 +123,7 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
     return match;
   });
 
-  // 1. 단축 태그: [사진1], [사진2|240px] 등 치환 (가로 나란히 배치 및 세로 줄바꿈 모두 호환되는 inline-flex 구조)
+  // 1. 단축 태그: [사진1], [사진2|240px] 등 치환 (가로 나란히 배치 및 세로 줄바꿈 모두 호환되는 깔끔한 인라인 이미지)
   const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
   safe = safe.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)(?:\|([^\]]+))?\]/gi, (match, _prefix, numStr, sizeOpt) => {
     const idx = parseInt(numStr, 10) - 1;
@@ -132,9 +132,7 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
       const sizeStyle = sizeOpt ? `style="width: ${sizeOpt.trim()}; max-width: 100%;"` : '';
       const defaultSizeClass = sizeOpt ? '' : 'max-w-full sm:max-w-[320px] max-h-[340px]';
       return (
-        `<span class="inline-flex flex-col items-center align-middle my-1.5 mr-2.5 max-w-full">` +
-        `<img src="${url}" alt="사진 ${numStr}" ${sizeStyle} class="rounded-xl border border-[#2d354a] bg-black/40 ${defaultSizeClass} object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />` +
-        `<span class="block text-[11px] text-slate-400 mt-1 font-sans">📸 사진 ${numStr}</span></span>`
+        `<img src="${url}" alt="사진 ${numStr}" ${sizeStyle} class="my-1.5 mr-2.5 rounded-xl border border-[#2d354a] bg-black/40 ${defaultSizeClass} object-contain shadow-lg inline-block align-middle cursor-zoom-in hover:brightness-105 transition" loading="lazy" />`
       );
     }
     return match;
@@ -154,9 +152,7 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
       const sizeStyle = sizeOpt ? `style="width: ${sizeOpt.trim()}; max-width: 100%;"` : '';
       const defaultSizeClass = sizeOpt ? '' : 'w-[140px] sm:w-[170px] max-h-[260px]';
       return (
-        `<span class="inline-flex flex-col items-center align-middle my-1.5 mr-2 max-w-full">` +
-        `<img src="${cardArt}" alt="${name}" ${sizeStyle} class="rounded-xl border-2 border-amber-500/40 bg-black/60 ${defaultSizeClass} object-contain shadow-xl cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />` +
-        `<span class="block text-[11px] text-amber-300 font-bold mt-1 font-sans">🃏 ${name}</span></span>`
+        `<img src="${cardArt}" alt="${name}" title="🃏 ${name}" ${sizeStyle} class="my-1.5 mr-2 rounded-xl border-2 border-amber-500/40 bg-black/60 ${defaultSizeClass} object-contain shadow-xl inline-block align-middle cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />`
       );
     }
     return match;
@@ -173,21 +169,17 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
       const sizeStyle = sizeOpt ? `style="width: ${sizeOpt.trim()}; max-width: 100%;"` : '';
       const defaultSizeClass = sizeOpt ? '' : 'w-[140px] sm:w-[170px] max-h-[260px]';
       return (
-        `<span class="inline-flex flex-col items-center align-middle my-1.5 mr-2 max-w-full">` +
-        `<img src="${url}" alt="${name}" ${sizeStyle} class="rounded-xl border-2 border-amber-500/40 bg-black/60 ${defaultSizeClass} object-contain shadow-xl cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />` +
-        `<span class="block text-[11px] text-amber-300 font-bold mt-1 font-sans">🃏 ${name}</span></span>`
+        `<img src="${url}" alt="${name}" title="🃏 ${name}" ${sizeStyle} class="my-1.5 mr-2 rounded-xl border-2 border-amber-500/40 bg-black/60 ${defaultSizeClass} object-contain shadow-xl inline-block align-middle cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />`
       );
     }
     return match;
   });
 
-  // 4. 마크다운 이미지 파싱: ![설명](url) -> 인라인 호환
+  // 4. 마크다운 이미지 파싱: ![설명](url) -> 인라인 깔끔 이미지
   safe = safe.replace(
     /!\[(.*?)\]\((.*?)\)/g,
     (_match, alt, url) =>
-      `<span class="inline-flex flex-col items-center align-middle my-1.5 mr-2.5 max-w-full"><img src="${url}" alt="${alt}" class="rounded-xl border border-[#2d354a] bg-black/40 max-w-full sm:max-w-[320px] max-h-[340px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />` +
-      (alt ? `<span class="block text-[11px] text-slate-400 mt-1 font-sans">${alt}</span>` : '') +
-      `</span>`
+      `<img src="${url}" alt="${alt || '사진'}" class="my-1.5 mr-2.5 rounded-xl border border-[#2d354a] bg-black/40 max-w-full sm:max-w-[320px] max-h-[340px] object-contain shadow-lg inline-block align-middle cursor-zoom-in hover:brightness-105 transition" loading="lazy" />`
   );
 
   // 5. 마크다운 볼드 변환
