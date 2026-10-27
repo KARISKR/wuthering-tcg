@@ -1427,7 +1427,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             <span className="hover:text-white transition cursor-pointer">게임</span>
             <span className="text-slate-600">&gt;</span>
             <div className="flex items-center gap-1.5">
-              <img src="/images/menu_icons/board.png" alt="" className="w-4 h-4 object-contain" />
+              <img src="/images/menu_icons/board.webp" alt="" className="w-4 h-4 object-contain" />
               <span className="text-amber-300 font-black">명조 배틀 채널 (자유게시판)</span>
             </div>
           </div>
@@ -1456,7 +1456,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 p-0.5 shrink-0 shadow-lg shadow-amber-500/20">
               <div className="w-full h-full bg-[#121622] rounded-[14px] flex items-center justify-center overflow-hidden p-2">
                 <img
-                  src="/images/menu_icons/board.png"
+                  src="/images/menu_icons/board.webp"
                   alt="자유게시판"
                   className="w-full h-full object-contain drop-shadow-[0_0_12px_rgba(245,158,11,0.6)] hover:scale-110 transition duration-300"
                 />

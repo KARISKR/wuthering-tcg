@@ -269,7 +269,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             onClick={onOpenDeckBuilder}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition cursor-pointer"
           >
-            <img src="/images/menu_icons/deck-builder.png" alt="" className="w-4 h-4 object-contain" />
+            <img src="/images/menu_icons/deck-builder.webp" alt="" className="w-4 h-4 object-contain" />
             <span>덱 빌더</span>
           </button>
           <button
@@ -284,7 +284,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs font-bold transition cursor-pointer shadow-sm"
             title="자유게시판 (덱공유, 소통, 버그제보)"
           >
-            <img src="/images/menu_icons/board.png" alt="" className="w-4 h-4 object-contain" />
+            <img src="/images/menu_icons/board.webp" alt="" className="w-4 h-4 object-contain" />
             <span>자유게시판</span>
             {hasNewBoardPosts && (
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
@@ -294,14 +294,14 @@ export const Lobby: React.FC<LobbyProps> = ({
             onClick={() => setHash('#shared-decks')}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition cursor-pointer"
           >
-            <img src="/images/menu_icons/shared-decks.png" alt="" className="w-4 h-4 object-contain" />
+            <img src="/images/menu_icons/shared-decks.webp" alt="" className="w-4 h-4 object-contain" />
             <span>공유된 덱</span>
           </button>
           <button
             onClick={() => setHash('#replay')}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition cursor-pointer"
           >
-            <img src="/images/menu_icons/replay.png" alt="" className="w-4 h-4 object-contain" />
+            <img src="/images/menu_icons/replay.webp" alt="" className="w-4 h-4 object-contain" />
             <span>대전 리플레이</span>
           </button>
         </nav>
@@ -524,7 +524,7 @@ export const Lobby: React.FC<LobbyProps> = ({
 
               <div className="relative z-10 w-18 h-18 sm:w-22 sm:h-22 flex items-center justify-center shrink-0">
                 <img
-                  src="/images/menu_icons/deck-builder.png"
+                  src="/images/menu_icons/deck-builder.webp"
                   alt="덱 빌더"
                   className="w-14 h-14 sm:w-18 sm:h-18 object-contain drop-shadow-[0_0_18px_rgba(34,211,238,0.45)] group-hover:scale-110 transition-transform duration-500"
                 />
@@ -626,7 +626,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
                 <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
                   <img
-                    src="/images/menu_icons/board.png"
+                    src="/images/menu_icons/board.webp"
                     alt="자유게시판"
                     className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.6)] group-hover:scale-110 transition-transform duration-300"
                   />
@@ -658,7 +658,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
                 <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
                   <img
-                    src="/images/menu_icons/shared-decks.png"
+                    src="/images/menu_icons/shared-decks.webp"
                     alt="공유된 덱 리스트"
                     className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(217,70,239,0.5)] group-hover:scale-110 transition-transform duration-300"
                   />
@@ -683,7 +683,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
                 <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
                   <img
-                    src="/images/menu_icons/replay.png"
+                    src="/images/menu_icons/replay.webp"
                     alt="대전 리플레이 & 복기"
                     className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(168,85,247,0.5)] group-hover:scale-110 transition-transform duration-300"
                   />
@@ -708,7 +708,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
                 <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
                   <img
-                    src="/images/menu_icons/rulebook.png"
+                    src="/images/menu_icons/rulebook.webp"
                     alt="공식 룰북 & FAQ"
                     className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(59,130,246,0.5)] group-hover:scale-110 transition-transform duration-300"
                   />
@@ -733,7 +733,7 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
                 <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
                   <img
-                    src="/images/menu_icons/video-guide.png"
+                    src="/images/menu_icons/video-guide.webp"
                     alt="룰 영상 가이드"
                     className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-300"
                   />

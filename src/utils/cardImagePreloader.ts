@@ -6,7 +6,6 @@
  */
 import { GameState, ActionCard, CharacterCard } from '../types/tcg';
 import { BattleReplayData } from './replayManager';
-import { buildReplayTimeline } from './replayTimelineBuilder';
 import { OFFICIAL_CARDS } from '../data/officialCards';
 
 const preloadedUrls = new Set<string>();
@@ -85,7 +84,7 @@ export function preloadBattleCards(state: GameState) {
 }
 
 /** 리플레이 시작 시 타임라인 상의 모든 카드 프리로드 */
-export function preloadReplayCards(replay: BattleReplayData) {
+export async function preloadReplayCards(replay: BattleReplayData) {
   if (!replay) return;
 
   const urls: string[] = [
@@ -96,6 +95,7 @@ export function preloadReplayCards(replay: BattleReplayData) {
   ].filter(Boolean) as string[];
 
   try {
+    const { buildReplayTimeline } = await import('./replayTimelineBuilder');
     const timeline = buildReplayTimeline(replay);
     timeline.forEach((snap) => {
       if (snap.p0?.leader?.artUrl) urls.push(snap.p0.leader.artUrl);
@@ -125,6 +125,14 @@ export function startIdleCardPreload() {
   if (idlePreloadStarted) return;
   idlePreloadStarted = true;
 
+  // 데이터 절약 모드이거나 2G 환경일 경우 백그라운드 프리로드 건너뜀
+  if (typeof navigator !== 'undefined') {
+    const conn = (navigator as any)?.connection;
+    if (conn?.saveData || conn?.effectiveType === '2g' || conn?.effectiveType === 'slow-2g') {
+      return;
+    }
+  }
+
   // LOD 256px 주소로 변환하여 3MB만 가볍게 프리로드
   const cardsToPreload = OFFICIAL_CARDS.map((c) => {
     if (!c.artUrl) return '';
@@ -134,13 +142,13 @@ export function startIdleCardPreload() {
   }).filter(Boolean);
 
   let batchIndex = 0;
-  const BATCH_SIZE = 8; // 한 번에 8장씩 대역폭 부하 없이 백그라운드 로드
+  const BATCH_SIZE = 4; // 한 번에 4장씩 초저부하 백그라운드 로드
 
   const scheduleNext = (fn: () => void) => {
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(fn, { timeout: 3000 });
+      (window as any).requestIdleCallback(fn, { timeout: 5000 });
     } else {
-      setTimeout(fn, 300);
+      setTimeout(fn, 800);
     }
   };
 
@@ -155,8 +163,8 @@ export function startIdleCardPreload() {
     scheduleNext(loadNextBatch);
   };
 
-  // 페이지 전체 리소스 로드가 완료된 후 여유롭게 시작
-  const begin = () => setTimeout(loadNextBatch, 1200);
+  // 페이지 전체 리소스 및 첫 로비 렌더링이 완전히 안정화된 후 4초 뒤부터 조용히 시작
+  const begin = () => setTimeout(loadNextBatch, 4000);
   if (typeof document !== 'undefined') {
     if (document.readyState === 'complete') {
       begin();

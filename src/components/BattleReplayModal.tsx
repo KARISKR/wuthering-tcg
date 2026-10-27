@@ -233,7 +233,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
             </button>
 
             <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-purple-500/20 to-indigo-600/20 border border-purple-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
-              <img src="/images/menu_icons/replay.png" alt="대전 리플레이" className="w-9 h-9 object-contain drop-shadow" />
+              <img src="/images/menu_icons/replay.webp" alt="대전 리플레이" className="w-9 h-9 object-contain drop-shadow" />
             </div>
 
             <div>

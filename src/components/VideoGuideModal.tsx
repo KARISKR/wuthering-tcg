@@ -89,7 +89,7 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
             </button>
 
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/25 shrink-0">
-              <img src="/images/menu_icons/video-guide.png" alt="룰 영상 가이드" className="w-9 h-9 object-contain drop-shadow" />
+              <img src="/images/menu_icons/video-guide.webp" alt="룰 영상 가이드" className="w-9 h-9 object-contain drop-shadow" />
             </div>
 
             <div>

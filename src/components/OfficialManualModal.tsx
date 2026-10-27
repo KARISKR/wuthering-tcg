@@ -83,7 +83,7 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
             </button>
 
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
-              <img src="/images/menu_icons/rulebook.png" alt="공식 룰북" className="w-9 h-9 object-contain drop-shadow" />
+              <img src="/images/menu_icons/rulebook.webp" alt="공식 룰북" className="w-9 h-9 object-contain drop-shadow" />
             </div>
 
             <div className="min-w-0">

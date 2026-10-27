@@ -302,7 +302,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
               <span>대기실로 나가기</span>
             </button>
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-indigo-600/20 border border-fuchsia-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-fuchsia-500/20 shrink-0">
-              <img src="/images/menu_icons/shared-decks.png" alt="공유된 덱 리스트" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
+              <img src="/images/menu_icons/shared-decks.webp" alt="공유된 덱 리스트" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
             </div>
             <div>
               <div className="flex items-center gap-2.5">

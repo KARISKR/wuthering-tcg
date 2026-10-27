@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>명조: 대결 (Wuthering Waves TCG)</title>
-    <!-- 고화질 로비 배경 선행 로딩 -->
-    <link rel="preload" as="image" type="image/webp" href="/images/bg-shorekeeper-piano.webp?v=5k" fetchpriority="high" />
+    <!-- 핵심 리소스 선행 로딩 (배경 이미지 및 웹폰트) -->
+    <link rel="preload" as="image" type="image/webp" href="/images/bg-shorekeeper-piano.webp?v=opt2" fetchpriority="high" />
+    <link rel="preload" as="font" type="font/woff2" href="/fonts/SUITE-Variable.woff2" crossorigin="anonymous" />
     <style>
       *, *::before, *::after {
         font-family: 'SUITE', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
@@ -14,16 +15,18 @@
       body {
         font-family: 'SUITE', sans-serif;
       }
-      /* 메인화면 덱 선택, 도감, 인게임 등 모든 크기 조절/축소 카드 이미지 자글거림(모아레) 완벽 방지 */
-      img, picture, canvas, svg {
-        image-rendering: auto !important;
-        image-rendering: smooth !important;
-        image-rendering: high-quality !important;
-        -webkit-backface-visibility: hidden !important;
-        backface-visibility: hidden !important;
-        -webkit-transform: translateZ(0) !important;
-        transform: translateZ(0) !important;
-        outline: 1px solid transparent !important;
+      /* 축소 카드 이미지 자글거림(모아레) 부드러운 렌더링 */
+      img, picture {
+        image-rendering: auto;
+        image-rendering: smooth;
+        image-rendering: high-quality;
+      }
+      .card-img, .card-texture, [data-card-img] {
+        -webkit-backface-visibility: hidden;
+        backface-visibility: hidden;
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        outline: 1px solid transparent;
       }
     </style>
   </head>
