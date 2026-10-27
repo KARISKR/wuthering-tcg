@@ -45,7 +45,8 @@ export type MultiplayerActionType =
   | 'DISCARD_OVERFLOW'
   | 'END_PHASE'
   | 'PENDING_CHOICE'
-  | 'INITIATIVE_ROLL';
+  | 'INITIATIVE_ROLL'
+  | 'CHOOSE_ORDER';
 
 export type MultiplayerMessage =
   | {

@@ -36,6 +36,8 @@ interface GameOverModalProps {
   onOpenReplay?: () => void;
   onPlayBattleReplay?: (replay: BattleReplayData) => void;
   onReplayFinisher?: () => void;
+  isMultiplayer?: boolean;
+  myPlayerIndex?: 0 | 1;
 }
 
 export const GameOverModal: React.FC<GameOverModalProps> = ({
@@ -48,8 +50,10 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   onOpenReplay,
   onPlayBattleReplay,
   onReplayFinisher,
+  isMultiplayer = false,
+  myPlayerIndex = 0,
 }) => {
-  const isPlayerWinner = winner === 0;
+  const isPlayerWinner = winner === (isMultiplayer && myPlayerIndex !== undefined ? myPlayerIndex : 0);
   const winnerPlayer = players[winner];
   const loserPlayer = players[winner === 0 ? 1 : 0];
   // 승리/패배 주체 리더 카드
@@ -468,20 +472,26 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           {onExitToLobby && (
             <button
               onClick={onExitToLobby}
-              className="w-full py-3 px-2 sm:px-3 bg-[#111520] hover:bg-[#1a2234] text-slate-200 font-bold text-xs sm:text-sm tracking-tight transition cursor-pointer border border-white/15 flex items-center justify-center gap-1.5 sm:gap-2 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+              className={`w-full py-3 px-2 sm:px-3 text-slate-200 font-bold text-xs sm:text-sm tracking-tight transition cursor-pointer flex items-center justify-center gap-1.5 sm:gap-2 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)] ${
+                isMultiplayer
+                  ? 'col-span-2 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)]'
+                  : 'bg-[#111520] hover:bg-[#1a2234] border border-white/15'
+              }`}
             >
-              <Home className="w-4 h-4 text-[#f97316] shrink-0" />
+              <Home className="w-4 h-4 shrink-0" />
               <span>대기실로 나가기</span>
             </button>
           )}
 
-          <button
-            onClick={onRestart}
-            className="w-full py-3 px-2 sm:px-4 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-bold text-xs sm:text-sm tracking-tight shadow-[0_0_20px_rgba(249,115,22,0.4)] transition flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer animate-pulse [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
-          >
-            <RotateCcw className="w-4 h-4 text-white shrink-0" />
-            <span>새로운 배틀</span>
-          </button>
+          {!isMultiplayer && (
+            <button
+              onClick={onRestart}
+              className="w-full py-3 px-2 sm:px-4 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-bold text-xs sm:text-sm tracking-tight shadow-[0_0_20px_rgba(249,115,22,0.4)] transition flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer animate-pulse [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+            >
+              <RotateCcw className="w-4 h-4 text-white shrink-0" />
+              <span>새로운 배틀</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

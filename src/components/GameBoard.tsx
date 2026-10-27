@@ -158,6 +158,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [isMultiplayerDisconnected, setIsMultiplayerDisconnected] = useState<boolean>(false);
   const [pingLatency, setPingLatency] = useState<number | null>(null);
 
+  // 멀티플레이 주사위 및 선/후공 선택 동기화 상태
+  const [externalDiceResult, setExternalDiceResult] = useState<{ val0: number; val1: number; winIdx: 0 | 1 } | null>(null);
+  const [externalOrderChoice, setExternalOrderChoice] = useState<'FIRST' | 'SECOND' | null>(null);
+  const lastRoll0Ref = useRef<number>(1);
+  const lastRoll1Ref = useRef<number>(1);
+
   const guestLeaderRef = useRef<string | null>(null);
   const hostLeaderRef = useRef<string | null>(null);
   const guestMulliganRef = useRef<string[] | null>(null);
@@ -1134,6 +1140,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         setGameState(msg.gameState);
       } else if (msg.type === 'RECONNECT_ACCEPT') {
         setGameState(msg.gameState);
+      } else if (msg.type === 'DISPATCH_ACTION') {
+        if (msg.actionType === 'INITIATIVE_ROLL') {
+          setExternalDiceResult(msg.payload);
+          lastRoll0Ref.current = msg.payload.val0;
+          lastRoll1Ref.current = msg.payload.val1;
+        } else if (msg.actionType === 'CHOOSE_ORDER') {
+          setExternalOrderChoice(msg.payload.order);
+        }
       } else if (msg.type === 'SURRENDER') {
         setGameState((prev) => ({
           ...prev,
@@ -1155,6 +1169,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         switch (actionType) {
           case 'DRAW_CARDS':
             engineDrawCards(1);
+            break;
+          case 'CHOOSE_ORDER':
+            setExternalOrderChoice(payload.order);
+            {
+              const firstIdx: 0 | 1 = payload.order === 'FIRST' ? 1 : 0;
+              handleSetInitiative(firstIdx, lastRoll0Ref.current || 1, lastRoll1Ref.current || 6, {
+                winnerIndex: 1,
+                chosenOrder: payload.order,
+              });
+              setIsInitiativeRolling(false);
+            }
             break;
           case 'SELECT_LEADER':
             guestLeaderRef.current = payload?.leaderName;
@@ -1233,6 +1258,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     engineFinishCombo,
     engineDiscardOverflow,
     engineResolvePendingChoice,
+    handleSetInitiative,
     setGameState,
   ]);
 
@@ -1567,39 +1593,43 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div className="hidden lg:block mr-1">
             <BgmPlayer />
           </div>
-          {/* 아브의 튜토리얼 가이드 버튼 */}
-          <button
-            onClick={() => setShowTutorialOverlay((prev) => !prev)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-black transition cursor-pointer border ${
-              showTutorialOverlay
-                ? 'bg-amber-500 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
-                : 'bg-[#111520] hover:bg-amber-950/40 text-amber-400 border-amber-500/40'
-            }`}
-            title="아브의 인터랙티브 튜토리얼 가이드 열기"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">아브 가이드</span>
-          </button>
+          {/* 아브의 튜토리얼 가이드 버튼, 게임 모드 전환, 게임 재시작은 멀티플레이 모드가 아닐 때만 노출 */}
+          {!isMultiplayer && (
+            <>
+              <button
+                onClick={() => setShowTutorialOverlay((prev) => !prev)}
+                className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-black transition cursor-pointer border ${
+                  showTutorialOverlay
+                    ? 'bg-amber-500 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
+                    : 'bg-[#111520] hover:bg-amber-950/40 text-amber-400 border-amber-500/40'
+                }`}
+                title="아브의 인터랙티브 튜토리얼 가이드 열기"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">아브 가이드</span>
+              </button>
 
-          <button
-            onClick={() => setGameMode(gameState.gameMode === 'AI' ? 'SOLO_DUAL' : 'AI')}
-            className="flex items-center gap-1 px-2 py-1 bg-[#111520] hover:bg-[#1c2334] text-slate-300 text-[11px] font-bold transition cursor-pointer border border-white/10"
-            title="게임 모드 전환"
-          >
-            {gameState.gameMode === 'AI' ? <Bot className="w-3.5 h-3.5 text-[#22d3ee]" /> : <User className="w-3.5 h-3.5 text-[#f97316]" />}
-            <span className="hidden xl:inline">{gameState.gameMode === 'AI' ? 'AI 모드' : '1인 2역'}</span>
-          </button>
+              <button
+                onClick={() => setGameMode(gameState.gameMode === 'AI' ? 'SOLO_DUAL' : 'AI')}
+                className="flex items-center gap-1 px-2 py-1 bg-[#111520] hover:bg-[#1c2334] text-slate-300 text-[11px] font-bold transition cursor-pointer border border-white/10"
+                title="게임 모드 전환"
+              >
+                {gameState.gameMode === 'AI' ? <Bot className="w-3.5 h-3.5 text-[#22d3ee]" /> : <User className="w-3.5 h-3.5 text-[#f97316]" />}
+                <span className="hidden xl:inline">{gameState.gameMode === 'AI' ? 'AI 모드' : '1인 2역'}</span>
+              </button>
 
-          <button
-            onClick={() => {
-              setIsInitiativeRolling(true);
-              restartGame();
-            }}
-            className="p-1 bg-[#111520] hover:bg-red-950/60 text-rose-400 border border-white/10 transition cursor-pointer"
-            title="게임 재시작"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
+              <button
+                onClick={() => {
+                  setIsInitiativeRolling(true);
+                  restartGame();
+                }}
+                className="p-1 bg-[#111520] hover:bg-red-950/60 text-rose-400 border border-white/10 transition cursor-pointer"
+                title="게임 재시작"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
         </div>
       </header>
 
@@ -3222,9 +3252,31 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         isOpen={isInitiativeRolling && (gameState.phase === 'LEADER_SELECT' || gameState.phase === 'MULLIGAN')}
         player0={gameState.players[0]}
         player1={gameState.players[1]}
+        myPlayerIndex={isGuest ? 1 : 0}
+        isMultiplayer={isMultiplayer}
+        externalDiceResult={externalDiceResult}
+        externalOrderChoice={externalOrderChoice}
+        onSendDiceRoll={(val0, val1, winIdx) => {
+          lastRoll0Ref.current = val0;
+          lastRoll1Ref.current = val1;
+          if (isHost) {
+            multiplayerService.sendAction('INITIATIVE_ROLL', 0, { val0, val1, winIdx });
+          }
+        }}
+        onSendOrderChoice={(order) => {
+          if (isMultiplayer) {
+            multiplayerService.sendAction('CHOOSE_ORDER', isGuest ? 1 : 0, {
+              order,
+              val0: lastRoll0Ref.current,
+              val1: lastRoll1Ref.current,
+            });
+          }
+        }}
         onComplete={(firstPlayerIndex, roll0, roll1, choiceDetail) => {
           setIsInitiativeRolling(false);
-          handleSetInitiative(firstPlayerIndex, roll0, roll1, choiceDetail);
+          if (!isGuest) {
+            handleSetInitiative(firstPlayerIndex, roll0, roll1, choiceDetail);
+          }
         }}
       />
 
@@ -3409,6 +3461,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             onOpenReplay={() => setIsReplayOpen(true)}
             onPlayBattleReplay={onPlayBattleReplay}
             onReplayFinisher={() => setIsFinisherFinished(false)}
+            isMultiplayer={isMultiplayer}
+            myPlayerIndex={controlledPlayerIndex}
           />
         )
       )}
@@ -3769,12 +3823,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       />
 
       {/* 실시간 카드 효과 발동 알림 토스트 (판정 연출 중에는 화면 겹침 방지를 위해 보류) */}
-      {/* 인게임 실전 대화형 튜토리얼 캐릭터 말풍선 가이드 */}
-      <InGameTutorialOverlay
-        gameState={gameState}
-        isActive={showTutorialOverlay}
-        onClose={() => setShowTutorialOverlay(false)}
-      />
+      {/* 인게임 실전 대화형 튜토리얼 캐릭터 말풍선 가이드 (멀티플레이에서는 비활성화) */}
+      {!isMultiplayer && (
+        <InGameTutorialOverlay
+          gameState={gameState}
+          isActive={showTutorialOverlay}
+          onClose={() => setShowTutorialOverlay(false)}
+        />
+      )}
 
       <EffectNotificationToast
         event={

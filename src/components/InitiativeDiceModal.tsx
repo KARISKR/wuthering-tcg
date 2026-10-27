@@ -13,12 +13,18 @@ interface InitiativeDiceModalProps {
   isOpen: boolean;
   player0: PlayerState;
   player1: PlayerState;
+  myPlayerIndex?: 0 | 1;
+  isMultiplayer?: boolean;
   onComplete: (
     firstPlayerIndex: 0 | 1,
     roll0: number,
     roll1: number,
     choiceDetail?: InitiativeChoiceDetail
   ) => void;
+  onSendDiceRoll?: (val0: number, val1: number, winIdx: 0 | 1) => void;
+  onSendOrderChoice?: (order: 'FIRST' | 'SECOND') => void;
+  externalDiceResult?: { val0: number; val1: number; winIdx: 0 | 1 } | null;
+  externalOrderChoice?: 'FIRST' | 'SECOND' | null;
 }
 
 // 6면체 주사위 핍(도트) 렌더러
@@ -56,7 +62,13 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
   isOpen,
   player0,
   player1,
+  myPlayerIndex = 0,
+  isMultiplayer = false,
   onComplete,
+  onSendDiceRoll,
+  onSendOrderChoice,
+  externalDiceResult,
+  externalOrderChoice,
 }) => {
   const [phase, setPhase] = useState<'READY' | 'ROLLING' | 'RESULT'>('READY');
   const [p0Value, setP0Value] = useState<number>(1);
@@ -104,6 +116,10 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
     if (hasCompletedRef.current || winnerIndex === null) return;
     soundEffects.playCardPlace();
 
+    if (onSendOrderChoice) {
+      onSendOrderChoice(order);
+    }
+
     let firstPlayerIdx: 0 | 1;
     if (winnerIndex === 0) {
       firstPlayerIdx = order === 'FIRST' ? 0 : 1;
@@ -116,6 +132,44 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
       chosenOrder: order,
     });
   };
+
+  // 외부(네트워크)에서 주사위 결과 수신 시 동기화
+  useEffect(() => {
+    if (externalDiceResult && phase !== 'RESULT') {
+      setP0Value(externalDiceResult.val0);
+      setP1Value(externalDiceResult.val1);
+      setWinnerIndex(externalDiceResult.winIdx);
+      setPhase('RESULT');
+      const isMyWin = externalDiceResult.winIdx === myPlayerIndex;
+      soundEffects.playDiceLand(isMyWin);
+      if (isMyWin) {
+        try {
+          confetti({
+            particleCount: 50,
+            spread: 60,
+            origin: { y: 0.65 },
+            colors: ['#38bdf8', '#fbbf24', '#34d399', '#ffffff'],
+          });
+        } catch {}
+      }
+    }
+  }, [externalDiceResult, phase, myPlayerIndex]);
+
+  // 외부(네트워크)에서 선/후공 선택 수신 시 완료 처리
+  useEffect(() => {
+    if (externalOrderChoice && winnerIndex !== null && !hasCompletedRef.current) {
+      let firstPlayerIdx: 0 | 1;
+      if (winnerIndex === 0) {
+        firstPlayerIdx = externalOrderChoice === 'FIRST' ? 0 : 1;
+      } else {
+        firstPlayerIdx = externalOrderChoice === 'FIRST' ? 1 : 0;
+      }
+      finishAndComplete(firstPlayerIdx, p0Value, p1Value, {
+        winnerIndex,
+        chosenOrder: externalOrderChoice,
+      });
+    }
+  }, [externalOrderChoice, winnerIndex, p0Value, p1Value]);
 
   // 주사위 굴리기 시작 함수
   const startRoll = () => {
@@ -157,26 +211,32 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
         }
 
         const winIdx: 0 | 1 = finalP0 > finalP1 ? 0 : 1;
-        const isP0Win = winIdx === 0;
+        const isMyWin = isMultiplayer ? winIdx === myPlayerIndex : winIdx === 0;
 
         setP0Value(finalP0);
         setP1Value(finalP1);
         setWinnerIndex(winIdx);
         setPhase('RESULT');
 
-        soundEffects.playDiceLand(isP0Win);
+        if (onSendDiceRoll) {
+          onSendDiceRoll(finalP0, finalP1, winIdx);
+        }
 
-        if (isP0Win) {
-          confetti({
-            particleCount: 50,
-            spread: 60,
-            origin: { y: 0.65 },
-            colors: ['#38bdf8', '#fbbf24', '#34d399', '#ffffff'],
-          });
+        soundEffects.playDiceLand(isMyWin);
+
+        if (isMyWin) {
+          try {
+            confetti({
+              particleCount: 50,
+              spread: 60,
+              origin: { y: 0.65 },
+              colors: ['#38bdf8', '#fbbf24', '#34d399', '#ffffff'],
+            });
+          } catch {}
           // 1P 승리 시: 유저가 직접 선공/후공을 선택할 수 있도록 대기
         } else {
           // 2P 승리 시: 상대가 AI이면 1.4초 후 선공 선택으로 자동 진행
-          if (player1.isAi) {
+          if (!isMultiplayer && player1.isAi) {
             completeTimerRef.current = window.setTimeout(() => {
               finishAndComplete(1, finalP0, finalP1, {
                 winnerIndex: 1,
@@ -217,15 +277,17 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
     setWinnerIndex(winIdx);
     setPhase('RESULT');
 
-    if (winIdx === 0 || !player1.isAi) {
-      if (winIdx === 0) {
-        soundEffects.playDiceLand(true);
-      }
-    } else {
+    if (onSendDiceRoll) {
+      onSendDiceRoll(finalP0, finalP1, winIdx);
+    }
+
+    if (!isMultiplayer && player1.isAi && winIdx === 1) {
       finishAndComplete(1, finalP0, finalP1, {
         winnerIndex: 1,
         chosenOrder: 'FIRST',
       });
+    } else {
+      soundEffects.playDiceLand(isMultiplayer ? winIdx === myPlayerIndex : winIdx === 0);
     }
   };
 
@@ -238,10 +300,14 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
       setP0Value(1);
       setP1Value(1);
 
-      // 1.4초 동안 조작 없으면 자동 굴림
-      autoStartTimerRef.current = window.setTimeout(() => {
-        startRoll();
-      }, 1400);
+      if (isMultiplayer && myPlayerIndex === 1) {
+        // 게스트는 호스트의 주사위 굴림 대기 (자동 시작 안함)
+      } else {
+        // 1.4초 동안 조작 없으면 자동 굴림
+        autoStartTimerRef.current = window.setTimeout(() => {
+          startRoll();
+        }, 1400);
+      }
 
       // 스페이스바 / 엔터 키 입력 시 즉시 굴림
       const handleKeyDown = (e: KeyboardEvent) => {
@@ -428,123 +494,113 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
         {/* 하단 상태 피드백 및 액션 버튼 */}
         <div className="mt-6 w-full max-w-lg flex flex-col items-center space-y-3">
-          {/* 1P 주사위 승리: 선공 / 후공 선택 UI */}
-          {phase === 'RESULT' && winnerIndex === 0 && (
-            <div className="w-full space-y-3 animate-in fade-in zoom-in-95 duration-200">
-              <div className="py-2 px-4 rounded-2xl text-center font-black bg-emerald-950/80 border border-emerald-500/80 text-emerald-300 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2">
-                <Crown className="w-4 h-4 text-amber-400" />
-                <span className="text-xs sm:text-sm">
-                  🎉 주사위 대결 승리! 선공 또는 후공을 선택하세요
-                </span>
-              </div>
+          {/* 주사위 결과 화면 */}
+          {phase === 'RESULT' && winnerIndex !== null && (() => {
+            const isWinner = isMultiplayer
+              ? winnerIndex === myPlayerIndex
+              : winnerIndex === 0 || !player1.isAi;
+            const winnerPlayer = winnerIndex === 0 ? player0 : player1;
+            const isAiWinner = !isMultiplayer && winnerIndex === 1 && player1.isAi;
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                {/* 선공 선택 */}
-                <button
-                  onClick={() => handleChooseOrder('FIRST')}
-                  className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border border-[#f97316]/70 hover:border-[#f97316] text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs sm:text-sm font-black text-[#f97316] uppercase tracking-wide flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-[#f97316] fill-[#f97316]" />
-                      선공 (First)
-                    </span>
-                    <span className="text-[10px] bg-[#f97316]/20 text-[#f97316] px-1.5 py-0.5 border border-[#f97316]/40 font-bold">
-                      1턴 선제
-                    </span>
+            // 1) AI 승리 시 (싱글플레이 전용)
+            if (isAiWinner) {
+              return (
+                <div className="w-full py-3 px-5 text-center font-black bg-purple-950/80 border border-purple-500/80 text-purple-300 shadow-xl shadow-purple-500/20 flex flex-col items-center justify-center gap-1 animate-in zoom-in-95 duration-200 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]">
+                  <div className="flex items-center gap-2 text-sm sm:text-base">
+                    <Swords className="w-5 h-5 text-purple-400" />
+                    <span>⚔️ [{player1.name}] 주사위 승리!</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-tight">
-                    내가 먼저 행동하여 1턴 첫 공세를 전개합니다.
-                  </p>
-                </button>
+                  <span className="text-xs text-purple-300/80 font-normal">
+                    상대(AI)가 [선공]을 선택했습니다. 잠시 후 시작됩니다...
+                  </span>
+                </div>
+              );
+            }
 
-                {/* 후공 선택 */}
-                <button
-                  onClick={() => handleChooseOrder('SECOND')}
-                  className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border border-[#22d3ee]/70 hover:border-[#22d3ee] text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs sm:text-sm font-black text-[#22d3ee] uppercase tracking-wide flex items-center gap-1.5">
-                      <Shield className="w-4 h-4 text-[#22d3ee]" />
-                      후공 (Second)
-                    </span>
-                    <span className="text-[10px] bg-[#22d3ee]/20 text-[#22d3ee] px-1.5 py-0.5 border border-[#22d3ee]/40 font-bold">
-                      대응 반격
-                    </span>
+            // 2) 멀티플레이에서 내가 패배한 경우: 상대방 선택 대기창 표출 (선택 버튼 절대 안 나옴!)
+            if (isMultiplayer && !isWinner) {
+              return (
+                <div className="w-full py-4 px-5 text-center font-black bg-[#0d1220]/95 border-2 border-violet-500/60 rounded-2xl text-slate-200 shadow-xl flex flex-col items-center justify-center gap-2 animate-in zoom-in-95 duration-200">
+                  <div className="flex items-center gap-2 text-sm sm:text-base text-violet-300 font-black">
+                    <Crown className="w-5 h-5 text-amber-400" />
+                    <span>⚔️ [{winnerPlayer.name}] 주사위 승리!</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-tight">
-                    상대의 행동을 먼저 확인한 뒤 대응합니다.
-                  </p>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 2P(AI) 승리 시 알림 배너 */}
-          {phase === 'RESULT' && winnerIndex === 1 && player1.isAi && (
-            <div className="w-full py-3 px-5 text-center font-black bg-purple-950/80 border border-purple-500/80 text-purple-300 shadow-xl shadow-purple-500/20 flex flex-col items-center justify-center gap-1 animate-in zoom-in-95 duration-200 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]">
-              <div className="flex items-center gap-2 text-sm sm:text-base">
-                <Swords className="w-5 h-5 text-purple-400" />
-                <span>⚔️ [{player1.name}] 주사위 승리!</span>
-              </div>
-              <span className="text-xs text-purple-300/80 font-normal">
-                상대(AI)가 [선공]을 선택했습니다. 잠시 후 시작됩니다...
-              </span>
-            </div>
-          )}
-
-          {/* 2P(사람 대전) 승리 시 선택 UI */}
-          {phase === 'RESULT' && winnerIndex === 1 && !player1.isAi && (
-            <div className="w-full space-y-3 animate-in fade-in zoom-in-95 duration-200">
-              <div className="py-2 px-4 text-center font-black bg-purple-950/80 border border-purple-500/80 text-purple-300 shadow-xl shadow-purple-500/20 flex items-center justify-center gap-2 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]">
-                <Crown className="w-4 h-4 text-purple-400" />
-                <span className="text-xs sm:text-sm">
-                  ⚔️ 2P [{player1.name}] 주사위 승리! 선공 또는 후공을 선택하세요
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                <button
-                  onClick={() => handleChooseOrder('FIRST')}
-                  className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border border-purple-500/70 hover:border-purple-400 text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs sm:text-sm font-black text-purple-300 uppercase tracking-wide flex items-center gap-1.5">
-                      <Zap className="w-4 h-4 text-purple-400 fill-purple-400" />
-                      2P 선공 (First)
-                    </span>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                    <span>상대방이 선공/후공을 선택하고 있습니다. 잠시만 기다려 주세요...</span>
                   </div>
-                  <p className="text-[11px] text-slate-300 leading-tight">
-                    2P가 먼저 행동하여 1턴 첫 공세를 전개합니다.
-                  </p>
-                </button>
+                </div>
+              );
+            }
 
-                <button
-                  onClick={() => handleChooseOrder('SECOND')}
-                  className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border border-[#22d3ee]/70 hover:border-[#22d3ee] text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
-                >
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-xs sm:text-sm font-black text-[#22d3ee] uppercase tracking-wide flex items-center gap-1.5">
-                      <Shield className="w-4 h-4 text-[#22d3ee]" />
-                      2P 후공 (1P 선공)
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 leading-tight">
-                    1P가 먼저 행동하게 하고 2P는 후공으로 대응합니다.
-                  </p>
-                </button>
+            // 3) 내가 주사위에 승리했거나 (또는 1인 2역): 선공 / 후공 선택 버튼 표출!
+            return (
+              <div className="w-full space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                <div className="py-2.5 px-4 rounded-2xl text-center font-black bg-emerald-950/80 border border-emerald-500/80 text-emerald-300 shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2">
+                  <Crown className="w-4 h-4 text-amber-400" />
+                  <span className="text-xs sm:text-sm">
+                    🎉 [{winnerPlayer.name}] 주사위 승리! 선공 또는 후공을 선택하세요
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                  {/* 선공 선택 */}
+                  <button
+                    onClick={() => handleChooseOrder('FIRST')}
+                    className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border-2 border-[#f97316]/70 hover:border-[#f97316] text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs sm:text-sm font-black text-[#f97316] uppercase tracking-wide flex items-center gap-1.5">
+                        <Zap className="w-4 h-4 text-[#f97316] fill-[#f97316]" />
+                        선공 (First)
+                      </span>
+                      <span className="text-[10px] bg-[#f97316]/20 text-[#f97316] px-1.5 py-0.5 border border-[#f97316]/40 font-bold">
+                        1턴 선제 행동
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-tight">
+                      내가 먼저 행동하여 1턴 첫 공세를 전개합니다.
+                    </p>
+                  </button>
+
+                  {/* 후공 선택 */}
+                  <button
+                    onClick={() => handleChooseOrder('SECOND')}
+                    className="group relative p-3.5 sm:p-4 bg-[#111520] hover:bg-[#1a2234] border-2 border-[#22d3ee]/70 hover:border-[#22d3ee] text-left transition-all duration-150 cursor-pointer shadow-lg hover:scale-[1.02] active:scale-[0.98] [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs sm:text-sm font-black text-[#22d3ee] uppercase tracking-wide flex items-center gap-1.5">
+                        <Shield className="w-4 h-4 text-[#22d3ee]" />
+                        후공 (Second)
+                      </span>
+                      <span className="text-[10px] bg-[#22d3ee]/20 text-[#22d3ee] px-1.5 py-0.5 border border-[#22d3ee]/40 font-bold">
+                        대응 반격
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-tight">
+                      상대의 행동을 먼저 확인한 뒤 대응합니다.
+                    </p>
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* 굴리기 시작 버튼 (READY 단계) */}
-          {phase === 'READY' && (
+          {phase === 'READY' && (!isMultiplayer || myPlayerIndex === 0) && (
             <button
               onClick={startRoll}
               className="w-full py-3.5 px-6 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-sm sm:text-base tracking-wide shadow-[0_0_20px_rgba(249,115,22,0.3)] transition cursor-pointer flex items-center justify-center gap-2 [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
             >
               <span>🎲 주사위 굴리기 (스페이스바)</span>
             </button>
+          )}
+
+          {phase === 'READY' && isMultiplayer && myPlayerIndex === 1 && (
+            <div className="text-xs text-slate-400 font-bold animate-pulse flex items-center gap-1.5 py-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span>방장(호스트)이 주사위를 굴리기를 기다리는 중...</span>
+            </div>
           )}
 
           {phase === 'ROLLING' && (
