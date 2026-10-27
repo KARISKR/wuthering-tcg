@@ -169,6 +169,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const guestMulliganRef = useRef<string[] | null>(null);
   const hostMulliganRef = useRef<string[] | null>(null);
 
+  // 멀티플레이 리더 선택 / 멀리건 완료 대기 플래그
+  const [hasSelectedMyLeader, setHasSelectedMyLeader] = useState<boolean>(false);
+  const [hasCompletedMyMulligan, setHasCompletedMyMulligan] = useState<boolean>(false);
+
   // [멀티플레이어 액션 프록시 래퍼] 게스트(P1)는 네트워크로 호스트에게 액션을 위임하고, 호스트/솔로/AI는 로컬 엔진을 즉시 실행
   const handleDrawCards = useCallback((pIdx?: 0 | 1) => {
     const targetIdx = pIdx ?? controlledPlayerIndex;
@@ -180,6 +184,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   }, [isGuest, controlledPlayerIndex, engineDrawCards]);
 
   const handleSelectStartingLeader = useCallback((p0Leader: string, p1Leader?: string) => {
+    setHasSelectedMyLeader(true);
     if (isGuest) {
       multiplayerService.sendAction('SELECT_LEADER', 1, { leaderName: p0Leader });
     } else if (isHost) {
@@ -193,6 +198,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   }, [isGuest, isHost, engineSelectStartingLeader]);
 
   const handleMulligan = useCallback((discardIds: string[]) => {
+    setHasCompletedMyMulligan(true);
     if (isGuest) {
       multiplayerService.sendAction('MULLIGAN', 1, { discardIds });
     } else if (isHost) {
@@ -321,6 +327,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       setIsInitiativeRolling(false);
     }
   }, [gameState.phase, isInitiativeRolling]);
+
+  useEffect(() => {
+    if (gameState.phase !== 'LEADER_SELECT' && hasSelectedMyLeader) {
+      setHasSelectedMyLeader(false);
+    }
+  }, [gameState.phase, hasSelectedMyLeader]);
+
+  useEffect(() => {
+    if (gameState.phase !== 'MULLIGAN' && hasCompletedMyMulligan) {
+      setHasCompletedMyMulligan(false);
+    }
+  }, [gameState.phase, hasCompletedMyMulligan]);
 
 
   // 덱에서 카드 드로우 시 시각 효과 상태
@@ -1307,11 +1325,47 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [gameState.logs.length]);
 
-  // 현재 조종 중인 플레이어 상태
-  const activeControlledPlayer = gameState.players[controlledPlayerIndex];
-  const isCurrentControlledTurn = gameState.activePlayerIndex === controlledPlayerIndex;
-  const otherPlayerIndex: 0 | 1 = controlledPlayerIndex === 0 ? 1 : 0;
-  const otherPlayer = gameState.players[otherPlayerIndex];
+  // 현재 조종 중인 플레이어 상태 및 시점 (멀티플레이에서는 호스트/게스트에 따라 상단/하단 분리)
+  const myPlayerIndex: 0 | 1 = controlledPlayerIndex;
+  const oppPlayerIndex: 0 | 1 = controlledPlayerIndex === 0 ? 1 : 0;
+  const activeControlledPlayer = gameState.players[myPlayerIndex];
+  const isCurrentControlledTurn = gameState.activePlayerIndex === myPlayerIndex;
+  const otherPlayerIndex: 0 | 1 = oppPlayerIndex;
+  const otherPlayer = gameState.players[oppPlayerIndex];
+
+  // 시점별 데미지/회복 알림 및 덱 드로우 상태
+  const myDamageAlert = myPlayerIndex === 0 ? p0DamageAlert : p1DamageAlert;
+  const myHealAlert = myPlayerIndex === 0 ? p0HealAlert : p1HealAlert;
+  const oppDamageAlert = oppPlayerIndex === 0 ? p0DamageAlert : p1DamageAlert;
+  const oppHealAlert = oppPlayerIndex === 0 ? p0HealAlert : p1HealAlert;
+  const myDeckDrawing = myPlayerIndex === 0 ? p0DeckDrawing : p1DeckDrawing;
+  const oppDeckDrawing = oppPlayerIndex === 0 ? p0DeckDrawing : p1DeckDrawing;
+
+  // 시점별 액션 에리어 출전 카드 목록 (2단 중앙 아레나 바인딩)
+  const myActionCards = (activeControlledPlayer.actionArea && activeControlledPlayer.actionArea.length > 0)
+    ? activeControlledPlayer.actionArea
+    : (activeControlledPlayer.clashCard ? [activeControlledPlayer.clashCard] : []);
+  const myNormalAttackCount = myActionCards.filter(
+    (c) => c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격')
+  ).length;
+
+  const oppActionCards = (otherPlayer.actionArea && otherPlayer.actionArea.length > 0)
+    ? otherPlayer.actionArea
+    : (otherPlayer.clashCard ? [otherPlayer.clashCard] : []);
+  const oppNormalAttackCount = oppActionCards.filter(
+    (c) => c.nameKr.includes('일반 공격') || c.nameKr.includes('기본 공격')
+  ).length;
+
+  // 현재 연격 공격권을 가진 플레이어 판별
+  const comboPlayerIndex: 0 | 1 =
+    (gameState.players[0].comboUnlimited || (gameState.players[0].comboCount ?? 0) > 0)
+      ? 0
+      : (gameState.players[1].comboUnlimited || (gameState.players[1].comboCount ?? 0) > 0)
+      ? 1
+      : gameState.lastComboStrike
+      ? gameState.lastComboStrike.attackerIndex
+      : gameState.activePlayerIndex;
+  const isMyComboTurn = controlledPlayerIndex === comboPlayerIndex;
 
   // AI가 현재 연격 단계를 진행 중인지 여부 판별
   const isAiComboInProgress =
@@ -1322,11 +1376,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         !activeControlledPlayer.comboUnlimited &&
         (activeControlledPlayer.comboCount ?? 0) === 0));
 
-  // 인간 플레이어의 연격 단계 여부 (연격을 모두 소진하여 comboCount가 0이 된 직후에도 연격 종료 처리가 가능하도록 유지)
+  // 인간 플레이어의 연격 단계 여부 (멀티플레이에서는 내가 연격 공격권자일 때만 활성화)
   const isPlayerComboPhase =
     gameState.phase === 'COMBO_STEP' &&
-    !activeControlledPlayer.isAi &&
-    !isAiComboInProgress;
+    (isMultiplayer ? isMyComboTurn : (!activeControlledPlayer.isAi && !isAiComboInProgress));
 
   // COMBO_STEP에서 사용 가능한 연격 카드가 없거나 추격 횟수를 모두 소진했을 때 알림 팝업 및 자동 턴 넘김 카운트다운
   const [noComboCountdown, setNoComboCountdown] = useState<number | null>(null);
@@ -1897,7 +1950,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_50%_at_50%_50%,rgba(223,194,134,0.04),transparent_80%)]" />
 
           {/* ------------------------------------------------------- */}
-          {/* [1단: 상대방(AI) 진영 - 상단 ~26% 비중 (컴팩트 스케일)] */}
+          {/* [1단: 상대방(AI/상대 플레이어) 진영 - 상단 ~26% 비중 (컴팩트 스케일)] */}
           {/* ------------------------------------------------------- */}
           <div className="relative z-10 w-full flex flex-col gap-1 shrink-0">
             {/* 상대 상태바 (38px / h-9.5): 이름 + 평행사변형 HP바 + 마름모 10칸 협주 게이지 + 손패 수 */}
@@ -1908,8 +1961,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {/* 좌측: 상대 이름 & 평행사변형(-skew-x-12) 택티컬 HP 게이지 */}
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 font-black text-sm sm:text-base text-cyan-300">
-                  {gameState.gameMode === 'AI' ? <Bot className="w-4 h-4 text-[#22d3ee]" /> : <User className="w-4 h-4 text-[#22d3ee]" />}
-                  <span>{p1.name}</span>
+                  {otherPlayer.isAi ? <Bot className="w-4 h-4 text-[#22d3ee]" /> : <User className="w-4 h-4 text-[#22d3ee]" />}
+                  <span>{otherPlayer.name}</span>
                 </div>
 
                 <div
@@ -1917,25 +1970,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   title="체력(HP) 상세 변동 내역 보기 (클릭)"
                   className="flex items-center gap-2 cursor-pointer group select-none hover:opacity-95 transition-opacity"
                 >
-                  <Heart className={`w-4 h-4 transition-transform group-hover:scale-110 ${p1HealAlert ? 'animate-bounce text-emerald-400 fill-emerald-400' : p1DamageAlert ? 'animate-bounce text-red-500 fill-red-500' : 'text-red-400 fill-red-400'}`} />
-                  <span className={`font-black text-base sm:text-lg font-mono tracking-wider ${p1HealAlert ? 'text-emerald-400' : 'text-white'}`}>
-                    {p1.hp}<span className="text-xs text-slate-400">/20</span>
+                  <Heart className={`w-4 h-4 transition-transform group-hover:scale-110 ${oppHealAlert ? 'animate-bounce text-emerald-400 fill-emerald-400' : oppDamageAlert ? 'animate-bounce text-red-500 fill-red-500' : 'text-red-400 fill-red-400'}`} />
+                  <span className={`font-black text-base sm:text-lg font-mono tracking-wider ${oppHealAlert ? 'text-emerald-400' : 'text-white'}`}>
+                    {otherPlayer.hp}<span className="text-xs text-slate-400">/20</span>
                   </span>
                   {/* 평행사변형(-skew-x-12) 택티컬 게이지 바 */}
                   <div className="w-28 sm:w-36 h-3 -skew-x-12 bg-[#070a12] border border-cyan-400/40 p-0.5 overflow-hidden shadow-inner group-hover:border-cyan-300">
                     <div
                       className={`h-full transition-all duration-300 ${
-                        p1HealAlert
+                        oppHealAlert
                           ? 'bg-gradient-to-r from-emerald-500 to-teal-300'
                           : 'bg-gradient-to-r from-red-600 via-rose-500 to-[#f97316]'
                       }`}
-                      style={{ width: `${(p1.hp / 20) * 100}%` }}
+                      style={{ width: `${(otherPlayer.hp / 20) * 100}%` }}
                     />
                   </div>
                   <span className="hidden sm:inline-block text-[10px] font-mono px-1 py-0.5 bg-cyan-950/80 border border-cyan-400/30 text-cyan-300 group-hover:bg-cyan-900 group-hover:text-white transition [clip-path:polygon(3px_0,100%_0,100%_calc(100%-3px),calc(100%-3px)_100%,0_100%,0_3px)]">
                     HP로그
                   </span>
-                  {p1.hasDominance && (
+                  {otherPlayer.hasDominance && (
                     <span
                       className="inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-sans tracking-tight rounded-xs shadow-[0_0_8px_rgba(251,191,36,0.7)] border border-yellow-200 animate-pulse shrink-0 select-none"
                       title="【우세】 상태: 지난 턴 배틀에서 승리하거나 상대가 배틀을 패스하여 우세 효과가 활성화되었습니다."
@@ -1943,14 +1996,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       👑 우세
                     </span>
                   )}
-                  {p1DamageAlert && (
+                  {oppDamageAlert && (
                     <span className="px-1.5 py-0.2 bg-red-600 text-white font-mono font-black text-xs animate-bounce">
-                      -{p1DamageAlert.diff}
+                      -{oppDamageAlert.diff}
                     </span>
                   )}
-                  {p1HealAlert && (
+                  {oppHealAlert && (
                     <span className="px-1.5 py-0.2 bg-emerald-600 text-white font-mono font-black text-xs animate-bounce">
-                      +{p1HealAlert.diff}
+                      +{oppHealAlert.diff}
                     </span>
                   )}
                 </div>
@@ -1958,10 +2011,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
               {/* 우측: 마름모(rotate-45) 10칸 협주 게이지 & 상대 남은 손패 */}
               <div className="flex items-center gap-3">
-                {p1.comboCount > 0 && (
+                {otherPlayer.comboCount > 0 && (
                   <div className="flex items-center gap-1 bg-red-950/90 px-2 py-0.5 border border-red-500 text-xs font-mono font-black text-orange-300 animate-pulse">
                     <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400" />
-                    <span>추격 {p1.comboCount}</span>
+                    <span>추격 {otherPlayer.comboCount}</span>
                   </div>
                 )}
 
@@ -1974,7 +2027,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       <div
                         key={i}
                         className={`w-2.5 h-2.5 rotate-45 border transition-all duration-200 ${
-                          i < p1.concertoZone.length
+                          i < otherPlayer.concertoZone.length
                             ? 'bg-[#22d3ee] border-white shadow-[0_0_8px_#22d3ee]'
                             : 'bg-[#0c101b] border-slate-700'
                         }`}
@@ -1982,7 +2035,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     ))}
                   </div>
                   <strong className="text-xs sm:text-sm font-black text-[#22d3ee] font-mono">
-                    {p1.concertoZone.length}/10
+                    {otherPlayer.concertoZone.length}/10
                   </strong>
                 </div>
 
@@ -1999,14 +2052,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       ch.revealedCards.forEach((rc) => pendingRevealIds.add(rc.id));
                     }
                   }
-                  const visibleP1Hand = p1.hand.filter((c) => !pendingRevealIds.has(c.id));
-                  const revealedCount = visibleP1Hand.filter((c) => c.isRevealed).length;
+                  const visibleOppHand = otherPlayer.hand.filter((c) => !pendingRevealIds.has(c.id));
+                  const revealedCount = visibleOppHand.filter((c) => c.isRevealed).length;
 
                   return (
                     <div className="flex items-center gap-2 bg-[#080b13] px-2.5 py-0.5 border border-white/10">
                       <span className="text-xs font-bold text-slate-300 flex items-center gap-1">
                         <span>🂠 패</span>
-                        <strong className="text-white font-mono text-xs sm:text-sm">{visibleP1Hand.length}장</strong>
+                        <strong className="text-white font-mono text-xs sm:text-sm">{visibleOppHand.length}장</strong>
                       </span>
                       {gameState.isOpponentHandScanned ? (
                         <span className="text-[10px] font-black text-[#f97316] bg-amber-950/80 px-1.5 py-0.2 border border-[#f97316]/50 animate-pulse">
@@ -2021,7 +2074,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         </span>
                       ) : null}
                       <div className="flex items-center -space-x-2 py-0.5 pl-1">
-                        {visibleP1Hand.map((c, i) => {
+                        {visibleOppHand.map((c, i) => {
                           const isCardVisible = Boolean(gameState.isOpponentHandScanned || c.isRevealed);
                           return (
                             <div
@@ -2043,7 +2096,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                                   ? `[스캔 공개] ${c.nameKr} (${c.color})`
                                   : c.isRevealed
                                   ? `[효과로 공개됨] ${c.nameKr} (${c.color}) — 마우스를 올려 상세 확인`
-                                  : `상대 손패 (${i + 1}/${visibleP1Hand.length})`
+                                  : `상대 손패 (${i + 1}/${visibleOppHand.length})`
                               }
                             >
                               <img
@@ -2067,25 +2120,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <div className="grid grid-cols-2 gap-1.5">
                 <DeckStack
                   type="CHARACTER"
-                  count={p1.characterDeck.length}
-                  playerTheme="p1"
+                  count={otherPlayer.characterDeck.length}
+                  playerTheme={oppPlayerIndex === 0 ? 'p0' : 'p1'}
                   compact={true}
                   onClick={() => {
-                    if (controlledPlayerIndex === 1 || !p1.isAi) {
-                      openCardListModal('CHARACTER', 1);
+                    if (gameState.gameMode === 'SOLO_DUAL' || !otherPlayer.isAi) {
+                      openCardListModal('CHARACTER', oppPlayerIndex);
                     }
                   }}
                 />
                 <ZoneCardStack
-                  cards={p1.concertoZone}
+                  cards={otherPlayer.concertoZone}
                   zoneType="CONCERTO"
                   compact={true}
-                  isSecret={controlledPlayerIndex !== 1}
+                  isSecret={true}
                   onOpenModal={() => {
-                    if (controlledPlayerIndex === 1) openCardListModal('CONCERTO', 1);
+                    if (gameState.gameMode === 'SOLO_DUAL') openCardListModal('CONCERTO', oppPlayerIndex);
                   }}
                   onHoverCard={(c) => {
-                    if (controlledPlayerIndex === 1) setPreviewCard(c);
+                    if (gameState.gameMode === 'SOLO_DUAL') setPreviewCard(c);
                   }}
                 />
               </div>
@@ -2093,46 +2146,56 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {/* 중앙: 상대 서포트 2장 + 상대 리더 1장 */}
               <div className="flex items-center justify-center gap-4 sm:gap-7">
                 <CharacterSlot
-                  card={p1.slots.leftSupport}
+                  card={otherPlayer.slots.leftSupport}
                   role="leftSupport"
-                  isOwnerActive={!isP0Turn}
-                  canUpgrade={gameState.gameMode === 'SOLO_DUAL' ? checkCanUpgradeSlot('leftSupport', 1) : false}
-                  canSwitch={!isActionLockedByModal && gameState.gameMode === 'SOLO_DUAL' && !p1.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && !isP0Turn}
-                  onUpgradeClick={() => openUpgradeModal('leftSupport', 1)}
-                  onSwitchClick={() => onSwitchLeaderWithSound(1, 'leftSupport')}
-                  onMouseEnter={() => p1.slots.leftSupport && setPreviewCard(p1.slots.leftSupport)}
+                  isOwnerActive={gameState.activePlayerIndex === oppPlayerIndex}
+                  canUpgrade={gameState.gameMode === 'SOLO_DUAL' ? checkCanUpgradeSlot('leftSupport', oppPlayerIndex) : false}
+                  canSwitch={!isActionLockedByModal && gameState.gameMode === 'SOLO_DUAL' && !otherPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && gameState.activePlayerIndex === oppPlayerIndex}
+                  onUpgradeClick={() => {
+                    if (gameState.gameMode === 'SOLO_DUAL') openUpgradeModal('leftSupport', oppPlayerIndex);
+                  }}
+                  onSwitchClick={() => {
+                    if (gameState.gameMode === 'SOLO_DUAL') onSwitchLeaderWithSound(oppPlayerIndex, 'leftSupport');
+                  }}
+                  onMouseEnter={() => otherPlayer.slots.leftSupport && setPreviewCard(otherPlayer.slots.leftSupport)}
                   onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                   onHoverUnderlyingCard={(c) => setPreviewCard(c)}
-                  isAi={p1.isAi}
+                  isAi={otherPlayer.isAi}
                   isOpponent={true}
                 />
 
                 <CharacterSlot
-                  card={p1.slots.leader}
+                  card={otherPlayer.slots.leader}
                   role="leader"
-                  isOwnerActive={!isP0Turn}
-                  canUpgrade={gameState.gameMode === 'SOLO_DUAL' ? checkCanUpgradeSlot('leader', 1) : false}
+                  isOwnerActive={gameState.activePlayerIndex === oppPlayerIndex}
+                  canUpgrade={gameState.gameMode === 'SOLO_DUAL' ? checkCanUpgradeSlot('leader', oppPlayerIndex) : false}
                   canSwitch={false}
-                  onUpgradeClick={() => openUpgradeModal('leader', 1)}
-                  onMouseEnter={() => setPreviewCard(p1.slots.leader)}
+                  onUpgradeClick={() => {
+                    if (gameState.gameMode === 'SOLO_DUAL') openUpgradeModal('leader', oppPlayerIndex);
+                  }}
+                  onMouseEnter={() => setPreviewCard(otherPlayer.slots.leader)}
                   onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                   onHoverUnderlyingCard={(c) => setPreviewCard(c)}
-                  isAi={p1.isAi}
+                  isAi={otherPlayer.isAi}
                   isOpponent={true}
                 />
 
                 <CharacterSlot
-                  card={p1.slots.rightSupport}
+                  card={otherPlayer.slots.rightSupport}
                   role="rightSupport"
-                  isOwnerActive={!isP0Turn}
-                  canUpgrade={gameState.gameMode === 'SOLO_DUAL' ? checkCanUpgradeSlot('rightSupport', 1) : false}
-                  canSwitch={!isActionLockedByModal && gameState.gameMode === 'SOLO_DUAL' && !p1.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && !isP0Turn}
-                  onUpgradeClick={() => openUpgradeModal('rightSupport', 1)}
-                  onSwitchClick={() => onSwitchLeaderWithSound(1, 'rightSupport')}
-                  onMouseEnter={() => p1.slots.rightSupport && setPreviewCard(p1.slots.rightSupport)}
+                  isOwnerActive={gameState.activePlayerIndex === oppPlayerIndex}
+                  canUpgrade={gameState.gameMode === 'SOLO_DUAL' ? checkCanUpgradeSlot('rightSupport', oppPlayerIndex) : false}
+                  canSwitch={!isActionLockedByModal && gameState.gameMode === 'SOLO_DUAL' && !otherPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && gameState.activePlayerIndex === oppPlayerIndex}
+                  onUpgradeClick={() => {
+                    if (gameState.gameMode === 'SOLO_DUAL') openUpgradeModal('rightSupport', oppPlayerIndex);
+                  }}
+                  onSwitchClick={() => {
+                    if (gameState.gameMode === 'SOLO_DUAL') onSwitchLeaderWithSound(oppPlayerIndex, 'rightSupport');
+                  }}
+                  onMouseEnter={() => otherPlayer.slots.rightSupport && setPreviewCard(otherPlayer.slots.rightSupport)}
                   onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                   onHoverUnderlyingCard={(c) => setPreviewCard(c)}
-                  isAi={p1.isAi}
+                  isAi={otherPlayer.isAi}
                   isOpponent={true}
                 />
               </div>
@@ -2141,19 +2204,18 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <div className="grid grid-cols-2 gap-1.5">
                 <DeckStack
                   type="ACTION"
-                  count={p1.actionDeck.length}
-                  isDrawing={p1DeckDrawing}
-                  canDraw={canP1Draw}
+                  count={otherPlayer.actionDeck.length}
+                  isDrawing={oppDeckDrawing}
+                  canDraw={false}
                   drawCount={currentTurnDrawCount}
-                  onClick={canP1Draw ? () => handleDrawCards(1) : undefined}
-                  playerTheme="p1"
+                  playerTheme={oppPlayerIndex === 0 ? 'p0' : 'p1'}
                   compact={true}
                 />
                 <ZoneCardStack
-                  cards={p1.dropZone}
+                  cards={otherPlayer.dropZone}
                   zoneType="TRASH"
                   compact={true}
-                  onOpenModal={() => openCardListModal('TRASH', 1)}
+                  onOpenModal={() => openCardListModal('TRASH', oppPlayerIndex)}
                   onHoverCard={(c) => setPreviewCard(c)}
                 />
               </div>
@@ -2188,39 +2250,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {/* 슬롯 상단 라벨 */}
               <div className="absolute top-1.5 left-3 right-3 flex items-center justify-between z-10 pointer-events-none">
                 <span className="text-xs font-black text-[#22d3ee] tracking-wider uppercase flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5" />
-                  <span>상대 출전 액션 슬롯</span>
+                  {otherPlayer.isAi ? <Bot className="w-3.5 h-3.5" /> : <User className="w-3.5 h-3.5" />}
+                  <span>상대 ({otherPlayer.name}) 출전 액션 슬롯</span>
                 </span>
                 <div className="flex items-center gap-1.5">
-                  {p1NormalAttackCount > 0 && (
+                  {oppNormalAttackCount > 0 && (
                     <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 bg-emerald-950/90 text-emerald-300 border border-emerald-500/40">
-                      일반공격 {p1NormalAttackCount}
+                      일반공격 {oppNormalAttackCount}
                     </span>
                   )}
-                  {p1ActionCards.length > 0 && (
+                  {oppActionCards.length > 0 && (
                     <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 bg-cyan-950/90 text-cyan-300 border border-cyan-500/40">
-                      {p1ActionCards.length}장
+                      {oppActionCards.length}장
                     </span>
                   )}
                 </div>
               </div>
 
-              {p1ActionCards.length > 0 ? (
+              {oppActionCards.length > 0 ? (
                 <div className="w-full h-full flex items-center justify-center gap-2.5 overflow-x-auto pt-4 custom-scrollbar">
-                  {p1ActionCards.map((card, idx) => {
-                    const isLastCard = idx === p1ActionCards.length - 1;
-                    const isP1ClashRevealed =
-                      controlledPlayerIndex === 1 ||
+                  {oppActionCards.map((card, idx) => {
+                    const isLastCard = idx === oppActionCards.length - 1;
+                    const isOppClashRevealed =
+                      controlledPlayerIndex === oppPlayerIndex ||
                       gameState.phase === 'CLASH_REVEAL' ||
                       gameState.phase === 'COMBO_STEP' ||
                       gameState.phase === 'ACTION_PHASE' ||
                       gameState.phase === 'END_PHASE' ||
                       gameState.phase === 'DISCARD_OVERFLOW';
-                    const isFacedown = !isP1ClashRevealed;
+                    const isFacedown = !isOppClashRevealed;
 
                     return (
                       <div
-                        key={card.id ? `${card.id}-${idx}` : `p1-action-${idx}`}
+                        key={card.id ? `${card.id}-${idx}` : `opp-action-${idx}`}
                         onMouseEnter={() => {
                           if (!isFacedown) setPreviewCard(card);
                         }}
@@ -2230,7 +2292,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         className={`shrink-0 transition-transform hover:scale-105 cursor-pointer relative ${
                           isLastCard ? 'ring-1 ring-[#22d3ee] shadow-[0_0_15px_rgba(34,211,238,0.35)]' : 'opacity-90'
                         } ${
-                          p0.clashCardReady && p1.clashCardReady && gameState.phase === 'CLASH_SET'
+                          activeControlledPlayer.clashCardReady && otherPlayer.clashCardReady && gameState.phase === 'CLASH_SET'
                             ? 'animate-card-tense'
                             : 'animate-card-slam'
                         }`}
@@ -2275,20 +2337,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 </div>
               </div>
 
-              {/* 상성 가이드(RED>GRN) 제거 ➔ 실시간 턴 소유자(플레이어 vs AI) & 페이즈 안내 */}
+              {/* 실시간 턴 소유자 & 페이즈 안내 */}
               <div className="flex flex-col items-center gap-1 w-full">
                 <div className={`flex items-center justify-center gap-1.5 text-xs font-black px-3 py-1 border shadow-md [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)] ${
-                  isP0Turn
+                  isCurrentControlledTurn
                     ? 'bg-[#f97316]/20 text-[#f97316] border-[#f97316]/70 shadow-[0_0_12px_rgba(249,115,22,0.35)]'
                     : 'bg-cyan-500/20 text-cyan-300 border-cyan-400/70 shadow-[0_0_12px_rgba(34,211,238,0.35)]'
                 }`}>
-                  <span>{isP0Turn ? '플레이어 (당신)의 턴' : '상대 (AI)의 턴'}</span>
+                  <span>{isCurrentControlledTurn ? '플레이어 (당신)의 턴' : `상대 (${otherPlayer.name})의 턴`}</span>
                 </div>
                 <span className="text-xs sm:text-[13px] font-bold text-slate-200 text-center max-w-full leading-tight">
                   {gameState.phase === 'CLASH_SET' &&
-                    (p0.clashCardReady && p1.clashCardReady ? '🔒 양측 세트 완료!' : '⚔️ 대결 카드 세트 중')}
+                    (activeControlledPlayer.clashCardReady && otherPlayer.clashCardReady ? '🔒 양측 세트 완료!' : '⚔️ 대결 카드 세트 중')}
                   {gameState.phase === 'CLASH_REVEAL' && '⚡ 상성 & 속도 판정!'}
-                  {gameState.phase === 'COMBO_STEP' && `🔥 연격 단계 (${activeControlledPlayer.comboUnlimited ? '∞' : `${activeControlledPlayer.comboCount}회`})`}
+                  {gameState.phase === 'COMBO_STEP' && `🔥 연격 단계 (${(gameState.players[comboPlayerIndex]?.comboUnlimited) ? '∞' : `${gameState.players[comboPlayerIndex]?.comboCount ?? 0}회`})`}
                   {gameState.phase === 'ACTION_PHASE' && '메인 행동 단계'}
                   {gameState.phase === 'DRAW_PHASE' && (canP0Draw || canP1Draw ? `🎴 덱 클릭 드로우 (${currentTurnDrawCount}장)` : '드로우 단계')}
                   {gameState.phase === 'DISCARD_OVERFLOW' && '엔드 페이즈 (패 정리)'}
@@ -2308,48 +2370,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <div className="absolute top-1.5 left-3 right-3 flex items-center justify-between z-10 pointer-events-none">
                 <span className="text-xs font-black text-[#f97316] tracking-wider uppercase flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5" />
-                  <span>내 출전 액션 슬롯</span>
+                  <span>내 ({activeControlledPlayer.name}) 출전 액션 슬롯</span>
                 </span>
                 <div className="flex items-center gap-1.5">
-                  {p0NormalAttackCount > 0 && (
+                  {myNormalAttackCount > 0 && (
                     <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 bg-emerald-950/90 text-emerald-300 border border-emerald-500/40">
-                      일반공격 {p0NormalAttackCount}
+                      일반공격 {myNormalAttackCount}
                     </span>
                   )}
-                  {p0ActionCards.length > 0 && (
+                  {myActionCards.length > 0 && (
                     <span className="text-[10px] sm:text-xs font-bold px-2 py-0.5 bg-[#f97316]/20 text-[#f97316] border border-[#f97316]/40">
-                      {p0ActionCards.length}장
+                      {myActionCards.length}장
                     </span>
                   )}
                 </div>
               </div>
 
-              {p0ActionCards.length > 0 ? (
+              {myActionCards.length > 0 ? (
                 <div className="w-full h-full flex items-center justify-center gap-2.5 overflow-x-auto pt-4 custom-scrollbar">
-                  {p0ActionCards.map((card, idx) => {
-                    const isLastCard = idx === p0ActionCards.length - 1;
-                    const isP0ClashRevealed =
-                      controlledPlayerIndex === 0 ||
-                      gameState.phase === 'CLASH_REVEAL' ||
-                      gameState.phase === 'COMBO_STEP' ||
-                      gameState.phase === 'ACTION_PHASE' ||
-                      gameState.phase === 'END_PHASE' ||
-                      gameState.phase === 'DISCARD_OVERFLOW';
-                    const isFacedown = !isP0ClashRevealed;
+                  {myActionCards.map((card, idx) => {
+                    const isLastCard = idx === myActionCards.length - 1;
+                    const isFacedown = false;
 
                     return (
                       <div
-                        key={card.id ? `${card.id}-${idx}` : `p0-action-${idx}`}
+                        key={card.id ? `${card.id}-${idx}` : `my-action-${idx}`}
                         onMouseEnter={() => {
-                          if (!isFacedown) setPreviewCard(card);
+                          setPreviewCard(card);
                         }}
                         onClick={() => {
-                          if (!isFacedown) setPreviewCard(card);
+                          setPreviewCard(card);
                         }}
                         className={`shrink-0 transition-transform hover:scale-105 cursor-pointer relative ${
                           isLastCard ? 'ring-1 ring-[#f97316] shadow-[0_0_15px_rgba(249,115,22,0.4)]' : 'opacity-90'
                         } ${
-                          p0.clashCardReady && p1.clashCardReady && gameState.phase === 'CLASH_SET'
+                          activeControlledPlayer.clashCardReady && otherPlayer.clashCardReady && gameState.phase === 'CLASH_SET'
                             ? 'animate-card-tense'
                             : 'animate-card-slam'
                         }`}
@@ -2358,7 +2413,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           card={card}
                           customSizeClass="w-[104px] h-[148px] sm:w-[116px] sm:h-[164px] text-xs"
                           isFacedown={isFacedown}
-                          badge={isFacedown ? undefined : idx === 0 ? '대결' : `연격 ${idx}`}
+                          badge={idx === 0 ? '대결' : `연격 ${idx}`}
                         />
                       </div>
                     );
@@ -2387,14 +2442,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <div className="grid grid-cols-2 gap-1.5">
                 <DeckStack
                   type="CHARACTER"
-                  count={p0.characterDeck.length}
-                  playerTheme="p0"
-                  onClick={() => openCardListModal('CHARACTER', 0)}
+                  count={activeControlledPlayer.characterDeck.length}
+                  playerTheme={myPlayerIndex === 0 ? 'p0' : 'p1'}
+                  onClick={() => openCardListModal('CHARACTER', myPlayerIndex)}
                 />
                 <ZoneCardStack
-                  cards={p0.concertoZone}
+                  cards={activeControlledPlayer.concertoZone}
                   zoneType="CONCERTO"
-                  onOpenModal={() => openCardListModal('CONCERTO', 0)}
+                  onOpenModal={() => openCardListModal('CONCERTO', myPlayerIndex)}
                   onHoverCard={(c) => setPreviewCard(c)}
                 />
               </div>
@@ -2402,21 +2457,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {/* 중앙: 내 서포트 2장 (h-144px) + 내 리더 1장 (h-164px, 14% 확대 + #f97316 오라) */}
               <div className="flex items-center justify-center gap-4 sm:gap-7">
                 <CharacterSlot
-                  card={p0.slots.leftSupport}
+                  card={activeControlledPlayer.slots.leftSupport}
                   role="leftSupport"
-                  isOwnerActive={isP0Turn}
-                  canUpgrade={checkCanUpgradeSlot('leftSupport', 0)}
-                  canSwitch={!isActionLockedByModal && !p0.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isP0Turn}
-                  onUpgradeClick={() => openUpgradeModal('leftSupport', 0)}
+                  isOwnerActive={isCurrentControlledTurn}
+                  canUpgrade={checkCanUpgradeSlot('leftSupport', myPlayerIndex)}
+                  canSwitch={!isActionLockedByModal && !activeControlledPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
+                  onUpgradeClick={() => openUpgradeModal('leftSupport', myPlayerIndex)}
                   onCardClick={() => {
-                    if (gameState.phase === 'ACTION_PHASE' && isP0Turn && checkCanUpgradeSlot('leftSupport', 0)) {
-                      openUpgradeModal('leftSupport', 0);
-                    } else if (p0.slots.leftSupport) {
-                      setEvolutionModalChar(p0.slots.leftSupport);
+                    if (gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn && checkCanUpgradeSlot('leftSupport', myPlayerIndex)) {
+                      openUpgradeModal('leftSupport', myPlayerIndex);
+                    } else if (activeControlledPlayer.slots.leftSupport) {
+                      setEvolutionModalChar(activeControlledPlayer.slots.leftSupport);
                     }
                   }}
-                  onSwitchClick={() => onSwitchLeaderWithSound(0, 'leftSupport')}
-                  onMouseEnter={() => p0.slots.leftSupport && setPreviewCard(p0.slots.leftSupport)}
+                  onSwitchClick={() => onSwitchLeaderWithSound(myPlayerIndex, 'leftSupport')}
+                  onMouseEnter={() => activeControlledPlayer.slots.leftSupport && setPreviewCard(activeControlledPlayer.slots.leftSupport)}
                   onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                   onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                   isAi={false}
@@ -2429,7 +2484,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       <div className="relative bg-[#0c101b]/95 border border-[#f97316] text-orange-100 px-3 py-2 shadow-2xl text-center backdrop-blur-md">
                         <div className="flex items-center justify-center gap-1 text-[10px] text-[#f97316] font-black mb-0.5">
                           <span className="animate-pulse">💭</span>
-                          <span>{(p0.slots.leader?.characterName || p0.slots.leader?.nameKr) || '리더'}의 생각</span>
+                          <span>{(activeControlledPlayer.slots.leader?.characterName || activeControlledPlayer.slots.leader?.nameKr) || '리더'}의 생각</span>
                         </div>
                         <div className="text-[11px] text-slate-100 font-medium leading-snug break-keep">
                           “{idleSpeech.text}”
@@ -2439,20 +2494,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   )}
 
                   <CharacterSlot
-                    card={p0.slots.leader}
+                    card={activeControlledPlayer.slots.leader}
                     role="leader"
-                    isOwnerActive={isP0Turn}
-                    canUpgrade={checkCanUpgradeSlot('leader', 0)}
+                    isOwnerActive={isCurrentControlledTurn}
+                    canUpgrade={checkCanUpgradeSlot('leader', myPlayerIndex)}
                     canSwitch={false}
-                    onUpgradeClick={() => openUpgradeModal('leader', 0)}
+                    onUpgradeClick={() => openUpgradeModal('leader', myPlayerIndex)}
                     onCardClick={() => {
-                      if (gameState.phase === 'ACTION_PHASE' && isP0Turn && checkCanUpgradeSlot('leader', 0)) {
-                        openUpgradeModal('leader', 0);
-                      } else if (p0.slots.leader) {
-                        setEvolutionModalChar(p0.slots.leader);
+                      if (gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn && checkCanUpgradeSlot('leader', myPlayerIndex)) {
+                        openUpgradeModal('leader', myPlayerIndex);
+                      } else if (activeControlledPlayer.slots.leader) {
+                        setEvolutionModalChar(activeControlledPlayer.slots.leader);
                       }
                     }}
-                    onMouseEnter={() => setPreviewCard(p0.slots.leader)}
+                    onMouseEnter={() => setPreviewCard(activeControlledPlayer.slots.leader)}
                     onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                     onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                     isAi={false}
@@ -2460,21 +2515,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 </div>
 
                 <CharacterSlot
-                  card={p0.slots.rightSupport}
+                  card={activeControlledPlayer.slots.rightSupport}
                   role="rightSupport"
-                  isOwnerActive={isP0Turn}
-                  canUpgrade={checkCanUpgradeSlot('rightSupport', 0)}
-                  canSwitch={!isActionLockedByModal && !p0.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isP0Turn}
-                  onUpgradeClick={() => openUpgradeModal('rightSupport', 0)}
+                  isOwnerActive={isCurrentControlledTurn}
+                  canUpgrade={checkCanUpgradeSlot('rightSupport', myPlayerIndex)}
+                  canSwitch={!isActionLockedByModal && !activeControlledPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
+                  onUpgradeClick={() => openUpgradeModal('rightSupport', myPlayerIndex)}
                   onCardClick={() => {
-                    if (gameState.phase === 'ACTION_PHASE' && isP0Turn && checkCanUpgradeSlot('rightSupport', 0)) {
-                      openUpgradeModal('rightSupport', 0);
-                    } else if (p0.slots.rightSupport) {
-                      setEvolutionModalChar(p0.slots.rightSupport);
+                    if (gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn && checkCanUpgradeSlot('rightSupport', myPlayerIndex)) {
+                      openUpgradeModal('rightSupport', myPlayerIndex);
+                    } else if (activeControlledPlayer.slots.rightSupport) {
+                      setEvolutionModalChar(activeControlledPlayer.slots.rightSupport);
                     }
                   }}
-                  onSwitchClick={() => onSwitchLeaderWithSound(0, 'rightSupport')}
-                  onMouseEnter={() => p0.slots.rightSupport && setPreviewCard(p0.slots.rightSupport)}
+                  onSwitchClick={() => onSwitchLeaderWithSound(myPlayerIndex, 'rightSupport')}
+                  onMouseEnter={() => activeControlledPlayer.slots.rightSupport && setPreviewCard(activeControlledPlayer.slots.rightSupport)}
                   onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                   onHoverUnderlyingCard={(c) => setPreviewCard(c)}
                   isAi={false}
@@ -2484,19 +2539,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               {/* 우측 끝: 트래시(홀로그램 슬롯) + 액션 덱(입체 다중 그림자) */}
               <div className="grid grid-cols-2 gap-1.5">
                 <ZoneCardStack
-                  cards={p0.dropZone}
+                  cards={activeControlledPlayer.dropZone}
                   zoneType="TRASH"
-                  onOpenModal={() => openCardListModal('TRASH', 0)}
+                  onOpenModal={() => openCardListModal('TRASH', myPlayerIndex)}
                   onHoverCard={(c) => setPreviewCard(c)}
                 />
                 <DeckStack
                   type="ACTION"
-                  count={p0.actionDeck.length}
-                  isDrawing={p0DeckDrawing}
-                  canDraw={canP0Draw}
+                  count={activeControlledPlayer.actionDeck.length}
+                  isDrawing={myDeckDrawing}
+                  canDraw={myPlayerIndex === 0 ? canP0Draw : canP1Draw}
                   drawCount={currentTurnDrawCount}
-                  onClick={canP0Draw ? () => handleDrawCards(0) : undefined}
-                  playerTheme="p0"
+                  onClick={(myPlayerIndex === 0 ? canP0Draw : canP1Draw) ? () => handleDrawCards(myPlayerIndex) : undefined}
+                  playerTheme={myPlayerIndex === 0 ? 'p0' : 'p1'}
                 />
               </div>
             </div>
@@ -2512,7 +2567,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-1.5 font-black text-xs sm:text-sm text-[#f97316]">
                   <User className="w-4 h-4 text-[#f97316]" />
-                  <span>{p0.name}</span>
+                  <span>{activeControlledPlayer.name}</span>
                 </div>
 
                 <div
@@ -2520,25 +2575,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   title="체력(HP) 상세 변동 내역 보기 (클릭)"
                   className="flex items-center gap-2 cursor-pointer group select-none hover:opacity-95 transition-opacity"
                 >
-                  <Heart className={`w-4 h-4 transition-transform group-hover:scale-110 ${p0HealAlert ? 'animate-bounce text-emerald-400 fill-emerald-400' : p0DamageAlert ? 'animate-bounce text-red-500 fill-red-500' : 'text-red-400 fill-red-400'}`} />
-                  <span className={`font-black text-base sm:text-lg font-mono tracking-wider ${p0HealAlert ? 'text-emerald-400' : 'text-white'}`}>
-                    {p0.hp}<span className="text-xs text-slate-400">/20</span>
+                  <Heart className={`w-4 h-4 transition-transform group-hover:scale-110 ${myHealAlert ? 'animate-bounce text-emerald-400 fill-emerald-400' : myDamageAlert ? 'animate-bounce text-red-500 fill-red-500' : 'text-red-400 fill-red-400'}`} />
+                  <span className={`font-black text-base sm:text-lg font-mono tracking-wider ${myHealAlert ? 'text-emerald-400' : 'text-white'}`}>
+                    {activeControlledPlayer.hp}<span className="text-xs text-slate-400">/20</span>
                   </span>
                   {/* 평행사변형(-skew-x-12) 택티컬 게이지 바 */}
                   <div className="w-32 sm:w-44 h-3.5 -skew-x-12 bg-[#070a12] border border-[#f97316]/60 p-0.5 overflow-hidden shadow-inner group-hover:border-[#f97316]">
                     <div
                       className={`h-full transition-all duration-300 ${
-                        p0HealAlert
+                        myHealAlert
                           ? 'bg-gradient-to-r from-emerald-500 to-teal-300'
                           : 'bg-gradient-to-r from-red-600 via-rose-500 to-[#f97316]'
                       }`}
-                      style={{ width: `${(p0.hp / 20) * 100}%` }}
+                      style={{ width: `${(activeControlledPlayer.hp / 20) * 100}%` }}
                     />
                   </div>
                   <span className="hidden sm:inline-block text-[10px] font-mono px-1.5 py-0.5 bg-[#f97316]/20 border border-[#f97316]/50 text-orange-300 group-hover:bg-[#f97316]/40 group-hover:text-white transition [clip-path:polygon(3px_0,100%_0,100%_calc(100%-3px),calc(100%-3px)_100%,0_100%,0_3px)]">
                     HP로그
                   </span>
-                  {p0.hasDominance && (
+                  {activeControlledPlayer.hasDominance && (
                     <span
                       className="inline-flex items-center gap-0.5 text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-sans tracking-tight rounded-xs shadow-[0_0_8px_rgba(251,191,36,0.7)] border border-yellow-200 animate-pulse shrink-0 select-none"
                       title="【우세】 상태: 지난 턴 배틀에서 승리하거나 상대가 배틀을 패스하여 우세 효과가 활성화되었습니다."
@@ -2546,14 +2601,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       👑 우세
                     </span>
                   )}
-                  {p0DamageAlert && (
+                  {myDamageAlert && (
                     <span className="px-2 py-0.2 bg-red-600 text-white font-mono font-black text-xs animate-bounce">
-                      -{p0DamageAlert.diff}
+                      -{myDamageAlert.diff}
                     </span>
                   )}
-                  {p0HealAlert && (
+                  {myHealAlert && (
                     <span className="px-2 py-0.2 bg-emerald-600 text-white font-mono font-black text-xs animate-bounce">
-                      +{p0HealAlert.diff}
+                      +{myHealAlert.diff}
                     </span>
                   )}
                 </div>
@@ -2561,10 +2616,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
               {/* 우측: 추격 카운트 & 명조 공명 회로 10칸 마름모(rotate-45) 협주 게이지 */}
               <div className="flex items-center gap-3">
-                {p0.comboCount > 0 && (
+                {activeControlledPlayer.comboCount > 0 && (
                   <div className="flex items-center gap-1.5 bg-red-950/90 px-2.5 py-0.5 border border-red-500 text-xs font-mono font-black text-orange-300 animate-pulse">
                     <Flame className="w-3.5 h-3.5 text-orange-400 fill-orange-400" />
-                    <span>추격 {p0.comboCount}회</span>
+                    <span>추격 {activeControlledPlayer.comboCount}회</span>
                   </div>
                 )}
 
@@ -2577,7 +2632,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       <div
                         key={i}
                         className={`w-2.5 h-2.5 rotate-45 border transition-all duration-200 ${
-                          i < p0.concertoZone.length
+                          i < activeControlledPlayer.concertoZone.length
                             ? 'bg-[#22d3ee] border-white shadow-[0_0_8px_#22d3ee]'
                             : 'bg-[#0c101b] border-slate-700'
                         }`}
@@ -2585,7 +2640,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     ))}
                   </div>
                   <strong className="text-xs sm:text-sm font-black text-[#22d3ee] font-mono ml-0.5">
-                    {p0.concertoZone.length}/10
+                    {activeControlledPlayer.concertoZone.length}/10
                   </strong>
                 </div>
               </div>
@@ -2636,8 +2691,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   phase={gameState.phase}
                   isTurnPlayer={isCurrentControlledTurn}
                   canChargeConcerto={!isActionLockedByModal && !activeControlledPlayer.actionFlags.chargedConcerto && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
-                  canSetClashCard={!isActionLockedByModal && gameState.phase === 'CLASH_SET' && !activeControlledPlayer.clashCardReady}
-                  isComboStep={!isActionLockedByModal && gameState.phase === 'COMBO_STEP' && (Boolean(activeControlledPlayer.comboUnlimited) || activeControlledPlayer.comboCount > 0)}
+                  canSetClashCard={!isActionLockedByModal && gameState.phase === 'CLASH_SET' && !activeControlledPlayer.clashCardReady && (isCurrentControlledTurn || gameState.players[gameState.activePlayerIndex].clashCardReady)}
+                  isComboStep={!isActionLockedByModal && gameState.phase === 'COMBO_STEP' && isPlayerComboPhase && (Boolean(activeControlledPlayer.comboUnlimited) || activeControlledPlayer.comboCount > 0)}
                   comboCount={activeControlledPlayer.comboCount}
                   comboUnlimited={activeControlledPlayer.comboUnlimited}
                   selectedOverflowCardIds={selectedOverflowIds}
@@ -2833,7 +2888,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   ) : (
                     <div className="flex flex-col gap-1.5">
                       <div className="p-2.5 bg-[#090d16] border border-white/10 text-center text-xs sm:text-sm font-black text-slate-300">
-                        {gameState.activePlayerIndex === 0 ? 'P1 턴 진행 중' : 'P2 턴 진행 중'}
+                        {isMultiplayer
+                          ? `상대방 (${otherPlayer.name})의 턴 진행 중`
+                          : (gameState.activePlayerIndex === 0 ? 'P1 턴 진행 중' : 'P2 턴 진행 중')}
                       </div>
                       {gameState.gameMode === 'SOLO_DUAL' && (
                         <button
@@ -2864,11 +2921,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 return (
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-2 gap-1.5 text-xs font-mono font-bold">
-                      <div className={`p-1.5 border text-center ${p0.clashCardReady ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-[#090d16] border-white/10 text-[#f97316] animate-pulse'}`}>
-                        P1 ({gameState.activePlayerIndex === 0 ? '공격/선공' : '수비'}): {p0.clashCardReady ? (p0.clashCard ? '✓ 세트 완료' : '✓ 패스 (카드 없음)') : '선택 대기'}
+                      <div className={`p-1.5 border text-center ${activeControlledPlayer.clashCardReady ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-[#090d16] border-white/10 text-[#f97316] animate-pulse'}`}>
+                        나 ({isTurnPlayer ? '선공' : '수비'}): {activeControlledPlayer.clashCardReady ? (activeControlledPlayer.clashCard ? '✓ 세트 완료' : '✓ 패스') : '선택 대기'}
                       </div>
-                      <div className={`p-1.5 border text-center ${p1.clashCardReady ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-[#090d16] border-white/10 text-[#22d3ee] animate-pulse'}`}>
-                        P2 ({gameState.activePlayerIndex === 1 ? '공격/선공' : '수비'}): {p1.clashCardReady ? (p1.clashCard ? '✓ 세트 완료' : '✓ 패스 (카드 없음)') : '선택 대기'}
+                      <div className={`p-1.5 border text-center ${otherPlayer.clashCardReady ? 'bg-emerald-950/60 border-emerald-500 text-emerald-300' : 'bg-[#090d16] border-white/10 text-[#22d3ee] animate-pulse'}`}>
+                        상대 ({!isTurnPlayer ? '선공' : '수비'}): {otherPlayer.clashCardReady ? (otherPlayer.clashCard ? '✓ 세트 완료' : '✓ 패스') : '선택 대기'}
                       </div>
                     </div>
 
@@ -2964,77 +3021,97 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         )}
                       </>
                     ) : (
-                      <button
-                        disabled={Boolean(gameState.pendingChoice)}
-                        onClick={handleForceResolveClash}
-                        className={`w-full py-3 px-4 font-black text-xs sm:text-sm transition transform flex items-center justify-center gap-2 [clip-path:polygon(10px_0,100%_0,100%_calc(100%-10px),calc(100%-10px)_100%,0_100%,0_10px)] ${
-                          gameState.pendingChoice
-                            ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white shadow-[0_0_20px_rgba(249,115,22,0.5)] cursor-pointer animate-pulse'
-                        }`}
-                      >
-                        <Zap className="w-4 h-4 fill-white" />
-                        <span>대결 즉시 오픈 & 판정</span>
-                      </button>
+                      !otherPlayer.clashCardReady ? (
+                        <div className="p-3 bg-[#111520] border border-cyan-400/40 text-center text-xs sm:text-sm text-cyan-300 font-bold animate-pulse">
+                          상대방({otherPlayer.name})이 대결 카드를 세트하는 중입니다... ⏳
+                        </div>
+                      ) : (
+                        <button
+                          disabled={Boolean(gameState.pendingChoice)}
+                          onClick={handleForceResolveClash}
+                          className={`w-full py-3 px-4 font-black text-xs sm:text-sm transition transform flex items-center justify-center gap-2 [clip-path:polygon(10px_0,100%_0,100%_calc(100%-10px),calc(100%-10px)_100%,0_100%,0_10px)] ${
+                            gameState.pendingChoice
+                              ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                              : 'bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white shadow-[0_0_20px_rgba(249,115,22,0.5)] cursor-pointer animate-pulse'
+                          }`}
+                        >
+                          <Zap className="w-4 h-4 fill-white" />
+                          <span>대결 즉시 오픈 & 판정</span>
+                        </button>
+                      )
                     )}
                   </div>
                 );
               })()}
 
               {/* 3. 연격 단계 (COMBO_STEP) */}
-              {isPlayerComboPhase && (
-                <div className="flex flex-col gap-2">
-                  {canPlayerExecuteCombo(activeControlledPlayer) ? (
-                    <div className="p-2.5 bg-red-950/90 border border-red-500 text-red-200 font-black text-xs sm:text-sm flex items-center justify-between animate-pulse">
-                      <span className="flex items-center gap-1.5">
-                        <Flame className="w-4 h-4 text-orange-400 fill-orange-400" />
-                        <span>{activeControlledPlayer.comboUnlimited ? '무제한 연격!' : '추격 연격 가동!'}</span>
-                      </span>
-                      <span className="font-mono text-[#f97316]">
-                        {activeControlledPlayer.comboUnlimited ? '∞' : `${activeControlledPlayer.comboCount}회`}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="p-2 bg-[#111520] border border-[#f97316]/50 text-[#f97316] text-xs font-bold text-center">
-                      추가 연격 가능한 카드가 없습니다.
-                    </div>
-                  )}
-                  <button
-                    onClick={() => {
-                      setNoComboCountdown(null);
-                      handleFinishCombo(controlledPlayerIndex);
-                    }}
-                    className="w-full py-2.5 px-4 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] text-white font-black text-xs sm:text-sm transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
-                  >
-                    {!canPlayerExecuteCombo(activeControlledPlayer)
-                      ? noComboCountdown !== null
-                        ? `즉시 턴 넘기기 (${noComboCountdown}초)`
-                        : '즉시 턴 넘기기'
-                      : '연격 종료 (턴 종료)'}
-                  </button>
-                </div>
+              {gameState.phase === 'COMBO_STEP' && (
+                isPlayerComboPhase ? (
+                  <div className="flex flex-col gap-2">
+                    {canPlayerExecuteCombo(activeControlledPlayer) ? (
+                      <div className="p-2.5 bg-red-950/90 border border-red-500 text-red-200 font-black text-xs sm:text-sm flex items-center justify-between animate-pulse">
+                        <span className="flex items-center gap-1.5">
+                          <Flame className="w-4 h-4 text-orange-400 fill-orange-400" />
+                          <span>{activeControlledPlayer.comboUnlimited ? '무제한 연격!' : '추격 연격 가동!'}</span>
+                        </span>
+                        <span className="font-mono text-[#f97316]">
+                          {activeControlledPlayer.comboUnlimited ? '∞' : `${activeControlledPlayer.comboCount}회`}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="p-2 bg-[#111520] border border-[#f97316]/50 text-[#f97316] text-xs font-bold text-center">
+                        추가 연격 가능한 카드가 없습니다.
+                      </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        setNoComboCountdown(null);
+                        handleFinishCombo(controlledPlayerIndex);
+                      }}
+                      className="w-full py-2.5 px-4 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] text-white font-black text-xs sm:text-sm transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
+                    >
+                      {!canPlayerExecuteCombo(activeControlledPlayer)
+                        ? noComboCountdown !== null
+                          ? `즉시 턴 넘기기 (${noComboCountdown}초)`
+                          : '즉시 턴 넘기기'
+                        : '연격 종료 (턴 종료)'}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-[#111520] border border-cyan-400/40 text-center text-xs sm:text-sm text-cyan-300 font-bold animate-pulse">
+                    상대방({otherPlayer.name})이 연격(추가 공격)을 진행하고 있습니다... ⏳
+                  </div>
+                )
               )}
 
               {/* 4. 패 초과 버리기 단계 (DISCARD_OVERFLOW) */}
               {gameState.phase === 'DISCARD_OVERFLOW' && (
                 <div className="flex flex-col gap-2">
-                  <div className="text-xs sm:text-sm text-[#f97316] font-bold p-2 bg-[#090d16] border border-white/10 text-center">
-                    초과된 카드 {activeControlledPlayer.hand.length - 8}장을 선택하여 버리세요.
-                  </div>
-                  <button
-                    disabled={selectedOverflowIds.length !== activeControlledPlayer.hand.length - 8}
-                    onClick={() => {
-                      handleDiscardOverflow(controlledPlayerIndex, selectedOverflowIds);
-                      setSelectedOverflowIds([]);
-                    }}
-                    className={`w-full py-2.5 px-4 font-black text-xs sm:text-sm transition [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] ${
-                      selectedOverflowIds.length === activeControlledPlayer.hand.length - 8
-                        ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer animate-pulse'
-                        : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                    }`}
-                  >
-                    초과 카드 버리기 ({selectedOverflowIds.length}/{activeControlledPlayer.hand.length - 8})
-                  </button>
+                  {activeControlledPlayer.hand.length > 8 ? (
+                    <>
+                      <div className="text-xs sm:text-sm text-[#f97316] font-bold p-2 bg-[#090d16] border border-white/10 text-center">
+                        초과된 카드 {activeControlledPlayer.hand.length - 8}장을 선택하여 버리세요.
+                      </div>
+                      <button
+                        disabled={selectedOverflowIds.length !== activeControlledPlayer.hand.length - 8}
+                        onClick={() => {
+                          handleDiscardOverflow(controlledPlayerIndex, selectedOverflowIds);
+                          setSelectedOverflowIds([]);
+                        }}
+                        className={`w-full py-2.5 px-4 font-black text-xs sm:text-sm transition [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] ${
+                          selectedOverflowIds.length === activeControlledPlayer.hand.length - 8
+                            ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer animate-pulse'
+                            : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+                        }`}
+                      >
+                        초과 카드 버리기 ({selectedOverflowIds.length}/{activeControlledPlayer.hand.length - 8})
+                      </button>
+                    </>
+                  ) : (
+                    <div className="p-3 bg-[#111520] border border-cyan-400/40 text-center text-xs sm:text-sm text-cyan-300 font-bold">
+                      상대방({otherPlayer.name})이 초과된 카드를 버리는 중입니다... ⏳
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -3282,40 +3359,68 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 시작 리더 카드 선택 모달 (주사위 결정 연출 완료 후 노출) */}
       {gameState.phase === 'LEADER_SELECT' && !isInitiativeRolling && (
-        <LeaderSelectModal
-          isOpen={true}
-          player={isGuest ? gameState.players[1] : gameState.players[leaderSelectPlayerIndex]}
-          isFirstTurnPlayer={gameState.activePlayerIndex === (isGuest ? 1 : leaderSelectPlayerIndex)}
-          titlePrefix={
-            isGuest
-              ? 'P2 (당신)'
-              : gameState.gameMode === 'SOLO_DUAL'
-              ? (leaderSelectPlayerIndex === 0 ? 'P1 (당신)' : 'P2 (상대)')
-              : undefined
-          }
-          onConfirm={(selectedCharName) => {
-            if (isGuest) {
-              handleSelectStartingLeader(selectedCharName);
-            } else if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 0) {
-              setP0ChosenLeader(selectedCharName);
-              setLeaderSelectPlayerIndex(1);
-            } else if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 1) {
-              handleSelectStartingLeader(p0ChosenLeader || selectedCharName, selectedCharName);
-              setLeaderSelectPlayerIndex(0);
-            } else {
-              handleSelectStartingLeader(selectedCharName);
+        isMultiplayer && hasSelectedMyLeader ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
+            <div className="bg-[#0c101b]/95 border border-[#f97316]/70 p-6 shadow-2xl max-w-sm w-full text-center flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-2 border-[#f97316] border-t-transparent rounded-full animate-spin" />
+              <div className="text-white font-bold text-sm">
+                시작 리더 선택 완료!
+              </div>
+              <div className="text-xs text-slate-400">
+                상대방이 시작 리더를 선택하는 중입니다... ⏳
+              </div>
+            </div>
+          </div>
+        ) : (
+          <LeaderSelectModal
+            isOpen={true}
+            player={isGuest ? gameState.players[1] : gameState.players[leaderSelectPlayerIndex]}
+            isFirstTurnPlayer={gameState.activePlayerIndex === (isGuest ? 1 : leaderSelectPlayerIndex)}
+            titlePrefix={
+              isGuest
+                ? 'P2 (당신)'
+                : gameState.gameMode === 'SOLO_DUAL'
+                ? (leaderSelectPlayerIndex === 0 ? 'P1 (당신)' : 'P2 (상대)')
+                : undefined
             }
-          }}
-        />
+            onConfirm={(selectedCharName) => {
+              if (isGuest) {
+                handleSelectStartingLeader(selectedCharName);
+              } else if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 0) {
+                setP0ChosenLeader(selectedCharName);
+                setLeaderSelectPlayerIndex(1);
+              } else if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 1) {
+                handleSelectStartingLeader(p0ChosenLeader || selectedCharName, selectedCharName);
+                setLeaderSelectPlayerIndex(0);
+              } else {
+                handleSelectStartingLeader(selectedCharName);
+              }
+            }}
+          />
+        )
       )}
 
       {/* 멀리건 모달 (시작 리더 선택 완료 후 노출) */}
       {gameState.phase === 'MULLIGAN' && !isInitiativeRolling && (
-        <MulliganModal
-          hand={activeControlledPlayer.hand}
-          deck={activeControlledPlayer.actionDeck}
-          onConfirm={handleMulligan}
-        />
+        isMultiplayer && hasCompletedMyMulligan ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
+            <div className="bg-[#0c101b]/95 border border-[#22d3ee]/70 p-6 shadow-2xl max-w-sm w-full text-center flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" />
+              <div className="text-white font-bold text-sm">
+                멀리건 확인 완료!
+              </div>
+              <div className="text-xs text-slate-400">
+                상대방이 멀리건을 진행하고 있습니다... ⏳
+              </div>
+            </div>
+          </div>
+        ) : (
+          <MulliganModal
+            hand={activeControlledPlayer.hand}
+            deck={activeControlledPlayer.actionDeck}
+            onConfirm={handleMulligan}
+          />
+        )
       )}
 
       {/* 매치 개시 양측 리더 컷인 및 출격 오프닝 대사 멘트 & 사운드 오버레이 */}
@@ -3795,6 +3900,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* 선택 발동 효과 모달 (대결 결과 확인 창, 레벨업 및 연격 참격, 효과 드로우 연출 완료 후 표출) */}
       <EffectChoiceModal
         choice={
+          (!isMultiplayer || gameState.pendingChoice?.playerIndex === controlledPlayerIndex) &&
           !activeUpgrade &&
           !gameState.lastUpgrade &&
           !activeComboStrike &&
@@ -3806,6 +3912,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }
         onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
       />
+
+      {/* 멀티플레이 상대방 효과 선택 중 대기 오버레이 */}
+      {isMultiplayer && gameState.pendingChoice && gameState.pendingChoice.playerIndex !== controlledPlayerIndex && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
+          <div className="bg-[#0c101b]/95 border border-cyan-400/60 p-6 shadow-2xl max-w-sm w-full text-center flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+            <div className="text-white font-bold text-sm">
+              상대방({otherPlayer.name})이 효과를 선택하고 있습니다...
+            </div>
+            <div className="text-xs text-slate-400">
+              선택 완료 시 자동으로 진행됩니다. ⏳
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 캐릭터 진화 계보 & 상속 스킬 모람 팝업 모달 */}
       <EvolutionTreeModal
