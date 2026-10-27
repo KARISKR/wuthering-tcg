@@ -83,14 +83,21 @@ import {
   ZoomOut,
   PanelLeftClose,
   PanelLeftOpen,
+  Copy,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 import { BgmPlayer } from './BgmPlayer';
 import { formatEffectText, formatBattleLogText } from '../utils/formatEffectText';
+import { multiplayerService } from '../services/multiplayerService';
+import type { MultiplayerActionType, MultiplayerRole } from '../types/multiplayer';
+import { MultiplayerDisconnectOverlay } from './MultiplayerDisconnectOverlay';
 
 interface GameBoardProps {
   onExitToLobby?: () => void;
-  initialMode?: 'AI' | 'SOLO_DUAL';
+  initialMode?: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER';
+  multiplayerRole?: MultiplayerRole | null;
   customDeck?: CustomDeckConfig | null;
   opponentDeck?: CustomDeckConfig | null;
   onPlayBattleReplay?: (replay: BattleReplayData) => void;
@@ -100,6 +107,7 @@ interface GameBoardProps {
 export const GameBoard: React.FC<GameBoardProps> = ({
   onExitToLobby,
   initialMode = 'AI',
+  multiplayerRole = null,
   customDeck,
   opponentDeck,
   onPlayBattleReplay,
@@ -108,24 +116,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [showTutorialOverlay, setShowTutorialOverlay] = useState(isTutorialMode);
   const {
     gameState,
+    setGameState,
     isAiThinking,
     restartGame,
     setGameMode,
     handleSetInitiative,
-    handleSelectStartingLeader,
-    handleMulligan,
-    handleDrawCards,
+    handleSelectStartingLeader: engineSelectStartingLeader,
+    handleMulligan: engineMulligan,
+    handleDrawCards: engineDrawCards,
     isDrawFlightActive,
-    handleUpgrade,
-    handleSwitchLeader,
-    handleChargeConcerto,
-    handleDecideClash,
-    handleSetClashCard,
-    handleProceedAfterClash,
-    handleComboAttack,
-    handleResolvePendingChoice,
-    handleFinishCombo,
-    handleDiscardOverflow,
+    handleUpgrade: engineUpgrade,
+    handleSwitchLeader: engineSwitchLeader,
+    handleChargeConcerto: engineChargeConcerto,
+    handleDecideClash: engineDecideClash,
+    handleSetClashCard: engineSetClashCard,
+    handleProceedAfterClash: engineProceedAfterClash,
+    handleComboAttack: engineComboAttack,
+    handleResolvePendingChoice: engineResolvePendingChoice,
+    handleFinishCombo: engineFinishCombo,
+    handleDiscardOverflow: engineDiscardOverflow,
     handleEndTurn,
     handleForceResolveClash,
     clearLastUpgrade,
@@ -133,6 +142,153 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     clearLastEffectEvent,
     handleFinishEffectDraw,
   } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
+
+  // 1인 2역 (SOLO_DUAL) 또는 멀티플레이 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
+  const isMultiplayer = gameState.gameMode === 'MULTIPLAYER';
+  const isGuest = isMultiplayer && multiplayerRole === 'GUEST';
+  const isHost = isMultiplayer && (multiplayerRole === 'HOST' || !multiplayerRole);
+
+  const [controlledPlayerIndex, setControlledPlayerIndex] = useState<0 | 1>(() => {
+    if (initialMode === 'MULTIPLAYER' && multiplayerRole === 'GUEST') return 1;
+    return 0;
+  });
+
+  // 멀티플레이 네트워크 & 재접속 상태
+  const [disconnectCountdown, setDisconnectCountdown] = useState<number | null>(null);
+  const [isMultiplayerDisconnected, setIsMultiplayerDisconnected] = useState<boolean>(false);
+  const [pingLatency, setPingLatency] = useState<number | null>(null);
+
+  const guestLeaderRef = useRef<string | null>(null);
+  const hostLeaderRef = useRef<string | null>(null);
+  const guestMulliganRef = useRef<string[] | null>(null);
+  const hostMulliganRef = useRef<string[] | null>(null);
+
+  // [멀티플레이어 액션 프록시 래퍼] 게스트(P1)는 네트워크로 호스트에게 액션을 위임하고, 호스트/솔로/AI는 로컬 엔진을 즉시 실행
+  const handleDrawCards = useCallback((pIdx?: 0 | 1) => {
+    const targetIdx = pIdx ?? controlledPlayerIndex;
+    if (isGuest) {
+      multiplayerService.sendAction('DRAW_CARDS', 1);
+    } else {
+      engineDrawCards(targetIdx);
+    }
+  }, [isGuest, controlledPlayerIndex, engineDrawCards]);
+
+  const handleSelectStartingLeader = useCallback((p0Leader: string, p1Leader?: string) => {
+    if (isGuest) {
+      multiplayerService.sendAction('SELECT_LEADER', 1, { leaderName: p0Leader });
+    } else if (isHost) {
+      hostLeaderRef.current = p0Leader;
+      if (guestLeaderRef.current) {
+        engineSelectStartingLeader(p0Leader, guestLeaderRef.current);
+      }
+    } else {
+      engineSelectStartingLeader(p0Leader, p1Leader);
+    }
+  }, [isGuest, isHost, engineSelectStartingLeader]);
+
+  const handleMulligan = useCallback((discardIds: string[]) => {
+    if (isGuest) {
+      multiplayerService.sendAction('MULLIGAN', 1, { discardIds });
+    } else if (isHost) {
+      hostMulliganRef.current = discardIds;
+      if (guestMulliganRef.current !== null) {
+        engineMulligan(discardIds, guestMulliganRef.current);
+      }
+    } else {
+      engineMulligan(discardIds);
+    }
+  }, [isGuest, isHost, engineMulligan]);
+
+  const handleUpgrade = useCallback((pIdx: 0 | 1, slotName: any, upgradeCardId: string, discardIds: string[]) => {
+    if (isGuest) {
+      multiplayerService.sendAction('UPGRADE', 1, { slotName, upgradeCardId, discardIds });
+    } else {
+      engineUpgrade(pIdx, slotName, upgradeCardId, discardIds);
+    }
+  }, [isGuest, engineUpgrade]);
+
+  const handleSwitchLeader = useCallback((pIdx: 0 | 1, targetSlot: 'leftSupport' | 'rightSupport') => {
+    if (isGuest) {
+      multiplayerService.sendAction('SWITCH_LEADER', 1, { targetSlot });
+    } else {
+      engineSwitchLeader(pIdx, targetSlot);
+    }
+  }, [isGuest, engineSwitchLeader]);
+
+  const handleChargeConcerto = useCallback((pIdx: 0 | 1, cardId: string) => {
+    if (isGuest) {
+      multiplayerService.sendAction('CHARGE_CONCERTO', 1, { cardId });
+    } else {
+      engineChargeConcerto(pIdx, cardId);
+    }
+  }, [isGuest, engineChargeConcerto]);
+
+  const handleSetClashCard = useCallback((pIdx: 0 | 1, cardId: string | null, spentConcertoIds?: string[]) => {
+    if (isGuest) {
+      multiplayerService.sendAction('SET_CLASH_CARD', 1, { cardId, spentConcertoIds });
+    } else {
+      engineSetClashCard(pIdx, cardId, spentConcertoIds);
+    }
+  }, [isGuest, engineSetClashCard]);
+
+  const handleDecideClash = useCallback((proceed: boolean) => {
+    if (isGuest) {
+      multiplayerService.sendAction('DECIDE_CLASH', 1, { proceed });
+    } else {
+      engineDecideClash(proceed);
+    }
+  }, [isGuest, engineDecideClash]);
+
+  const handleProceedAfterClash = useCallback(() => {
+    if (isGuest) {
+      multiplayerService.sendAction('PROCEED_AFTER_CLASH', 1);
+    } else {
+      engineProceedAfterClash();
+    }
+  }, [isGuest, engineProceedAfterClash]);
+
+  const handleComboAttack = useCallback((
+    pIdx: 0 | 1,
+    cardId: string,
+    spentConcertoIds?: string[],
+    discardForBonusDmgId?: string,
+    swapSupportSlot?: 'leftSupport' | 'rightSupport'
+  ) => {
+    if (isGuest) {
+      multiplayerService.sendAction('COMBO_ATTACK', 1, {
+        cardId,
+        spentConcertoIds,
+        discardForBonusDmgId,
+        swapSupportSlot,
+      });
+    } else {
+      engineComboAttack(pIdx, cardId, spentConcertoIds, discardForBonusDmgId, swapSupportSlot);
+    }
+  }, [isGuest, engineComboAttack]);
+
+  const handleFinishCombo = useCallback((pIdx: 0 | 1) => {
+    if (isGuest) {
+      multiplayerService.sendAction('FINISH_COMBO', 1);
+    } else {
+      engineFinishCombo(pIdx);
+    }
+  }, [isGuest, engineFinishCombo]);
+
+  const handleDiscardOverflow = useCallback((pIdx: 0 | 1, cardIds: string[]) => {
+    if (isGuest) {
+      multiplayerService.sendAction('DISCARD_OVERFLOW', 1, { cardIds });
+    } else {
+      engineDiscardOverflow(pIdx, cardIds);
+    }
+  }, [isGuest, engineDiscardOverflow]);
+
+  const handleResolvePendingChoice = useCallback((chosenCardIds: string[]) => {
+    if (isGuest) {
+      multiplayerService.sendAction('PENDING_CHOICE', 1, { optionId: chosenCardIds });
+    } else {
+      engineResolvePendingChoice(chosenCardIds);
+    }
+  }, [isGuest, engineResolvePendingChoice]);
 
   // 드로우 페이즈 연출 및 카드 매수 계산 (공식 룰 602.1.3: 게임의 맨 첫 번째 턴(선공의 턴 1)은 1장, 그 외 모든 턴은 2장)
   const currentTurnDrawCount = getTurnDrawCount(gameState);
@@ -421,9 +577,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     clearLastComboStrike();
     soundEffects.stopComboSounds();
   }, [clearLastComboStrike]);
-
-  // 1인 2역 (SOLO_DUAL) 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
-  const [controlledPlayerIndex, setControlledPlayerIndex] = useState<0 | 1>(0);
 
   // 현재 매치에 참여 중인 모든 캐릭터(리더, 서포터, 캐릭터 덱) 보이스 및 효과음 사전 비동기 로드
   useEffect(() => {
@@ -947,6 +1100,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         if (p0.hand.length > 8) setControlledPlayerIndex(0);
         else if (p1.hand.length > 8) setControlledPlayerIndex(1);
       }
+    } else if (gameState.gameMode === 'MULTIPLAYER') {
+      setControlledPlayerIndex(multiplayerRole === 'GUEST' ? 1 : 0);
     } else {
       setControlledPlayerIndex(0);
     }
@@ -960,7 +1115,166 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     p1.comboCount,
     p0.hand.length,
     p1.hand.length,
+    multiplayerRole,
   ]);
+
+  // [멀티플레이] 호스트: 게임 상태 변경 시 게스트에게 브로드캐스트
+  useEffect(() => {
+    if (gameState.gameMode === 'MULTIPLAYER' && isHost) {
+      multiplayerService.sendGameState(gameState);
+    }
+  }, [gameState, isHost]);
+
+  // [멀티플레이] 게스트: 상태 동기화 및 기권 수신
+  useEffect(() => {
+    if (gameState.gameMode !== 'MULTIPLAYER' || !isGuest) return;
+
+    const unsub = multiplayerService.onMessage((msg) => {
+      if (msg.type === 'SYNC_GAME_STATE') {
+        setGameState(msg.gameState);
+      } else if (msg.type === 'RECONNECT_ACCEPT') {
+        setGameState(msg.gameState);
+      } else if (msg.type === 'SURRENDER') {
+        setGameState((prev) => ({
+          ...prev,
+          isGameOver: true,
+          winner: 1,
+        }));
+      }
+    });
+    return unsub;
+  }, [gameState.gameMode, isGuest, setGameState]);
+
+  // [멀티플레이] 호스트: 게스트의 액션 수신 및 실행
+  useEffect(() => {
+    if (gameState.gameMode !== 'MULTIPLAYER' || !isHost) return;
+
+    const unsub = multiplayerService.onMessage((msg) => {
+      if (msg.type === 'DISPATCH_ACTION') {
+        const { actionType, payload } = msg;
+        switch (actionType) {
+          case 'DRAW_CARDS':
+            engineDrawCards(1);
+            break;
+          case 'SELECT_LEADER':
+            guestLeaderRef.current = payload?.leaderName;
+            if (hostLeaderRef.current) {
+              engineSelectStartingLeader(hostLeaderRef.current, guestLeaderRef.current || undefined);
+            }
+            break;
+          case 'MULLIGAN':
+            guestMulliganRef.current = payload?.discardIds || [];
+            if (hostMulliganRef.current !== null) {
+              engineMulligan(hostMulliganRef.current, guestMulliganRef.current || undefined);
+            }
+            break;
+          case 'UPGRADE':
+            engineUpgrade(1, payload.slotName, payload.upgradeCardId, payload.discardIds);
+            break;
+          case 'SWITCH_LEADER':
+            engineSwitchLeader(1, payload.targetSlot);
+            break;
+          case 'CHARGE_CONCERTO':
+            engineChargeConcerto(1, payload.cardId);
+            break;
+          case 'SET_CLASH_CARD':
+            engineSetClashCard(1, payload.cardId, payload.spentConcertoIds);
+            break;
+          case 'DECIDE_CLASH':
+            engineDecideClash(payload.proceed);
+            break;
+          case 'PROCEED_AFTER_CLASH':
+            engineProceedAfterClash();
+            break;
+          case 'COMBO_ATTACK':
+            engineComboAttack(
+              1,
+              payload.cardId,
+              payload.spentConcertoIds,
+              payload.discardForBonusDmgId,
+              payload.swapSupportSlot
+            );
+            break;
+          case 'FINISH_COMBO':
+            engineFinishCombo(1);
+            break;
+          case 'DISCARD_OVERFLOW':
+            engineDiscardOverflow(1, payload.cardIds);
+            break;
+          case 'PENDING_CHOICE':
+            engineResolvePendingChoice(payload.optionId);
+            break;
+          default:
+            break;
+        }
+      } else if (msg.type === 'SURRENDER') {
+        setGameState((prev) => ({
+          ...prev,
+          isGameOver: true,
+          winner: 0,
+        }));
+      }
+    });
+
+    return unsub;
+  }, [
+    gameState.gameMode,
+    isHost,
+    engineDrawCards,
+    engineSelectStartingLeader,
+    engineMulligan,
+    engineUpgrade,
+    engineSwitchLeader,
+    engineChargeConcerto,
+    engineSetClashCard,
+    engineDecideClash,
+    engineProceedAfterClash,
+    engineComboAttack,
+    engineFinishCombo,
+    engineDiscardOverflow,
+    engineResolvePendingChoice,
+    setGameState,
+  ]);
+
+  // [멀티플레이] 네트워크 끊김 및 재접속 카운트다운 리스너
+  useEffect(() => {
+    if (gameState.gameMode !== 'MULTIPLAYER') return;
+
+    const unsubCount = multiplayerService.onDisconnectCountdown((seconds) => {
+      setDisconnectCountdown(seconds);
+      if (seconds > 0) {
+        setIsMultiplayerDisconnected(true);
+      }
+    });
+
+    const unsubStatus = multiplayerService.onStatusChange((status) => {
+      if (status === 'DISCONNECTED') {
+        setIsMultiplayerDisconnected(true);
+      } else if (status === 'CONNECTED') {
+        setIsMultiplayerDisconnected(false);
+        setDisconnectCountdown(null);
+      }
+    });
+
+    const pingTimer = setInterval(() => {
+      if (multiplayerService.status === 'CONNECTED') {
+        multiplayerService.send({ type: 'PING', timestamp: Date.now() });
+      }
+    }, 4000);
+
+    const unsubMsg = multiplayerService.onMessage((msg) => {
+      if (msg.type === 'PONG') {
+        setPingLatency(Date.now() - msg.clientTimestamp);
+      }
+    });
+
+    return () => {
+      unsubCount();
+      unsubStatus();
+      unsubMsg();
+      clearInterval(pingTimer);
+    };
+  }, [gameState.gameMode]);
 
   // 배틀 로그 자동 스크롤
   useEffect(() => {
@@ -1144,8 +1458,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               TURN {gameState.turn}
             </span>
             <span className="text-slate-600">:</span>
-            <span className={`font-black tracking-wide ${isP0Turn ? 'text-[#f97316]' : 'text-[#22d3ee]'}`}>
-              {isP0Turn ? 'YOUR PHASE' : 'OPPONENT PHASE'}
+            <span className={`font-black tracking-wide ${isCurrentControlledTurn ? 'text-[#f97316]' : 'text-[#22d3ee]'}`}>
+              {isCurrentControlledTurn ? 'YOUR PHASE' : 'OPPONENT PHASE'}
             </span>
             <span className="text-[10px] font-mono text-slate-400 hidden sm:inline">
               ({gameState.phase === 'LEADER_SELECT' && 'LEADER SELECT'}
@@ -1189,6 +1503,34 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 <ArrowLeftRight className="w-3 h-3" />
                 P2
               </button>
+            </div>
+          )}
+
+          {gameState.gameMode === 'MULTIPLAYER' && (
+            <div className="flex items-center gap-1.5 bg-[#0c101b] px-2.5 py-1 rounded border border-violet-400/60 text-xs shadow-[0_0_15px_rgba(139,92,246,0.25)]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="font-mono text-violet-300 font-black tracking-wider text-[11px]">
+                ROOM {multiplayerService.roomCode}
+              </span>
+              <button
+                onClick={() => {
+                  try {
+                    navigator.clipboard.writeText(multiplayerService.roomCode);
+                  } catch {}
+                }}
+                className="p-0.5 text-slate-400 hover:text-white transition cursor-pointer"
+                title="방 코드 복사"
+              >
+                <Copy className="w-3 h-3" />
+              </button>
+              {pingLatency !== null && (
+                <span className="font-mono text-[10px] text-slate-400 pl-1 border-l border-white/20">
+                  {pingLatency}ms
+                </span>
+              )}
+              <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40">
+                {multiplayerRole === 'GUEST' ? 'GUEST' : 'HOST'}
+              </span>
             </div>
           )}
         </div>
@@ -2890,11 +3232,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {gameState.phase === 'LEADER_SELECT' && !isInitiativeRolling && (
         <LeaderSelectModal
           isOpen={true}
-          player={gameState.players[leaderSelectPlayerIndex]}
-          isFirstTurnPlayer={gameState.activePlayerIndex === leaderSelectPlayerIndex}
-          titlePrefix={gameState.gameMode === 'SOLO_DUAL' ? (leaderSelectPlayerIndex === 0 ? 'P1 (당신)' : 'P2 (상대)') : undefined}
+          player={isGuest ? gameState.players[1] : gameState.players[leaderSelectPlayerIndex]}
+          isFirstTurnPlayer={gameState.activePlayerIndex === (isGuest ? 1 : leaderSelectPlayerIndex)}
+          titlePrefix={
+            isGuest
+              ? 'P2 (당신)'
+              : gameState.gameMode === 'SOLO_DUAL'
+              ? (leaderSelectPlayerIndex === 0 ? 'P1 (당신)' : 'P2 (상대)')
+              : undefined
+          }
           onConfirm={(selectedCharName) => {
-            if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 0) {
+            if (isGuest) {
+              handleSelectStartingLeader(selectedCharName);
+            } else if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 0) {
               setP0ChosenLeader(selectedCharName);
               setLeaderSelectPlayerIndex(1);
             } else if (gameState.gameMode === 'SOLO_DUAL' && leaderSelectPlayerIndex === 1) {
@@ -2910,8 +3260,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* 멀리건 모달 (시작 리더 선택 완료 후 노출) */}
       {gameState.phase === 'MULLIGAN' && !isInitiativeRolling && (
         <MulliganModal
-          hand={p0.hand}
-          deck={p0.actionDeck}
+          hand={activeControlledPlayer.hand}
+          deck={activeControlledPlayer.actionDeck}
           onConfirm={handleMulligan}
         />
       )}
@@ -3433,6 +3783,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             : null
         }
       />
+
+      {/* [멀티플레이] 60초 네트워크 끊김 및 재접속 대기 오버레이 */}
+      {isMultiplayerDisconnected && (
+        <MultiplayerDisconnectOverlay
+          countdownSec={disconnectCountdown ?? 60}
+          isHost={multiplayerRole === 'HOST'}
+          onSurrenderOrLeave={() => {
+            multiplayerService.send({ type: 'SURRENDER', playerIndex: controlledPlayerIndex });
+            multiplayerService.cleanUp();
+            if (onExitToLobby) onExitToLobby();
+          }}
+          onAttemptReconnect={() => {
+            multiplayerService.attemptReconnect();
+          }}
+        />
+      )}
     </div>
   );
 };

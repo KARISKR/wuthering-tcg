@@ -3,7 +3,7 @@ import { LogItem, PlayerState, CharacterCard } from '../types/tcg';
 export interface BattleReplaySummary {
   id: string;
   timestamp: number;
-  gameMode: 'AI' | 'SOLO_DUAL';
+  gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER';
   totalTurns: number;
   winner: 0 | 1;
   p0Leader: {
@@ -97,7 +97,7 @@ export function createBattleReplayData(
   players: [PlayerState, PlayerState],
   logs: LogItem[],
   totalTurns: number,
-  gameMode: 'AI' | 'SOLO_DUAL'
+  gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER'
 ): BattleReplayData {
   const p0Leader = players[0].slots.leader;
   const p1Leader = players[1].slots.leader;
@@ -172,7 +172,7 @@ export function saveBattleReplay(
   players: [PlayerState, PlayerState],
   logs: LogItem[],
   totalTurns: number,
-  gameMode: 'AI' | 'SOLO_DUAL'
+  gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER'
 ): BattleReplayData {
   const replay = createBattleReplayData(winner, players, logs, totalTurns, gameMode);
   return saveReplayObject(replay);

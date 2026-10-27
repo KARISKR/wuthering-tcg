@@ -927,7 +927,7 @@ export function createBoardSnapshot(state: {
 export function createInitialGameState(
   p0PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_ROVER',
   p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_CHIXIA',
-  gameMode: 'AI' | 'SOLO_DUAL' = 'AI',
+  gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER' = 'AI',
   p0CustomDeck?: CustomDeckConfig | null,
   p1CustomDeck?: CustomDeckConfig | null
 ): GameState {

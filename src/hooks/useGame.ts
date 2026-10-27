@@ -37,7 +37,7 @@ import {
 export function useGame(
   p0PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_ROVER',
   p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_CHIXIA',
-  initialGameMode: 'AI' | 'SOLO_DUAL' = 'AI',
+  initialGameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER' = 'AI',
   customDeck?: CustomDeckConfig | null,
   p1CustomDeck?: CustomDeckConfig | null
 ) {
@@ -83,8 +83,8 @@ export function useGame(
     [p0PresetKey, p1PresetKey, gameState.gameMode, customDeck, p1CustomDeck]
   );
 
-  // 게임 모드 변경 (AI 대전 <-> 1인 2역)
-  const setGameMode = useCallback((mode: 'AI' | 'SOLO_DUAL') => {
+  // 게임 모드 변경 (AI 대전 <-> 1인 2역 <-> 온라인 P2P)
+  const setGameMode = useCallback((mode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER') => {
     setGameState((prev) => ({
       ...prev,
       gameMode: mode,
@@ -93,7 +93,7 @@ export function useGame(
         {
           ...prev.players[1],
           isAi: mode === 'AI',
-          name: mode === 'AI' ? '상대 (AI 봇)' : '상대 (플레이어 2)',
+          name: mode === 'AI' ? '상대 (AI 봇)' : mode === 'MULTIPLAYER' ? '상대 (온라인 참가자)' : '상대 (플레이어 2)',
         },
       ],
     }));
@@ -144,15 +144,17 @@ export function useGame(
     []
   );
 
-  // 1. 멀리건 확인
+  // 1. 멀리건 확인 (p1DiscardIds 지원)
   const handleMulligan = useCallback(
-    (p0DiscardIds: string[]) => {
+    (p0DiscardIds: string[], p1DiscardIds?: string[]) => {
       setGameState((prev) => {
-        let p1DiscardIds: string[] = [];
-        if (prev.players[1].isAi) {
-          p1DiscardIds = decideAiMulligan(prev.players[1]);
+        let finalP1DiscardIds: string[] = [];
+        if (p1DiscardIds !== undefined) {
+          finalP1DiscardIds = p1DiscardIds;
+        } else if (prev.players[1].isAi) {
+          finalP1DiscardIds = decideAiMulligan(prev.players[1]);
         }
-        return executeMulligan(prev, p0DiscardIds, p1DiscardIds);
+        return executeMulligan(prev, p0DiscardIds, finalP1DiscardIds);
       });
     },
     []
@@ -606,6 +608,7 @@ export function useGame(
 
   return {
     gameState,
+    setGameState,
     isAiThinking,
     restartGame,
     setGameMode,

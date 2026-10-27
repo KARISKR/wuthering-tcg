@@ -15,12 +15,15 @@ const SfxGuideModal = lazy(() => import('./SfxGuideModal').then((m) => ({ defaul
 const CommunityDeckModal = lazy(() => import('./CommunityDeckModal').then((m) => ({ default: m.CommunityDeckModal })));
 const BattleReplayModal = lazy(() => import('./BattleReplayModal').then((m) => ({ default: m.BattleReplayModal })));
 const InteractiveTutorialModal = lazy(() => import('./InteractiveTutorialModal').then((m) => ({ default: m.InteractiveTutorialModal })));
+const MultiplayerLobbyModal = lazy(() => import('./MultiplayerLobbyModal').then((m) => ({ default: m.MultiplayerLobbyModal })));
+import type { MultiplayerRole } from '../types/multiplayer';
 import {
   Swords,
   Layers,
   BookOpen,
   Bot,
   User,
+  Users,
   Sparkles,
   ChevronRight,
   Shield,
@@ -55,6 +58,7 @@ import {
 
 interface LobbyProps {
   onStartGame: (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, opponentDeck?: CustomDeckConfig) => void;
+  onStartMultiplayerMatch?: (role: MultiplayerRole, myDeck?: CustomDeckConfig | null, opponentDeck?: CustomDeckConfig | null) => void;
   onOpenDeckBuilder: () => void;
   onOpenBoard?: (postId?: string) => void;
   onStartTutorial?: () => void;
@@ -64,6 +68,7 @@ interface LobbyProps {
 
 export const Lobby: React.FC<LobbyProps> = ({
   onStartGame,
+  onStartMultiplayerMatch,
   onOpenDeckBuilder,
   onOpenBoard,
   onStartTutorial,
@@ -78,6 +83,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isInteractiveTutorialOpen, setIsInteractiveTutorialOpen] = useState(false);
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
+  const [isMultiplayerModalOpen, setIsMultiplayerModalOpen] = useState(false);
   const [boardPosts, setBoardPosts] = useState<FeedbackItem[]>([]);
 
   useEffect(() => {
@@ -166,6 +172,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     if (
       hash === '#battle' ||
       hash === '#mode' ||
+      hash === '#multiplayer' ||
+      hash.startsWith('#multiplayer?') ||
       hash === '#card-gallery' ||
       hash === '#catalog' ||
       hash === '#gallery' ||
@@ -199,6 +207,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     const syncHashToModals = () => {
       const hash = window.location.hash.toLowerCase().replace('#/', '#');
       setShowModeModal(hash === '#battle' || hash === '#mode');
+      setIsMultiplayerModalOpen(hash === '#multiplayer' || hash.startsWith('#multiplayer?') || hash.includes('room='));
       setIsCatalogOpen(hash === '#card-gallery' || hash === '#catalog' || hash === '#gallery');
       setIsPresetOpen(hash === '#preset' || hash === '#presets');
       setIsCommunityDeckOpen(hash === '#shared-decks' || hash === '#shared' || hash === '#community-decks');
@@ -577,30 +586,34 @@ export const Lobby: React.FC<LobbyProps> = ({
               </div>
             </div>
 
-            {/* [2-3] 멀티배틀 (개발중) */}
+            {/* [2-3] 멀티배틀 (온라인 1:1 P2P 대전) */}
             <div
-              className="group relative flex-1 border-2 border-violet-400/50 bg-[#0c101b]/90 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_16px_rgba(139,92,246,0.15)] overflow-hidden select-none cursor-not-allowed"
+              onClick={() => {
+                setHash('#multiplayer');
+                setIsMultiplayerModalOpen(true);
+              }}
+              className="group relative flex-1 border-2 border-violet-400/80 hover:border-violet-300 bg-[#0c101b]/90 hover:bg-[#161129]/95 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(139,92,246,0.25)] hover:shadow-[0_0_36px_rgba(139,92,246,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
               style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
-              title="멀티배틀은 현재 개발중입니다"
             >
-              <div className="absolute inset-1.5 border border-violet-400/20 pointer-events-none z-10" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-violet-300/70 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-violet-300/70 z-20 pointer-events-none" />
+              <div className="absolute inset-1.5 border border-violet-400/25 pointer-events-none z-10" />
+              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-violet-300 z-20 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-violet-300 z-20 pointer-events-none" />
 
               <div className="relative z-20 flex flex-col justify-center">
-                <h3 className="text-2xl sm:text-3xl font-black text-white/80 tracking-tight drop-shadow">
+                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-violet-200 transition-colors tracking-tight drop-shadow">
                   멀티배틀
                 </h3>
-                <span className="text-[11px] sm:text-xs font-mono font-black text-violet-300/90 tracking-wider uppercase mt-1">
-                  (MULTI BATTLE)
+                <span className="text-[11px] sm:text-xs font-mono font-black text-violet-300 tracking-wider uppercase mt-1">
+                  (ONLINE 1:1 BATTLE)
                 </span>
-                <span className="mt-1.5 inline-flex w-fit items-center px-2 py-0.5 rounded border border-amber-400/60 bg-amber-500/10 text-amber-300 text-[11px] font-black tracking-wide">
-                  (개발중)
+                <span className="mt-1.5 inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded border border-emerald-400/60 bg-emerald-500/10 text-emerald-300 text-[11px] font-black tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  P2P 온라인 1:1 대전
                 </span>
               </div>
 
-              <div className="relative z-10 w-18 h-18 sm:w-22 sm:h-22 flex items-center justify-center shrink-0 opacity-70">
-                <Swords className="w-12 h-12 sm:w-14 sm:h-14 text-violet-300 drop-shadow-[0_0_14px_rgba(139,92,246,0.5)]" />
+              <div className="relative z-10 w-18 h-18 sm:w-22 sm:h-22 flex items-center justify-center shrink-0">
+                <Swords className="w-12 h-12 sm:w-14 sm:h-14 text-violet-300 drop-shadow-[0_0_18px_rgba(139,92,246,0.6)] group-hover:scale-110 transition-transform duration-300" />
               </div>
             </div>
 
@@ -953,6 +966,31 @@ export const Lobby: React.FC<LobbyProps> = ({
                 </div>
                 <ChevronRight className="w-5 h-5 text-indigo-400/60 group-hover:text-indigo-300 group-hover:translate-x-1 transition-transform" />
               </button>
+
+              <button
+                onClick={() => {
+                  setShowModeModal(false);
+                  setHash('#multiplayer');
+                  setIsMultiplayerModalOpen(true);
+                }}
+                className="w-full p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a142e] border-2 border-violet-400/60 hover:border-violet-400 transition-all duration-200 flex items-center gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(139,92,246,0.15)] hover:shadow-[0_0_30px_rgba(139,92,246,0.35)] transform hover:-translate-y-0.5"
+              >
+                <div className="w-13 h-13 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-400/40 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition shadow">
+                  <Users className="w-7 h-7" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-black text-white group-hover:text-violet-300 transition text-base flex items-center gap-2">
+                    <span>온라인 1:1 대전 (P2P)</span>
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40">
+                      MULTIPLAYER
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    초대 코드 또는 공유 링크로 친구와 실시간 대결을 진행합니다. (재접속 지원)
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-violet-400/60 group-hover:text-violet-300 group-hover:translate-x-1 transition-transform" />
+              </button>
             </div>
 
             <button
@@ -985,6 +1023,24 @@ export const Lobby: React.FC<LobbyProps> = ({
 
       {/* 비동기 지연 로드 모달 컴포넌트 풀 (Suspense) */}
       <Suspense fallback={null}>
+        {/* 온라인 1:1 멀티플레이 로비 모달 */}
+        {isMultiplayerModalOpen && (
+          <MultiplayerLobbyModal
+            isOpen={isMultiplayerModalOpen}
+            onClose={() => {
+              clearHash();
+              setIsMultiplayerModalOpen(false);
+            }}
+            onStartMatch={(role, myDeck, opponentDeck) => {
+              clearHash();
+              setIsMultiplayerModalOpen(false);
+              if (onStartMultiplayerMatch) {
+                onStartMultiplayerMatch(role, myDeck, opponentDeck);
+              }
+            }}
+          />
+        )}
+
         {/* 공식 룰북 모달 */}
         {isManualOpen && (
           <OfficialManualModal
