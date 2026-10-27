@@ -342,10 +342,10 @@
     ],
     "levelup": [
       "/audio/sfx/characters/yangyang/levelup/1.ogg",
-      "/audio/sfx/characters/yangyang/levelup/2.mp3",
-      "/audio/sfx/characters/yangyang/levelup/3.mp3",
-      "/audio/sfx/characters/yangyang/levelup/4.mp3",
-      "/audio/sfx/characters/yangyang/levelup/5.mp3"
+      "/audio/sfx/characters/yangyang/levelup/2.ogg",
+      "/audio/sfx/characters/yangyang/levelup/3.ogg",
+      "/audio/sfx/characters/yangyang/levelup/4.ogg",
+      "/audio/sfx/characters/yangyang/levelup/5.ogg"
     ],
     "low_hp": [
       "/audio/sfx/characters/yangyang/low_hp/1.ogg",
@@ -353,7 +353,7 @@
       "/audio/sfx/characters/yangyang/low_hp/3.ogg"
     ],
     "opening": [
-      "/audio/sfx/characters/yangyang/opening/1.mp3"
+      "/audio/sfx/characters/yangyang/opening/1.ogg"
     ],
     "switch": [
       "/audio/sfx/characters/yangyang/switch/1.ogg",
