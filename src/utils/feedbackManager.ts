@@ -18,6 +18,7 @@ export interface FeedbackItem {
   title: string;
   content: string;
   createdAt: string; // ISO string
+  updatedAt?: string; // 수정 시각 (병합 시 최신본 우선 반영용)
   appVersion: string; // e.g. "v1.9.4"
   contextView?: string; // "LOBBY" | "BATTLE" | "DECK_BUILDER" | "REPLAY_STAGE"
   contact?: string; // 작성자 닉네임 (기본값 '방랑자')
@@ -198,8 +199,17 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
       for (const c of [...(existing.comments || []), ...(p.comments || [])]) {
         if (c && c.id) commentMap.set(c.id, c);
       }
+      // updatedAt 비교: 더 최신에 수정된 버전(또는 로컬 최신본 p)을 우선 채택하여 삭제된 이미지가 부활하는 현상 방지
+      const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+      const incomingTime = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
+      const newer = incomingTime >= existingTime ? p : existing;
+      const older = incomingTime >= existingTime ? existing : p;
+
       mergedMap.set(p.id, {
-        ...existing,
+        ...older,
+        ...newer,
+        imageUrl: newer.images && newer.images.length === 0 ? undefined : newer.imageUrl,
+        images: newer.images,
         likes: Math.max(existing.likes || 0, p.likes || 0),
         dislikes: Math.max(existing.dislikes || 0, p.dislikes || 0),
         views: Math.max(existing.views || 0, p.views || 0),
@@ -393,7 +403,18 @@ export function addCommentToFeedback(
 
 export function updateFeedback(id: string, updates: Partial<Omit<FeedbackItem, 'id' | 'createdAt'>>): void {
   const list = getFeedbackList();
-  const updated = list.map((item) => (item.id === id ? { ...item, ...updates } : item));
+  const updated = list.map((item) => {
+    if (item.id !== id) return item;
+    const nextImages = updates.images !== undefined ? updates.images : (item.images || []);
+    const nextImageUrl = nextImages.length > 0 ? nextImages[0] : undefined;
+    return {
+      ...item,
+      ...updates,
+      images: nextImages,
+      imageUrl: nextImageUrl,
+      updatedAt: new Date().toISOString(),
+    };
+  });
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   } catch (err) {

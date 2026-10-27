@@ -88,8 +88,13 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
   // 0. 기존 HTML <img> 태그가 있는 경우 data-shortcode 또는 마크다운 형태로 먼저 정규화 (이중 래핑 방지)
   safe = safe.replace(/<img\s+([^>]*?)>/gi, (match, attrs) => {
     const shortcodeMatch = attrs.match(/data-shortcode=["']([^"']+)["']/i);
+    const widthMatch = attrs.match(/data-width=["']([^"']+)["']/i);
     if (shortcodeMatch && shortcodeMatch[1]) {
-      return shortcodeMatch[1];
+      const baseCode = shortcodeMatch[1];
+      if (widthMatch && widthMatch[1] && !baseCode.includes('|')) {
+        return baseCode.replace(/\]$/, `|${widthMatch[1]}]`);
+      }
+      return baseCode;
     }
     const srcMatch = attrs.match(/src=["']([^"']+)["']/i);
     const altMatch = attrs.match(/alt=["']([^"']*)["']/i);
@@ -99,23 +104,25 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
     return match;
   });
 
-  // 1. 단축 태그: [사진1], [사진2], [이미지1] 등 치환 (업로드 사진 매핑)
+  // 1. 단축 태그: [사진1], [사진2|240px] 등 치환 (가로 나란히 배치 및 세로 줄바꿈 모두 호환되는 inline-flex 구조)
   const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
-  safe = safe.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)\]/gi, (match, _prefix, numStr) => {
+  safe = safe.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)(?:\|([^\]]+))?\]/gi, (match, _prefix, numStr, sizeOpt) => {
     const idx = parseInt(numStr, 10) - 1;
     const url = uploadedPhotos[idx] || postImages[idx];
     if (url) {
+      const sizeStyle = sizeOpt ? `style="width: ${sizeOpt.trim()}; max-width: 100%;"` : '';
+      const defaultSizeClass = sizeOpt ? '' : 'max-w-full sm:max-w-[320px] max-h-[340px]';
       return (
-        `<div class="my-3.5 max-w-2xl">` +
-        `<img src="${url}" alt="사진 ${numStr}" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />` +
-        `<span class="block text-[11px] text-slate-400 mt-1 font-sans">📸 사진 ${numStr}</span></div>`
+        `<span class="inline-flex flex-col items-center align-middle my-1.5 mr-2.5 max-w-full">` +
+        `<img src="${url}" alt="사진 ${numStr}" ${sizeStyle} class="rounded-xl border border-[#2d354a] bg-black/40 ${defaultSizeClass} object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />` +
+        `<span class="block text-[11px] text-slate-400 mt-1 font-sans">📸 사진 ${numStr}</span></span>`
       );
     }
     return match;
   });
 
-  // 2. 단축 태그: [카드:카드명], [카드:코드] 치환 (192종 도감 카드 매핑)
-  safe = safe.replace(/\[카드\s*:\s*([^\]]+)\]/gi, (match, cardQuery) => {
+  // 2. 단축 태그: [카드:카드명], [카드:코드|140px] 치환 (콤보 설명 시 가로 나란히 정렬 완벽 지원)
+  safe = safe.replace(/\[카드\s*:\s*([^\]|]+)(?:\|([^\]]+))?\]/gi, (match, cardQuery, sizeOpt) => {
     const q = cardQuery.trim();
     let card = OFFICIAL_CARDS.find((c) => c.nameKr === q || c.code === q || c.characterName === q);
     if (!card) {
@@ -124,39 +131,43 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
     const cardArt = card ? card.artUrl : postImages.find((u) => u.includes(q));
     if (cardArt) {
       const name = card ? card.nameKr : q;
+      const sizeStyle = sizeOpt ? `style="width: ${sizeOpt.trim()}; max-width: 100%;"` : '';
+      const defaultSizeClass = sizeOpt ? '' : 'w-[140px] sm:w-[170px] max-h-[260px]';
       return (
-        `<div class="my-3.5 max-w-xs sm:max-w-sm">` +
-        `<img src="${cardArt}" alt="${name}" class="rounded-xl border-2 border-amber-500/40 bg-black/60 max-h-[380px] object-contain shadow-xl cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />` +
-        `<span class="block text-[11px] text-amber-300 font-bold mt-1.5 font-sans">🃏 ${name}</span></div>`
+        `<span class="inline-flex flex-col items-center align-middle my-1.5 mr-2 max-w-full">` +
+        `<img src="${cardArt}" alt="${name}" ${sizeStyle} class="rounded-xl border-2 border-amber-500/40 bg-black/60 ${defaultSizeClass} object-contain shadow-xl cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />` +
+        `<span class="block text-[11px] text-amber-300 font-bold mt-1 font-sans">🃏 ${name}</span></span>`
       );
     }
     return match;
   });
 
-  // 3. 단축 태그: [카드1], [카드2] 순서형 치환
+  // 3. 단축 태그: [카드1], [카드2|140px] 순서형 치환
   const cardImages = postImages.filter((u) => u.startsWith('/cards/'));
-  safe = safe.replace(/\[카드\s*#?([0-9]+)\]/gi, (match, numStr) => {
+  safe = safe.replace(/\[카드\s*#?([0-9]+)(?:\|([^\]]+))?\]/gi, (match, numStr, sizeOpt) => {
     const idx = parseInt(numStr, 10) - 1;
     const url = cardImages[idx];
     if (url) {
       const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
       const name = foundCard ? foundCard.nameKr : `카드 ${numStr}`;
+      const sizeStyle = sizeOpt ? `style="width: ${sizeOpt.trim()}; max-width: 100%;"` : '';
+      const defaultSizeClass = sizeOpt ? '' : 'w-[140px] sm:w-[170px] max-h-[260px]';
       return (
-        `<div class="my-3.5 max-w-xs sm:max-w-sm">` +
-        `<img src="${url}" alt="${name}" class="rounded-xl border-2 border-amber-500/40 bg-black/60 max-h-[380px] object-contain shadow-xl cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />` +
-        `<span class="block text-[11px] text-amber-300 font-bold mt-1.5 font-sans">🃏 ${name}</span></div>`
+        `<span class="inline-flex flex-col items-center align-middle my-1.5 mr-2 max-w-full">` +
+        `<img src="${url}" alt="${name}" ${sizeStyle} class="rounded-xl border-2 border-amber-500/40 bg-black/60 ${defaultSizeClass} object-contain shadow-xl cursor-zoom-in hover:scale-[1.02] transition" loading="lazy" />` +
+        `<span class="block text-[11px] text-amber-300 font-bold mt-1 font-sans">🃏 ${name}</span></span>`
       );
     }
     return match;
   });
 
-  // 4. 마크다운 이미지 파싱: ![설명](url) -> 하위 호환
+  // 4. 마크다운 이미지 파싱: ![설명](url) -> 인라인 호환
   safe = safe.replace(
     /!\[(.*?)\]\((.*?)\)/g,
     (_match, alt, url) =>
-      `<div class="my-3.5 max-w-2xl"><img src="${url}" alt="${alt}" class="rounded-xl border border-[#2d354a] bg-black/40 max-h-[480px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />` +
+      `<span class="inline-flex flex-col items-center align-middle my-1.5 mr-2.5 max-w-full"><img src="${url}" alt="${alt}" class="rounded-xl border border-[#2d354a] bg-black/40 max-w-full sm:max-w-[320px] max-h-[340px] object-contain shadow-lg cursor-zoom-in hover:brightness-105 transition" loading="lazy" />` +
       (alt ? `<span class="block text-[11px] text-slate-400 mt-1 font-sans">${alt}</span>` : '') +
-      `</div>`
+      `</span>`
   );
 
   // 5. 마크다운 볼드 변환
@@ -220,6 +231,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const contentTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const wysiwygRef = React.useRef<HTMLDivElement>(null);
   const savedRangeRef = React.useRef<Range | null>(null);
+  const selectedEditorImgRef = React.useRef<HTMLImageElement | null>(null);
+  const [selectedImgMeta, setSelectedImgMeta] = useState<{ shortcode: string; width: string; src: string } | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [contact, setContact] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_author') || '' : ''));
@@ -234,24 +247,27 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const [cardPickerType, setCardPickerType] = useState<'ALL' | 'CHARACTER' | 'ACTION'>('ALL');
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
-  // 단축 태그/마크다운 본문을 아카라이브 위지윅 에디터용 HTML로 변환
+  // 단축 태그/마크다운 본문을 아카라이브 위지윅 에디터용 HTML로 변환 (inline-block으로 가로/세로 자유 배치 지원)
   const contentToWysiwygHtml = (rawContent: string, postImages: string[] = []): string => {
     if (!rawContent) return '';
     let html = rawContent.replace(/\r\n/g, '\n');
 
-    // 1. [사진1], [사진2] 치환
+    // 1. [사진1], [사진2|240px] 치환
     const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
-    html = html.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)\]/gi, (match, _prefix, numStr) => {
+    html = html.replace(/\[(사진|이미지|image|img)\s*#?([0-9]+)(?:\|([^\]]+))?\]/gi, (match, _prefix, numStr, sizeOpt) => {
       const idx = parseInt(numStr, 10) - 1;
       const url = uploadedPhotos[idx] || postImages[idx];
       if (url) {
-        return `<img src="${url}" data-shortcode="[사진${numStr}]" alt="사진 ${numStr}" class="my-2 max-w-full sm:max-w-lg max-h-[380px] rounded-xl border border-[#3b4254] shadow-lg object-contain block" />`;
+        const w = sizeOpt ? sizeOpt.trim() : '';
+        const sizeAttr = w ? `data-width="${w}" style="width: ${w}; max-width: 100%;"` : '';
+        const defaultCls = w ? '' : 'max-w-full sm:max-w-[300px] max-h-[320px]';
+        return `<img src="${url}" data-shortcode="[사진${numStr}]" ${sizeAttr} alt="사진 ${numStr}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border border-[#3b4254] shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-blue-400 transition" />`;
       }
       return match;
     });
 
-    // 2. [카드:이름] 치환
-    html = html.replace(/\[카드\s*:\s*([^\]]+)\]/gi, (match, cardQuery) => {
+    // 2. [카드:이름], [카드:이름|140px] 치환
+    html = html.replace(/\[카드\s*:\s*([^\]|]+)(?:\|([^\]]+))?\]/gi, (match, cardQuery, sizeOpt) => {
       const q = cardQuery.trim();
       let card = OFFICIAL_CARDS.find((c) => c.nameKr === q || c.code === q || c.characterName === q);
       if (!card) {
@@ -260,20 +276,26 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       const cardArt = card ? card.artUrl : postImages.find((u) => u.includes(q));
       if (cardArt) {
         const name = card ? card.nameKr : q;
-        return `<img src="${cardArt}" data-shortcode="[카드:${name}]" alt="${name}" class="my-2 max-w-[220px] max-h-[320px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain block" />`;
+        const w = sizeOpt ? sizeOpt.trim() : '';
+        const sizeAttr = w ? `data-width="${w}" style="width: ${w}; max-width: 100%;"` : '';
+        const defaultCls = w ? '' : 'w-[140px] sm:w-[165px] max-h-[260px]';
+        return `<img src="${cardArt}" data-shortcode="[카드:${name}]" ${sizeAttr} alt="${name}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />`;
       }
       return match;
     });
 
     // 3. [카드1] 순서형 치환
     const cardImages = postImages.filter((u) => u.startsWith('/cards/'));
-    html = html.replace(/\[카드\s*#?([0-9]+)\]/gi, (match, numStr) => {
+    html = html.replace(/\[카드\s*#?([0-9]+)(?:\|([^\]]+))?\]/gi, (match, numStr, sizeOpt) => {
       const idx = parseInt(numStr, 10) - 1;
       const url = cardImages[idx];
       if (url) {
         const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
         const name = foundCard ? foundCard.nameKr : `카드 ${numStr}`;
-        return `<img src="${url}" data-shortcode="[카드:${name}]" alt="${name}" class="my-2 max-w-[220px] max-h-[320px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain block" />`;
+        const w = sizeOpt ? sizeOpt.trim() : '';
+        const sizeAttr = w ? `data-width="${w}" style="width: ${w}; max-width: 100%;"` : '';
+        const defaultCls = w ? '' : 'w-[140px] sm:w-[165px] max-h-[260px]';
+        return `<img src="${url}" data-shortcode="[카드:${name}]" ${sizeAttr} alt="${name}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />`;
       }
       return match;
     });
@@ -284,11 +306,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       if (isCard) {
         const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
         const name = foundCard ? foundCard.nameKr : (alt || '카드');
-        return `<img src="${url}" data-shortcode="[카드:${name}]" alt="${name}" class="my-2 max-w-[220px] max-h-[320px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain block" />`;
+        return `<img src="${url}" data-shortcode="[카드:${name}]" alt="${name}" class="my-1.5 mr-2 w-[140px] sm:w-[165px] max-h-[260px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer" />`;
       }
       const pIdx = uploadedPhotos.indexOf(url);
       const shortTag = pIdx >= 0 ? `[사진${pIdx + 1}]` : '';
-      return `<img src="${url}" ${shortTag ? `data-shortcode="${shortTag}"` : ''} alt="${alt || '사진'}" class="my-2 max-w-full sm:max-w-lg max-h-[380px] rounded-xl border border-[#3b4254] shadow-lg object-contain block" />`;
+      return `<img src="${url}" ${shortTag ? `data-shortcode="${shortTag}"` : ''} alt="${alt || '사진'}" class="my-1.5 mr-2 max-w-full sm:max-w-[300px] max-h-[320px] rounded-xl border border-[#3b4254] shadow-lg object-contain inline-block align-middle cursor-pointer" />`;
     });
 
     // 5. 마크다운 볼드 및 줄바꿈 처리
@@ -297,25 +319,34 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     return html;
   };
 
-  // 위지윅 에디터 DOM을 깔끔한 단축 태그([사진1], [카드:이름]) + 서식 문자열로 직렬화
+  // 위지윅 에디터 DOM을 단축 태그([사진1], [카드:이름|140px]) + 서식 문자열로 직렬화 (가로 나란히 배치 보존!)
   const wysiwygDomToContent = (container: HTMLElement, currentImages: string[] = images): string => {
     const clone = container.cloneNode(true) as HTMLElement;
     const uploadedPhotos = currentImages.filter((u) => !u.startsWith('/cards/'));
 
     clone.querySelectorAll('img').forEach((img) => {
-      let shortcode = img.getAttribute('data-shortcode');
-      if (!shortcode) {
-        const src = img.getAttribute('src') || '';
-        if (src.startsWith('/cards/')) {
-          const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === src);
-          shortcode = `[카드:${foundCard ? foundCard.nameKr : '카드'}]`;
-        } else {
-          let pIdx = uploadedPhotos.indexOf(src) + 1;
-          if (pIdx <= 0) pIdx = 1;
-          shortcode = `[사진${pIdx}]`;
+      const src = img.getAttribute('src') || '';
+      const customW = img.getAttribute('data-width') || img.style.width || '';
+      let baseCode = img.getAttribute('data-shortcode') || '';
+
+      if (src.startsWith('/cards/')) {
+        const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === src);
+        baseCode = `[카드:${foundCard ? foundCard.nameKr : '카드'}]`;
+      } else {
+        const pIdx = uploadedPhotos.indexOf(src) + 1;
+        if (pIdx > 0) {
+          baseCode = `[사진${pIdx}]`;
+        } else if (!baseCode) {
+          baseCode = `[사진1]`;
         }
       }
-      const textNode = document.createTextNode(`\n${shortcode}\n`);
+
+      // 기본 태그에서 기존 |크기 옵션 제거 후 새 크기 옵션 결합
+      const cleanBase = baseCode.replace(/\|[^\]]+\]$/, ']');
+      const finalTag = customW ? cleanBase.replace(/\]$/, `|${customW}]`) : cleanBase;
+
+      // 강제 줄바꿈(\n)을 넣지 않고 그 자리 그대로 치환하여 가로 나란히 배치를 100% 보존!
+      const textNode = document.createTextNode(finalTag);
       img.parentNode?.replaceChild(textNode, img);
     });
 
@@ -363,8 +394,143 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   const syncFromWysiwyg = (customImages?: string[]) => {
     if (!wysiwygRef.current) return;
-    const serialized = wysiwygDomToContent(wysiwygRef.current, customImages || images);
+    const baseList = customImages !== undefined ? customImages : images;
+    const domImgs = Array.from(wysiwygRef.current.querySelectorAll('img'));
+    const domSrcSet = new Set(domImgs.map((el) => el.getAttribute('src') || '').filter(Boolean));
+
+    // 에디터 본문(DOM)에서 백스페이스/삭제 키 등으로 지워진 이미지는 첨부 상태(images, imageUrl)에서도 즉시 제거
+    const syncedImages = baseList.filter((u) => domSrcSet.has(u));
+    domImgs.forEach((el) => {
+      const s = el.getAttribute('src') || '';
+      if (s && !syncedImages.includes(s)) {
+        syncedImages.push(s);
+      }
+    });
+
+    // 남은 업로드 사진 번호([사진1], [사진2]...) 재정렬
+    const uploadedPhotos = syncedImages.filter((u) => !u.startsWith('/cards/'));
+    domImgs.forEach((el) => {
+      const s = el.getAttribute('src') || '';
+      if (s && !s.startsWith('/cards/')) {
+        const pIdx = uploadedPhotos.indexOf(s) + 1;
+        if (pIdx > 0) el.setAttribute('data-shortcode', `[사진${pIdx}]`);
+      }
+    });
+
+    setImages(syncedImages);
+    setImageUrl(syncedImages.length > 0 ? syncedImages[0] : '');
+
+    const serialized = wysiwygDomToContent(wysiwygRef.current, syncedImages);
     setContent(serialized);
+  };
+
+  // 위지윅 에디터 내에서 이미지 클릭 시 선택 및 크기/배치 컨트롤 활성화
+  const handleWysiwygClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (wysiwygRef.current) {
+      wysiwygRef.current.querySelectorAll('img').forEach((img) => {
+        img.classList.remove('ring-4', 'ring-blue-500');
+      });
+    }
+    if (target.tagName === 'IMG') {
+      const imgEl = target as HTMLImageElement;
+      imgEl.classList.add('ring-4', 'ring-blue-500');
+      selectedEditorImgRef.current = imgEl;
+      setSelectedImgMeta({
+        shortcode: imgEl.getAttribute('data-shortcode') || '이미지',
+        width: imgEl.getAttribute('data-width') || imgEl.style.width || '',
+        src: imgEl.getAttribute('src') || '',
+      });
+    } else {
+      selectedEditorImgRef.current = null;
+      setSelectedImgMeta(null);
+    }
+    saveEditorSelection();
+  };
+
+  // 선택된 이미지 크기 변경 (콤보 소형 / 가로 병렬 / 중형 / 대형 / 원본)
+  const handleResizeSelectedImg = (newWidth: string) => {
+    const imgEl = selectedEditorImgRef.current;
+    if (!imgEl) return;
+    if (newWidth) {
+      imgEl.setAttribute('data-width', newWidth);
+      imgEl.style.width = newWidth;
+      imgEl.style.maxWidth = '100%';
+    } else {
+      imgEl.removeAttribute('data-width');
+      imgEl.style.width = '';
+    }
+    setSelectedImgMeta((prev) => (prev ? { ...prev, width: newWidth } : null));
+    syncFromWysiwyg();
+  };
+
+  // 선택된 이미지를 앞 요소/이미지와 같은 줄(가로 나란히)에 붙이기
+  const handlePlaceImgSideBySide = () => {
+    const imgEl = selectedEditorImgRef.current;
+    if (!imgEl || !wysiwygRef.current) return;
+    // 이미지 바로 앞의 <br>들을 제거
+    while (imgEl.previousSibling && imgEl.previousSibling.nodeName === 'BR') {
+      imgEl.parentNode?.removeChild(imgEl.previousSibling);
+    }
+    // 만약 이미지가 별도 <div>나 <p>의 첫 요소로 감싸져 있다면 이전 블록 끝으로 이동
+    const parent = imgEl.parentElement;
+    if (parent && parent !== wysiwygRef.current && (parent.tagName === 'DIV' || parent.tagName === 'P')) {
+      const prevBlock = parent.previousElementSibling;
+      if (prevBlock) {
+        prevBlock.appendChild(document.createTextNode(' '));
+        prevBlock.appendChild(imgEl);
+        if (!parent.textContent?.trim() && parent.querySelectorAll('img').length === 0) {
+          parent.remove();
+        }
+      }
+    }
+    syncFromWysiwyg();
+    showToast('↔ 이미지를 윗줄 옆(가로 나란히)으로 배치했습니다!');
+  };
+
+  // 선택된 이미지를 다음 줄(세로)로 내리기
+  const handlePlaceImgNextLine = () => {
+    const imgEl = selectedEditorImgRef.current;
+    if (!imgEl || !wysiwygRef.current) return;
+    const br = document.createElement('br');
+    imgEl.parentNode?.insertBefore(br, imgEl);
+    syncFromWysiwyg();
+    showToast('↵ 이미지를 다음 줄(세로)로 내렸습니다!');
+  };
+
+  // 선택된 이미지 삭제
+  const handleDeleteSelectedImg = () => {
+    const imgEl = selectedEditorImgRef.current;
+    if (!imgEl) return;
+    const srcToRemove = imgEl.getAttribute('src') || '';
+    imgEl.remove();
+    selectedEditorImgRef.current = null;
+    setSelectedImgMeta(null);
+
+    // 본문에 동일 이미지가 더 남아있지 않다면 첨부 배열에서도 완전히 제거
+    const remainingSameImgs = wysiwygRef.current
+      ? Array.from(wysiwygRef.current.querySelectorAll('img')).some((el) => el.getAttribute('src') === srcToRemove)
+      : false;
+
+    let nextImages = images;
+    if (!remainingSameImgs && srcToRemove) {
+      nextImages = images.filter((u) => u !== srcToRemove);
+      setImages(nextImages);
+      setImageUrl(nextImages.length > 0 ? nextImages[0] : '');
+    }
+    // 남은 사진들의 번호 재정렬 후 동기화
+    if (wysiwygRef.current) {
+      const uploadedPhotos = nextImages.filter((u) => !u.startsWith('/cards/'));
+      wysiwygRef.current.querySelectorAll('img').forEach((el) => {
+        const s = el.getAttribute('src') || '';
+        if (!s.startsWith('/cards/')) {
+          const pIdx = uploadedPhotos.indexOf(s) + 1;
+          if (pIdx > 0) el.setAttribute('data-shortcode', `[사진${pIdx}]`);
+        }
+      });
+    }
+    syncFromWysiwyg(nextImages);
+    showToast('🗑️ 선택한 이미지를 삭제했습니다.');
   };
 
   // 모달 열릴 때나 코드보기 <-> 위지윅 전환 시 에디터 DOM 동기화
@@ -374,6 +540,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       if (wysiwygRef.current.innerHTML !== targetHtml) {
         wysiwygRef.current.innerHTML = targetHtml;
       }
+      selectedEditorImgRef.current = null;
+      setSelectedImgMeta(null);
     }
   }, [isWriteModalOpen, isPreviewMode, editingPostId]);
 
@@ -433,7 +601,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     syncFromWysiwyg();
   };
 
-  // 본문 커서 위치에 이미지/공식 카드 즉시 삽입 핸들러 (위지윅에서는 실제 이미지로, 코드에서는 [사진1] 단축 태그로!)
+  // 본문 커서 위치에 이미지/공식 카드 즉시 삽입 핸들러 (inline-block으로 가로 나란히 배치 및 Enter 줄바꿈 모두 지원!)
   const insertImageIntoContent = (url: string, label = '이미지', customImagesList?: string[]) => {
     const activeImages = customImagesList || images;
     const isCard = url.startsWith('/cards/');
@@ -454,9 +622,10 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
     if (!isPreviewMode && wysiwygRef.current) {
       restoreEditorSelection();
+      // 강제 <br> 없이 inline-block으로 삽입하여 연속 삽입 시 가로로 나란히 배치되고, Enter를 치면 아래 줄로 내려가도록 설계
       const imgHtml = isCard
-        ? `<img src="${url}" data-shortcode="${shortTag}" alt="${displayAlt}" class="my-2 max-w-[220px] max-h-[320px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain block" /><br>`
-        : `<img src="${url}" data-shortcode="${shortTag}" alt="${displayAlt}" class="my-2 max-w-full sm:max-w-lg max-h-[380px] rounded-xl border border-[#3b4254] shadow-lg object-contain block" /><br>`;
+        ? `<img src="${url}" data-shortcode="${shortTag}" alt="${displayAlt}" class="my-1.5 mr-2 w-[140px] sm:w-[165px] max-h-[260px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />&nbsp;`
+        : `<img src="${url}" data-shortcode="${shortTag}" alt="${displayAlt}" class="my-1.5 mr-2 max-w-full sm:max-w-[300px] max-h-[320px] rounded-xl border border-[#3b4254] shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-blue-400 transition" />&nbsp;`;
 
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && wysiwygRef.current.contains(sel.getRangeAt(0).commonAncestorContainer)) {
@@ -466,24 +635,24 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       }
       saveEditorSelection();
       syncFromWysiwyg(activeImages);
-      showToast(`📸 ${shortTag} 이미지가 본문 커서 위치에 삽입되었습니다!`);
+      showToast(`📸 ${shortTag} 삽입 완료! (연속 삽입 시 가로 배치, Enter 키로 줄바꿈)`);
       return;
     }
 
-    const tagWithNewline = `\n${shortTag}\n`;
+    const tagInline = `${shortTag} `;
     const textarea = contentTextareaRef.current;
     if (!textarea) {
-      setContent((prev) => prev + tagWithNewline);
+      setContent((prev) => prev + tagInline);
       showToast(`📸 ${shortTag} 태그가 본문에 삽입되었습니다.`);
       return;
     }
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const newContent = content.substring(0, start) + tagWithNewline + content.substring(end);
+    const newContent = content.substring(0, start) + tagInline + content.substring(end);
     setContent(newContent);
     setTimeout(() => {
       textarea.focus();
-      const newPos = start + tagWithNewline.length;
+      const newPos = start + tagInline.length;
       textarea.setSelectionRange(newPos, newPos);
     }, 20);
     showToast(`📸 ${shortTag} 태그가 커서 위치에 삽입되었습니다!`);
@@ -750,17 +919,45 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       }
     }
     const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
+    const postImages =
+      post.images !== undefined
+        ? post.images
+        : post.imageUrl
+        ? [post.imageUrl]
+        : [];
+    let initialContent = post.content;
+    const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
+    postImages.forEach((url) => {
+      if (initialContent.includes(url)) return;
+      if (!url.startsWith('/cards/')) {
+        const pIdx = uploadedPhotos.indexOf(url) + 1;
+        const hasTag = new RegExp(`\\[(?:사진|이미지)\\s*${pIdx}(?:\\|[^\\]]+)?\\]`).test(initialContent);
+        if (!hasTag && pIdx > 0) {
+          initialContent = initialContent ? `${initialContent}\n[사진${pIdx}]` : `[사진${pIdx}]`;
+        }
+      } else {
+        const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
+        if (foundCard) {
+          const hasCardTag =
+            initialContent.includes(`[카드:${foundCard.nameKr}`) ||
+            initialContent.includes(`[카드:${foundCard.code}`);
+          if (!hasCardTag) {
+            initialContent = initialContent ? `${initialContent} [카드:${foundCard.nameKr}]` : `[카드:${foundCard.nameKr}]`;
+          }
+        }
+      }
+    });
+
     setEditingPostId(post.id);
     setCategory(post.category);
     setTitle(post.title);
-    setContent(post.content);
+    setContent(initialContent);
     setContact(post.contact || '');
     setDeckCode(post.deckCode || '');
     setDeckName(post.deckName || '');
     setIsSecret(Boolean(post.isSecret));
     setPassword(post.password || savedPw);
-    setImageUrl(post.imageUrl || '');
-    const postImages = post.images && post.images.length > 0 ? post.images : (post.imageUrl ? [post.imageUrl] : []);
+    setImageUrl(postImages[0] || '');
     setImages(postImages);
     setIsPreviewMode(false);
     setShowColorPicker(false);
@@ -936,30 +1133,94 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   };
 
   const handleRemoveImage = (indexToRemove: number) => {
-    setImages((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    const urlToRemove = images[indexToRemove];
+    if (!urlToRemove) return;
+
+    const oldUploadedPhotos = images.filter((u) => !u.startsWith('/cards/'));
+    const removedPhotoIdx = !urlToRemove.startsWith('/cards/') ? oldUploadedPhotos.indexOf(urlToRemove) + 1 : 0;
+
+    const nextImages = images.filter((_, idx) => idx !== indexToRemove);
+    setImages(nextImages);
+    setImageUrl(nextImages.length > 0 ? nextImages[0] : '');
+
+    if (selectedEditorImgRef.current && selectedEditorImgRef.current.getAttribute('src') === urlToRemove) {
+      selectedEditorImgRef.current = null;
+      setSelectedImgMeta(null);
+    }
+
+    // 위지윅 에디터 DOM 내에서도 해당 이미지를 즉시 제거하고 번호 재정렬
+    if (!isPreviewMode && wysiwygRef.current) {
+      wysiwygRef.current.querySelectorAll('img').forEach((imgEl) => {
+        if (imgEl.getAttribute('src') === urlToRemove) {
+          imgEl.remove();
+        }
+      });
+      syncFromWysiwyg(nextImages);
+    } else {
+      // 코드보기 모드일 때 텍스트 내 해당 태그 제거 및 사진 번호 재정렬
+      let updated = content;
+      if (urlToRemove.startsWith('/cards/')) {
+        const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === urlToRemove);
+        if (foundCard) {
+          const escName = foundCard.nameKr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const escCode = foundCard.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          updated = updated
+            .replace(new RegExp(`\\[카드:${escName}(?:\\|[^\\]]+)?\\]`, 'g'), '')
+            .replace(new RegExp(`\\[카드:${escCode}(?:\\|[^\\]]+)?\\]`, 'g'), '');
+        }
+      } else if (removedPhotoIdx > 0) {
+        updated = updated.replace(new RegExp(`\\[(?:사진|이미지)\\s*${removedPhotoIdx}(?:\\|[^\\]]+)?\\]`, 'g'), '');
+        // 뒷번호 사진들을 1씩 앞당김
+        updated = updated.replace(/\[(?:사진|이미지)\s*(\d+)(\|[^\]]+)?\]/g, (match, numStr, sizeSuffix) => {
+          const n = parseInt(numStr, 10);
+          if (n > removedPhotoIdx) {
+            return `[사진${n - 1}${sizeSuffix || ''}]`;
+          }
+          return match;
+        });
+      }
+      setContent(updated);
+    }
+    showToast('🗑️ 이미지가 삭제되었습니다.');
   };
 
-  const handleToggleCardImage = (artUrl: string) => {
-    setImages((prev) => {
-      if (prev.includes(artUrl)) {
-        return prev.filter((url) => url !== artUrl);
-      } else {
-        return [...prev, artUrl];
-      }
-    });
+  const handleToggleCardImage = (artUrl: string, cardNameKr?: string) => {
+    if (images.includes(artUrl)) {
+      const idx = images.indexOf(artUrl);
+      if (idx >= 0) handleRemoveImage(idx);
+    } else {
+      const nextImages = [...images, artUrl];
+      setImages(nextImages);
+      if (!imageUrl) setImageUrl(nextImages[0]);
+      insertImageIntoContent(artUrl, cardNameKr || '카드', nextImages);
+      showToast(`🃏 [${cardNameKr || '카드'}] 본문에 가로로 이어서 삽입됨!`);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 위지윅 모드일 경우 에디터 DOM에 실제로 남아있는 이미지 목록과 최종 동기화 (마지막 1장 삭제 시에도 확실히 비움)
+    let finalImages = images;
+    if (!isPreviewMode && wysiwygRef.current) {
+      const domImgs = Array.from(wysiwygRef.current.querySelectorAll('img'));
+      const domSrcSet = new Set(domImgs.map((el) => el.getAttribute('src') || '').filter(Boolean));
+      finalImages = images.filter((u) => domSrcSet.has(u));
+      domImgs.forEach((el) => {
+        const s = el.getAttribute('src') || '';
+        if (s && !finalImages.includes(s)) finalImages.push(s);
+      });
+    }
+
     const finalContent = (!isPreviewMode && wysiwygRef.current)
-      ? wysiwygDomToContent(wysiwygRef.current, images)
+      ? wysiwygDomToContent(wysiwygRef.current, finalImages)
       : content;
 
     if (!title.trim()) {
       showToast('⚠️ 제목을 입력해주세요.');
       return;
     }
-    if (!finalContent.trim()) {
+    if (!finalContent.trim() && finalImages.length === 0) {
       showToast('⚠️ 내용을 입력해주세요.');
       return;
     }
@@ -995,8 +1256,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       }
     }
 
-    const primaryImage = images.length > 0 ? images[0] : (imageUrl || undefined);
-    const allImages = images.length > 0 ? images : (imageUrl ? [imageUrl] : undefined);
+    const primaryImage = finalImages.length > 0 ? finalImages[0] : undefined;
+    const allImages = finalImages;
 
     if (editingPostId) {
       updateFeedback(editingPostId, {
@@ -1523,30 +1784,30 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
               {/* 본문에 삽입되지 않은 별도 첨부 이미지/카드 갤러리 렌더링 */}
               {(() => {
                 const postImages =
-                  selectedPost.images && selectedPost.images.length > 0
+                  selectedPost.images !== undefined
                     ? selectedPost.images
                     : selectedPost.imageUrl
                     ? [selectedPost.imageUrl]
                     : [];
-                // 이미 본문 텍스트 내에 태그([사진1], [카드:...])나 URL로 인라인 삽입된 이미지는 상단 갤러리에서 중복 표시하지 않음
+                // 이미 본문 텍스트 내에 태그([사진1], [사진1|200px], [카드:...])나 URL로 인라인 삽입된 이미지는 상단 갤러리에서 중복 표시하지 않음
                 const uploadedPhotos = postImages.filter((u) => !u.startsWith('/cards/'));
                 const unEmbeddedImages = postImages.filter((url) => {
                   if (selectedPost.content.includes(url)) return false;
                   const isCard = url.startsWith('/cards/');
                   if (!isCard) {
                     const photoIdx = uploadedPhotos.indexOf(url) + 1;
-                    if (
-                      selectedPost.content.includes(`[사진${photoIdx}]`) ||
-                      selectedPost.content.includes(`[사진 ${photoIdx}]`) ||
-                      selectedPost.content.includes(`[이미지${photoIdx}]`)
-                    ) {
+                    const photoRegex = new RegExp(`\\[(?:사진|이미지)\\s*${photoIdx}(?:\\|[^\\]]+)?\\]`);
+                    if (photoRegex.test(selectedPost.content)) {
                       return false;
                     }
                   } else {
                     const foundCard = OFFICIAL_CARDS.find((c) => c.artUrl === url);
                     if (
-                      (foundCard && selectedPost.content.includes(`[카드:${foundCard.nameKr}]`)) ||
-                      (foundCard && selectedPost.content.includes(`[카드:${foundCard.code}]`))
+                      foundCard &&
+                      (selectedPost.content.includes(`[카드:${foundCard.nameKr}]`) ||
+                        selectedPost.content.includes(`[카드:${foundCard.nameKr}|`) ||
+                        selectedPost.content.includes(`[카드:${foundCard.code}]`) ||
+                        selectedPost.content.includes(`[카드:${foundCard.code}|`))
                     ) {
                       return false;
                     }
@@ -1602,7 +1863,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 dangerouslySetInnerHTML={{
                   __html: renderFormattedContent(
                     selectedPost.content,
-                    selectedPost.images && selectedPost.images.length > 0
+                    selectedPost.images !== undefined
                       ? selectedPost.images
                       : selectedPost.imageUrl
                       ? [selectedPost.imageUrl]
@@ -2703,7 +2964,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                             key={idx}
                             className="relative w-11 h-11 rounded border border-[#363b48] bg-black/50 overflow-hidden shrink-0 group cursor-pointer"
                             onClick={() => insertImageIntoContent(imgUrl, isCard ? (foundCard ? foundCard.nameKr : '카드') : `사진 ${photoIdx}`)}
-                            title={`클릭하여 본문 커서 위치에 ${tag} 다시 삽입`}
+                            title={`클릭하여 본문 커서 위치에 ${tag} 가로로 재삽입`}
                           >
                             <img src={imgUrl} alt="" className="w-full h-full object-cover" />
                             <span className="absolute bottom-0 inset-x-0 bg-black/80 text-[8px] text-center font-bold text-amber-300 truncate px-0.5">
@@ -2716,7 +2977,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                 handleRemoveImage(idx);
                               }}
                               className="absolute top-0 right-0 w-4 h-4 bg-red-600/90 hover:bg-red-500 text-white text-[10px] flex items-center justify-center leading-none"
-                              title="첨부 삭제"
+                              title="첨부 및 본문에서 삭제"
                             >
                               ×
                             </button>
@@ -2724,9 +2985,72 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         );
                       })}
                     </div>
-                    <span className="text-[10px] text-slate-500 ml-auto shrink-0 hidden md:inline">
-                      썸네일 클릭 시 커서 위치에 재삽입됩니다
+                    <span className="text-[10px] text-slate-400 ml-auto shrink-0 hidden md:inline">
+                      💡 본문 안의 이미지를 클릭하면 <b className="text-blue-300">가로/세로 배치 및 크기 조절</b>이 가능합니다
                     </span>
+                  </div>
+                )}
+
+                {/* 선택된 이미지 크기 조절 & 가로/세로 배치 컨트롤 바 (워드 프로그램 스타일) */}
+                {!isPreviewMode && selectedImgMeta && (
+                  <div className="px-3 py-2 bg-blue-950/60 border-b border-blue-500/40 flex flex-wrap items-center justify-between gap-2 text-xs animate-in fade-in duration-100">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-black text-blue-300 mr-1">
+                        🖼️ {selectedImgMeta.shortcode} 설정:
+                      </span>
+                      {/* 크기 프리셋 */}
+                      {[
+                        { label: '110px (콤보소형)', val: '110px' },
+                        { label: '165px (가로병렬)', val: '165px' },
+                        { label: '240px (중형)', val: '240px' },
+                        { label: '380px (대형)', val: '380px' },
+                        { label: '원본/기본', val: '' },
+                      ].map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleResizeSelectedImg(preset.val)}
+                          className={`px-2 py-1 rounded font-bold transition cursor-pointer border ${
+                            selectedImgMeta.width === preset.val
+                              ? 'bg-blue-600 border-blue-400 text-white shadow'
+                              : 'bg-[#1a1f2e] border-[#333e59] text-slate-300 hover:bg-[#252d42] hover:text-white'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={handlePlaceImgSideBySide}
+                        className="px-2.5 py-1 rounded bg-emerald-600/80 hover:bg-emerald-500 text-white font-bold border border-emerald-400/50 transition cursor-pointer shadow"
+                        title="앞의 줄바꿈을 제거하여 이전 이미지/글자 옆(가로 나란히)에 배치합니다"
+                      >
+                        ↔ 윗줄 옆에 가로로 붙이기
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={handlePlaceImgNextLine}
+                        className="px-2.5 py-1 rounded bg-[#23293a] hover:bg-[#2f374e] text-slate-200 font-bold border border-[#3a4562] transition cursor-pointer"
+                        title="이미지를 다음 줄(세로)로 내립니다"
+                      >
+                        ↵ 다음 줄로 내리기
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={handleDeleteSelectedImg}
+                        className="px-2.5 py-1 rounded bg-red-600/80 hover:bg-red-500 text-white font-bold border border-red-400/50 transition cursor-pointer"
+                        title="선택한 이미지를 본문과 첨부 목록에서 완전히 삭제합니다"
+                      >
+                        🗑️ 삭제
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -2760,7 +3084,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       ref={contentTextareaRef}
                       value={content}
                       onChange={(e) => setContent(e.target.value)}
-                      placeholder="원본 텍스트 및 단축 태그([사진1], [카드:치샤]) 편집 모드입니다. 우측 상단 [<> 시각편집]을 누르면 실제 이미지가 보이는 에디터로 돌아갑니다."
+                      placeholder="원본 텍스트 및 단축 태그([사진1], [카드:치샤], [카드:치샤|110px]) 편집 모드입니다. 같은 줄에 [카드:치샤] → [카드:앙코] 처럼 쓰면 가로로 나란히 정렬됩니다."
                       className="w-full min-h-[420px] sm:min-h-[480px] max-h-[60vh] p-4 sm:p-5 bg-[#12141a] text-sm sm:text-base text-slate-100 placeholder-slate-500 focus:outline-none font-mono resize-y leading-relaxed select-text block"
                     />
                   ) : (
@@ -2769,15 +3093,16 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       {!content.trim() && (
                         <div className="pointer-events-none select-none absolute inset-0 p-4 sm:p-5 text-slate-500 text-sm sm:text-[15px] leading-7 space-y-1">
                           <p>✨ 명조: 워더링 웨이브 배틀 채널 글쓰기 에디터입니다 ✨</p>
-                          <p>🖼️ 상단 툴바의 [이미지] 또는 [공식 카드] 버튼을 누르면 현재 커서 위치에 사진이 바로 삽입됩니다.</p>
+                          <p>🖼️ 여러 이미지나 공식 카드를 연속 삽입하면 <b className="text-slate-400">가로(나란히)로 정렬</b>되며, <b className="text-slate-400">Enter(엔터)</b>를 치면 세로(다음 줄)로 내려갑니다.</p>
+                          <p>📐 본문 속 이미지를 클릭하면 상단에서 <b className="text-slate-400">크기 조절 및 가로/세로 배치 변경</b>을 워드처럼 자유롭게 할 수 있습니다.</p>
                           <p>💡 클립보드 이미지 붙여넣기(Ctrl+V) 및 마우스 드래그 앤 드롭 업로드도 지원합니다.</p>
-                          <p>✍️ 이미지를 눈으로 직접 확인하면서 위아래로 자유롭게 장문 게시글을 작성해보세요!</p>
                         </div>
                       )}
                       <div
                         ref={wysiwygRef}
                         contentEditable
                         suppressContentEditableWarning
+                        onClick={handleWysiwygClick}
                         onInput={() => {
                           saveEditorSelection();
                           syncFromWysiwyg();
@@ -2973,11 +3298,12 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleToggleCardImage(card.artUrl);
+                          handleToggleCardImage(card.artUrl, card.nameKr);
                         }}
                         className="px-2 py-1 rounded bg-[#20273a] hover:bg-[#2b354e] text-slate-200 text-[10px] font-bold w-full text-center border border-[#333e59] cursor-pointer"
+                        title="창을 닫지 않고 여러 카드를 가로로 연속 삽입하거나 취소합니다"
                       >
-                        {isSelected ? '선택 취소' : '연속 선택(창 유지)'}
+                        {isSelected ? '삽입 취소' : '연속 가로 삽입(창 유지)'}
                       </button>
                     </div>
 

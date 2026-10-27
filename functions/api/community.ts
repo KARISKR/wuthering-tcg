@@ -1,5 +1,5 @@
-// Cloudflare Pages Function - /api/community
-// 모든 접속 플레이어 간 공유 덱(Shared Decks) 및 자유게시판(Community Board) 실시간 글로벌 동기화 API (D1 & KV 하이브리드 지원)
+// functions/api/community.ts
+// 모든 접속 플레이어 간 공유 덱(Shared Decks) 및 자유게시판(Community Board) 실시간 글로벌 동기화 API (D1 전용)
 
 interface D1Result<T = unknown> {
   results?: T[];
@@ -21,7 +21,6 @@ interface D1Database {
 
 interface Env {
   DB?: D1Database;
-  VISITOR_STATS?: KVNamespace;
 }
 
 const POINTER_IDS = {
@@ -51,12 +50,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   }
 
   const type = (url.searchParams.get('type') === 'board' ? 'board' : 'decks') as 'decks' | 'board';
-  const kvKey = `wuthering_global_${type}_v2`;
   const pointerId = POINTER_IDS[type];
   const pointerName = POINTER_NAMES[type];
 
   try {
-    // 1. GET: 글로벌 공유 데이터 조회
+    // 1. GET: 데이터 조회
     if (request.method === 'GET') {
       // (A) Cloudflare D1 최우선 조회
       if (env.DB) {
@@ -70,19 +68,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         }
       }
 
-      // (B) Cloudflare KV 조회
-      if (env.VISITOR_STATS) {
-        try {
-          const kvRaw = await env.VISITOR_STATS.get(kvKey);
-          if (kvRaw) {
-            return new Response(kvRaw, { headers });
-          }
-        } catch (kvErr) {
-          console.warn('[Community KV GET Error]:', kvErr);
-        }
-      }
-
-      // (C) 글로벌 클라우드 스토어 (Pointer + Bytebin) 조회
+      // (B) 글로벌 클라우드 스토어 (Pointer + Bytebin) 백업 조회
       try {
         const ptrRes = await fetch(`https://api.restful-api.dev/objects/${pointerId}`, {
           headers: { Accept: 'application/json' },
@@ -107,7 +93,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return new Response(JSON.stringify(type === 'decks' ? { decks: [] } : { posts: [] }), { headers });
     }
 
-    // 2. POST / PUT: 글로벌 공유 데이터 저장 및 동기화
+    // 2. POST / PUT: 데이터 저장
     if (request.method === 'POST' || request.method === 'PUT') {
       const bodyText = await request.text();
       const nowTs = Date.now();
@@ -125,17 +111,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         }
       }
 
-      // (B) Cloudflare KV 동기화
-      if (env.VISITOR_STATS) {
-        try {
-          await env.VISITOR_STATS.put(kvKey, bodyText);
-          saved = true;
-        } catch (kvErr) {
-          console.warn('[Community KV PUT Error]:', kvErr);
-        }
-      }
-
-      // (C) 글로벌 클라우드 스토어 (Bytebin + Pointer) 백업 저장
+      // (B) 글로벌 클라우드 스토어 (Bytebin + Pointer) 백업 저장
       try {
         const blobRes = await fetch('https://bytebin.lucko.me/post', {
           method: 'POST',
