@@ -169,10 +169,13 @@ async function fetchStatsApi(
     const cur = curRes.status === 'fulfilled' && curRes.value?.value ? parseInt(curRes.value.value, 10) : 0;
     const prev = prevRes.status === 'fulfilled' && prevRes.value?.value ? parseInt(prevRes.value.value, 10) : 0;
 
+    const safeDay = Math.max(1, day);
+    const safeTot = Math.max(1, tot, safeDay);
+
     return {
       online: Math.max(1, Math.max(cur, prev)),
-      today: Math.max(1, day),
-      total: Math.max(1, tot),
+      today: safeDay,
+      total: safeTot,
       isDevExcluded: options.isExcluded,
     };
   } catch {
@@ -191,6 +194,7 @@ export function useVisitorStats(): VisitorStatsData {
     try {
       cachedTotal = parseInt(localStorage.getItem('wuthering_cached_total') || '1', 10);
       cachedToday = parseInt(localStorage.getItem('wuthering_cached_today') || '1', 10);
+      cachedTotal = Math.max(cachedTotal, cachedToday);
     } catch {}
 
     const isExcluded = isDevOrPortingSession();
@@ -216,25 +220,16 @@ export function useVisitorStats(): VisitorStatsData {
       } catch {}
     }
 
-    // 당일 방문 및 누적 방문 여부 확인 (1일 1회만 카운트 증가)
+    // 당일 방문 여부 확인 (1일 1회만 카운트 증가, 신규 일일 방문 시 총 누적 방문도 함께 증가)
     let isNewToday = false;
-    let isNewTotal = false;
 
     try {
       const lastVisitDate = localStorage.getItem('wuthering_last_visit_date');
-      const hasVisitedTotal = localStorage.getItem('wuthering_has_visited_total') === 'true';
 
       if (lastVisitDate !== todayStr) {
         isNewToday = true;
         if (!isExcluded) {
           localStorage.setItem('wuthering_last_visit_date', todayStr);
-        }
-      }
-
-      if (!hasVisitedTotal) {
-        isNewTotal = true;
-        if (!isExcluded) {
-          localStorage.setItem('wuthering_has_visited_total', 'true');
         }
       }
     } catch {
@@ -244,29 +239,32 @@ export function useVisitorStats(): VisitorStatsData {
     const currentSlot = getCurrentSlot();
 
     const runVisitSync = async () => {
-      const action = !hasInitiatedVisitRef.current && (isNewToday || isNewTotal) ? 'visit' : 'ping';
+      const action = !hasInitiatedVisitRef.current && isNewToday ? 'visit' : 'ping';
       hasInitiatedVisitRef.current = true;
 
       const data = await fetchStatsApi(action, {
         incDaily: isNewToday && !isExcluded,
-        incTotal: isNewTotal && !isExcluded,
+        incTotal: isNewToday && !isExcluded,
         slot: currentSlot,
         isExcluded,
         date: todayStr,
       });
 
       if (data) {
+        const safeToday = Math.max(1, data.today);
+        const safeTotal = Math.max(1, data.total, safeToday);
+
         setStats({
           online: data.online,
-          today: data.today,
-          total: data.total,
+          today: safeToday,
+          total: safeTotal,
           isExcluded,
           isLoading: false,
         });
 
         try {
-          localStorage.setItem('wuthering_cached_total', String(data.total));
-          localStorage.setItem('wuthering_cached_today', String(data.today));
+          localStorage.setItem('wuthering_cached_total', String(safeTotal));
+          localStorage.setItem('wuthering_cached_today', String(safeToday));
         } catch {}
       } else {
         setStats((prev) => ({ ...prev, isLoading: false }));
@@ -288,11 +286,13 @@ export function useVisitorStats(): VisitorStatsData {
         date: todayStr,
       }).then((data) => {
         if (data) {
+          const safeToday = Math.max(1, data.today);
+          const safeTotal = Math.max(1, data.total, safeToday);
           setStats((prev) => ({
             ...prev,
             online: data.online,
-            today: data.today,
-            total: data.total,
+            today: safeToday,
+            total: safeTotal,
             isLoading: false,
           }));
         }
@@ -311,11 +311,13 @@ export function useVisitorStats(): VisitorStatsData {
           date: todayStr,
         }).then((data) => {
           if (data) {
+            const safeToday = Math.max(1, data.today);
+            const safeTotal = Math.max(1, data.total, safeToday);
             setStats((prev) => ({
               ...prev,
               online: data.online,
-              today: data.today,
-              total: data.total,
+              today: safeToday,
+              total: safeTotal,
             }));
           }
         });

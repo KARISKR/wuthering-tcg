@@ -83,7 +83,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       if (!shouldExclude) {
         if (action === 'visit') {
-          if (incTotal) {
+          // 일일 방문 시 총 누적 방문자 수도 반드시 함께 누적 증가 (총 방문자는 일일 방문자들의 누적합)
+          const shouldIncTotal = incTotal || incDaily;
+          if (shouldIncTotal) {
             statements.push(
               env.DB.prepare(
                 'INSERT INTO stats_counters (id, val, updated_at) VALUES (\'total\', 1, ?) ON CONFLICT(id) DO UPDATE SET val = val + 1, updated_at = ?'
@@ -111,21 +113,33 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         await env.DB.batch(statements);
       }
 
-      // 동시 쿼리 조회
-      const [onlineRes, countersRes] = await Promise.all([
+      // 동시 쿼리 조회: 실시간 세션, total 카운터, 오늘 daily 카운터, 전체 daily 카운터들의 누적합
+      const [onlineRes, countersRes, sumDailyRes] = await Promise.all([
         env.DB.prepare('SELECT COUNT(*) as count FROM active_sessions WHERE last_seen >= ?').bind(expiredTs).first<{ count: number }>(),
         env.DB.prepare('SELECT id, val FROM stats_counters WHERE id IN (\'total\', ?)').bind(dailyId).all<{ id: string; val: number }>(),
+        env.DB.prepare('SELECT SUM(val) as total_sum FROM stats_counters WHERE id LIKE \'daily_%\'').first<{ total_sum: number | null }>(),
       ]);
 
       const online = Math.max(1, onlineRes?.count || 1);
-      let total = 0;
+      let rawTotal = 0;
       let today = 0;
 
       if (countersRes?.results) {
         for (const row of countersRes.results) {
-          if (row.id === 'total') total = row.val;
+          if (row.id === 'total') rawTotal = row.val;
           if (row.id === dailyId) today = row.val;
         }
+      }
+
+      const sumDaily = sumDailyRes?.total_sum || 0;
+      // 총 누적 방문자는 오늘 방문자 수 및 전체 일일 방문자들의 누적 합계 이상이어야 함
+      const total = Math.max(rawTotal, today, sumDaily);
+
+      // 만약 total 레코드가 오늘 방문자 수나 일일 방문자 누적합보다 작다면 D1 DB도 자동으로 보정 업데이트
+      if (total > rawTotal && !shouldExclude) {
+        env.DB.prepare(
+          'INSERT INTO stats_counters (id, val, updated_at) VALUES (\'total\', ?, ?) ON CONFLICT(id) DO UPDATE SET val = ?, updated_at = ?'
+        ).bind(total, nowTs, total, nowTs).run().catch(() => {});
       }
 
       return new Response(
