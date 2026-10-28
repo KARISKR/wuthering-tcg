@@ -666,26 +666,6 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
                                   case 'draw':
                                     soundEffects.playClashDraw();
                                     break;
-                                  case 'damage':
-                                    if (!soundEffects.playCustomBufferDirect('damage')) {
-                                      soundEffects.playDamageDirect();
-                                    }
-                                    break;
-                                  case 'damage_light':
-                                    if (!soundEffects.playCustomBufferDirect('damage_light')) {
-                                      soundEffects.playDamageLight();
-                                    }
-                                    break;
-                                  case 'damage_medium':
-                                    if (!soundEffects.playCustomBufferDirect('damage_medium')) {
-                                      soundEffects.playDamageMedium(4);
-                                    }
-                                    break;
-                                  case 'damage_heavy':
-                                    if (!soundEffects.playCustomBufferDirect('damage_heavy')) {
-                                      soundEffects.playDamageHeavy(7);
-                                    }
-                                    break;
                                   case 'weapon_sword':
                                     soundEffects.playWeaponSound('직검');
                                     break;

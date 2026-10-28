@@ -134,42 +134,6 @@ export const SFX_SPECIFICATIONS: Record<string, SfxSpec> = {
     folderPath: '/audio/sfx/draw/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
-  damage: {
-    category: 'damage',
-    nameKr: 'HP 피격 / 대미지 (기본 통합)',
-    recommendedDuration: '0.3초 ~ 0.6초',
-    recommendedDurationSec: 0.45,
-    description: '공통 생명력 감소 시 타격음 (세부 티어 파일이 없을 때 폴백)',
-    folderPath: '/audio/sfx/damage/',
-    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
-  },
-  damage_light: {
-    category: 'damage_light',
-    nameKr: '대미지 1~2 (경타 / 스침)',
-    recommendedDuration: '0.15초 ~ 0.35초',
-    recommendedDurationSec: 0.25,
-    description: '가벼운 견제타 및 스침 피격음 (경쾌한 스냅/잽 타격)',
-    folderPath: '/audio/sfx/damage_light/',
-    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
-  },
-  damage_medium: {
-    category: 'damage_medium',
-    nameKr: '대미지 3~5 (중타 / 크런치)',
-    recommendedDuration: '0.3초 ~ 0.6초',
-    recommendedDurationSec: 0.45,
-    description: '일반 유효타 및 강력한 공격 피격음 (묵직한 크런치 & 서브 베이스 펀치)',
-    folderPath: '/audio/sfx/damage_medium/',
-    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
-  },
-  damage_heavy: {
-    category: 'damage_heavy',
-    nameKr: '대미지 6 이상 (치명타 / 필살 슬램)',
-    recommendedDuration: '0.6초 ~ 1.2초',
-    recommendedDurationSec: 0.85,
-    description: '치명적 대량 피해 피격음 (대폭발 서브 베이스 럼블 & 균열 파쇄음)',
-    folderPath: '/audio/sfx/damage_heavy/',
-    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
-  },
   weapon_sword: {
     category: 'weapon_sword',
     nameKr: '무기 - 직검 (Sword)',
@@ -620,10 +584,15 @@ class SoundEffectsEngine {
    * 대결(카드 오픈/격돌/대미지/무기/페이즈/연격) 시 끊김이나 합성음 폴백 없이 고음질 오디오 즉시 재생
    */
   public async preloadAllCustomSounds() {
-    // 1순위: 카드 오픈(clash_reveal), 격돌(clash), 카드 세트(card), 딜링(card_deal) 등 핵심 대결 사운드 최우선 로드
+    // 1순위: 카드 오픈(clash_reveal), 격돌(clash), 무기 타격(직검/대검/권총/증폭기), 카드 세트(card), 딜링(card_deal) 등 핵심 대결 사운드 최우선 로드
     const priorityCategories: string[] = [
       'clash_reveal',
       'clash',
+      'weapon_sword',
+      'weapon_broadblade',
+      'weapon_pistol',
+      'weapon_rectifier',
+      'combo_broadblade',
       'card',
       'card_deal',
       'draw',
@@ -957,6 +926,12 @@ class SoundEffectsEngine {
         folderDirs.push('/audio/sfx/combo_rectifier', '/audio/sfx/weapon_rectifier');
         directFileBases.push('/audio/sfx/combo_rectifier/1', '/audio/sfx/weapon_rectifier/1');
       }
+      // 6.9 무기 직군별 기본 타격음 (weapon_sword, weapon_broadblade, weapon_pistol, weapon_rectifier)
+      else if (key.startsWith('weapon_')) {
+        const w = key.replace('weapon_', '');
+        folderDirs.push(`/audio/sfx/${key}`, `/audio/sfx/combo_${w}`, `/audio/sfx/combo`);
+        directFileBases.push(`/audio/sfx/${key}/1`, `/audio/sfx/combo_${w}/1`, `/audio/sfx/combo/1`);
+      }
       // 7. 카드 격돌 (clash_impact -> clash 폴더로 일원화)
       else if (key === 'clash_impact') {
         folderDirs.push('/audio/sfx/clash');
@@ -1183,6 +1158,11 @@ class SoundEffectsEngine {
       // 카드 오픈/플립(clash_reveal, card_open) 효과음 명확한 가청성 확보 (1.1x 배율)
       if (key === 'clash_reveal' || key === 'card_open') {
         finalMultiplier = volumeMultiplier * 1.1;
+      }
+
+      // 대검(weapon_broadblade, combo_broadblade) 묵직한 타격감 및 가청성 확보 (1.25x 배율)
+      if (key.includes('broadblade')) {
+        finalMultiplier = volumeMultiplier * 1.25;
       }
 
       // 양양(Yangyang) 캐릭터 사운드 개별 볼륨 정밀 설정
@@ -1444,19 +1424,16 @@ class SoundEffectsEngine {
     this.playWeaponSound(finalWeapon);
   }
 
-  /** HP 데미지 기본 공통 사운드 직접 재생 (UI 테스트 또는 일반 피격) */
-  public playDamageDirect(): boolean {
+  /** HP 데미지 기본 공통 사운드 직접 재생 (무기 기본음 기반) */
+  public playDamageDirect(weapon: WeaponType = '직검'): boolean {
     if (this.isMuted) return false;
-    if (this.playCustomBuffer('damage', this.HIT_VOLUME_MULTIPLIER)) return true;
-    this.playDamageMedium(3);
+    this.playWeaponSound(weapon);
     return true;
   }
 
-  /** 티어 1: 데미지 1~2 (가벼운 타격음 - 커스텀 우선 및 20% 볼륨 감소) */
+  /** 티어 1: 데미지 1~2 (가벼운 타격음 물리 합성 폴백) */
   public playDamageLight() {
     if (this.isMuted) return;
-    if (this.playCustomBuffer('damage_light', this.HIT_VOLUME_MULTIPLIER)) return;
-    if (this.playCustomBuffer('damage', this.HIT_VOLUME_MULTIPLIER)) return;
 
     const ctx = this.getAudioContext();
     if (!ctx) return;
@@ -1481,11 +1458,9 @@ class SoundEffectsEngine {
     this.playDullThudNoise(0.12, hitVol * 0.5, 520);
   }
 
-  /** 티어 2: 데미지 3~5 (중타 크런치 - 커스텀 우선 및 20% 볼륨 감소) */
+  /** 티어 2: 데미지 3~5 (중타 크런치 물리 합성 폴백) */
   public playDamageMedium(amount: number = 3) {
     if (this.isMuted) return;
-    if (this.playCustomBuffer('damage_medium', this.HIT_VOLUME_MULTIPLIER)) return;
-    if (this.playCustomBuffer('damage', this.HIT_VOLUME_MULTIPLIER)) return;
 
     const ctx = this.getAudioContext();
     if (!ctx) return;
@@ -1525,11 +1500,9 @@ class SoundEffectsEngine {
     this.playDullThudNoise(0.24, hitVol * 0.8 * intensity, 340);
   }
 
-  /** 티어 3: 데미지 6 이상 (치명타 슬램 - 커스텀 우선 및 20% 볼륨 감소) */
+  /** 티어 3: 데미지 6 이상 (치명타 슬램 물리 합성 폴백) */
   public playDamageHeavy(amount: number = 6) {
     if (this.isMuted) return;
-    if (this.playCustomBuffer('damage_heavy', this.HIT_VOLUME_MULTIPLIER)) return;
-    if (this.playCustomBuffer('damage', this.HIT_VOLUME_MULTIPLIER)) return;
 
     const ctx = this.getAudioContext();
     if (!ctx) return;

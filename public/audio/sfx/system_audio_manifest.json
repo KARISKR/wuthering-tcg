@@ -74,18 +74,6 @@
   "combo_sword_3": [
     "/audio/sfx/combo_sword_3/1.mp3"
   ],
-  "damage": [
-    "/audio/sfx/damage/1.mp3"
-  ],
-  "damage_heavy": [
-    "/audio/sfx/damage_heavy/1.mp3"
-  ],
-  "damage_light": [
-    "/audio/sfx/damage_light/1.mp3"
-  ],
-  "damage_medium": [
-    "/audio/sfx/damage_medium/1.mp3"
-  ],
   "draw": [
     "/audio/sfx/draw/1.mp3"
   ],
