@@ -114,6 +114,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   isTutorialMode = false,
 }) => {
   const [showTutorialOverlay, setShowTutorialOverlay] = useState(isTutorialMode);
+
+  // 멀티플레이어 닉네임 계산 (P0: 방장/호스트, P1: 도전자/게스트)
+  const mpP0Name =
+    initialMode === 'MULTIPLAYER'
+      ? multiplayerRole === 'GUEST'
+        ? multiplayerService.opponentProfile?.name || '호스트 (방장)'
+        : multiplayerService.myProfile?.name || localStorage.getItem('wuthering_player_name') || '호스트 (방장)'
+      : undefined;
+  const mpP1Name =
+    initialMode === 'MULTIPLAYER'
+      ? multiplayerRole === 'GUEST'
+        ? multiplayerService.myProfile?.name || localStorage.getItem('wuthering_player_name') || '도전자 (게스트)'
+        : multiplayerService.opponentProfile?.name || '도전자 (게스트)'
+      : undefined;
+
   const {
     gameState,
     setGameState,
@@ -141,7 +156,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     clearLastComboStrike,
     clearLastEffectEvent,
     handleFinishEffectDraw,
-  } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck);
+  } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck, mpP0Name, mpP1Name);
 
   // 1인 2역 (SOLO_DUAL) 또는 멀티플레이 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
   const isMultiplayer = gameState.gameMode === 'MULTIPLAYER';

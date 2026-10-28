@@ -929,7 +929,9 @@ export function createInitialGameState(
   p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_CHIXIA',
   gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER' = 'AI',
   p0CustomDeck?: CustomDeckConfig | null,
-  p1CustomDeck?: CustomDeckConfig | null
+  p1CustomDeck?: CustomDeckConfig | null,
+  p0CustomName?: string,
+  p1CustomName?: string
 ): GameState {
   let p0Deck = generateStarterActionDeck(p0PresetKey);
   let p1Deck = generateStarterActionDeck(p1PresetKey);
@@ -968,7 +970,7 @@ export function createInitialGameState(
 
   const player0: PlayerState = createPlayerState(
     'p0',
-    '플레이어 (당신)',
+    p0CustomName || '플레이어 (당신)',
     p0PresetObj,
     p0Deck,
     p0Hand,
@@ -977,7 +979,7 @@ export function createInitialGameState(
 
   const player1: PlayerState = createPlayerState(
     'p1',
-    gameMode === 'AI' ? '상대 (AI 봇)' : '상대 (플레이어 2)',
+    p1CustomName || (gameMode === 'AI' ? '상대 (AI 봇)' : '상대 (플레이어 2)'),
     p1PresetObj,
     p1Deck,
     p1Hand,

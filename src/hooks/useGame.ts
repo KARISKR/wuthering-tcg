@@ -39,10 +39,20 @@ export function useGame(
   p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_CHIXIA',
   initialGameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER' = 'AI',
   customDeck?: CustomDeckConfig | null,
-  p1CustomDeck?: CustomDeckConfig | null
+  p1CustomDeck?: CustomDeckConfig | null,
+  p0CustomName?: string,
+  p1CustomName?: string
 ) {
   const [gameState, rawSetGameState] = useState<GameState>(() =>
-    createInitialGameState(p0PresetKey, p1PresetKey, initialGameMode, customDeck, p1CustomDeck)
+    createInitialGameState(
+      p0PresetKey,
+      p1PresetKey,
+      initialGameMode,
+      customDeck,
+      p1CustomDeck,
+      p0CustomName,
+      p1CustomName
+    )
   );
 
   // React 19 <StrictMode>는 setState(updater)의 updater(prev)를 2회(EagerState + Render Double Invoke) 호출하므로,
@@ -75,12 +85,22 @@ export function useGame(
   // 새 게임 시작
   const restartGame = useCallback(
     (newP0Preset = p0PresetKey, newP1Preset = p1PresetKey, newMode = gameState.gameMode) => {
-      setGameState(createInitialGameState(newP0Preset, newP1Preset, newMode, customDeck, p1CustomDeck));
+      setGameState(
+        createInitialGameState(
+          newP0Preset,
+          newP1Preset,
+          newMode,
+          customDeck,
+          p1CustomDeck,
+          p0CustomName,
+          p1CustomName
+        )
+      );
       setIsAiThinking(false);
       setIsDrawFlightActive(false);
       isDrawingInProgress.current = false;
     },
-    [p0PresetKey, p1PresetKey, gameState.gameMode, customDeck, p1CustomDeck]
+    [p0PresetKey, p1PresetKey, gameState.gameMode, customDeck, p1CustomDeck, p0CustomName, p1CustomName]
   );
 
   // 게임 모드 변경 (AI 대전 <-> 1인 2역 <-> 온라인 P2P)
