@@ -12,6 +12,13 @@ export type MultiplayerConnectionStatus =
   | 'DISCONNECTED'
   | 'ERROR';
 
+export interface TimeLimitConfig {
+  hasTimeLimit: boolean;
+  totalTimeSec: number; // default 300
+  turnTimeSec: number;  // default 90
+  clashTimeSec: number; // default 30
+}
+
 export interface MultiplayerPlayerProfile {
   name: string;
   presetKey?: 'STARTER_ROVER' | 'STARTER_CHIXIA';
@@ -27,6 +34,10 @@ export interface MultiplayerSessionData {
   myProfile: MultiplayerPlayerProfile;
   opponentProfile?: MultiplayerPlayerProfile;
   lastGameState?: GameState | null;
+  timeLimitConfig?: TimeLimitConfig;
+  p0TotalTime?: number;
+  p1TotalTime?: number;
+  currentTurnTime?: number;
   timestamp: number;
 }
 
@@ -56,6 +67,11 @@ export type MultiplayerMessage =
   | {
       type: 'LOBBY_ACCEPT';
       hostProfile: MultiplayerPlayerProfile;
+      timeLimitConfig?: TimeLimitConfig;
+    }
+  | {
+      type: 'ROOM_CONFIG_UPDATE';
+      timeLimitConfig: TimeLimitConfig;
     }
   | {
       type: 'LOBBY_READY';
@@ -67,6 +83,7 @@ export type MultiplayerMessage =
       initialState: GameState;
       hostProfile: MultiplayerPlayerProfile;
       guestProfile: MultiplayerPlayerProfile;
+      timeLimitConfig?: TimeLimitConfig;
     }
   | {
       type: 'DISPATCH_ACTION';
@@ -78,6 +95,18 @@ export type MultiplayerMessage =
       type: 'SYNC_GAME_STATE';
       gameState: GameState;
       actionDesc?: string;
+    }
+  | {
+      type: 'TIME_SYNC';
+      p0TotalTime: number;
+      p1TotalTime: number;
+      currentTurnTime: number;
+      activePlayerIndex: 0 | 1;
+    }
+  | {
+      type: 'TIME_OUT';
+      loserIndex: 0 | 1;
+      reason: string;
     }
   | {
       type: 'PING';
@@ -98,6 +127,10 @@ export type MultiplayerMessage =
       gameState: GameState;
       hostProfile: MultiplayerPlayerProfile;
       guestProfile: MultiplayerPlayerProfile;
+      timeLimitConfig?: TimeLimitConfig;
+      p0TotalTime?: number;
+      p1TotalTime?: number;
+      currentTurnTime?: number;
     }
   | {
       type: 'DISCONNECT_WARNING';
@@ -123,6 +156,10 @@ export interface MultiplayerRoomInfo {
   hostLeader?: string;
   hostLeaderArt?: string;
   deckName?: string;
+  hasTimeLimit?: boolean;
+  totalTimeSec?: number;
+  turnTimeSec?: number;
+  clashTimeSec?: number;
   status: 'WAITING' | 'PLAYING';
   playerCount: number;
   createdAt: number;

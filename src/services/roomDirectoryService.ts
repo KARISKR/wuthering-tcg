@@ -28,6 +28,10 @@ class RoomDirectoryService {
     hostLeader?: string;
     hostLeaderArt?: string;
     deckName?: string;
+    hasTimeLimit?: boolean;
+    totalTimeSec?: number;
+    turnTimeSec?: number;
+    clashTimeSec?: number;
   }): Promise<void> {
     this.currentRoomCode = info.roomCode;
     try {
@@ -53,6 +57,10 @@ class RoomDirectoryService {
     hostLeader?: string;
     hostLeaderArt?: string;
     deckName?: string;
+    hasTimeLimit?: boolean;
+    totalTimeSec?: number;
+    turnTimeSec?: number;
+    clashTimeSec?: number;
   }) {
     this.stopHeartbeat();
     this.currentRoomCode = info.roomCode;

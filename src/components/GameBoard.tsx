@@ -86,12 +86,13 @@ import {
   Copy,
   Wifi,
   WifiOff,
+  Clock,
 } from 'lucide-react';
 
 import { BgmPlayer } from './BgmPlayer';
 import { formatEffectText, formatBattleLogText } from '../utils/formatEffectText';
 import { multiplayerService } from '../services/multiplayerService';
-import type { MultiplayerActionType, MultiplayerRole } from '../types/multiplayer';
+import type { MultiplayerActionType, MultiplayerRole, TimeLimitConfig } from '../types/multiplayer';
 import { MultiplayerDisconnectOverlay } from './MultiplayerDisconnectOverlay';
 
 interface GameBoardProps {
@@ -102,6 +103,13 @@ interface GameBoardProps {
   opponentDeck?: CustomDeckConfig | null;
   onPlayBattleReplay?: (replay: BattleReplayData) => void;
   isTutorialMode?: boolean;
+}
+
+function formatChessTime(totalSec: number): string {
+  const safe = Math.max(0, Math.floor(totalSec));
+  const min = Math.floor(safe / 60);
+  const sec = safe % 60;
+  return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({
@@ -187,6 +195,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 멀티플레이 리더 선택 / 멀리건 완료 대기 플래그
   const [hasSelectedMyLeader, setHasSelectedMyLeader] = useState<boolean>(false);
   const [hasCompletedMyMulligan, setHasCompletedMyMulligan] = useState<boolean>(false);
+
+  // 멀티플레이어 시간 제한 시스템 (총 300초 / 턴 90초 / 대결 30초)
+  const [timeLimitConfig, setTimeLimitConfig] = useState<TimeLimitConfig>(() => {
+    return multiplayerService.timeLimitConfig || {
+      hasTimeLimit: true,
+      totalTimeSec: 300,
+      turnTimeSec: 90,
+      clashTimeSec: 30,
+    };
+  });
+  const [p0TotalTime, setP0TotalTime] = useState<number>(() => multiplayerService.p0TotalTime ?? 300);
+  const [p1TotalTime, setP1TotalTime] = useState<number>(() => multiplayerService.p1TotalTime ?? 300);
+  const [currentTurnTime, setCurrentTurnTime] = useState<number>(() => multiplayerService.currentTurnTime ?? 90);
+
+  const prevPhaseRef = useRef<string>(gameState.phase);
+  const prevTurnPlayerRef = useRef<number>(gameState.activePlayerIndex);
+  const prevTurnCountRef = useRef<number>(gameState.turn);
 
   // [멀티플레이어 액션 프록시 래퍼] 게스트(P1)는 네트워크로 호스트에게 액션을 위임하고, 호스트/솔로/AI는 로컬 엔진을 즉시 실행
   const handleDrawCards = useCallback((pIdx?: 0 | 1) => {
@@ -1177,6 +1202,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         multiplayerService.saveSession(msg.gameState);
         setIsMultiplayerDisconnected(false);
         setDisconnectCountdown(null);
+        if (msg.timeLimitConfig) setTimeLimitConfig(msg.timeLimitConfig);
+        if (msg.p0TotalTime !== undefined) setP0TotalTime(msg.p0TotalTime);
+        if (msg.p1TotalTime !== undefined) setP1TotalTime(msg.p1TotalTime);
+        if (msg.currentTurnTime !== undefined) setCurrentTurnTime(msg.currentTurnTime);
+      } else if (msg.type === 'TIME_SYNC') {
+        setP0TotalTime(msg.p0TotalTime);
+        setP1TotalTime(msg.p1TotalTime);
+        setCurrentTurnTime(msg.currentTurnTime);
+      } else if (msg.type === 'TIME_OUT') {
+        setGameState((prev) => ({
+          ...prev,
+          phase: 'GAME_OVER',
+          winner: msg.loserIndex === 0 ? 1 : 0,
+        }));
       } else if (msg.type === 'DISPATCH_ACTION') {
         if (msg.actionType === 'INITIATIVE_ROLL') {
           setExternalDiceResult(msg.payload);
@@ -1490,6 +1529,192 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       setNoComboCountdown(null);
     }
   }, [noComboCountdown, gameState.phase, controlledPlayerIndex, handleFinishCombo]);
+
+  // [멀티플레이] 시간 초과 패배 처리 핸들러 (호스트 권한)
+  const handleTriggerTimeOut = useCallback(
+    (loserIndex: 0 | 1) => {
+      const winnerIndex = loserIndex === 0 ? 1 : 0;
+      setGameState((prev) => ({
+        ...prev,
+        phase: 'GAME_OVER',
+        winner: winnerIndex,
+      }));
+      multiplayerService.send({
+        type: 'TIME_OUT',
+        loserIndex,
+        reason: '시간 초과 (TIME OUT)',
+      });
+    },
+    [setGameState]
+  );
+
+  // [멀티플레이 시간 제한] 페이즈 전환 및 턴 교체 시 행동 제한시간 리셋 (호스트 기준)
+  useEffect(() => {
+    if (!isHost || !timeLimitConfig.hasTimeLimit) return;
+
+    if (
+      gameState.phase !== prevPhaseRef.current ||
+      gameState.activePlayerIndex !== prevTurnPlayerRef.current ||
+      gameState.turn !== prevTurnCountRef.current
+    ) {
+      prevPhaseRef.current = gameState.phase;
+      prevTurnPlayerRef.current = gameState.activePlayerIndex;
+      prevTurnCountRef.current = gameState.turn;
+
+      if (gameState.phase === 'ACTION_PHASE') {
+        setCurrentTurnTime(timeLimitConfig.turnTimeSec || 90);
+      } else if (gameState.phase === 'CLASH_SET') {
+        setCurrentTurnTime(timeLimitConfig.clashTimeSec || 30);
+      } else if (gameState.phase === 'COMBO_STEP') {
+        setCurrentTurnTime(timeLimitConfig.clashTimeSec || 30);
+      }
+    }
+  }, [
+    isHost,
+    timeLimitConfig.hasTimeLimit,
+    timeLimitConfig.turnTimeSec,
+    timeLimitConfig.clashTimeSec,
+    gameState.phase,
+    gameState.activePlayerIndex,
+    gameState.turn,
+  ]);
+
+  // [멀티플레이 시간 제한] 호스트 1초 타이머 틱 루프 (공식 Chess Clock & 턴/대결 카운트다운)
+  useEffect(() => {
+    if (!isMultiplayer || !isHost || !timeLimitConfig.hasTimeLimit) return;
+    if (gameState.phase === 'GAME_OVER') return;
+
+    // 대전 셋업 단계(주사위, 리더선택, 멀리건) 중에는 타이머 정지
+    if (
+      gameState.phase === 'START_PHASE' ||
+      gameState.phase === 'LEADER_SELECT' ||
+      gameState.phase === 'MULLIGAN'
+    ) {
+      return;
+    }
+
+    // 애니메이션 오버레이 재생 중이거나 상대 접속 끊김 대기 중에는 타이머 정지
+    if (
+      gameState.clashResult ||
+      activeUpgrade ||
+      activeComboStrike ||
+      isInitiativeRolling ||
+      isMultiplayerDisconnected
+    ) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setCurrentTurnTime((prevTurnTime) => {
+        const nextTurnTime = Math.max(0, prevTurnTime - 1);
+
+        // 총 보유 시간 감소 및 행동 만료 처리
+        if (gameState.phase === 'ACTION_PHASE') {
+          const activeIdx = gameState.activePlayerIndex;
+          if (activeIdx === 0) {
+            setP0TotalTime((prev) => {
+              const nextP0 = Math.max(0, prev - 1);
+              if (nextP0 <= 0) handleTriggerTimeOut(0);
+              return nextP0;
+            });
+          } else {
+            setP1TotalTime((prev) => {
+              const nextP1 = Math.max(0, prev - 1);
+              if (nextP1 <= 0) handleTriggerTimeOut(1);
+              return nextP1;
+            });
+          }
+
+          if (nextTurnTime <= 0) {
+            handleEndTurn();
+          }
+        } else if (gameState.phase === 'CLASH_SET') {
+          if (!gameState.players[0].clashCardReady) {
+            setP0TotalTime((prev) => {
+              const next = Math.max(0, prev - 1);
+              if (next <= 0) handleTriggerTimeOut(0);
+              return next;
+            });
+          }
+          if (!gameState.players[1].clashCardReady) {
+            setP1TotalTime((prev) => {
+              const next = Math.max(0, prev - 1);
+              if (next <= 0) handleTriggerTimeOut(1);
+              return next;
+            });
+          }
+
+          if (nextTurnTime <= 0) {
+            if (!gameState.players[0].clashCardReady) engineSetClashCard(0, null, []);
+            if (!gameState.players[1].clashCardReady) engineSetClashCard(1, null, []);
+          }
+        } else if (gameState.phase === 'COMBO_STEP') {
+          const comboIdx = comboPlayerIndex;
+          if (comboIdx === 0) {
+            setP0TotalTime((prev) => {
+              const nextP0 = Math.max(0, prev - 1);
+              if (nextP0 <= 0) handleTriggerTimeOut(0);
+              return nextP0;
+            });
+          } else {
+            setP1TotalTime((prev) => {
+              const nextP1 = Math.max(0, prev - 1);
+              if (nextP1 <= 0) handleTriggerTimeOut(1);
+              return nextP1;
+            });
+          }
+
+          if (nextTurnTime <= 0) {
+            engineFinishCombo(comboIdx);
+          }
+        }
+
+        return nextTurnTime;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [
+    isMultiplayer,
+    isHost,
+    timeLimitConfig.hasTimeLimit,
+    gameState.phase,
+    gameState.activePlayerIndex,
+    gameState.players,
+    gameState.clashResult,
+    activeUpgrade,
+    activeComboStrike,
+    isInitiativeRolling,
+    isMultiplayerDisconnected,
+    comboPlayerIndex,
+    handleEndTurn,
+    engineSetClashCard,
+    engineFinishCombo,
+    handleTriggerTimeOut,
+  ]);
+
+  // [멀티플레이 시간 제한] 호스트 타이머 상태 게스트에게 1초마다 동기화
+  useEffect(() => {
+    if (!isHost || !isMultiplayer || !timeLimitConfig.hasTimeLimit) return;
+    multiplayerService.p0TotalTime = p0TotalTime;
+    multiplayerService.p1TotalTime = p1TotalTime;
+    multiplayerService.currentTurnTime = currentTurnTime;
+    multiplayerService.send({
+      type: 'TIME_SYNC',
+      p0TotalTime,
+      p1TotalTime,
+      currentTurnTime,
+      activePlayerIndex: gameState.activePlayerIndex,
+    });
+  }, [
+    isHost,
+    isMultiplayer,
+    timeLimitConfig.hasTimeLimit,
+    p0TotalTime,
+    p1TotalTime,
+    currentTurnTime,
+    gameState.activePlayerIndex,
+  ]);
 
   // 레벨업 버튼 클릭 시 가능한 진화 후보 계산 (공식 룰 603.1.2.2: 동일 레벨 또는 +1 레벨의 동명 카드)
   const openUpgradeModal = (slotName: 'leader' | 'leftSupport' | 'rightSupport', playerIdx: 0 | 1 = 0) => {
@@ -2014,6 +2239,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <span>{otherPlayer.name}</span>
                 </div>
 
+                {/* 멀티플레이 상대방 잔여 시간 배지 */}
+                {isMultiplayer && timeLimitConfig.hasTimeLimit && (
+                  <div
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-xs font-mono font-black ${
+                      (myPlayerIndex === 0 ? p1TotalTime : p0TotalTime) <= 30
+                        ? 'bg-rose-950/80 border-rose-500/70 text-rose-300 animate-pulse'
+                        : !isCurrentControlledTurn
+                        ? 'bg-cyan-950/80 border-cyan-500/70 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                        : 'bg-slate-900 border-slate-700 text-slate-400'
+                    }`}
+                    title="상대 총 잔여 시간 (Chess Clock)"
+                  >
+                    <Clock className="w-3 h-3 text-cyan-400 shrink-0" />
+                    <span>{formatChessTime(myPlayerIndex === 0 ? p1TotalTime : p0TotalTime)}</span>
+                  </div>
+                )}
+
                 <div
                   onClick={() => setIsHpHistoryModalOpen(true)}
                   title="체력(HP) 상세 변동 내역 보기 (클릭)"
@@ -2405,6 +2647,90 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   {gameState.phase === 'DISCARD_OVERFLOW' && '엔드 페이즈 (패 정리)'}
                   {(gameState.phase === 'LEADER_SELECT' || gameState.phase === 'MULLIGAN' || gameState.phase === 'START_PHASE') && '대전 준비 중'}
                 </span>
+
+                {/* [멀티플레이 제한시간 HUD] 플레이어 (당신) 밑 타이머 게이지 & Chess Clock */}
+                {isMultiplayer && timeLimitConfig.hasTimeLimit && gameState.phase !== 'START_PHASE' && gameState.phase !== 'LEADER_SELECT' && gameState.phase !== 'MULLIGAN' && (
+                  <div className="w-full mt-1 px-1.5 py-1 bg-[#070a12]/95 border border-slate-700/80 rounded-xl flex flex-col gap-1 shadow-md">
+                    {/* 행동/턴 남은 시간 게이지 */}
+                    <div className="flex items-center justify-between text-[11px] font-mono font-black">
+                      <span className="text-slate-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-amber-400" />
+                        <span>{gameState.phase === 'CLASH_SET' ? '대결 제한' : '행동 제한'}</span>
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.2 rounded font-black tracking-wider text-xs ${
+                          currentTurnTime <= 10
+                            ? 'bg-rose-500/30 text-rose-300 border border-rose-500/60 animate-pulse'
+                            : currentTurnTime <= 30
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                            : 'text-slate-200'
+                        }`}
+                      >
+                        {currentTurnTime}s
+                      </span>
+                    </div>
+
+                    {/* 카운트다운 프로그레스 바 */}
+                    <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          currentTurnTime <= 10
+                            ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]'
+                            : currentTurnTime <= 30
+                            ? 'bg-amber-400'
+                            : isCurrentControlledTurn
+                            ? 'bg-gradient-to-r from-orange-500 to-amber-400'
+                            : 'bg-cyan-400'
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.max(
+                              0,
+                              (currentTurnTime /
+                                (gameState.phase === 'CLASH_SET'
+                                  ? (timeLimitConfig.clashTimeSec || 30)
+                                  : (timeLimitConfig.turnTimeSec || 90))) *
+                                100
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+
+                    {/* Chess Clock: 각 플레이어 총 잔여 시간 */}
+                    <div className="grid grid-cols-2 gap-1 pt-0.5 text-[10px] font-mono font-black">
+                      <div
+                        className={`flex items-center justify-between px-1.5 py-0.5 rounded border transition-colors ${
+                          (isCurrentControlledTurn && gameState.phase === 'ACTION_PHASE') ||
+                          (gameState.phase === 'CLASH_SET' && !activeControlledPlayer.clashCardReady)
+                            ? 'bg-amber-950/80 border-amber-500/70 text-amber-300 shadow-[0_0_6px_rgba(245,158,11,0.25)]'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                        }`}
+                        title="내 총 잔여 시간"
+                      >
+                        <span className="truncate">나(총)</span>
+                        <span>
+                          {formatChessTime(myPlayerIndex === 0 ? p0TotalTime : p1TotalTime)}
+                        </span>
+                      </div>
+                      <div
+                        className={`flex items-center justify-between px-1.5 py-0.5 rounded border transition-colors ${
+                          (!isCurrentControlledTurn && gameState.phase === 'ACTION_PHASE') ||
+                          (gameState.phase === 'CLASH_SET' && !otherPlayer.clashCardReady)
+                            ? 'bg-cyan-950/80 border-cyan-500/70 text-cyan-300 shadow-[0_0_6px_rgba(6,182,212,0.25)]'
+                            : 'bg-slate-950/60 border-slate-800 text-slate-400'
+                        }`}
+                        title="상대 총 잔여 시간"
+                      >
+                        <span className="truncate">상대(총)</span>
+                        <span>
+                          {formatChessTime(myPlayerIndex === 0 ? p1TotalTime : p0TotalTime)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -2618,6 +2944,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   <User className="w-4 h-4 text-[#f97316]" />
                   <span>{activeControlledPlayer.name}</span>
                 </div>
+
+                {/* 멀티플레이 내 잔여 시간 배지 */}
+                {isMultiplayer && timeLimitConfig.hasTimeLimit && (
+                  <div
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded-lg border text-xs font-mono font-black ${
+                      (myPlayerIndex === 0 ? p0TotalTime : p1TotalTime) <= 30
+                        ? 'bg-rose-950/80 border-rose-500/70 text-rose-300 animate-pulse'
+                        : isCurrentControlledTurn
+                        ? 'bg-amber-950/80 border-amber-500/70 text-amber-300 shadow-[0_0_8px_rgba(245,158,11,0.3)]'
+                        : 'bg-slate-900 border-slate-700 text-slate-300'
+                    }`}
+                    title="내 총 잔여 시간 (Chess Clock)"
+                  >
+                    <Clock className="w-3 h-3 text-amber-400 shrink-0" />
+                    <span>{formatChessTime(myPlayerIndex === 0 ? p0TotalTime : p1TotalTime)}</span>
+                  </div>
+                )}
 
                 <div
                   onClick={() => setIsHpHistoryModalOpen(true)}

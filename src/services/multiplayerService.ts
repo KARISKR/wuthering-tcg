@@ -6,6 +6,7 @@ import {
   MultiplayerPlayerProfile,
   MultiplayerSessionData,
   MultiplayerActionType,
+  TimeLimitConfig,
 } from '../types/multiplayer';
 import { GameState } from '../types/tcg';
 
@@ -43,6 +44,16 @@ class MultiplayerService {
   public myProfile: MultiplayerPlayerProfile | null = null;
   public opponentProfile: MultiplayerPlayerProfile | null = null;
   public latestGameState: GameState | null = null;
+
+  public timeLimitConfig: TimeLimitConfig = {
+    hasTimeLimit: true,
+    totalTimeSec: 300,
+    turnTimeSec: 90,
+    clashTimeSec: 30,
+  };
+  public p0TotalTime: number = 300;
+  public p1TotalTime: number = 300;
+  public currentTurnTime: number = 90;
 
   private messageHandlers: Set<(msg: MultiplayerMessage) => void> = new Set();
   private statusHandlers: Set<(status: MultiplayerConnectionStatus) => void> = new Set();
@@ -82,6 +93,12 @@ class MultiplayerService {
         this.clearSavedSession();
         return null;
       }
+      if (parsed.timeLimitConfig) {
+        this.timeLimitConfig = parsed.timeLimitConfig;
+      }
+      if (parsed.p0TotalTime !== undefined) this.p0TotalTime = parsed.p0TotalTime;
+      if (parsed.p1TotalTime !== undefined) this.p1TotalTime = parsed.p1TotalTime;
+      if (parsed.currentTurnTime !== undefined) this.currentTurnTime = parsed.currentTurnTime;
       return parsed;
     } catch {
       return null;
@@ -103,6 +120,10 @@ class MultiplayerService {
         myProfile: this.myProfile,
         opponentProfile: this.opponentProfile || existing?.opponentProfile || undefined,
         lastGameState: lastGameState || this.latestGameState || existing?.lastGameState || undefined,
+        timeLimitConfig: this.timeLimitConfig || existing?.timeLimitConfig,
+        p0TotalTime: this.p0TotalTime,
+        p1TotalTime: this.p1TotalTime,
+        currentTurnTime: this.currentTurnTime,
         timestamp: Date.now(),
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
@@ -404,14 +425,30 @@ class MultiplayerService {
     if (msg.type === 'LOBBY_JOIN') {
       this.opponentProfile = msg.profile;
       this.saveSession();
-      // 호스트 프로필 전송
+      // 호스트 프로필 및 설정 전송
       this.send({
         type: 'LOBBY_ACCEPT',
         hostProfile: this.myProfile!,
+        timeLimitConfig: this.timeLimitConfig,
       });
     } else if (msg.type === 'LOBBY_ACCEPT') {
       this.opponentProfile = msg.hostProfile;
+      if (msg.timeLimitConfig) {
+        this.timeLimitConfig = msg.timeLimitConfig;
+      }
       this.saveSession();
+    } else if (msg.type === 'ROOM_CONFIG_UPDATE') {
+      if (msg.timeLimitConfig) {
+        this.timeLimitConfig = msg.timeLimitConfig;
+      }
+    } else if (msg.type === 'GAME_START') {
+      if (msg.timeLimitConfig) {
+        this.timeLimitConfig = msg.timeLimitConfig;
+      }
+    } else if (msg.type === 'TIME_SYNC') {
+      this.p0TotalTime = msg.p0TotalTime;
+      this.p1TotalTime = msg.p1TotalTime;
+      this.currentTurnTime = msg.currentTurnTime;
     }
 
     // 재접속 핸드셰이크
@@ -431,6 +468,10 @@ class MultiplayerService {
             sessionId: msg.sessionId,
             customDeck: null,
           },
+          timeLimitConfig: this.timeLimitConfig,
+          p0TotalTime: this.p0TotalTime,
+          p1TotalTime: this.p1TotalTime,
+          currentTurnTime: this.currentTurnTime,
         });
       }
     } else if (msg.type === 'RECONNECT_ACCEPT') {
@@ -438,6 +479,12 @@ class MultiplayerService {
       this.setStatus('CONNECTED');
       this.emitMessage({ type: 'DISCONNECT_RESOLVED' });
       this.opponentProfile = msg.hostProfile;
+      if (msg.timeLimitConfig) {
+        this.timeLimitConfig = msg.timeLimitConfig;
+      }
+      if (msg.p0TotalTime !== undefined) this.p0TotalTime = msg.p0TotalTime;
+      if (msg.p1TotalTime !== undefined) this.p1TotalTime = msg.p1TotalTime;
+      if (msg.currentTurnTime !== undefined) this.currentTurnTime = msg.currentTurnTime;
       this.saveSession(msg.gameState);
     }
 

@@ -29,6 +29,10 @@ export interface MultiplayerRoomInfo {
   hostLeader?: string;
   hostLeaderArt?: string;
   deckName?: string;
+  hasTimeLimit?: boolean;
+  totalTimeSec?: number;
+  turnTimeSec?: number;
+  clashTimeSec?: number;
   status: 'WAITING' | 'PLAYING';
   playerCount: number;
   createdAt: number;
@@ -106,6 +110,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         hostLeader?: string;
         hostLeaderArt?: string;
         deckName?: string;
+        hasTimeLimit?: boolean;
+        totalTimeSec?: number;
+        turnTimeSec?: number;
+        clashTimeSec?: number;
       };
 
       const { action, roomCode } = body;
@@ -149,6 +157,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           hostLeader: body.hostLeader,
           hostLeaderArt: body.hostLeaderArt,
           deckName: body.deckName,
+          hasTimeLimit: body.hasTimeLimit !== false,
+          totalTimeSec: body.totalTimeSec ?? 300,
+          turnTimeSec: body.turnTimeSec ?? 90,
+          clashTimeSec: body.clashTimeSec ?? 30,
           status: 'WAITING',
           playerCount: 1,
           createdAt: now,
@@ -158,6 +170,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         const target = currentRooms.find((r) => r.roomCode === upperCode);
         if (target) {
           target.updatedAt = now;
+          if (body.hasTimeLimit !== undefined) target.hasTimeLimit = body.hasTimeLimit;
+          if (body.totalTimeSec !== undefined) target.totalTimeSec = body.totalTimeSec;
+          if (body.turnTimeSec !== undefined) target.turnTimeSec = body.turnTimeSec;
+          if (body.clashTimeSec !== undefined) target.clashTimeSec = body.clashTimeSec;
         } else {
           // 혹시 만료되었거나 누락된 방 복구
           currentRooms.unshift({
@@ -166,6 +182,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             hostLeader: body.hostLeader,
             hostLeaderArt: body.hostLeaderArt,
             deckName: body.deckName,
+            hasTimeLimit: body.hasTimeLimit !== false,
+            totalTimeSec: body.totalTimeSec ?? 300,
+            turnTimeSec: body.turnTimeSec ?? 90,
+            clashTimeSec: body.clashTimeSec ?? 30,
             status: 'WAITING',
             playerCount: 1,
             createdAt: now,

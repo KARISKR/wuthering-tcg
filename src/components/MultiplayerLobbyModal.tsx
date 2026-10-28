@@ -32,6 +32,7 @@ import {
   MultiplayerMessage,
   MultiplayerPlayerProfile,
   MultiplayerRoomInfo,
+  TimeLimitConfig,
 } from '../types/multiplayer';
 import type { CustomDeckConfig, DeckPreset } from '../types/tcg';
 import { getStoredPresets, presetToCustomDeck } from '../utils/deckCode';
@@ -140,6 +141,11 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   const [isGuestReady, setIsGuestReady] = useState<boolean>(false);
   const guestDeckRef = useRef<CustomDeckConfig | null>(null);
 
+  // 경기 제한시간 설정 ('STANDARD': 총 300초/턴 90초/대결 30초, 'UNLIMITED': 무제한)
+  const [timeLimitMode, setTimeLimitMode] = useState<'STANDARD' | 'UNLIMITED'>(() => {
+    return multiplayerService.timeLimitConfig?.hasTimeLimit ? 'STANDARD' : 'UNLIMITED';
+  });
+
   // 방 목록 조회 함수
   const fetchRoomList = useCallback(async (showSpinner: boolean = false) => {
     if (showSpinner) setIsRefreshing(true);
@@ -199,7 +205,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         // 호스트: 게스트 입장 수신
         setOpponentProfile(msg.profile);
         soundEffects.playCardPlace();
-        // 게스트에게 방장 정보 응답 (덱은 비공개)
+        // 게스트에게 방장 정보 및 경기 규칙 응답 (덱은 비공개)
         multiplayerService.send({
           type: 'LOBBY_ACCEPT',
           hostProfile: {
@@ -207,11 +213,21 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
             sessionId: multiplayerService.sessionId,
             customDeck: null,
           },
+          timeLimitConfig: multiplayerService.timeLimitConfig,
         });
       } else if (msg.type === 'LOBBY_ACCEPT') {
         // 게스트: 호스트 수락 수신
         setOpponentProfile(msg.hostProfile);
+        if (msg.timeLimitConfig) {
+          setTimeLimitMode(msg.timeLimitConfig.hasTimeLimit ? 'STANDARD' : 'UNLIMITED');
+        }
         soundEffects.playCardPlace();
+      } else if (msg.type === 'ROOM_CONFIG_UPDATE') {
+        // 방장이 시간 규칙 변경 시 게스트 실시간 동기화
+        if (msg.timeLimitConfig) {
+          setTimeLimitMode(msg.timeLimitConfig.hasTimeLimit ? 'STANDARD' : 'UNLIMITED');
+          soundEffects.playCardPlace();
+        }
       } else if (msg.type === 'LOBBY_READY') {
         // 호스트: 게스트의 덱 선택 완료 및 준비 신호 수신
         setIsGuestReady(msg.isReady);
@@ -228,6 +244,9 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         // 게스트: 호스트가 게임 시작 신호를 보냄
         if (msg.hostProfile) {
           multiplayerService.opponentProfile = msg.hostProfile;
+        }
+        if (msg.timeLimitConfig) {
+          multiplayerService.timeLimitConfig = msg.timeLimitConfig;
         }
         if (multiplayerService.myProfile) {
           multiplayerService.myProfile.name = playerName.trim() || '방랑자';
@@ -330,6 +349,14 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       };
       await multiplayerService.createRoom(targetCode, profile);
 
+      const nextConfig: TimeLimitConfig = {
+        hasTimeLimit: timeLimitMode === 'STANDARD',
+        totalTimeSec: timeLimitMode === 'STANDARD' ? 300 : 0,
+        turnTimeSec: timeLimitMode === 'STANDARD' ? 90 : 0,
+        clashTimeSec: timeLimitMode === 'STANDARD' ? 30 : 0,
+      };
+      multiplayerService.timeLimitConfig = nextConfig;
+
       // 공개 방 목록 디렉토리에 등록 (덱과 리더는 비공개로 등록!)
       await roomDirectoryService.registerRoom({
         roomCode: targetCode,
@@ -337,12 +364,46 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         hostLeader: undefined,
         hostLeaderArt: undefined,
         deckName: undefined,
+        hasTimeLimit: nextConfig.hasTimeLimit,
+        totalTimeSec: nextConfig.totalTimeSec,
+        turnTimeSec: nextConfig.turnTimeSec,
+        clashTimeSec: nextConfig.clashTimeSec,
       });
 
       // 목록 즉시 재조회
       fetchRoomList(false);
     } catch (err: any) {
       setErrorMessage(err.message || '방 생성 중 오류가 발생했습니다.');
+    }
+  };
+
+  // 방장 시간 제한 설정 변경 핸들러
+  const handleSetTimeLimit = (mode: 'STANDARD' | 'UNLIMITED') => {
+    setTimeLimitMode(mode);
+    soundEffects.playCardPlace();
+    const nextConfig: TimeLimitConfig = {
+      hasTimeLimit: mode === 'STANDARD',
+      totalTimeSec: mode === 'STANDARD' ? 300 : 0,
+      turnTimeSec: mode === 'STANDARD' ? 90 : 0,
+      clashTimeSec: mode === 'STANDARD' ? 30 : 0,
+    };
+    multiplayerService.timeLimitConfig = nextConfig;
+    multiplayerService.send({
+      type: 'ROOM_CONFIG_UPDATE',
+      timeLimitConfig: nextConfig,
+    });
+    if (activeOverlay === 'HOST_WAITING') {
+      roomDirectoryService.registerRoom({
+        roomCode: createdRoomCode,
+        hostName: playerName.trim() || '방랑자',
+        hostLeader: undefined,
+        hostLeaderArt: undefined,
+        deckName: undefined,
+        hasTimeLimit: nextConfig.hasTimeLimit,
+        totalTimeSec: nextConfig.totalTimeSec,
+        turnTimeSec: nextConfig.turnTimeSec,
+        clashTimeSec: nextConfig.clashTimeSec,
+      });
     }
   };
 
@@ -469,6 +530,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         customDeck: guestDeck,
         sessionId: opponentProfile.sessionId,
       },
+      timeLimitConfig: multiplayerService.timeLimitConfig,
     });
     onStartMatch('HOST', hostDeck, guestDeck);
   };
@@ -677,6 +739,65 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                   </button>
                 </div>
               )}
+
+              {/* 대결 시간 규칙 배너 (방장 설정 및 양측 실시간 동기화) */}
+              <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 border border-slate-700/80 rounded-2xl px-4 py-3 shadow-lg">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-black text-slate-200">
+                      경기 제한시간:
+                    </span>
+                    {isHostView ? (
+                      <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-700">
+                        <button
+                          type="button"
+                          onClick={() => handleSetTimeLimit('STANDARD')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                            timeLimitMode === 'STANDARD'
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md font-black'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                          }`}
+                        >
+                          <span>⏱️ 표준 (5분 / 턴 90s / 대결 30s)</span>
+                          {timeLimitMode === 'STANDARD' && (
+                            <span className="text-[10px] px-1 py-0.2 bg-slate-950/40 text-slate-950 rounded font-black">
+                              추천
+                            </span>
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetTimeLimit('UNLIMITED')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                            timeLimitMode === 'UNLIMITED'
+                              ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-md font-black'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                          }`}
+                        >
+                          <span>♾️ 무제한</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-black text-amber-300 bg-amber-950/70 border border-amber-500/50 px-3 py-1 rounded-xl shadow-sm flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>
+                          {timeLimitMode === 'STANDARD'
+                            ? '표준 (총 보유 5분 / 턴 90초 / 대결 30초)'
+                            : '무제한 (시간 제한 없음)'}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="text-[11px] text-slate-400 font-medium">
+                  {isHostView
+                    ? '💡 방장이 경기 시간 제한 규칙을 언제든 변경할 수 있습니다'
+                    : '💡 방장이 설정한 시간 규칙이 경기 시작 시 적용됩니다'}
+                </span>
+              </div>
 
               {/* 상단 VS 플레이어 대기 슬롯 (P1 방장 vs P2 도전자) */}
               <div className="grid grid-cols-1 lg:grid-cols-11 gap-4 items-stretch">
@@ -1220,14 +1341,17 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                           </span>
                         </div>
 
-                        {/* 카운터 픽 방지를 위한 비공개 안내 배지 */}
+                        {/* 카운터 픽 방지를 위한 비공개 안내 배지 & 경기 시간 규칙 배지 */}
                         <div className="text-xs text-slate-300 font-bold flex flex-wrap items-center gap-2 pl-1">
                           <span className="text-cyan-400 font-black flex items-center gap-1 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-500/30">
                             <Lock className="w-3 h-3 text-cyan-400" />
-                            <span>덱: 대기실 내 비공개 선택</span>
+                            <span>덱 비공개</span>
                           </span>
                           <span className="text-slate-600">•</span>
-                          <span className="text-slate-400 text-[11px]">블라인드 픽</span>
+                          <span className="text-amber-300 font-black flex items-center gap-1 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-500/30 text-[11px]">
+                            <Clock className="w-3 h-3 text-amber-400" />
+                            <span>{room.hasTimeLimit === false ? '무제한' : '5분 (턴 90s/대결 30s)'}</span>
+                          </span>
                         </div>
                       </div>
 
