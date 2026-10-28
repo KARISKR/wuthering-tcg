@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { ClashResult, PlayerState } from '../types/tcg';
 import { CardView } from './CardView';
 import { Flame, Wind, Shield, Swords, Sparkles, XCircle, Zap, Crown, Heart, BatteryCharging, ShieldAlert } from 'lucide-react';
@@ -10,13 +10,49 @@ interface ClashAnimationOverlayProps {
   clashResult: ClashResult;
   players: [PlayerState, PlayerState];
   onDismiss: () => void;
+  /** 화면을 보는 플레이어 인덱스 (멀티플레이 게스트=1). 항상 '나'를 좌측에 배치합니다. */
+  myPlayerIndex?: 0 | 1;
+}
+
+// 게스트(P1) 시점일 때 좌/우(P0/P1) 데이터를 뒤집어 '나'가 항상 좌측(승/패 배지 포함)에 오도록 변환
+function toViewerPerspective(
+  clashResult: ClashResult,
+  players: [PlayerState, PlayerState],
+  myPlayerIndex: 0 | 1
+): { clashResult: ClashResult; players: [PlayerState, PlayerState] } {
+  if (myPlayerIndex === 0) return { clashResult, players };
+  const flipIdx = (i: any) => (i === 0 ? 1 : i === 1 ? 0 : i);
+  return {
+    players: [players[1], players[0]],
+    clashResult: {
+      ...clashResult,
+      p0Card: clashResult.p1Card,
+      p1Card: clashResult.p0Card,
+      winnerIndex: flipIdx(clashResult.winnerIndex),
+      triggeredEffects: clashResult.triggeredEffects?.map((eff) => ({
+        ...eff,
+        playerIndex: flipIdx(eff.playerIndex),
+      })),
+    } as ClashResult,
+  };
 }
 
 export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
-  clashResult,
-  players,
+  clashResult: rawClashResult,
+  players: rawPlayers,
   onDismiss,
+  myPlayerIndex = 0,
 }) => {
+  // useEffect([clashResult]) 타이머가 매 렌더마다 재시작되지 않도록 참조 안정화
+  const clashResult = useMemo(
+    () => toViewerPerspective(rawClashResult, rawPlayers, myPlayerIndex).clashResult,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rawClashResult, myPlayerIndex]
+  );
+  const players = useMemo<[PlayerState, PlayerState]>(
+    () => (myPlayerIndex === 1 ? [rawPlayers[1], rawPlayers[0]] : rawPlayers),
+    [rawPlayers, myPlayerIndex]
+  );
   // 5단계 시네마틱 연출:
   // SET_WAIT (0~800ms 양측 뒷면 대치)
   // -> REVEAL (800~2400ms 3D 카드 플립 오픈 & 카드 정보/스피드 확인)
@@ -326,10 +362,10 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                 </>
               )}
 
-              {/* P1이 상대(P0 치샤/금희 등) 배틀 효과 피해를 받았을 때 */}
-              {p0BattleDmgToP1 > 0 && stage !== 'SET_WAIT' && (
+              {/* P0(좌측)가 상대(P1) 배틀 효과 피해를 받았을 때 */}
+              {p1BattleDmgToP0 > 0 && stage !== 'SET_WAIT' && (
                 <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 pointer-events-none z-40 bg-gradient-to-r from-red-950 to-rose-900 text-rose-200 border border-red-500/80 px-3 py-1 rounded-full text-xs font-black shadow-lg shadow-red-950/60 animate-bounce whitespace-nowrap">
-                  🎯 -{p0BattleDmgToP1} HP (배틀 효과 피해)
+                  🎯 -{p1BattleDmgToP0} HP (배틀 효과 피해)
                 </div>
               )}
 

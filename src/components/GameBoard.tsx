@@ -1184,7 +1184,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       } else if (msg.type === 'SURRENDER') {
         setGameState((prev) => ({
           ...prev,
-          isGameOver: true,
+          phase: 'GAME_OVER',
           winner: 1,
         }));
       }
@@ -1268,7 +1268,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       } else if (msg.type === 'SURRENDER') {
         setGameState((prev) => ({
           ...prev,
-          isGameOver: true,
+          phase: 'GAME_OVER',
           winner: 0,
         }));
       }
@@ -1341,12 +1341,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   }, [gameState.logs.length]);
 
   // 현재 조종 중인 플레이어 상태 및 시점 (멀티플레이에서는 호스트/게스트에 따라 상단/하단 분리)
+  const viewerPlayerIndex: 0 | 1 = isMultiplayer ? (isGuest ? 1 : 0) : 0;
   const myPlayerIndex: 0 | 1 = controlledPlayerIndex;
   const oppPlayerIndex: 0 | 1 = controlledPlayerIndex === 0 ? 1 : 0;
   const activeControlledPlayer = gameState.players[myPlayerIndex];
   const isCurrentControlledTurn = gameState.activePlayerIndex === myPlayerIndex;
   const otherPlayerIndex: 0 | 1 = oppPlayerIndex;
   const otherPlayer = gameState.players[oppPlayerIndex];
+
+  // [멀티플레이 비공개 정보 보호] 상대의 효과 드로우/패 추가 로그에서 현재 상대 손패에 있는 카드 이름을 가림
+  const opponentHandNameSet = new Set(otherPlayer.hand.map((c) => c.nameKr));
+  const getDisplayLogText = (log: { text: string; playerIndex?: 0 | 1 }): string => {
+    if (!isMultiplayer || log.playerIndex !== oppPlayerIndex) return log.text;
+    if (log.text.includes('[카드 공개]')) return log.text;
+    if (!/드로우|패에 추가|손패/.test(log.text)) return log.text;
+    return log.text.replace(/\[([^\]]+)\]/g, (match, name: string) =>
+      opponentHandNameSet.has(name.trim()) ? '[🔒 비공개 카드]' : match
+    );
+  };
 
   // 시점별 데미지/회복 알림 및 덱 드로우 상태
   const myDamageAlert = myPlayerIndex === 0 ? p0DamageAlert : p1DamageAlert;
@@ -1783,7 +1795,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       <span>[TURN {log.turn}]</span>
                       {log.effectTag && <span>{log.effectTag}</span>}
                     </div>
-                    <p className="text-slate-200 break-words">{log.text}</p>
+                    <p className="text-slate-200 break-words">{getDisplayLogText(log)}</p>
                   </div>
                 ))}
               </div>
@@ -3219,7 +3231,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           </div>
 
                           <div className="flex items-start gap-2">
-                            {log.cardArt && (
+                            {log.cardArt && (!isMultiplayer || log.playerIndex !== oppPlayerIndex || log.text.includes('[카드 공개]')) && (
                               <div
                                 onMouseEnter={() => {
                                   if (log.cardName) {
@@ -3248,10 +3260,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
                             <div className="flex-1 min-w-0">
                               <p className="text-xs leading-snug whitespace-pre-line text-slate-200 font-medium">
-                                {formatBattleLogText(log.text)}
+                                {formatBattleLogText(getDisplayLogText(log))}
                               </p>
 
-                              {log.drawnCards && log.drawnCards.length > 0 && (
+                              {log.drawnCards && log.drawnCards.length > 0 && (!isMultiplayer || log.playerIndex !== oppPlayerIndex || log.text.includes('[카드 공개]')) && (
                                 <div className="mt-1.5 pt-1 border-t border-white/10 flex flex-wrap gap-1">
                                   {log.drawnCards.map((card, cIdx) => (
                                     <span
@@ -3337,6 +3349,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             : null
         }
         onComplete={handleFinishEffectDrawWithCooldown}
+        viewerPlayerIndex={viewerPlayerIndex}
+        hideCardFaces={
+          isMultiplayer &&
+          !!gameState.lastEffectDraw &&
+          gameState.lastEffectDraw.playerIndex !== viewerPlayerIndex
+        }
       />
 
       {/* 선공 결정 주사위 모달 (양측 주사위 투척 연출) */}
@@ -3510,6 +3528,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           clashResult={gameState.clashResult!}
           players={gameState.players}
           onDismiss={handleProceedAfterClash}
+          myPlayerIndex={viewerPlayerIndex}
         />
       )}
 
@@ -3569,6 +3588,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             winner={gameState.winner as 0 | 1}
             players={gameState.players}
             onComplete={() => setIsFinisherFinished(true)}
+            myPlayerIndex={viewerPlayerIndex}
           />
         ) : (
           <GameOverModal
@@ -3582,7 +3602,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             onPlayBattleReplay={onPlayBattleReplay}
             onReplayFinisher={() => setIsFinisherFinished(false)}
             isMultiplayer={isMultiplayer}
-            myPlayerIndex={controlledPlayerIndex}
+            myPlayerIndex={viewerPlayerIndex}
           />
         )
       )}

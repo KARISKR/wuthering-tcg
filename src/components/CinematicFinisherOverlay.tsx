@@ -8,6 +8,8 @@ interface CinematicFinisherOverlayProps {
   winner: 0 | 1;
   players: [PlayerState, PlayerState];
   onComplete: () => void;
+  /** 화면을 보는 플레이어 인덱스 (멀티플레이 게스트=1) */
+  myPlayerIndex?: 0 | 1;
 }
 
 // 20개의 폴리곤 조각 정의 (카드를 틈새 없이 분할하며, 폭발 시 각 조각이 고유한 3D 궤적으로 비산)
@@ -286,8 +288,9 @@ export const CinematicFinisherOverlay: React.FC<CinematicFinisherOverlayProps> =
   winner,
   players,
   onComplete,
+  myPlayerIndex = 0,
 }) => {
-  const isPlayerWinner = winner === 0;
+  const isPlayerWinner = winner === myPlayerIndex;
   const loserIdx = winner === 0 ? 1 : 0;
   const loserPlayer = players[loserIdx];
   const winnerPlayer = players[winner];

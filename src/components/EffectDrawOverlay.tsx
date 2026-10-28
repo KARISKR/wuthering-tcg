@@ -6,6 +6,10 @@ import { Sparkles, Layers, ArrowDown, CheckCircle2 } from 'lucide-react';
 interface EffectDrawOverlayProps {
   effectDraw: EffectDrawAnimation | null;
   onComplete: () => void;
+  /** 화면을 보는 플레이어 인덱스 (멀티플레이 게스트=1) */
+  viewerPlayerIndex?: 0 | 1;
+  /** true면 상대의 드로우이므로 카드 앞면/이름을 숨기고 뒷면만 표시 (멀티플레이 비공개 정보 보호) */
+  hideCardFaces?: boolean;
 }
 
 type DrawStage = 'READY' | 'PULLING' | 'REVEAL' | 'FLYING' | 'SETTLED' | 'COMPLETED';
@@ -13,6 +17,8 @@ type DrawStage = 'READY' | 'PULLING' | 'REVEAL' | 'FLYING' | 'SETTLED' | 'COMPLE
 export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
   effectDraw,
   onComplete,
+  viewerPlayerIndex = 0,
+  hideCardFaces = false,
 }) => {
   const [stage, setStage] = useState<DrawStage>('READY');
   const hasTriggeredRef = useRef(false);
@@ -115,8 +121,10 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
 
   if (!effectDraw || stage === 'COMPLETED') return null;
 
-  const isPlayer0 = effectDraw.playerIndex === 0;
+  // '내' 드로우면 하단(내 손패)으로, 상대 드로우면 상단(상대 손패)으로 비행
+  const isPlayer0 = effectDraw.playerIndex === viewerPlayerIndex;
   const cards = effectDraw.cards || [];
+  const hidden = hideCardFaces;
 
   return (
     <div
@@ -131,12 +139,16 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400/70 shadow-[0_0_25px_rgba(245,158,11,0.5)] mb-2">
           <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
           <span className="font-mono text-xs sm:text-sm font-black tracking-wider text-amber-300 uppercase">
-            EFFECT DRAW · 효과 드로우
+            {hidden ? 'OPPONENT EFFECT DRAW · 상대 효과 드로우' : 'EFFECT DRAW · 효과 드로우'}
           </span>
         </div>
 
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-yellow-100 to-amber-400 drop-shadow-[0_4px_14px_rgba(0,0,0,0.9)] tracking-tight">
-          {stage === 'READY'
+          {hidden
+            ? stage === 'FLYING' || stage === 'SETTLED'
+              ? `상대가 카드 ${cards.length}장을 손패에 추가했습니다`
+              : `상대가 효과로 카드 ${cards.length}장을 드로우합니다`
+            : stage === 'READY'
             ? '덱을 클릭하여 카드를 드로우하세요!'
             : stage === 'PULLING'
             ? '카드를 뽑는 중...'
@@ -147,14 +159,20 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
             : '손패에 카드가 추가되었습니다.'}
         </h2>
 
-        {stage === 'READY' && (
+        {hidden && (
+          <p className="text-xs sm:text-sm font-bold text-slate-300 mt-2 drop-shadow">
+            ({effectDraw.sourceCardName || '효과 발동'}) · 🔒 상대가 뽑은 카드는 비공개입니다
+          </p>
+        )}
+
+        {!hidden && stage === 'READY' && (
           <p className="text-xs sm:text-sm font-bold text-amber-200/90 mt-2 flex items-center gap-1.5 drop-shadow">
             <ArrowDown className="w-4 h-4 text-amber-400 animate-bounce" />
             <span>중앙의 덱을 누르면 카드를 뽑습니다 ({effectDraw.sourceCardName || '효과 발동'})</span>
           </p>
         )}
 
-        {stage === 'REVEAL' && cards.length > 0 && (
+        {!hidden && stage === 'REVEAL' && cards.length > 0 && (
           <p className="text-xs sm:text-sm font-bold text-emerald-300 mt-2 flex items-center gap-1.5 drop-shadow bg-emerald-950/60 px-3 py-1 rounded-full border border-emerald-500/40">
             <CheckCircle2 className="w-4 h-4 text-emerald-400" />
             <span>방금 덱에서 [{cards.map((c) => c.nameKr).join(', ')}] 카드를 드로우했습니다!</span>
@@ -216,8 +234,9 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
         {stage === 'REVEAL' && (
           <div className="flex items-center justify-center gap-4 sm:gap-6 animate-scale-up">
             {cards.map((card, idx) => {
-              const colorBorder =
-                card.color === 'RED'
+              const colorBorder = hidden
+                ? 'border-slate-500 ring-slate-500/60 shadow-[0_0_35px_rgba(100,116,139,0.6)]'
+                : card.color === 'RED'
                   ? 'border-red-500 ring-red-500/70 shadow-[0_0_45px_rgba(239,68,68,0.8)]'
                   : card.color === 'GREEN'
                   ? 'border-emerald-500 ring-emerald-500/70 shadow-[0_0_45px_rgba(16,185,129,0.8)]'
@@ -233,9 +252,9 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
                     className={`relative w-48 sm:w-56 md:w-64 aspect-[588/1024] rounded-2xl overflow-hidden border-2 ring-4 bg-slate-900 shadow-2xl ${colorBorder}`}
                   >
                     <img
-                      src={card.artUrl}
-                      alt={card.nameKr}
-                      className="w-full h-full object-contain bg-slate-950"
+                      src={hidden ? '/cards/card_back_action.png' : card.artUrl}
+                      alt={hidden ? '비공개 카드' : card.nameKr}
+                      className={hidden ? 'w-full h-full object-cover bg-slate-950' : 'w-full h-full object-contain bg-slate-950'}
                     />
 
                     {/* 상단 빛나는 DRAW 획득 뱃지 */}
@@ -245,6 +264,11 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
                     </div>
 
                     {/* 카드 하단 정보 바 */}
+                    {hidden ? (
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-3 text-center">
+                        <div className="text-sm sm:text-base font-black text-slate-300 drop-shadow">🔒 비공개</div>
+                      </div>
+                    ) : (
                     <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-3 text-center">
                       <div className="text-sm sm:text-base font-black text-white truncate drop-shadow">
                         {card.nameKr}
@@ -257,6 +281,7 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
                         )}
                       </div>
                     </div>
+                    )}
                   </div>
                 </div>
               );
@@ -278,9 +303,9 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
                 }`}
               >
                 <img
-                  src={card.artUrl}
-                  alt={card.nameKr}
-                  className="w-full h-full object-contain rounded-2xl bg-slate-950"
+                  src={hidden ? '/cards/card_back_action.png' : card.artUrl}
+                  alt={hidden ? '비공개 카드' : card.nameKr}
+                  className={`w-full h-full rounded-2xl bg-slate-950 ${hidden ? 'object-cover' : 'object-contain'}`}
                 />
               </div>
             ))}

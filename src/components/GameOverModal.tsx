@@ -53,11 +53,13 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   isMultiplayer = false,
   myPlayerIndex = 0,
 }) => {
-  const isPlayerWinner = winner === (isMultiplayer && myPlayerIndex !== undefined ? myPlayerIndex : 0);
+  const isPlayerWinner = isMultiplayer ? winner === myPlayerIndex : winner === 0;
   const winnerPlayer = players[winner];
   const loserPlayer = players[winner === 0 ? 1 : 0];
-  // 승리/패배 주체 리더 카드
-  const activeLeaderCard = isPlayerWinner ? winnerPlayer.slots.leader : loserPlayer.slots.leader;
+  const myPlayer = players[isMultiplayer ? myPlayerIndex : 0];
+  const oppPlayer = players[isMultiplayer ? (myPlayerIndex === 0 ? 1 : 0) : 1];
+  // 승리/패배 주체 리더 카드 (내 리더 카드 기준)
+  const activeLeaderCard = myPlayer.slots.leader;
   const [animationStep, setAnimationStep] = useState(0);
 
   // 리플레이 저장 상태: 'IDLE' (저장 여부 질문 중) | 'SAVED' (저장 완료) | 'DISCARDED' (저장 안 함)
@@ -233,7 +235,13 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           </h1>
 
           <p className="text-xs sm:text-sm text-slate-300 font-medium mt-2 leading-relaxed tracking-normal">
-            {isPlayerWinner ? '상대 플레이어의 모든 생명력을 제압하고 완승했습니다!' : '아쉽습니다. 다음 전투에서는 상성과 협주 에너지를 더 전략적으로 운용해보세요.'}
+            {isPlayerWinner
+              ? isMultiplayer
+                ? `상대 플레이어 [${oppPlayer.name}]의 모든 생명력을 제압하고 완승했습니다!`
+                : '상대 플레이어의 모든 생명력을 제압하고 완승했습니다!'
+              : isMultiplayer
+              ? `상대 플레이어 [${oppPlayer.name}]에게 아쉽게 패배했습니다.`
+              : '아쉽습니다. 다음 전투에서는 상성과 협주 에너지를 더 전략적으로 운용해보세요.'}
           </p>
         </div>
 
@@ -320,12 +328,20 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             <span className="text-base sm:text-lg font-bold font-mono text-amber-300">{turn}T</span>
           </div>
           <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex flex-col items-center">
-            <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight">승자 잔여 HP</span>
-            <span className="text-base sm:text-lg font-bold font-mono text-red-400">{winnerPlayer.hp} / 20</span>
+            <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight truncate max-w-full">
+              {isMultiplayer ? `내 잔여 HP` : `내 HP`}
+            </span>
+            <span className={`text-base sm:text-lg font-bold font-mono ${myPlayer.hp > 0 ? 'text-emerald-400' : 'text-slate-500'}`}>
+              {myPlayer.hp} / 20
+            </span>
           </div>
           <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex flex-col items-center">
-            <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight">패자 잔여 HP</span>
-            <span className="text-base sm:text-lg font-bold font-mono text-slate-400">{loserPlayer.hp} / 20</span>
+            <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight truncate max-w-full">
+              {isMultiplayer ? `상대 잔여 HP` : `상대 HP`}
+            </span>
+            <span className={`text-base sm:text-lg font-bold font-mono ${oppPlayer.hp > 0 ? 'text-rose-400' : 'text-slate-500'}`}>
+              {oppPlayer.hp} / 20
+            </span>
           </div>
           <div className="rounded-xl bg-slate-950/80 border border-slate-800 p-2.5 flex flex-col items-center">
             <span className="text-[11px] text-slate-400 font-medium mb-0.5 tracking-tight">협주 자원</span>
