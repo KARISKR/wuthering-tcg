@@ -224,42 +224,6 @@ export const SFX_SPECIFICATIONS: Record<string, SfxSpec> = {
     folderPath: '/audio/sfx/phase_end/',
     supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
   },
-  combo: {
-    category: 'combo',
-    nameKr: '연격 참격 (기본 통합)',
-    recommendedDuration: '0.2초 ~ 0.5초',
-    recommendedDurationSec: 0.35,
-    description: '연격 발동 시 칼바람 및 참격음 (세부 콤보 파일 부재 시 폴백)',
-    folderPath: '/audio/sfx/combo/',
-    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
-  },
-  combo_1: {
-    category: 'combo_1',
-    nameKr: '1콤보 연격 참격 (Combo 1)',
-    recommendedDuration: '0.2초 ~ 0.4초',
-    recommendedDurationSec: 0.3,
-    description: '1번째 연격 발동 시 가볍고 날렵한 시동 참격음',
-    folderPath: '/audio/sfx/combo_1/',
-    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
-  },
-  combo_2: {
-    category: 'combo_2',
-    nameKr: '2콤보 연격 참격 (Combo 2)',
-    recommendedDuration: '0.25초 ~ 0.45초',
-    recommendedDurationSec: 0.35,
-    description: '2번째 연속 연격 시 한층 고조되는 2단 참격음',
-    folderPath: '/audio/sfx/combo_2/',
-    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
-  },
-  combo_3: {
-    category: 'combo_3',
-    nameKr: '3콤보 이상 최대 연격 (Combo 3+)',
-    recommendedDuration: '0.35초 ~ 0.6초',
-    recommendedDurationSec: 0.45,
-    description: '3콤보부터 4, 5, 6... 연속 공격 시 폭발하는 최고조 피니시 참격음',
-    folderPath: '/audio/sfx/combo_3/',
-    supportedFormats: ['mp3', 'wav', 'ogg', 'webm'],
-  },
   combo_sword: {
     category: 'combo_sword',
     nameKr: '연격 - 직검 공통 (Sword Combo)',
@@ -897,26 +861,20 @@ class SoundEffectsEngine {
         const match = key.match(/^combo_(sword|broadblade|pistol|rectifier)_([123])$/)!;
         const weapon = match[1];
         const stage = match[2];
-        folderDirs.push(`/audio/sfx/combo_${weapon}_${stage}`);
-        folderDirs.push(`/audio/sfx/combo_${weapon}`);
-        folderDirs.push(`/audio/sfx/combo_${stage}`);
-        folderDirs.push(`/audio/sfx/combo`);
-        folderDirs.push(`/audio/sfx/weapon_${weapon}`);
+        folderDirs.push(`/audio/sfx/combo_${weapon}_${stage}`, `/audio/sfx/combo_${weapon}`, `/audio/sfx/weapon_${weapon}`);
         directFileBases.push(
           `/audio/sfx/combo_${weapon}_${stage}/1`,
           `/audio/sfx/combo_${weapon}/1`,
-          `/audio/sfx/combo_${stage}/1`,
-          `/audio/sfx/combo/1`,
           `/audio/sfx/weapon_${weapon}/1`
         );
       }
       else if (key.startsWith('combo_sword')) {
-        folderDirs.push('/audio/sfx/combo_sword', '/audio/sfx/combo', '/audio/sfx/weapon_sword');
-        directFileBases.push('/audio/sfx/combo_sword/1', '/audio/sfx/combo/1', '/audio/sfx/weapon_sword/1');
+        folderDirs.push('/audio/sfx/combo_sword', '/audio/sfx/weapon_sword');
+        directFileBases.push('/audio/sfx/combo_sword/1', '/audio/sfx/weapon_sword/1');
       }
       else if (key.startsWith('combo_broadblade')) {
-        folderDirs.push('/audio/sfx/combo_broadblade', '/audio/sfx/weapon_broadblade', '/audio/sfx/combo');
-        directFileBases.push('/audio/sfx/combo_broadblade/1', '/audio/sfx/weapon_broadblade/1', '/audio/sfx/combo/1');
+        folderDirs.push('/audio/sfx/combo_broadblade', '/audio/sfx/weapon_broadblade');
+        directFileBases.push('/audio/sfx/combo_broadblade/1', '/audio/sfx/weapon_broadblade/1');
       }
       else if (key.startsWith('combo_pistol')) {
         folderDirs.push('/audio/sfx/combo_pistol', '/audio/sfx/weapon_pistol');
@@ -929,8 +887,8 @@ class SoundEffectsEngine {
       // 6.9 무기 직군별 기본 타격음 (weapon_sword, weapon_broadblade, weapon_pistol, weapon_rectifier)
       else if (key.startsWith('weapon_')) {
         const w = key.replace('weapon_', '');
-        folderDirs.push(`/audio/sfx/${key}`, `/audio/sfx/combo_${w}`, `/audio/sfx/combo`);
-        directFileBases.push(`/audio/sfx/${key}/1`, `/audio/sfx/combo_${w}/1`, `/audio/sfx/combo/1`);
+        folderDirs.push(`/audio/sfx/${key}`, `/audio/sfx/combo_${w}`);
+        directFileBases.push(`/audio/sfx/${key}/1`, `/audio/sfx/combo_${w}/1`);
       }
       // 7. 카드 격돌 (clash_impact -> clash 폴더로 일원화)
       else if (key === 'clash_impact') {
@@ -1988,16 +1946,12 @@ class SoundEffectsEngine {
     const wKey = weaponMap[finalWeapon] || 'sword';
 
     // 2. 커스텀 음원 우선 탐색 계층:
-    // A. combo_pistol_1, combo_pistol_2, combo_pistol_3 (무기별 단계별 연격)
-    // B. combo_pistol (무기별 기본 연격)
-    // C. weapon_pistol (무기 기본 타격음)
-    // D. combo_1, combo_2, combo_3 (공통 연격 단계)
-    // E. combo (공통 연격)
+    // A. combo_wKey_stage (무기별 단계별 연격)
+    // B. combo_wKey (무기별 기본 연격)
+    // C. weapon_wKey (무기 기본 타격음)
     if (this.playCustomBuffer(`combo_${wKey}_${stage}`, this.HIT_VOLUME_MULTIPLIER)) return;
     if (this.playCustomBuffer(`combo_${wKey}`, this.HIT_VOLUME_MULTIPLIER)) return;
     if (this.playCustomBuffer(`weapon_${wKey}`, this.HIT_VOLUME_MULTIPLIER)) return;
-    if (this.playCustomBuffer(`combo_${stage}`, this.HIT_VOLUME_MULTIPLIER)) return;
-    if (this.playCustomBuffer('combo', this.HIT_VOLUME_MULTIPLIER)) return;
 
     // 3. 내장 Web Audio 물리 합성음으로 무기군별 맞춤 연격 사운드 재생
     this.playWeaponComboSynth(finalWeapon, comboCount);

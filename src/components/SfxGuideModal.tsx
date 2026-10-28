@@ -696,18 +696,6 @@ export const SfxGuideModal: React.FC<SfxGuideModalProps> = ({ isOpen, onClose })
                                   case 'phase_end':
                                     soundEffects.playPhaseEnd();
                                     break;
-                                  case 'combo':
-                                    soundEffects.playComboSlash(1);
-                                    break;
-                                  case 'combo_1':
-                                    soundEffects.playComboSlash(1);
-                                    break;
-                                  case 'combo_2':
-                                    soundEffects.playComboSlash(2);
-                                    break;
-                                  case 'combo_3':
-                                    soundEffects.playComboSlash(3);
-                                    break;
                                   case 'combo_sword':
                                     soundEffects.playComboSlash(2, '직검');
                                     break;
