@@ -213,6 +213,20 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const prevTurnPlayerRef = useRef<number>(gameState.activePlayerIndex);
   const prevTurnCountRef = useRef<number>(gameState.turn);
 
+  // [멀티플레이] 브라우저 새로고침/재진입 시 로컬에 보존된 이전 게임 진행 상태 즉각 복원
+  useEffect(() => {
+    if (initialMode === 'MULTIPLAYER') {
+      const saved = multiplayerService.getSavedSession();
+      if (saved?.lastGameState) {
+        setGameState(saved.lastGameState);
+        if (saved.timeLimitConfig) setTimeLimitConfig(saved.timeLimitConfig);
+        if (saved.p0TotalTime !== undefined) setP0TotalTime(saved.p0TotalTime);
+        if (saved.p1TotalTime !== undefined) setP1TotalTime(saved.p1TotalTime);
+        if (saved.currentTurnTime !== undefined) setCurrentTurnTime(saved.currentTurnTime);
+      }
+    }
+  }, [initialMode, setGameState]);
+
   // [멀티플레이어 액션 프록시 래퍼] 게스트(P1)는 네트워크로 호스트에게 액션을 위임하고, 호스트/솔로/AI는 로컬 엔진을 즉시 실행
   const handleDrawCards = useCallback((pIdx?: 0 | 1) => {
     const targetIdx = pIdx ?? controlledPlayerIndex;
@@ -1225,10 +1239,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           setExternalOrderChoice(msg.payload.order);
         }
       } else if (msg.type === 'SURRENDER') {
+        const winner = msg.playerIndex !== undefined ? (msg.playerIndex === 0 ? 1 : 0) : 1;
         setGameState((prev) => ({
           ...prev,
           phase: 'GAME_OVER',
-          winner: 1,
+          winner,
         }));
       }
     });
@@ -1309,10 +1324,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             break;
         }
       } else if (msg.type === 'SURRENDER') {
+        const winner = msg.playerIndex !== undefined ? (msg.playerIndex === 0 ? 1 : 0) : 0;
         setGameState((prev) => ({
           ...prev,
           phase: 'GAME_OVER',
-          winner: 0,
+          winner,
         }));
       }
     });
@@ -1358,15 +1374,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       }
     });
 
-    const pingTimer = setInterval(() => {
-      if (multiplayerService.status === 'CONNECTED') {
-        multiplayerService.send({ type: 'PING', timestamp: Date.now() });
-      }
-    }, 4000);
-
     const unsubMsg = multiplayerService.onMessage((msg) => {
       if (msg.type === 'PONG') {
-        setPingLatency(Date.now() - msg.clientTimestamp);
+        setPingLatency(multiplayerService.pingMs);
       }
     });
 
@@ -1374,7 +1384,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       unsubCount();
       unsubStatus();
       unsubMsg();
-      clearInterval(pingTimer);
     };
   }, [gameState.gameMode]);
 

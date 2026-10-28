@@ -318,8 +318,7 @@ class MultiplayerService {
             }
             this.peer = new Peer(hostPeerId, { debug: 1 });
             this.peer.on('open', () => {
-              this.setStatus('CONNECTED');
-              this.emitMessage({ type: 'DISCONNECT_RESOLVED' });
+              this.setStatus('WAITING_FOR_GUEST');
               resolve(true);
             });
             this.peer.on('connection', (conn) => {
@@ -410,6 +409,9 @@ class MultiplayerService {
   private handleReceivedData(msg: MultiplayerMessage) {
     if (!msg || !msg.type) return;
 
+    // 상대방으로부터 수신된 모든 유효 데이터 패킷은 연결 생존 증명으로 간주하여 하트비트 타이머 갱신
+    this.lastPongReceivedTime = Date.now();
+
     // Heartbeat 처리
     if (msg.type === 'PING') {
       this.send({ type: 'PONG', clientTimestamp: msg.timestamp });
@@ -417,7 +419,7 @@ class MultiplayerService {
     }
     if (msg.type === 'PONG') {
       this.pingMs = Math.max(0, Date.now() - msg.clientTimestamp);
-      this.lastPongReceivedTime = Date.now();
+      this.emitMessage(msg);
       return;
     }
 

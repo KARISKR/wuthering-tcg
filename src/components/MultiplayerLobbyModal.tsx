@@ -160,16 +160,32 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     }
   }, []);
 
-  // 모달 오픈 시 자동 새로고침 (4.5초 간격 폴링)
+  // 모달 오픈 시 자동 새로고침 (로비 화면일 때만 4.5초 간격 폴링, 대기방 입장 시 불필요한 백그라운드 폴링 중단)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || activeOverlay !== 'NONE') return;
     setIsLoadingRooms(true);
     fetchRoomList();
     const timer = setInterval(() => {
       fetchRoomList(false);
     }, 4500);
     return () => clearInterval(timer);
-  }, [isOpen, fetchRoomList]);
+  }, [isOpen, activeOverlay, fetchRoomList]);
+
+  // 브라우저 탭 종료/새로고침 시 생성된 공개 방 즉각 해제 (sendBeacon)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (createdRoomCode && activeOverlay === 'HOST_WAITING') {
+        try {
+          const blob = new Blob([JSON.stringify({ action: 'close', roomCode: createdRoomCode })], {
+            type: 'application/json',
+          });
+          navigator.sendBeacon('/api/rooms', blob);
+        } catch {}
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [createdRoomCode, activeOverlay]);
 
   // URL 해시 파라미터 확인 (#multiplayer?room=CODE 또는 ?room=CODE)
   useEffect(() => {
