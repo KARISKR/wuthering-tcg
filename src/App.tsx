@@ -27,11 +27,25 @@ export function App() {
   const [activeReplay, setActiveReplay] = useState<BattleReplayData | null>(null);
   const [boardInitialPostId, setBoardInitialPostId] = useState<string | null>(null);
 
-  // 멀티플레이 세션 복구 확인
+  // 멀티플레이 세션 복구 확인 (브라우저 종료 또는 새로고침 후 복구 지원)
   useEffect(() => {
     const session = multiplayerService.getSavedSession();
-    if (session && Date.now() - session.timestamp < 60000 && session.lastGameState) {
-      setSavedSessionToResume(session);
+    if (session && Date.now() - session.timestamp < 10 * 60 * 1000 && session.lastGameState) {
+      // 배틀 도중 새로고침된 경우 배틀 화면으로 즉시 자동 복귀
+      if (window.location.hash.toLowerCase().includes('battle')) {
+        setIsTutorialBattle(false);
+        bgmManager.unlockTrack();
+        setBattleMode('MULTIPLAYER');
+        setMultiplayerRole(session.role);
+        setCustomDeck(session.myProfile.customDeck || null);
+        setOpponentDeck(session.opponentProfile?.customDeck || null);
+        setCurrentView('BATTLE');
+        multiplayerService.attemptReconnect().catch((e) => {
+          console.warn('Auto-reconnect on reload failed:', e);
+        });
+      } else {
+        setSavedSessionToResume(session);
+      }
     }
   }, []);
 
@@ -223,7 +237,7 @@ export function App() {
     setIsTutorialBattle(false);
     bgmManager.unlockTrack();
     if (battleMode === 'MULTIPLAYER') {
-      multiplayerService.cleanUp();
+      multiplayerService.leaveRoom();
     }
     setMultiplayerRole(null);
     if (window.location.hash.toLowerCase().includes('battle')) {

@@ -42,6 +42,7 @@ class MultiplayerService {
 
   public myProfile: MultiplayerPlayerProfile | null = null;
   public opponentProfile: MultiplayerPlayerProfile | null = null;
+  public latestGameState: GameState | null = null;
 
   private messageHandlers: Set<(msg: MultiplayerMessage) => void> = new Set();
   private statusHandlers: Set<(status: MultiplayerConnectionStatus) => void> = new Set();
@@ -60,10 +61,10 @@ class MultiplayerService {
 
   private getOrInitSessionId(): string {
     try {
-      let id = sessionStorage.getItem('wuthering_player_session_id');
+      let id = localStorage.getItem('wuthering_player_session_id');
       if (!id) {
         id = generateSessionId();
-        sessionStorage.setItem('wuthering_player_session_id', id);
+        localStorage.setItem('wuthering_player_session_id', id);
       }
       return id;
     } catch {
@@ -73,7 +74,7 @@ class MultiplayerService {
 
   public getSavedSession(): MultiplayerSessionData | null {
     try {
-      const data = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const data = localStorage.getItem(SESSION_STORAGE_KEY);
       if (!data) return null;
       const parsed: MultiplayerSessionData = JSON.parse(data);
       // 세션 유효 기간: 15분
@@ -90,17 +91,21 @@ class MultiplayerService {
   public saveSession(lastGameState?: GameState | null) {
     if (!this.roomCode || !this.myProfile) return;
     try {
+      if (lastGameState) {
+        this.latestGameState = lastGameState;
+      }
+      const existing = this.getSavedSession();
       const sessionData: MultiplayerSessionData = {
         role: this.role,
         roomCode: this.roomCode,
         sessionId: this.sessionId,
         playerName: this.myProfile.name,
         myProfile: this.myProfile,
-        opponentProfile: this.opponentProfile || undefined,
-        lastGameState: lastGameState || undefined,
+        opponentProfile: this.opponentProfile || existing?.opponentProfile || undefined,
+        lastGameState: lastGameState || this.latestGameState || existing?.lastGameState || undefined,
         timestamp: Date.now(),
       };
-      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData));
     } catch (e) {
       console.warn('[Multiplayer] Failed to save session:', e);
     }
@@ -108,8 +113,9 @@ class MultiplayerService {
 
   public clearSavedSession() {
     try {
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
     } catch {}
+    this.latestGameState = null;
   }
 
   public clearSession() {
@@ -223,7 +229,7 @@ class MultiplayerService {
     this.myProfile = profile;
     this.setStatus('CONNECTING_TO_HOST');
 
-    const guestPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-guest-${this.sessionId.slice(-6)}`;
+    const guestPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-guest-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
     const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
 
     return new Promise((resolve, reject) => {
@@ -284,26 +290,39 @@ class MultiplayerService {
     if (this.role === 'HOST') {
       const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
       return new Promise((resolve) => {
-        try {
-          this.peer = new Peer(hostPeerId, { debug: 1 });
-          this.peer.on('open', () => {
-            this.setStatus('CONNECTED');
-            resolve(true);
-          });
-          this.peer.on('connection', (conn) => {
-            this.handleIncomingConnection(conn);
-          });
-          this.peer.on('error', () => {
+        const tryCreateHost = (retryCount = 0) => {
+          try {
+            if (this.peer) {
+              try { this.peer.destroy(); } catch {}
+            }
+            this.peer = new Peer(hostPeerId, { debug: 1 });
+            this.peer.on('open', () => {
+              this.setStatus('CONNECTED');
+              this.emitMessage({ type: 'DISCONNECT_RESOLVED' });
+              resolve(true);
+            });
+            this.peer.on('connection', (conn) => {
+              this.handleIncomingConnection(conn);
+            });
+            this.peer.on('error', (err: any) => {
+              console.warn('[Multiplayer] Host reconnect peer error:', err);
+              if (err?.type === 'unavailable-id' && retryCount < 4) {
+                console.log(`[Multiplayer] Retrying host peer in 1.5s (attempt ${retryCount + 1})...`);
+                setTimeout(() => tryCreateHost(retryCount + 1), 1500);
+              } else {
+                this.setStatus('DISCONNECTED');
+                resolve(false);
+              }
+            });
+          } catch {
             this.setStatus('DISCONNECTED');
             resolve(false);
-          });
-        } catch {
-          this.setStatus('DISCONNECTED');
-          resolve(false);
-        }
+          }
+        };
+        tryCreateHost();
       });
     } else {
-      const guestPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-guest-${this.sessionId.slice(-6)}`;
+      const guestPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-guest-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
       const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
       return new Promise((resolve) => {
         try {
@@ -315,12 +334,14 @@ class MultiplayerService {
                 type: 'RECONNECT_REQUEST',
                 sessionId: this.sessionId,
                 role: 'GUEST',
-                playerName: this.myProfile!.name,
+                playerName: this.myProfile?.name || '도전자',
               });
+              this.emitMessage({ type: 'DISCONNECT_RESOLVED' });
               resolve(true);
             });
           });
-          this.peer.on('error', () => {
+          this.peer.on('error', (err) => {
+            console.warn('[Multiplayer] Guest reconnect peer error:', err);
             this.setStatus('DISCONNECTED');
             resolve(false);
           });
@@ -397,18 +418,25 @@ class MultiplayerService {
     if (msg.type === 'RECONNECT_REQUEST' && this.role === 'HOST') {
       this.stopDisconnectTimer();
       this.setStatus('CONNECTED');
+      this.emitMessage({ type: 'DISCONNECT_RESOLVED' });
       const saved = this.getSavedSession();
-      if (saved?.lastGameState) {
+      const stateToSend = this.latestGameState || saved?.lastGameState;
+      if (stateToSend) {
         this.send({
           type: 'RECONNECT_ACCEPT',
-          gameState: saved.lastGameState,
+          gameState: stateToSend,
           hostProfile: this.myProfile!,
-          guestProfile: this.opponentProfile!,
+          guestProfile: this.opponentProfile || {
+            name: msg.playerName,
+            sessionId: msg.sessionId,
+            customDeck: null,
+          },
         });
       }
     } else if (msg.type === 'RECONNECT_ACCEPT') {
       this.stopDisconnectTimer();
       this.setStatus('CONNECTED');
+      this.emitMessage({ type: 'DISCONNECT_RESOLVED' });
       this.opponentProfile = msg.hostProfile;
       this.saveSession(msg.gameState);
     }
@@ -443,6 +471,7 @@ class MultiplayerService {
   }
 
   public sendGameState(gameState: GameState, actionDesc?: string) {
+    this.latestGameState = gameState;
     this.saveSession(gameState);
     this.send({
       type: 'SYNC_GAME_STATE',

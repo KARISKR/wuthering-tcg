@@ -1171,8 +1171,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const unsub = multiplayerService.onMessage((msg) => {
       if (msg.type === 'SYNC_GAME_STATE') {
         setGameState(msg.gameState);
+        multiplayerService.saveSession(msg.gameState);
       } else if (msg.type === 'RECONNECT_ACCEPT') {
         setGameState(msg.gameState);
+        multiplayerService.saveSession(msg.gameState);
+        setIsMultiplayerDisconnected(false);
+        setDisconnectCountdown(null);
       } else if (msg.type === 'DISPATCH_ACTION') {
         if (msg.actionType === 'INITIATIVE_ROLL') {
           setExternalDiceResult(msg.payload);
@@ -1334,6 +1338,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       clearInterval(pingTimer);
     };
   }, [gameState.gameMode]);
+
+  // [멀티플레이] 연결 끊김 시 게스트의 자동 재접속 시도 (상대/방장이 브라우저를 껐다 켰을 때 자동 복구)
+  useEffect(() => {
+    if (gameState.gameMode !== 'MULTIPLAYER' || !isGuest || !isMultiplayerDisconnected) return;
+
+    const retryTimer = setInterval(() => {
+      if (multiplayerService.status === 'DISCONNECTED' || multiplayerService.status === 'RECONNECTING') {
+        multiplayerService.attemptReconnect().then((success) => {
+          if (success) {
+            setIsMultiplayerDisconnected(false);
+            setDisconnectCountdown(null);
+          }
+        }).catch(() => {});
+      }
+    }, 3500);
+
+    return () => clearInterval(retryTimer);
+  }, [gameState.gameMode, isGuest, isMultiplayerDisconnected]);
 
   // 배틀 로그 자동 스크롤
   useEffect(() => {
