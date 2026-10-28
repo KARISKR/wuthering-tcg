@@ -1030,7 +1030,9 @@ class SoundEffectsEngine {
       await Promise.allSettled(
         uniqueUrls.map(async (url) => {
           try {
-            const resp = await fetch(encodeURI(url), { method: 'GET' });
+            // 캐시 무효화 파라미터를 추가하여 브라우저/CDN 디스크 캐시로 인한 구버전/무음 음원 잔류 방지
+            const cacheBustUrl = `${url}?v=20261029`;
+            const resp = await fetch(encodeURI(cacheBustUrl), { method: 'GET' });
             if (resp.ok) {
               const contentType = resp.headers.get('content-type') || '';
               if (contentType.includes('text/html')) return;
@@ -1177,6 +1179,11 @@ class SoundEffectsEngine {
 
       // 캐릭터 보이스(char_*) 음원일 경우 가청성 향상을 위해 10% 볼륨 업(1.1x) 적용
       let finalMultiplier = volumeMultiplier * (isVoice ? this.VOICE_VOLUME_MULTIPLIER : 1.0);
+
+      // 카드 오픈/플립(clash_reveal, card_open) 효과음 명확한 가청성 확보 (1.1x 배율)
+      if (key === 'clash_reveal' || key === 'card_open') {
+        finalMultiplier = volumeMultiplier * 1.1;
+      }
 
       // 양양(Yangyang) 캐릭터 사운드 개별 볼륨 정밀 설정
       if (key.startsWith('char_attack_yangyang_cost')) {
