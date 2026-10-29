@@ -4,7 +4,7 @@
   font-display: swap;
   src: url('/fonts/SUITE-Variable.woff2') format('woff2-variations');
 }
-@import "tailwindcss";
+@import "tailwindcss" source("../src");
 
 @theme {
   --font-sans: 'SUITE', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
@@ -32,14 +32,17 @@
   }
 
   /* 카드 및 이미지 다운스케일링 시 자글자글/모아레 현상 완화 (Bicubic smooth filtering) */
-  img, picture, canvas, svg, .card-img {
-    image-rendering: auto !important;
-    image-rendering: smooth !important;
-    image-rendering: high-quality !important;
-    transform: translate3d(0, 0, 0) !important;
-    backface-visibility: hidden !important;
-    -webkit-backface-visibility: hidden !important;
-    outline: 1px solid transparent !important;
+  img, picture, canvas, .card-img {
+    image-rendering: auto;
+    image-rendering: smooth;
+    image-rendering: high-quality;
+  }
+
+  .card-img, .card-view, .card-texture {
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    outline: 1px solid transparent;
   }
 }
 
@@ -52,9 +55,10 @@
   backface-visibility: hidden;
 }
 
-/* 마우스 호버 및 스케일 애니메이션 시 리샘플링 지글거림 방지 */
-[class*="scale-"],
-[class*="hover:scale-"] {
+/* 마우스 호버 및 스케일 애니메이션 시 리샘플링 지글거림 방지 (호버 시에만 GPU 레이어 활성화) */
+.card-hover,
+.card-view,
+[class*="hover:scale-"]:hover {
   will-change: transform;
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;

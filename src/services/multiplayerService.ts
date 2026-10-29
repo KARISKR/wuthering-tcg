@@ -66,9 +66,21 @@ class MultiplayerService {
   // 상대방 접속 끊김 카운트다운 타이머
   public disconnectCountdown: number = DISCONNECT_TIMEOUT_SEC;
   private disconnectTimer: number | null = null;
+  public isReconnecting: boolean = false;
 
   constructor() {
     this.sessionId = this.getOrInitSessionId();
+    if (typeof window !== 'undefined') {
+      const handleUnload = () => {
+        if (this.peer) {
+          try {
+            this.peer.destroy();
+          } catch {}
+        }
+      };
+      window.addEventListener('beforeunload', handleUnload);
+      window.addEventListener('pagehide', handleUnload);
+    }
   }
 
   private getOrInitSessionId(): string {
@@ -299,14 +311,34 @@ class MultiplayerService {
     });
   }
 
+  public resetPeerOnly() {
+    this.stopHeartbeat();
+    if (this.connection) {
+      try {
+        this.connection.close();
+      } catch {}
+      this.connection = null;
+    }
+    if (this.peer) {
+      try {
+        this.peer.destroy();
+      } catch {}
+      this.peer = null;
+    }
+  }
+
   // --------------------------------------------------------------------------
   // 3. 재접속 복구 로직 (Reconnection)
   // --------------------------------------------------------------------------
   public async attemptReconnect(): Promise<boolean> {
+    if (this.isReconnecting) {
+      return false;
+    }
     const saved = this.getSavedSession();
     if (!saved) return false;
 
-    this.cleanUp();
+    this.isReconnecting = true;
+    this.resetPeerOnly();
     this.role = saved.role;
     this.roomCode = saved.roomCode;
     this.myProfile = saved.myProfile;
@@ -316,6 +348,14 @@ class MultiplayerService {
     if (this.role === 'HOST') {
       const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
       return new Promise((resolve) => {
+        let settled = false;
+        const finish = (result: boolean) => {
+          if (settled) return;
+          settled = true;
+          this.isReconnecting = false;
+          resolve(result);
+        };
+
         const tryCreateHost = (retryCount = 0) => {
           try {
             if (this.peer) {
@@ -324,24 +364,24 @@ class MultiplayerService {
             this.peer = new Peer(hostPeerId, { debug: 1 });
             this.peer.on('open', () => {
               this.setStatus('WAITING_FOR_GUEST');
-              resolve(true);
+              finish(true);
             });
             this.peer.on('connection', (conn) => {
               this.handleIncomingConnection(conn);
             });
             this.peer.on('error', (err: any) => {
               console.warn('[Multiplayer] Host reconnect peer error:', err);
-              if (err?.type === 'unavailable-id' && retryCount < 4) {
-                console.log(`[Multiplayer] Retrying host peer in 1.5s (attempt ${retryCount + 1})...`);
+              if (err?.type === 'unavailable-id' && retryCount < 15) {
+                console.log(`[Multiplayer] Retrying host peer in 1.5s (attempt ${retryCount + 1}/15)...`);
                 setTimeout(() => tryCreateHost(retryCount + 1), 1500);
               } else {
                 this.setStatus('DISCONNECTED');
-                resolve(false);
+                finish(false);
               }
             });
           } catch {
             this.setStatus('DISCONNECTED');
-            resolve(false);
+            finish(false);
           }
         };
         tryCreateHost();
@@ -350,6 +390,21 @@ class MultiplayerService {
       const guestPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-guest-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
       const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
       return new Promise((resolve) => {
+        let settled = false;
+        const timeoutId = setTimeout(() => {
+          console.warn('[Multiplayer] Guest reconnect attempt timed out (8s)');
+          this.setStatus('DISCONNECTED');
+          finish(false);
+        }, 8000);
+
+        const finish = (result: boolean) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          this.isReconnecting = false;
+          resolve(result);
+        };
+
         try {
           this.peer = new Peer(guestPeerId, { debug: 1 });
           this.peer.on('open', () => {
@@ -362,17 +417,17 @@ class MultiplayerService {
                 playerName: this.myProfile?.name || '도전자',
               });
               this.emitMessage({ type: 'DISCONNECT_RESOLVED' });
-              resolve(true);
+              finish(true);
             });
           });
           this.peer.on('error', (err) => {
             console.warn('[Multiplayer] Guest reconnect peer error:', err);
             this.setStatus('DISCONNECTED');
-            resolve(false);
+            finish(false);
           });
         } catch {
           this.setStatus('DISCONNECTED');
-          resolve(false);
+          finish(false);
         }
       });
     }
@@ -393,6 +448,7 @@ class MultiplayerService {
       this.setStatus('CONNECTED');
       this.stopDisconnectTimer();
       this.startHeartbeat();
+      this.emitMessage({ type: 'DISCONNECT_RESOLVED' });
       if (onReady) onReady();
     });
 
@@ -650,3 +706,4 @@ class MultiplayerService {
 }
 
 export const multiplayerService = new MultiplayerService();
+

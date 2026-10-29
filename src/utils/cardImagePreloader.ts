@@ -51,36 +51,51 @@ export function preloadImages(
   return Promise.all(validUrls.map((url) => preloadImage(url, priority)));
 }
 
-/** 배틀 매치 시작 시 양측 덱/슬롯/진화 카드 전수 프리로드 */
+function getLodUrl(url: string | undefined, width = 512): string | undefined {
+  if (!url || !url.includes('/cards/card_images/')) return url;
+  const dot = url.lastIndexOf('.');
+  const base = dot > -1 ? url.slice(0, dot) : url;
+  return base.replace('/cards/card_images/', `/cards/card_images_lod/${width}/`) + '.webp';
+}
+
+/** 배틀 매치 시작 시 양측 덱/슬롯/진화 카드 전수 프리로드 (512px LOD 우선 캐싱) */
 export function preloadBattleCards(state: GameState) {
   if (!state || !state.players) return;
 
-  const urls: string[] = [
-    '/cards/card_back_action.png',
-    '/cards/card_back_character.png',
+  const rawUrls: (string | undefined)[] = [
+    '/cards/card_back_action.webp',
+    '/cards/card_back_character.webp',
   ];
 
   state.players.forEach((p) => {
     if (!p) return;
     // 1. 패 카드
-    p.hand?.forEach((c: ActionCard) => c?.artUrl && urls.push(c.artUrl));
+    p.hand?.forEach((c: ActionCard) => c?.artUrl && rawUrls.push(c.artUrl));
     // 2. 덱 카드
-    p.actionDeck?.forEach((c: ActionCard) => c?.artUrl && urls.push(c.artUrl));
+    p.actionDeck?.forEach((c: ActionCard) => c?.artUrl && rawUrls.push(c.artUrl));
     // 3. 필드 캐릭터 슬롯 및 상속 카드
     if (p.slots) {
       Object.values(p.slots).forEach((c: CharacterCard | null) => {
-        if (c?.artUrl) urls.push(c.artUrl);
-        c?.underlyingCards?.forEach((u: CharacterCard) => u?.artUrl && urls.push(u.artUrl));
+        if (c?.artUrl) rawUrls.push(c.artUrl);
+        c?.underlyingCards?.forEach((u: CharacterCard) => u?.artUrl && rawUrls.push(u.artUrl));
       });
     }
     // 4. 캐릭터 덱 (진화용 카드)
-    p.characterDeck?.forEach((c: CharacterCard) => c?.artUrl && urls.push(c.artUrl));
+    p.characterDeck?.forEach((c: CharacterCard) => c?.artUrl && rawUrls.push(c.artUrl));
     // 5. 협주 존 및 버린 카드 존
-    p.concertoZone?.forEach((c: ActionCard) => c?.artUrl && urls.push(c.artUrl));
-    p.dropZone?.forEach((c) => (c as any)?.artUrl && urls.push((c as any).artUrl));
+    p.concertoZone?.forEach((c: ActionCard) => c?.artUrl && rawUrls.push(c.artUrl));
+    p.dropZone?.forEach((c) => (c as any)?.artUrl && rawUrls.push((c as any).artUrl));
   });
 
-  preloadImages(urls);
+  const urlsToPreload: string[] = [];
+  rawUrls.forEach((u) => {
+    if (!u) return;
+    urlsToPreload.push(u);
+    const lod512 = getLodUrl(u, 512);
+    if (lod512 && lod512 !== u) urlsToPreload.push(lod512);
+  });
+
+  preloadImages(urlsToPreload);
 }
 
 /** 리플레이 시작 시 타임라인 상의 모든 카드 프리로드 */
@@ -88,8 +103,8 @@ export async function preloadReplayCards(replay: BattleReplayData) {
   if (!replay) return;
 
   const urls: string[] = [
-    '/cards/card_back_action.png',
-    '/cards/card_back_character.png',
+    '/cards/card_back_action.webp',
+    '/cards/card_back_character.webp',
     replay.p0Leader?.artUrl,
     replay.p1Leader?.artUrl,
   ].filter(Boolean) as string[];
@@ -173,3 +188,4 @@ export function startIdleCardPreload() {
     }
   }
 }
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, Suspense, lazy } from 'react';
 import { useGame } from '../hooks/useGame';
 import { CardView } from './CardView';
 import { CharacterSlot } from './CharacterSlot';
@@ -15,14 +15,14 @@ import { CardDrawFlightOverlay } from './CardDrawFlightOverlay';
 import { CenterDrawOverlay } from './CenterDrawOverlay';
 import { EffectDrawOverlay } from './EffectDrawOverlay';
 import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
-import { RulesGuideModal } from './RulesGuideModal';
-import { CardCatalogModal } from './CardCatalogModal';
+const RulesGuideModal = lazy(() => import('./RulesGuideModal').then((m) => ({ default: m.RulesGuideModal })));
+const CardCatalogModal = lazy(() => import('./CardCatalogModal').then((m) => ({ default: m.CardCatalogModal })));
 import { GameOverModal } from './GameOverModal';
 import { CinematicFinisherOverlay } from './CinematicFinisherOverlay';
-import { BattleReplayModal } from './BattleReplayModal';
+const BattleReplayModal = lazy(() => import('./BattleReplayModal').then((m) => ({ default: m.BattleReplayModal })));
 import { createBattleReplayData, BattleReplayData } from '../utils/replayManager';
 import { telemetryService } from '../services/telemetryService';
-import { CardListModal } from './CardListModal';
+const CardListModal = lazy(() => import('./CardListModal').then((m) => ({ default: m.CardListModal })));
 import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
 import { EffectNotificationToast } from './EffectNotificationToast';
@@ -139,6 +139,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         : multiplayerService.opponentProfile?.name || '도전자 (게스트)'
       : undefined;
 
+  // [멀티플레이 세션 동기 복원] 첫 렌더링 시점에 즉시 저장된 배틀 상태를 주입하여 초기화 레이스 컨디션 차단
+  const initialSavedSession = useMemo(() => {
+    if (initialMode === 'MULTIPLAYER') {
+      return multiplayerService.getSavedSession();
+    }
+    return null;
+  }, [initialMode]);
+
   const {
     gameState,
     setGameState,
@@ -166,7 +174,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     clearLastComboStrike,
     clearLastEffectEvent,
     handleFinishEffectDraw,
-  } = useGame(undefined, undefined, initialMode, customDeck, opponentDeck, mpP0Name, mpP1Name);
+  } = useGame(
+    undefined,
+    undefined,
+    initialMode,
+    customDeck,
+    opponentDeck,
+    mpP0Name,
+    mpP1Name,
+    initialSavedSession?.lastGameState
+  );
 
   // 1인 2역 (SOLO_DUAL) 또는 멀티플레이 시 현재 조종 중인 플레이어 (0: P1, 1: P2)
   const isMultiplayer = gameState.gameMode === 'MULTIPLAYER';
@@ -200,22 +217,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // 멀티플레이어 시간 제한 시스템 (총 300초 / 턴 90초 / 대결 30초)
   const [timeLimitConfig, setTimeLimitConfig] = useState<TimeLimitConfig>(() => {
-    return multiplayerService.timeLimitConfig || {
+    return initialSavedSession?.timeLimitConfig || multiplayerService.timeLimitConfig || {
       hasTimeLimit: true,
       totalTimeSec: 300,
       turnTimeSec: 90,
       clashTimeSec: 30,
     };
   });
-  const [p0TotalTime, setP0TotalTime] = useState<number>(() => multiplayerService.p0TotalTime ?? 300);
-  const [p1TotalTime, setP1TotalTime] = useState<number>(() => multiplayerService.p1TotalTime ?? 300);
-  const [currentTurnTime, setCurrentTurnTime] = useState<number>(() => multiplayerService.currentTurnTime ?? 90);
+  const [p0TotalTime, setP0TotalTime] = useState<number>(() => initialSavedSession?.p0TotalTime ?? multiplayerService.p0TotalTime ?? 300);
+  const [p1TotalTime, setP1TotalTime] = useState<number>(() => initialSavedSession?.p1TotalTime ?? multiplayerService.p1TotalTime ?? 300);
+  const [currentTurnTime, setCurrentTurnTime] = useState<number>(() => initialSavedSession?.currentTurnTime ?? multiplayerService.currentTurnTime ?? 90);
 
   const prevPhaseRef = useRef<string>(gameState.phase);
   const prevTurnPlayerRef = useRef<number>(gameState.activePlayerIndex);
   const prevTurnCountRef = useRef<number>(gameState.turn);
 
-  // [멀티플레이] 브라우저 새로고침/재진입 시 로컬에 보존된 이전 게임 진행 상태 즉각 복원
+  // [멀티플레이] 브라우저 새로고침/재진입 시 로컬에 보존된 이전 게임 진행 상태 즉각 복원 (useGame 초기화 보조)
   useEffect(() => {
     if (initialMode === 'MULTIPLAYER') {
       const saved = multiplayerService.getSavedSession();
@@ -371,7 +388,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     !isDrawFlightActive;
 
   // 선공 결정 주사위 연출 상태 (게임 시작 시 LEADER_SELECT 단계에서 활성화)
-  const [isInitiativeRolling, setIsInitiativeRolling] = useState(true);
+  const [isInitiativeRolling, setIsInitiativeRolling] = useState(() => {
+    if (initialSavedSession?.lastGameState) {
+      const p = initialSavedSession.lastGameState.phase;
+      const t = initialSavedSession.lastGameState.turn;
+      if (t > 1 || (p !== 'LEADER_SELECT' && p !== 'MULLIGAN')) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   // 시작 리더 선택 상태 (1인 2역 대전 지원용)
   const [leaderSelectPlayerIndex, setLeaderSelectPlayerIndex] = useState<0 | 1>(0);
@@ -710,7 +736,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // 매치 개시 양측 리더 컷인 및 출격 오프닝 대사 멘트 오버레이 상태
   const [showMatchOpening, setShowMatchOpening] = useState(false);
-  const hasShownMatchOpeningRef = useRef(false);
+  const hasShownMatchOpeningRef = useRef(
+    Boolean(
+      initialSavedSession?.lastGameState &&
+      (initialSavedSession.lastGameState.turn > 1 ||
+        (initialSavedSession.lastGameState.phase !== 'LEADER_SELECT' &&
+          initialSavedSession.lastGameState.phase !== 'MULLIGAN'))
+    )
+  );
 
   useEffect(() => {
     // 턴 1이 본격적으로 시작되고, 선공 주사위 및 시작 리더 선택, 멀리건이 모두 완료된 시점에 1회 표출
@@ -1428,7 +1461,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     if (gameState.gameMode !== 'MULTIPLAYER' || !isGuest || !isMultiplayerDisconnected) return;
 
     const retryTimer = setInterval(() => {
-      if (multiplayerService.status === 'DISCONNECTED' || multiplayerService.status === 'RECONNECTING') {
+      // 진행 중인 재접속 시도가 없을 때만 4초 주기로 재시도 (WebRTC ICE 협상 도중 자가 파괴 방지)
+      if (!multiplayerService.isReconnecting && multiplayerService.status === 'DISCONNECTED') {
         multiplayerService.attemptReconnect().then((success) => {
           if (success) {
             setIsMultiplayerDisconnected(false);
@@ -1436,7 +1470,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           }
         }).catch(() => {});
       }
-    }, 3500);
+    }, 4000);
 
     return () => clearInterval(retryTimer);
   }, [gameState.gameMode, isGuest, isMultiplayerDisconnected]);
@@ -2554,7 +2588,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                               }
                             >
                               <img
-                                src={isCardVisible ? (c.artUrl || '/cards/card_back_action.png') : '/cards/card_back_action.png'}
+                                src={isCardVisible ? (c.artUrl || '/cards/card_back_action.webp') : '/cards/card_back_action.webp'}
                                 alt="상대 패"
                                 className="w-full h-full object-cover"
                               />
@@ -4080,29 +4114,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 트래시 에리어 및 협주 존 카드 목록 모달 */}
       {cardListModalState && (
-        <CardListModal
-          isOpen={cardListModalState.isOpen}
-          onClose={() => setCardListModalState(null)}
-          title={cardListModalState.title}
-          type={cardListModalState.type}
-          cards={cardListModalState.cards}
-          onSelectCard={(card) => {
-            setPreviewCard(card);
-          }}
-        />
+        <Suspense fallback={null}>
+          <CardListModal
+            isOpen={cardListModalState.isOpen}
+            onClose={() => setCardListModalState(null)}
+            title={cardListModalState.title}
+            type={cardListModalState.type}
+            cards={cardListModalState.cards}
+            onSelectCard={(card) => {
+              setPreviewCard(card);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* 공식 룰 가이드 모달 */}
-      <RulesGuideModal
-        isOpen={isRulesOpen}
-        onClose={() => setIsRulesOpen(false)}
-      />
+      {isRulesOpen && (
+        <Suspense fallback={null}>
+          <RulesGuideModal
+            isOpen={isRulesOpen}
+            onClose={() => setIsRulesOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* 카드 도감 모달 */}
-      <CardCatalogModal
-        isOpen={isCatalogOpen}
-        onClose={() => setIsCatalogOpen(false)}
-      />
+      {isCatalogOpen && (
+        <Suspense fallback={null}>
+          <CardCatalogModal
+            isOpen={isCatalogOpen}
+            onClose={() => setIsCatalogOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* 게임 종료 치명타 피니시(카드 파쇄) 연출 및 종료 모달 (대결 결과창 및 연격 참격 연출이 완전히 끝난 후 순차 진행) */}
       {gameState.phase === 'GAME_OVER' &&
@@ -4198,11 +4242,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       )}
 
       {/* 대전 복기 리플레이 모달 */}
-      <BattleReplayModal
-        isOpen={isReplayOpen}
-        onClose={() => setIsReplayOpen(false)}
-        onPlayBattleReplay={onPlayBattleReplay}
-      />
+      {isReplayOpen && (
+        <Suspense fallback={null}>
+          <BattleReplayModal
+            isOpen={isReplayOpen}
+            onClose={() => setIsReplayOpen(false)}
+            onPlayBattleReplay={onPlayBattleReplay}
+          />
+        </Suspense>
+      )}
 
       {/* 협주 게이지 소모 선택 모달 */}
       <ConcertoSelectModal
@@ -4544,3 +4592,4 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     </div>
   );
 };
+

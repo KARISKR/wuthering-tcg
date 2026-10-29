@@ -57,8 +57,8 @@ export const CardView: React.FC<CardViewProps> = ({
       ? cardBackType === 'CHARACTER'
       : card?.kind === 'CHARACTER';
     const backImage = isCharacter
-      ? '/cards/card_back_character.png'
-      : '/cards/card_back_action.png';
+      ? '/cards/card_back_character.webp'
+      : '/cards/card_back_action.webp';
 
     return (
       <div
@@ -414,3 +414,4 @@ const CardZoomModal: React.FC<{ card: AnyCard; onClose: () => void }> = ({ card,
     </div>
   );
 };
+

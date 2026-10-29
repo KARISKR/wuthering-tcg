@@ -165,7 +165,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                 : 'border-cyan-400 ring-2 ring-cyan-400/60'
             }`}>
               <img
-                src="/cards/card_back_action.png"
+                src="/cards/card_back_action.webp"
                 alt="중앙 액션 덱"
                 className="w-full h-full object-cover rounded-2xl"
               />
@@ -190,7 +190,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
               {stage === 'PULLING' && (
                 <div className="absolute inset-0 animate-pull-card-up pointer-events-none">
                   <img
-                    src="/cards/card_back_action.png"
+                    src="/cards/card_back_action.webp"
                     alt="뽑히는 카드"
                     className="w-full h-full object-cover rounded-2xl border-2 border-yellow-300 shadow-[0_0_30px_rgba(253,224,71,0.9)]"
                   />
@@ -219,7 +219,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                   >
                     <div className="relative w-44 sm:w-52 aspect-[588/1024] rounded-2xl overflow-hidden border-2 border-cyan-400/80 ring-4 ring-cyan-500/40 bg-slate-950 shadow-[0_0_35px_rgba(6,182,212,0.6)]">
                       <img
-                        src="/cards/card_back_action.png"
+                        src="/cards/card_back_action.webp"
                         alt="상대 비공개 드로우 카드"
                         className="w-full h-full object-cover rounded-2xl"
                       />
@@ -303,7 +303,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                 }`}
               >
                 <img
-                  src={isUserTurn ? card.artUrl : '/cards/card_back_action.png'}
+                  src={isUserTurn ? card.artUrl : '/cards/card_back_action.webp'}
                   alt={isUserTurn ? card.nameKr : '상대 드로우 카드'}
                   className={`w-full h-full ${isUserTurn ? 'object-contain' : 'object-cover'} rounded-2xl bg-slate-950`}
                 />
@@ -315,3 +315,4 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
     </div>
   );
 };
+

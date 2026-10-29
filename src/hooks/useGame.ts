@@ -41,9 +41,11 @@ export function useGame(
   customDeck?: CustomDeckConfig | null,
   p1CustomDeck?: CustomDeckConfig | null,
   p0CustomName?: string,
-  p1CustomName?: string
+  p1CustomName?: string,
+  initialSavedGameState?: GameState | null
 ) {
   const [gameState, rawSetGameState] = useState<GameState>(() =>
+    initialSavedGameState ||
     createInitialGameState(
       p0PresetKey,
       p1PresetKey,
@@ -655,3 +657,4 @@ export function useGame(
     handleFinishEffectDraw,
   };
 }
+

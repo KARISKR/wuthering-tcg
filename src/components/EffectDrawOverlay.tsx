@@ -193,7 +193,7 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
             {/* 맨 위 액션 덱 카드 */}
             <div className="relative w-48 sm:w-56 aspect-[588/1024] rounded-2xl overflow-hidden border-2 border-amber-400 ring-4 ring-amber-400/80 bg-slate-950 shadow-[0_0_35px_rgba(245,158,11,0.7)] group-hover:shadow-[0_0_55px_rgba(245,158,11,0.95)]">
               <img
-                src="/cards/card_back_action.png"
+                src="/cards/card_back_action.webp"
                 alt="효과 드로우 덱"
                 className="w-full h-full object-cover rounded-2xl"
               />
@@ -218,7 +218,7 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
               {stage === 'PULLING' && (
                 <div className="absolute inset-0 animate-pull-card-up pointer-events-none">
                   <img
-                    src="/cards/card_back_action.png"
+                    src="/cards/card_back_action.webp"
                     alt="뽑히는 카드"
                     className="w-full h-full object-cover rounded-2xl border-2 border-yellow-300 shadow-[0_0_35px_rgba(253,224,71,0.95)]"
                   />
@@ -252,7 +252,7 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
                     className={`relative w-48 sm:w-56 md:w-64 aspect-[588/1024] rounded-2xl overflow-hidden border-2 ring-4 bg-slate-900 shadow-2xl ${colorBorder}`}
                   >
                     <img
-                      src={hidden ? '/cards/card_back_action.png' : card.artUrl}
+                      src={hidden ? '/cards/card_back_action.webp' : card.artUrl}
                       alt={hidden ? '비공개 카드' : card.nameKr}
                       className={hidden ? 'w-full h-full object-cover bg-slate-950' : 'w-full h-full object-contain bg-slate-950'}
                     />
@@ -303,7 +303,7 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
                 }`}
               >
                 <img
-                  src={hidden ? '/cards/card_back_action.png' : card.artUrl}
+                  src={hidden ? '/cards/card_back_action.webp' : card.artUrl}
                   alt={hidden ? '비공개 카드' : card.nameKr}
                   className={`w-full h-full rounded-2xl bg-slate-950 ${hidden ? 'object-cover' : 'object-contain'}`}
                 />
@@ -327,3 +327,4 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
     </div>
   );
 };
+

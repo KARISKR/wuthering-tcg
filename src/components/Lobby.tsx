@@ -571,7 +571,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                   </div>
                   <div className="absolute w-13 h-17 sm:w-15 sm:h-19 rounded-md border border-amber-400/80 bg-[#0c1426] shadow-[0_0_14px_rgba(245,158,11,0.4)] transform rotate-6 z-10 group-hover:scale-105 transition-transform duration-500 overflow-hidden flex items-center justify-center">
                     <img
-                      src="/cards/card_back_character.png"
+                      src="/cards/card_back_character.webp"
                       alt="Official Card"
                       className="w-full h-full object-cover"
                       onError={(e) => {
@@ -1201,3 +1201,4 @@ export const Lobby: React.FC<LobbyProps> = ({
     </div>
   );
 };
+

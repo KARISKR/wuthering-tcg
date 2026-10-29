@@ -31,8 +31,8 @@ export const DeckStack: React.FC<DeckStackProps> = ({
   const displayLabel = label || defaultLabel;
 
   const cardBackSrc = isCharacter
-    ? '/cards/card_back_character.png'
-    : '/cards/card_back_action.png';
+    ? '/cards/card_back_character.webp'
+    : '/cards/card_back_action.webp';
 
   const bracketColor = canDraw
     ? 'border-[#f97316]'
@@ -149,4 +149,5 @@ export const DeckStack: React.FC<DeckStackProps> = ({
     </div>
   );
 };
+
 

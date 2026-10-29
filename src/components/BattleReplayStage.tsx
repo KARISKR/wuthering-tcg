@@ -381,7 +381,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
       cost: 1,
       speed: 0,
       damage: 0,
-      artUrl: '/cards/card_back_action.png',
+      artUrl: '/cards/card_back_action.webp',
       description: '트래시 영역에 위치한 액션 카드입니다.',
     }));
   }, [p0.dropCount]);
@@ -396,7 +396,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
       cost: 1,
       speed: 0,
       damage: 0,
-      artUrl: '/cards/card_back_action.png',
+      artUrl: '/cards/card_back_action.webp',
       description: '트래시 영역에 위치한 액션 카드입니다.',
     }));
   }, [p1.dropCount]);
@@ -411,7 +411,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
       cost: 1,
       speed: 0,
       damage: 0,
-      artUrl: '/cards/card_back_action.png',
+      artUrl: '/cards/card_back_action.webp',
       description: '협주 에리어에 충전된 공명 에너지입니다.',
     }));
   }, [p0.concerto]);
@@ -426,7 +426,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
       cost: 1,
       speed: 0,
       damage: 0,
-      artUrl: '/cards/card_back_action.png',
+      artUrl: '/cards/card_back_action.webp',
       description: '협주 에리어에 충전된 공명 에너지입니다.',
     }));
   }, [p1.concerto]);
@@ -972,7 +972,7 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                         title={`${c.nameKr} (${c.color})`}
                       >
                         <img
-                          src={c.artUrl || '/cards/card_back_action.png'}
+                          src={c.artUrl || '/cards/card_back_action.webp'}
                           alt="상대 패"
                           className="w-full h-full object-cover"
                         />
@@ -1600,3 +1600,4 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
     </div>
   );
 };
+

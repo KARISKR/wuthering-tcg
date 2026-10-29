@@ -150,7 +150,7 @@ export const patchNotes: PatchNote[] = [
         tag: 'IMPROVE',
         title: '상대방 드로우 카드 완벽 비공개(Face-down) 보안 처리',
         items: [
-          '상대방(AI 등)의 드로우 시 카드가 앞면으로 공개되지 않고 공식 뒷면(card_back_action.png) 상태 유지',
+          '상대방(AI 등)의 드로우 시 카드가 앞면으로 공개되지 않고 공식 뒷면(card_back_action.webp) 상태 유지',
           '상대 드로우 카드에 SECRET 비공개 뱃지 적용 및 상대 손패로 날아가는 비행 궤적 분기',
           '상대 드로우 템포를 최적화하여 불필요한 대기 시간 단축',
         ],
@@ -869,4 +869,5 @@ export const patchNotes: PatchNote[] = [
 // 최신 버전 정보 추출 헬퍼 (시스템 전체 단일 출처)
 export const CURRENT_GAME_VERSION = patchNotes[0].version;
 export const LATEST_PATCH_NOTE = patchNotes[0];
+
 

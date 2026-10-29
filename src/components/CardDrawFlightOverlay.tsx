@@ -50,7 +50,7 @@ export const CardDrawFlightOverlay: React.FC<CardDrawFlightOverlayProps> = ({
                 className="absolute w-24 sm:w-28 md:w-32 aspect-[588/1024] rounded-2xl overflow-hidden border-2 border-amber-400 bg-slate-900 shadow-2xl animate-deck-flight-p0"
               >
                 <img
-                  src="/cards/card_back_action.png"
+                  src="/cards/card_back_action.webp"
                   alt="드로우 카드"
                   className="w-full h-full object-cover rounded-2xl"
                 />
@@ -75,7 +75,7 @@ export const CardDrawFlightOverlay: React.FC<CardDrawFlightOverlayProps> = ({
                 className="absolute w-20 sm:w-24 aspect-[588/1024] rounded-2xl overflow-hidden border-2 border-rose-500 bg-slate-900 shadow-2xl animate-deck-flight-p1"
               >
                 <img
-                  src="/cards/card_back_action.png"
+                  src="/cards/card_back_action.webp"
                   alt="상대 드로우 카드"
                   className="w-full h-full object-cover rounded-2xl"
                 />
@@ -88,3 +88,4 @@ export const CardDrawFlightOverlay: React.FC<CardDrawFlightOverlayProps> = ({
     </div>
   );
 };
+
