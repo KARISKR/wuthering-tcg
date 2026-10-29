@@ -4849,7 +4849,14 @@ export function continuePostClashOrBattlePhase(state: GameState): GameState {
       p1State.comboCount = 0;
       p1State.comboUnlimited = false;
       newState.players = [p0State, p1State];
-      return executeBattlePhaseEndStep(newState);
+      newState.phase = 'COMBO_STEP';
+      newState = addLog(
+        newState,
+        `배틀이 종료되었습니다. 우측의 [턴 종료] 버튼을 눌러 턴을 마치세요.`,
+        'ACTION',
+        newState.activePlayerIndex
+      );
+      return newState;
     }
   }
 
@@ -5769,7 +5776,7 @@ export function discardOverflowCards(
   newState = addLog(newState, `[트래시 이동] ${player.name}이(가) 패 상한 초과로 ${discarded.length}장(${discarded.map((c) => `[${c.nameKr}]`).join(', ')})을 트래시로 버렸습니다.`, 'ACTION', playerIndex);
 
   // 패 버리기 완료 후 턴 종료 마무리 처리 (더블 트리거 방지)
-  return { success: true, newState: finalizeEndPhase(newState) };
+  return { success: true, newState: executeEndPhase(newState) };
 }
 
 export function executeEndPhase(state: GameState): GameState {
@@ -5913,7 +5920,8 @@ export function executeEndPhase(state: GameState): GameState {
     };
   }
 
-  return finalizeEndPhase(newState);
+  // END_PHASE 상태로 반환하여 화면에 턴 종료 페이즈 배너를 노출한 뒤 다음 턴으로 전환
+  return newState;
 }
 
 // 턴 종료 마무리 (605.1.3 & 605.1.4 및 다음 턴 전환)
@@ -6759,7 +6767,8 @@ export function resolvePendingChoice(
     if (newState.players[activeIdx].hand.length > 8) {
       return { ...newState, phase: 'DISCARD_OVERFLOW' };
     }
-    return finalizeEndPhase(newState);
+    // END_PHASE 상태로 반환하여 화면에 턴 종료 페이즈 배너를 노출한 뒤 다음 턴으로 전환
+  return newState;
   }
 
   // 코스트 지불 완료 직후: 배틀 스텝 스킬 적용 후 판정 스텝으로 진행

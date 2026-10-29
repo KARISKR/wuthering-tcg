@@ -46,6 +46,7 @@ import {
   getIntroSkillTargetChar,
   doesCharMatchIntroTarget,
   getTurnDrawCount,
+  finalizeEndPhase,
 } from '../engine/gameEngine';
 import { getOfficialCardByCode } from '../data/officialCards';
 import { getCharacterIdleQuote, getCharacterLowHpQuote } from '../data/characterQuotes';
@@ -1482,6 +1483,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [noComboCountdown, setNoComboCountdown] = useState<number | null>(null);
 
   useEffect(() => {
+    // 멀티플레이에서는 자동으로 턴을 넘기지 않고 반드시 유저가 우측 [턴 종료] 버튼을 누르도록 함
+    if (isMultiplayer) {
+      setNoComboCountdown(null);
+      return;
+    }
+
     // COMBO_STEP이 아니거나 플레이어 연격 차례가 아니거나,
     // 연격 애니메이션(activeComboStrike), 레벨업(activeUpgrade), 효과 선택(pendingChoice) 진행 중이면 카운트다운 대기
     if (
@@ -1520,6 +1527,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       setNoComboCountdown(null);
     }
   }, [
+    isMultiplayer,
     isPlayerComboPhase,
     activeControlledPlayer.hand.length,
     activeControlledPlayer.concertoZone.length,
@@ -1538,6 +1546,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       setNoComboCountdown(null);
     }
   }, [noComboCountdown, gameState.phase, controlledPlayerIndex, handleFinishCombo]);
+
+  // [턴 종료 연출] END_PHASE 배너 표시 후 1초 뒤 다음 턴으로 전환 (finalizeEndPhase)
+  useEffect(() => {
+    if (gameState.phase !== 'END_PHASE' || isGuest) return;
+    if (gameState.pendingChoice) return;
+
+    const timer = setTimeout(() => {
+      setGameState((prev) => {
+        if (prev.phase !== 'END_PHASE' || prev.pendingChoice) return prev;
+        return finalizeEndPhase(prev);
+      });
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [gameState.phase, isGuest, gameState.pendingChoice]);
 
   // [멀티플레이] 시간 초과 패배 처리 핸들러 (호스트 권한)
   const handleTriggerTimeOut = useCallback(
@@ -1576,6 +1599,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         setCurrentTurnTime(timeLimitConfig.clashTimeSec || 30);
       } else if (gameState.phase === 'COMBO_STEP') {
         setCurrentTurnTime(timeLimitConfig.clashTimeSec || 30);
+      } else if (gameState.phase === 'CLASH_REVEAL') {
+        setCurrentTurnTime(timeLimitConfig.clashTimeSec || 30);
+      } else if (gameState.phase === 'DISCARD_OVERFLOW') {
+        setCurrentTurnTime(timeLimitConfig.clashTimeSec || 30);
       }
     }
   }, [
@@ -1588,37 +1615,89 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     gameState.turn,
   ]);
 
-  // [멀티플레이 시간 제한] 호스트 1초 타이머 틱 루프 (공식 Chess Clock & 턴/대결 카운트다운)
+  // 효과 선택(pendingChoice) 발생 시 해당 효과 선택에 대한 제한시간 동기화
+  const prevChoiceIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isHost || !timeLimitConfig.hasTimeLimit) return;
+    const currentChoiceId = gameState.pendingChoice?.id || null;
+    if (currentChoiceId && currentChoiceId !== prevChoiceIdRef.current) {
+      prevChoiceIdRef.current = currentChoiceId;
+      setCurrentTurnTime((prev) =>
+        Math.max(15, Math.min(prev, timeLimitConfig.clashTimeSec || 30))
+      );
+    } else if (!currentChoiceId) {
+      prevChoiceIdRef.current = null;
+    }
+  }, [
+    isHost,
+    timeLimitConfig.hasTimeLimit,
+    timeLimitConfig.clashTimeSec,
+    gameState.pendingChoice?.id,
+  ]);
+
+  // [멀티플레이 시간 제한] 호스트 1초 타이머 틱 루프 (공식 Chess Clock & 턴/대결/효과선택 카운트다운)
   useEffect(() => {
     if (!isMultiplayer || !isHost || !timeLimitConfig.hasTimeLimit) return;
     if (gameState.phase === 'GAME_OVER') return;
 
-    // 대전 셋업 단계(주사위, 리더선택, 멀리건) 중에는 타이머 정지
+    // 대전 셋업 단계(주사위, 리더선택, 멀리건) 중에는 타이머 정지 (단, 시작 페이즈라도 효과 선택 중이면 동작)
     if (
-      gameState.phase === 'START_PHASE' ||
       gameState.phase === 'LEADER_SELECT' ||
-      gameState.phase === 'MULLIGAN'
+      gameState.phase === 'MULLIGAN' ||
+      (gameState.phase === 'START_PHASE' && !gameState.pendingChoice)
     ) {
       return;
     }
 
-    // 애니메이션 오버레이 재생 중이거나 상대 접속 끊김 대기 중에는 타이머 정지
-    if (
-      gameState.clashResult ||
-      activeUpgrade ||
-      activeComboStrike ||
-      isInitiativeRolling ||
-      isMultiplayerDisconnected
-    ) {
+    // 상대 접속 끊김 대기 중이거나 선후공 주사위 굴림 중에는 타이머 정지
+    if (isMultiplayerDisconnected || isInitiativeRolling) {
       return;
+    }
+
+    // 효과 선택(pendingChoice) 중이 아닐 때만 순수 연출 오버레이 동안 정지
+    // (효과 선택 중에는 절대로 멈추지 않고 흘러가야 함!)
+    if (!gameState.pendingChoice) {
+      if (
+        activeUpgrade ||
+        activeComboStrike ||
+        (gameState.clashResult && gameState.phase !== 'CLASH_REVEAL')
+      ) {
+        return;
+      }
     }
 
     const timer = setInterval(() => {
       setCurrentTurnTime((prevTurnTime) => {
         const nextTurnTime = Math.max(0, prevTurnTime - 1);
 
-        // 총 보유 시간 감소 및 행동 만료 처리
-        if (gameState.phase === 'ACTION_PHASE') {
+        // 1) 효과 선택(pendingChoice) 중인 경우: 선택 대상 플레이어의 시간 차감
+        if (gameState.pendingChoice) {
+          const choosingIdx = gameState.pendingChoice.playerIndex;
+          if (choosingIdx === 0) {
+            setP0TotalTime((prev) => {
+              const nextP0 = Math.max(0, prev - 1);
+              if (nextP0 <= 0) handleTriggerTimeOut(0);
+              return nextP0;
+            });
+          } else {
+            setP1TotalTime((prev) => {
+              const nextP1 = Math.max(0, prev - 1);
+              if (nextP1 <= 0) handleTriggerTimeOut(1);
+              return nextP1;
+            });
+          }
+
+          if (nextTurnTime <= 0) {
+            // 시간 만료 시 기본 자동 선택 처리
+            const choice = gameState.pendingChoice;
+            const autoChosen = choice.minSelect === 0
+              ? []
+              : (choice.revealedCards || []).slice(0, choice.minSelect).map((c) => c.id).filter(Boolean);
+            engineResolvePendingChoice(autoChosen as string[]);
+          }
+        }
+        // 2) 액션 페이즈 (ACTION_PHASE)
+        else if (gameState.phase === 'ACTION_PHASE') {
           const activeIdx = gameState.activePlayerIndex;
           if (activeIdx === 0) {
             setP0TotalTime((prev) => {
@@ -1637,7 +1716,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           if (nextTurnTime <= 0) {
             handleEndTurn();
           }
-        } else if (gameState.phase === 'CLASH_SET') {
+        }
+        // 3) 대결 세트 (CLASH_SET)
+        else if (gameState.phase === 'CLASH_SET') {
           if (!gameState.players[0].clashCardReady) {
             setP0TotalTime((prev) => {
               const next = Math.max(0, prev - 1);
@@ -1657,7 +1738,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             if (!gameState.players[0].clashCardReady) engineSetClashCard(0, null, []);
             if (!gameState.players[1].clashCardReady) engineSetClashCard(1, null, []);
           }
-        } else if (gameState.phase === 'COMBO_STEP') {
+        }
+        // 4) 대결 결과 공개 (CLASH_REVEAL)
+        else if (gameState.phase === 'CLASH_REVEAL') {
+          if (nextTurnTime <= 0) {
+            engineProceedAfterClash();
+          }
+        }
+        // 5) 연격 단계 (COMBO_STEP)
+        else if (gameState.phase === 'COMBO_STEP') {
           const comboIdx = comboPlayerIndex;
           if (comboIdx === 0) {
             setP0TotalTime((prev) => {
@@ -1677,6 +1766,32 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             engineFinishCombo(comboIdx);
           }
         }
+        // 6) 패 초과 버리기 (DISCARD_OVERFLOW)
+        else if (gameState.phase === 'DISCARD_OVERFLOW') {
+          const activeIdx = gameState.activePlayerIndex;
+          if (activeIdx === 0) {
+            setP0TotalTime((prev) => {
+              const nextP0 = Math.max(0, prev - 1);
+              if (nextP0 <= 0) handleTriggerTimeOut(0);
+              return nextP0;
+            });
+          } else {
+            setP1TotalTime((prev) => {
+              const nextP1 = Math.max(0, prev - 1);
+              if (nextP1 <= 0) handleTriggerTimeOut(1);
+              return nextP1;
+            });
+          }
+
+          if (nextTurnTime <= 0) {
+            const player = gameState.players[activeIdx];
+            const needed = player.hand.length - 8;
+            if (needed > 0) {
+              const autoDiscardIds = player.hand.slice(-needed).map((c) => c.id);
+              engineDiscardOverflow(activeIdx, autoDiscardIds);
+            }
+          }
+        }
 
         return nextTurnTime;
       });
@@ -1691,6 +1806,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     gameState.activePlayerIndex,
     gameState.players,
     gameState.clashResult,
+    gameState.pendingChoice,
     activeUpgrade,
     activeComboStrike,
     isInitiativeRolling,
@@ -1699,6 +1815,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     handleEndTurn,
     engineSetClashCard,
     engineFinishCombo,
+    engineProceedAfterClash,
+    engineDiscardOverflow,
+    engineResolvePendingChoice,
     handleTriggerTimeOut,
   ]);
 
@@ -3460,8 +3579,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         </span>
                       </div>
                     ) : (
-                      <div className="p-2 bg-[#111520] border border-[#f97316]/50 text-[#f97316] text-xs font-bold text-center">
-                        추가 연격 가능한 카드가 없습니다.
+                      <div className="p-2.5 bg-[#111520] border border-[#f97316]/50 text-[#f97316] text-xs font-bold text-center">
+                        배틀이 완료되었습니다. 우측의 [턴 종료] 버튼을 눌러 턴을 마치세요.
                       </div>
                     )}
                     <button
@@ -3469,18 +3588,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         setNoComboCountdown(null);
                         handleFinishCombo(controlledPlayerIndex);
                       }}
-                      className="w-full py-2.5 px-4 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] text-white font-black text-xs sm:text-sm transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
+                      className="w-full py-3 px-4 bg-gradient-to-r from-red-600 via-amber-500 to-orange-500 hover:brightness-110 text-white font-black text-xs sm:text-sm transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2"
                     >
-                      {!canPlayerExecuteCombo(activeControlledPlayer)
-                        ? noComboCountdown !== null
-                          ? `즉시 턴 넘기기 (${noComboCountdown}초)`
-                          : '즉시 턴 넘기기'
-                        : '연격 종료 (턴 종료)'}
+                      <RotateCcw className="w-4 h-4" />
+                      <span>
+                        {!canPlayerExecuteCombo(activeControlledPlayer)
+                          ? '턴 종료 (END PHASE)'
+                          : '연격 종료 및 턴 넘기기'}
+                      </span>
                     </button>
                   </div>
                 ) : (
                   <div className="p-3 bg-[#111520] border border-cyan-400/40 text-center text-xs sm:text-sm text-cyan-300 font-bold animate-pulse">
-                    상대방({otherPlayer.name})이 연격(추가 공격)을 진행하고 있습니다... ⏳
+                    상대방({otherPlayer.name})이 턴을 마무리하고 있습니다... ⏳
                   </div>
                 )
               )}
@@ -4243,6 +4363,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         (!gameState.deferredEffectDraws || gameState.deferredEffectDraws.length === 0) &&
         !introSwapModalState.isOpen &&
         !concertoModalState.isOpen &&
+        !isMultiplayer &&
         isPlayerComboPhase &&
         !canPlayerExecuteCombo(activeControlledPlayer) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
