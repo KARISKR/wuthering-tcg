@@ -34,8 +34,8 @@ import {
   MultiplayerRoomInfo,
   TimeLimitConfig,
 } from '../types/multiplayer';
-import type { CustomDeckConfig, DeckPreset } from '../types/tcg';
-import { getStoredPresets, presetToCustomDeck } from '../utils/deckCode';
+import type { CustomDeckConfig } from '../types/tcg';
+import { getUserDecks, getActiveCustomDeck } from '../utils/deckCode';
 import { ALL_CHARACTERS } from '../data/cards';
 import { soundEffects } from '../utils/soundEffects';
 
@@ -117,16 +117,39 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   // 활성 화면: 'NONE' (공개 방 리스트) | 'HOST_WAITING' (방장 대기실 룸) | 'GUEST_CONNECTING' (도전자 대기실 룸)
   const [activeOverlay, setActiveOverlay] = useState<'NONE' | 'HOST_WAITING' | 'GUEST_CONNECTING'>('NONE');
 
-  // 덱 선택 상태 (방 안에서 대기하며 언제든 선택/변경 가능)
-  const presets: DeckPreset[] = useMemo(() => getStoredPresets(), [isOpen]);
+  // 덱 선택 상태: 내 덱빌더의 마이 덱(getUserDecks)만 출전 목록에 표시 (AI추천/공유 프리셋 제외)
+  const myDecks: CustomDeckConfig[] = useMemo(() => {
+    try {
+      const list = getUserDecks();
+      if (Array.isArray(list) && list.length > 0) return list;
+    } catch (e) {
+      console.error('Failed to load user decks in multiplayer lobby:', e);
+    }
+    return [getActiveCustomDeck()];
+  }, [isOpen]);
+
   const [selectedDeckId, setSelectedDeckId] = useState<string>(() => {
-    return presets[0]?.id || 'starter-rover';
+    try {
+      const active = getActiveCustomDeck();
+      const list = getUserDecks();
+      const match = list.find((d) => d.id === active?.id);
+      return match?.id || list[0]?.id || active?.id || 'user-deck-1';
+    } catch {
+      return 'user-deck-1';
+    }
   });
 
   const selectedDeckConfig = useMemo<CustomDeckConfig | null>(() => {
-    const preset = presets.find((p) => p.id === selectedDeckId);
-    return preset ? presetToCustomDeck(preset) : null;
-  }, [presets, selectedDeckId]);
+    const deck = myDecks.find((d) => d.id === selectedDeckId);
+    return deck || myDecks[0] || null;
+  }, [myDecks, selectedDeckId]);
+
+  // 보유 덱 목록 변경 시 유효한 선택 ID 유지
+  useEffect(() => {
+    if (myDecks.length > 0 && !myDecks.some((d) => d.id === selectedDeckId)) {
+      setSelectedDeckId(myDecks[0].id);
+    }
+  }, [myDecks, selectedDeckId]);
 
   // 네트워크 상태
   const [connectionStatus, setConnectionStatus] = useState<MultiplayerConnectionStatus>(
@@ -1086,100 +1109,121 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                         </span>
                       </h3>
                       <p className="text-xs text-slate-400">
-                        상대방을 기다리는 동안 사용할 덱을 자유롭게 선택해 두세요. (총 {presets.length}개 프리셋 보유 중)
+                        덱 빌더에서 구성한 마이 덱 중 출전할 덱을 선택하세요. (총 {myDecks.length}개 보유 중)
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* 덱 카드 선택 그리드 */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
-                  {presets.map((preset) => {
-                    const isSelected = preset.id === selectedDeckId;
-                    const customCfg = presetToCustomDeck(preset);
-                    const leaderName = customCfg?.leader?.nameKr || '리더 미지정';
-                    const leaderArt =
-                      customCfg?.leader?.artUrl || findLeaderArt(leaderName);
-                    const supports = [
-                      customCfg?.leftSupport,
-                      customCfg?.rightSupport,
-                    ].filter((s): s is NonNullable<typeof s> => Boolean(s));
-                    const cardCount = customCfg?.actionCards?.length || 40;
+                {/* 덱 카드 선택 그리드: 내 덱빌더 마이 덱 목록 */}
+                {myDecks.length === 0 ? (
+                  <div className="py-12 px-4 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                    <Layers className="w-10 h-10 text-slate-600 mb-1" />
+                    <p className="font-bold text-sm text-slate-300">저장된 마이 덱이 없습니다.</p>
+                    <p className="text-xs text-slate-500">메인 화면의 [덱 빌더]에서 나만의 덱을 생성하고 저장해 주세요.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5">
+                    {myDecks.map((deck) => {
+                      const isSelected = deck.id === selectedDeckId;
+                      const leaderName = deck.leader?.nameKr || '리더 미지정';
+                      const leaderArt =
+                        deck.leader?.artUrl || findLeaderArt(leaderName);
+                      const supports = [
+                        deck.leftSupport,
+                        deck.rightSupport,
+                      ].filter((s): s is NonNullable<typeof s> => Boolean(s));
+                      const cardCount = deck.actionCards?.length || 0;
+                      const r = (deck.actionCards || []).filter((c) => c.color === 'RED').length;
+                      const g = (deck.actionCards || []).filter((c) => c.color === 'GREEN').length;
+                      const b = (deck.actionCards || []).filter((c) => c.color === 'BLUE').length;
+                      const charCount = deck.characterDeck?.length;
 
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => handleSelectDeckCard(preset.id)}
-                        className={`text-left rounded-2xl p-4 border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between gap-3 group ${
-                          isSelected
-                            ? 'bg-gradient-to-br from-amber-950/60 via-slate-900 to-slate-950 border-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.3)] scale-[1.01]'
-                            : 'bg-slate-950/85 hover:bg-slate-900 border-slate-800 hover:border-slate-600'
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-3 min-w-0">
-                            {leaderArt ? (
-                              <img
-                                src={leaderArt}
-                                alt={leaderName}
-                                className={`w-13 h-13 rounded-xl object-cover border-2 shrink-0 ${
-                                  isSelected
-                                    ? 'border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.4)]'
-                                    : 'border-slate-700'
-                                }`}
-                              />
-                            ) : (
-                              <div className="w-13 h-13 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 shrink-0">
-                                <Layers className="w-6 h-6" />
-                              </div>
-                            )}
+                      return (
+                        <button
+                          key={deck.id}
+                          type="button"
+                          onClick={() => handleSelectDeckCard(deck.id)}
+                          className={`text-left rounded-2xl p-4 border-2 transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between gap-3 group ${
+                            isSelected
+                              ? 'bg-gradient-to-br from-amber-950/60 via-slate-900 to-slate-950 border-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.3)] scale-[1.01]'
+                              : 'bg-slate-950/85 hover:bg-slate-900 border-slate-800 hover:border-slate-600'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {leaderArt ? (
+                                <img
+                                  src={leaderArt}
+                                  alt={leaderName}
+                                  className={`w-13 h-13 rounded-xl object-cover border-2 shrink-0 ${
+                                    isSelected
+                                      ? 'border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.4)]'
+                                      : 'border-slate-700'
+                                  }`}
+                                />
+                              ) : (
+                                <div className="w-13 h-13 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-amber-400 shrink-0">
+                                  <Layers className="w-6 h-6" />
+                                </div>
+                              )}
 
-                            <div className="min-w-0">
-                              <div className="text-sm font-black text-white truncate group-hover:text-amber-300 transition">
-                                {preset.name}
-                              </div>
-                              <div className="text-xs font-bold text-amber-300/90 truncate mt-0.5">
-                                리더: {leaderName}
-                              </div>
-                              <div className="text-[11px] text-slate-400 truncate mt-0.5">
-                                액션 카드 {cardCount}장
+                              <div className="min-w-0">
+                                <div className="text-sm font-black text-white truncate group-hover:text-amber-300 transition">
+                                  {deck.name}
+                                </div>
+                                <div className="text-xs font-bold text-amber-300/90 truncate mt-0.5">
+                                  리더: {leaderName}
+                                </div>
+                                <div className="text-[11px] text-slate-400 truncate mt-0.5 flex items-center gap-1.5 font-mono">
+                                  <span>액션 {cardCount}장</span>
+                                  {cardCount > 0 && (
+                                    <span className="text-[10px]">
+                                      (<span className="text-red-400">R{r}</span> <span className="text-emerald-400">G{g}</span> <span className="text-cyan-400">B{b}</span>)
+                                    </span>
+                                  )}
+                                </div>
+                                {charCount !== undefined && charCount > 0 && (
+                                  <div className="text-[10px] text-purple-400 truncate mt-0.5 font-bold">
+                                    캐릭터 덱 {charCount}장
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
 
-                          {isSelected ? (
-                            <span className="px-2 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[10px] flex items-center gap-1 shrink-0 shadow">
-                              <Check className="w-3 h-3 stroke-[3]" />
-                              <span>선택됨</span>
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-lg bg-slate-900 text-slate-400 group-hover:text-white font-bold text-[10px] border border-slate-800 shrink-0">
-                              선택
-                            </span>
-                          )}
-                        </div>
-
-                        {/* 서포트 캐릭터 요약 */}
-                        {supports.length > 0 && (
-                          <div className="pt-2.5 border-t border-slate-800/80 flex items-center gap-1.5 flex-wrap">
-                            <span className="text-[10px] font-bold text-slate-500 mr-1">
-                              서포트:
-                            </span>
-                            {supports.map((sup, idx) => (
-                              <span
-                                key={`${preset.id}-sup-${idx}`}
-                                className="text-[10px] font-bold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 truncate max-w-[90px]"
-                              >
-                                {sup.nameKr}
+                            {isSelected ? (
+                              <span className="px-2 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[10px] flex items-center gap-1 shrink-0 shadow">
+                                <Check className="w-3 h-3 stroke-[3]" />
+                                <span>선택됨</span>
                               </span>
-                            ))}
+                            ) : (
+                              <span className="px-2 py-1 rounded-lg bg-slate-900 text-slate-400 group-hover:text-white font-bold text-[10px] border border-slate-800 shrink-0">
+                                선택
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+
+                          {/* 서포트 캐릭터 요약 */}
+                          {supports.length > 0 && (
+                            <div className="pt-2.5 border-t border-slate-800/80 flex items-center gap-1.5 flex-wrap">
+                              <span className="text-[10px] font-bold text-slate-500 mr-1">
+                                서포트:
+                              </span>
+                              {supports.map((sup, idx) => (
+                                <span
+                                  key={`${deck.id}-sup-${idx}`}
+                                  className="text-[10px] font-bold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 truncate max-w-[90px]"
+                                >
+                                  {sup.nameKr}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </main>
