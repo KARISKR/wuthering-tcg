@@ -577,12 +577,51 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     }
   };
 
+  // 배틀 실시간 관전하기 (관전자)
+  const [isSpectatingLoading, setIsSpectatingLoading] = useState<boolean>(false);
+
+  const handleSpectateRoom = async (targetRoomCode: string) => {
+    soundEffects.playCardPlace();
+    setErrorMessage(null);
+    setIsSpectatingLoading(true);
+
+    try {
+      const session = await multiplayerService.spectateRoom(
+        targetRoomCode,
+        playerName.trim() || '관전자'
+      );
+      soundEffects.playTurnStart();
+      onStartMatch(
+        'SPECTATOR',
+        session.myProfile?.customDeck || null,
+        session.opponentProfile?.customDeck || null
+      );
+    } catch (err: any) {
+      setErrorMessage(err.message || '관전 접속 중 오류가 발생했습니다.');
+    } finally {
+      setIsSpectatingLoading(false);
+    }
+  };
+
   // 직접 코드 입력하여 방 참가하기
   const handleJoinByCode = async () => {
-    if (!inputRoomCode.trim()) {
+    const targetCode = inputRoomCode.trim().toUpperCase();
+    if (!targetCode) {
       setErrorMessage('방 코드를 입력해 주세요.');
       return;
     }
+
+    // 만약 이미 진행 중인 방 코드인 경우 관전으로 안내/유도
+    const matchedRoom = rooms.find((r) => r.roomCode.toUpperCase() === targetCode);
+    if (matchedRoom && matchedRoom.status === 'PLAYING') {
+      if (matchedRoom.allowSpectating !== false) {
+        handleSpectateRoom(targetCode);
+      } else {
+        setErrorMessage('해당 방은 현재 대결이 진행 중이며 관전이 비허용(비공개)된 방입니다.');
+      }
+      return;
+    }
+
     soundEffects.playCardPlace();
     setErrorMessage(null);
     setOpponentProfile(null);
@@ -595,7 +634,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         customDeck: null, // 매칭 완료 전 덱 비공개
         sessionId: multiplayerService.sessionId,
       };
-      await multiplayerService.joinRoom(inputRoomCode.trim(), profile);
+      await multiplayerService.joinRoom(targetCode, profile);
     } catch (err: any) {
       setErrorMessage(err.message || '방 참가 중 오류가 발생했습니다.');
     }
@@ -1708,11 +1747,12 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                           </button>
                         ) : canSpectate ? (
                           <button
-                            onClick={() => handleJoinFromList(room.roomCode)}
-                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:brightness-110 text-white font-black text-xs sm:text-sm shadow-lg shadow-indigo-500/25 flex items-center gap-1.5 transition hover:scale-105 active:scale-95 cursor-pointer"
+                            onClick={() => handleSpectateRoom(room.roomCode)}
+                            disabled={isSpectatingLoading}
+                            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-xs sm:text-sm shadow-lg shadow-indigo-500/25 flex items-center gap-1.5 transition hover:scale-105 active:scale-95 cursor-pointer"
                           >
                             <Eye className="w-4 h-4" />
-                            <span>배틀 관전</span>
+                            <span>{isSpectatingLoading ? '관전 접속 중...' : '배틀 관전'}</span>
                           </button>
                         ) : (
                           <button

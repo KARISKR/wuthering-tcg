@@ -34,6 +34,8 @@ export function generateSessionId(): string {
 class MultiplayerService {
   private peer: Peer | null = null;
   private connection: DataConnection | null = null;
+  public spectatorConnections: Map<string, DataConnection> = new Map();
+  public spectatorCount: number = 0;
 
   public role: MultiplayerRole = 'HOST';
   public roomCode: string = '';
@@ -311,6 +313,129 @@ class MultiplayerService {
     });
   }
 
+  // --------------------------------------------------------------------------
+  // 2-B. 배틀 실시간 관전하기 (Spectator)
+  // --------------------------------------------------------------------------
+  public async spectateRoom(
+    roomCode: string,
+    spectatorName: string
+  ): Promise<MultiplayerSessionData> {
+    this.cleanUp();
+    this.role = 'SPECTATOR';
+    this.roomCode = roomCode.toUpperCase().trim();
+    this.myProfile = {
+      name: spectatorName.trim() || '관전자',
+      sessionId: this.sessionId,
+      customDeck: null,
+    };
+    this.setStatus('CONNECTING_TO_HOST');
+
+    const spectatorPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-spectator-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
+    const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
+
+    return new Promise((resolve, reject) => {
+      try {
+        this.peer = new Peer(spectatorPeerId, {
+          debug: 1,
+        });
+
+        const connectTimeout = setTimeout(() => {
+          this.setStatus('ERROR');
+          reject(new Error('방장(호스트)을 찾을 수 없거나 응답이 없습니다. 배틀이 종료되었는지 확인해 주세요.'));
+        }, 12000);
+
+        this.peer.on('open', () => {
+          const conn = this.peer!.connect(hostPeerId, {
+            reliable: true,
+          });
+
+          this.connection = conn;
+
+          conn.on('open', () => {
+            this.setStatus('CONNECTED');
+            // 호스트에 관전 참여 메시지 전송
+            try {
+              conn.send({
+                type: 'SPECTATOR_JOIN',
+                spectatorName: this.myProfile!.name,
+                spectatorSessionId: this.sessionId,
+              });
+            } catch (e) {
+              console.warn('[Multiplayer] Failed to send SPECTATOR_JOIN:', e);
+            }
+          });
+
+          conn.on('data', (data) => {
+            const msg = data as MultiplayerMessage;
+            if (!msg || !msg.type) return;
+
+            if (msg.type === 'SPECTATOR_REJECT') {
+              clearTimeout(connectTimeout);
+              this.cleanUp();
+              reject(new Error(msg.reason || '관전이 비허용(비공개)된 방입니다.'));
+              return;
+            }
+
+            if (msg.type === 'SPECTATOR_INIT') {
+              clearTimeout(connectTimeout);
+              this.latestGameState = msg.gameState;
+              this.opponentProfile = msg.guestProfile;
+              if (msg.timeLimitConfig) this.timeLimitConfig = msg.timeLimitConfig;
+              if (msg.p0TotalTime !== undefined) this.p0TotalTime = msg.p0TotalTime;
+              if (msg.p1TotalTime !== undefined) this.p1TotalTime = msg.p1TotalTime;
+              if (msg.currentTurnTime !== undefined) this.currentTurnTime = msg.currentTurnTime;
+
+              const sessionData: MultiplayerSessionData = {
+                role: 'SPECTATOR',
+                roomCode: this.roomCode,
+                sessionId: this.sessionId,
+                playerName: this.myProfile!.name,
+                myProfile: msg.hostProfile,
+                opponentProfile: msg.guestProfile,
+                lastGameState: msg.gameState,
+                timeLimitConfig: msg.timeLimitConfig,
+                p0TotalTime: msg.p0TotalTime,
+                p1TotalTime: msg.p1TotalTime,
+                currentTurnTime: msg.currentTurnTime,
+                timestamp: Date.now(),
+              };
+
+              this.saveSession(msg.gameState);
+              this.emitMessage(msg);
+              resolve(sessionData);
+              return;
+            }
+
+            this.handleReceivedData(msg);
+          });
+
+          conn.on('close', () => {
+            clearTimeout(connectTimeout);
+            console.warn('[Multiplayer] Spectator connection closed');
+            this.setStatus('DISCONNECTED');
+          });
+
+          conn.on('error', (err) => {
+            clearTimeout(connectTimeout);
+            console.error('[Multiplayer] Spectator connection error:', err);
+            this.setStatus('ERROR');
+            reject(err);
+          });
+        });
+
+        this.peer.on('error', (err) => {
+          clearTimeout(connectTimeout);
+          console.error('[Multiplayer] Spectator Peer error:', err);
+          this.setStatus('ERROR');
+          reject(err);
+        });
+      } catch (err) {
+        this.setStatus('ERROR');
+        reject(err);
+      }
+    });
+  }
+
   public resetPeerOnly() {
     this.stopHeartbeat();
     if (this.connection) {
@@ -319,6 +444,11 @@ class MultiplayerService {
       } catch {}
       this.connection = null;
     }
+    this.spectatorConnections.forEach((conn) => {
+      try { conn.close(); } catch {}
+    });
+    this.spectatorConnections.clear();
+    this.spectatorCount = 0;
     if (this.peer) {
       try {
         this.peer.destroy();
@@ -437,8 +567,171 @@ class MultiplayerService {
   // 공통 연결 및 데이터 처리
   // --------------------------------------------------------------------------
   private handleIncomingConnection(conn: DataConnection) {
-    // 이미 연결된 게스트가 있고 재접속이 아닌 경우 처리
+    const isSpectatorConn = conn.peer?.includes('-spectator-');
+    if (isSpectatorConn) {
+      this.setupSpectatorConnection(conn);
+      return;
+    }
+
+    // 이미 다른 게스트와 연결되어 있는 경우 (단, 재접속 요청은 허용)
+    if (this.connection && this.connection.open && this.connection.peer !== conn.peer) {
+      const tempListener = (data: any) => {
+        const msg = data as MultiplayerMessage;
+        if (msg?.type === 'RECONNECT_REQUEST') {
+          console.log('[Multiplayer] Authorized guest reconnection accepted');
+          try { this.connection?.close(); } catch {}
+          this.setupConnectionListeners(conn);
+        } else {
+          console.warn('[Multiplayer] Rejected duplicate guest connection while battle in progress');
+          try {
+            conn.send({
+              type: 'DISCONNECT_WARNING',
+              reason: '이미 다른 도전자와 대결이 진행 중인 방입니다.',
+              countdownSec: 0,
+            });
+            setTimeout(() => { try { conn.close(); } catch {} }, 500);
+          } catch {}
+        }
+      };
+      conn.once('data', tempListener);
+      return;
+    }
+
     this.setupConnectionListeners(conn);
+  }
+
+  private setupSpectatorConnection(conn: DataConnection) {
+    conn.on('open', () => {
+      if (!this.allowSpectating) {
+        try {
+          conn.send({
+            type: 'SPECTATOR_REJECT',
+            reason: '현재 방은 관전이 비허용(비공개)되어 있습니다.',
+          });
+          setTimeout(() => { try { conn.close(); } catch {} }, 500);
+        } catch {}
+        return;
+      }
+
+      this.spectatorConnections.set(conn.peer, conn);
+      this.spectatorCount = this.spectatorConnections.size;
+      this.emitSpectatorCount();
+
+      // 현재 진행 중인 게임판 상태가 있다면 즉시 전송
+      const saved = this.getSavedSession();
+      const stateToSend = this.latestGameState || saved?.lastGameState;
+      if (stateToSend && this.myProfile) {
+        try {
+          conn.send({
+            type: 'SPECTATOR_INIT',
+            gameState: stateToSend,
+            hostProfile: this.myProfile,
+            guestProfile: this.opponentProfile || {
+              name: '도전자',
+              sessionId: 'unknown',
+              customDeck: null,
+            },
+            timeLimitConfig: this.timeLimitConfig,
+            p0TotalTime: this.p0TotalTime,
+            p1TotalTime: this.p1TotalTime,
+            currentTurnTime: this.currentTurnTime,
+          });
+        } catch (e) {
+          console.warn('[Multiplayer] Failed to send SPECTATOR_INIT on open:', e);
+        }
+      }
+    });
+
+    conn.on('data', (data) => {
+      const msg = data as MultiplayerMessage;
+      if (!msg || !msg.type) return;
+
+      if (msg.type === 'PING') {
+        try { conn.send({ type: 'PONG', clientTimestamp: msg.timestamp }); } catch {}
+        return;
+      }
+
+      if (msg.type === 'SPECTATOR_JOIN') {
+        if (!this.allowSpectating) {
+          try {
+            conn.send({
+              type: 'SPECTATOR_REJECT',
+              reason: '현재 방은 관전이 비허용(비공개)되어 있습니다.',
+            });
+            setTimeout(() => { try { conn.close(); } catch {} }, 500);
+          } catch {}
+          return;
+        }
+
+        const saved = this.getSavedSession();
+        const stateToSend = this.latestGameState || saved?.lastGameState;
+        if (stateToSend && this.myProfile) {
+          try {
+            conn.send({
+              type: 'SPECTATOR_INIT',
+              gameState: stateToSend,
+              hostProfile: this.myProfile,
+              guestProfile: this.opponentProfile || {
+                name: '도전자',
+                sessionId: 'unknown',
+                customDeck: null,
+              },
+              timeLimitConfig: this.timeLimitConfig,
+              p0TotalTime: this.p0TotalTime,
+              p1TotalTime: this.p1TotalTime,
+              currentTurnTime: this.currentTurnTime,
+            });
+          } catch (e) {
+            console.warn('[Multiplayer] Failed to send SPECTATOR_INIT on SPECTATOR_JOIN:', e);
+          }
+        }
+      }
+    });
+
+    conn.on('close', () => {
+      this.spectatorConnections.delete(conn.peer);
+      this.spectatorCount = this.spectatorConnections.size;
+      this.emitSpectatorCount();
+    });
+
+    conn.on('error', (err) => {
+      console.warn('[Multiplayer] Spectator connection error:', err);
+      this.spectatorConnections.delete(conn.peer);
+      this.spectatorCount = this.spectatorConnections.size;
+      this.emitSpectatorCount();
+    });
+  }
+
+  public broadcastToSpectators(msg: MultiplayerMessage) {
+    if (this.spectatorConnections.size === 0) return;
+    const deadPeers: string[] = [];
+    this.spectatorConnections.forEach((conn, peerId) => {
+      if (conn && conn.open) {
+        try {
+          conn.send(msg);
+        } catch {
+          deadPeers.push(peerId);
+        }
+      } else {
+        deadPeers.push(peerId);
+      }
+    });
+    if (deadPeers.length > 0) {
+      deadPeers.forEach((p) => this.spectatorConnections.delete(p));
+      this.spectatorCount = this.spectatorConnections.size;
+    }
+  }
+
+  private emitSpectatorCount() {
+    const msg: MultiplayerMessage = {
+      type: 'SPECTATOR_COUNT',
+      count: this.spectatorCount,
+    };
+    this.emitMessage(msg);
+    if (this.role === 'HOST') {
+      this.send(msg);
+      this.broadcastToSpectators(msg);
+    }
   }
 
   private setupConnectionListeners(conn: DataConnection, onReady?: () => void) {
@@ -565,6 +858,17 @@ class MultiplayerService {
   // 메시지 송신 유틸
   // --------------------------------------------------------------------------
   public send(msg: MultiplayerMessage): boolean {
+    if (this.role === 'HOST') {
+      if (
+        msg.type === 'TIME_SYNC' ||
+        msg.type === 'TIME_OUT' ||
+        msg.type === 'SURRENDER' ||
+        msg.type === 'DISPATCH_ACTION' ||
+        msg.type === 'ROOM_CONFIG_UPDATE'
+      ) {
+        this.broadcastToSpectators(msg);
+      }
+    }
     if (!this.connection || !this.connection.open) {
       console.warn('[Multiplayer] Cannot send, connection not open:', msg.type);
       return false;
@@ -590,11 +894,13 @@ class MultiplayerService {
   public sendGameState(gameState: GameState, actionDesc?: string) {
     this.latestGameState = gameState;
     this.saveSession(gameState);
-    this.send({
+    const msg: MultiplayerMessage = {
       type: 'SYNC_GAME_STATE',
       gameState,
       actionDesc,
-    });
+    };
+    this.send(msg);
+    this.broadcastToSpectators(msg);
   }
 
   public sendSurrender(playerIndex: 0 | 1) {
@@ -680,6 +986,11 @@ class MultiplayerService {
   public cleanUp() {
     this.stopHeartbeat();
     this.stopDisconnectTimer();
+    this.spectatorConnections.forEach((conn) => {
+      try { conn.close(); } catch {}
+    });
+    this.spectatorConnections.clear();
+    this.spectatorCount = 0;
     if (this.connection) {
       try {
         this.connection.close();

@@ -31,6 +31,12 @@ export function App() {
   useEffect(() => {
     const session = multiplayerService.getSavedSession();
     if (session && Date.now() - session.timestamp < 10 * 60 * 1000 && session.lastGameState) {
+      // 관전자는 새로고침 시 대결 복구 토스트 없이 세션 정리
+      if (session.role === 'SPECTATOR') {
+        multiplayerService.clearSession();
+        return;
+      }
+
       // 배틀 도중 새로고침된 경우 배틀 화면으로 즉시 자동 복귀
       if (window.location.hash.toLowerCase().includes('battle')) {
         setIsTutorialBattle(false);

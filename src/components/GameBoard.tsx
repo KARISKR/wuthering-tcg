@@ -125,20 +125,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 }) => {
   const [showTutorialOverlay, setShowTutorialOverlay] = useState(isTutorialMode);
 
-  // 멀티플레이어 닉네임 계산 (P0: 방장/호스트, P1: 도전자/게스트)
-  const mpP0Name =
-    initialMode === 'MULTIPLAYER'
-      ? multiplayerRole === 'GUEST'
-        ? multiplayerService.opponentProfile?.name || '호스트 (방장)'
-        : multiplayerService.myProfile?.name || localStorage.getItem('wuthering_player_name') || '호스트 (방장)'
-      : undefined;
-  const mpP1Name =
-    initialMode === 'MULTIPLAYER'
-      ? multiplayerRole === 'GUEST'
-        ? multiplayerService.myProfile?.name || localStorage.getItem('wuthering_player_name') || '도전자 (게스트)'
-        : multiplayerService.opponentProfile?.name || '도전자 (게스트)'
-      : undefined;
-
   // [멀티플레이 세션 동기 복원] 첫 렌더링 시점에 즉시 저장된 배틀 상태를 주입하여 초기화 레이스 컨디션 차단
   const initialSavedSession = useMemo(() => {
     if (initialMode === 'MULTIPLAYER') {
@@ -146,6 +132,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
     return null;
   }, [initialMode]);
+
+  // 멀티플레이어 닉네임 계산 (P0: 방장/호스트, P1: 도전자/게스트)
+  const mpP0Name =
+    initialMode === 'MULTIPLAYER'
+      ? multiplayerRole === 'GUEST'
+        ? multiplayerService.opponentProfile?.name || '호스트 (방장)'
+        : multiplayerRole === 'SPECTATOR'
+        ? multiplayerService.myProfile?.name || initialSavedSession?.myProfile?.name || '호스트 (방장)'
+        : multiplayerService.myProfile?.name || localStorage.getItem('wuthering_player_name') || '호스트 (방장)'
+      : undefined;
+  const mpP1Name =
+    initialMode === 'MULTIPLAYER'
+      ? multiplayerRole === 'GUEST'
+        ? multiplayerService.myProfile?.name || localStorage.getItem('wuthering_player_name') || '도전자 (게스트)'
+        : multiplayerRole === 'SPECTATOR'
+        ? multiplayerService.opponentProfile?.name || initialSavedSession?.opponentProfile?.name || '도전자 (게스트)'
+        : multiplayerService.opponentProfile?.name || '도전자 (게스트)'
+      : undefined;
 
   const {
     gameState,
@@ -189,6 +193,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const isMultiplayer = gameState.gameMode === 'MULTIPLAYER';
   const isGuest = isMultiplayer && multiplayerRole === 'GUEST';
   const isHost = isMultiplayer && (multiplayerRole === 'HOST' || !multiplayerRole);
+  const isSpectator = isMultiplayer && multiplayerRole === 'SPECTATOR';
+  const [spectatorCount, setSpectatorCount] = useState<number>(() => multiplayerService.spectatorCount);
 
   const [controlledPlayerIndex, setControlledPlayerIndex] = useState<0 | 1>(() => {
     if (initialMode === 'MULTIPLAYER' && multiplayerRole === 'GUEST') return 1;
@@ -248,15 +254,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // [멀티플레이어 액션 프록시 래퍼] 게스트(P1)는 네트워크로 호스트에게 액션을 위임하고, 호스트/솔로/AI는 로컬 엔진을 즉시 실행
   const handleDrawCards = useCallback((pIdx?: 0 | 1) => {
+    if (isSpectator) return;
     const targetIdx = pIdx ?? controlledPlayerIndex;
     if (isGuest) {
       multiplayerService.sendAction('DRAW_CARDS', 1);
     } else {
       engineDrawCards(targetIdx);
     }
-  }, [isGuest, controlledPlayerIndex, engineDrawCards]);
+  }, [isSpectator, isGuest, controlledPlayerIndex, engineDrawCards]);
 
   const handleSelectStartingLeader = useCallback((p0Leader: string, p1Leader?: string) => {
+    if (isSpectator) return;
     setHasSelectedMyLeader(true);
     if (isGuest) {
       multiplayerService.sendAction('SELECT_LEADER', 1, { leaderName: p0Leader });
@@ -268,9 +276,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     } else {
       engineSelectStartingLeader(p0Leader, p1Leader);
     }
-  }, [isGuest, isHost, engineSelectStartingLeader]);
+  }, [isSpectator, isGuest, isHost, engineSelectStartingLeader]);
 
   const handleMulligan = useCallback((discardIds: string[]) => {
+    if (isSpectator) return;
     setHasCompletedMyMulligan(true);
     if (isGuest) {
       multiplayerService.sendAction('MULLIGAN', 1, { discardIds });
@@ -282,55 +291,61 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     } else {
       engineMulligan(discardIds);
     }
-  }, [isGuest, isHost, engineMulligan]);
+  }, [isSpectator, isGuest, isHost, engineMulligan]);
 
   const handleUpgrade = useCallback((pIdx: 0 | 1, slotName: any, upgradeCardId: string, discardIds: string[]) => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('UPGRADE', 1, { slotName, upgradeCardId, discardIds });
     } else {
       engineUpgrade(pIdx, slotName, upgradeCardId, discardIds);
     }
-  }, [isGuest, engineUpgrade]);
+  }, [isSpectator, isGuest, engineUpgrade]);
 
   const handleSwitchLeader = useCallback((pIdx: 0 | 1, targetSlot: 'leftSupport' | 'rightSupport') => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('SWITCH_LEADER', 1, { targetSlot });
     } else {
       engineSwitchLeader(pIdx, targetSlot);
     }
-  }, [isGuest, engineSwitchLeader]);
+  }, [isSpectator, isGuest, engineSwitchLeader]);
 
   const handleChargeConcerto = useCallback((pIdx: 0 | 1, cardId: string) => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('CHARGE_CONCERTO', 1, { cardId });
     } else {
       engineChargeConcerto(pIdx, cardId);
     }
-  }, [isGuest, engineChargeConcerto]);
+  }, [isSpectator, isGuest, engineChargeConcerto]);
 
   const handleSetClashCard = useCallback((pIdx: 0 | 1, cardId: string | null, spentConcertoIds?: string[]) => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('SET_CLASH_CARD', 1, { cardId, spentConcertoIds });
     } else {
       engineSetClashCard(pIdx, cardId, spentConcertoIds);
     }
-  }, [isGuest, engineSetClashCard]);
+  }, [isSpectator, isGuest, engineSetClashCard]);
 
   const handleDecideClash = useCallback((proceed: boolean) => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('DECIDE_CLASH', 1, { proceed });
     } else {
       engineDecideClash(proceed);
     }
-  }, [isGuest, engineDecideClash]);
+  }, [isSpectator, isGuest, engineDecideClash]);
 
   const handleProceedAfterClash = useCallback(() => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('PROCEED_AFTER_CLASH', 1);
     } else {
       engineProceedAfterClash();
     }
-  }, [isGuest, engineProceedAfterClash]);
+  }, [isSpectator, isGuest, engineProceedAfterClash]);
 
   const handleComboAttack = useCallback((
     pIdx: 0 | 1,
@@ -339,6 +354,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     discardForBonusDmgId?: string,
     swapSupportSlot?: 'leftSupport' | 'rightSupport'
   ) => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('COMBO_ATTACK', 1, {
         cardId,
@@ -349,31 +365,34 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     } else {
       engineComboAttack(pIdx, cardId, spentConcertoIds, discardForBonusDmgId, swapSupportSlot);
     }
-  }, [isGuest, engineComboAttack]);
+  }, [isSpectator, isGuest, engineComboAttack]);
 
   const handleFinishCombo = useCallback((pIdx: 0 | 1) => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('FINISH_COMBO', 1);
     } else {
       engineFinishCombo(pIdx);
     }
-  }, [isGuest, engineFinishCombo]);
+  }, [isSpectator, isGuest, engineFinishCombo]);
 
   const handleDiscardOverflow = useCallback((pIdx: 0 | 1, cardIds: string[]) => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('DISCARD_OVERFLOW', 1, { cardIds });
     } else {
       engineDiscardOverflow(pIdx, cardIds);
     }
-  }, [isGuest, engineDiscardOverflow]);
+  }, [isSpectator, isGuest, engineDiscardOverflow]);
 
   const handleResolvePendingChoice = useCallback((chosenCardIds: string[]) => {
+    if (isSpectator) return;
     if (isGuest) {
       multiplayerService.sendAction('PENDING_CHOICE', 1, { optionId: chosenCardIds });
     } else {
       engineResolvePendingChoice(chosenCardIds);
     }
-  }, [isGuest, engineResolvePendingChoice]);
+  }, [isSpectator, isGuest, engineResolvePendingChoice]);
 
   // 드로우 페이즈 연출 및 카드 매수 계산 (공식 룰 602.1.3: 게임의 맨 첫 번째 턴(선공의 턴 1)은 1장, 그 외 모든 턴은 2장)
   const currentTurnDrawCount = getTurnDrawCount(gameState);
@@ -499,6 +518,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // [공식 룰] 대결 세트 시: 사전 협주 차감 및 모달 없이 카드를 뒷면으로 즉시 세트 (코스트는 양측 카드 동시 공개 시점에 지불)
   const requestSetClashCard = (playerIndex: 0 | 1, cardId: string | null) => {
+    if (isSpectator) return;
     // 진행 중인 효과/모달(필드 확인 상태 포함)이 있을 때는 다른 조작 차단
     if (
       gameState.pendingChoice ||
@@ -551,6 +571,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // 연격 공격 시 협주 코스트 지불 선택 및 <변주 스킬> 백 캐릭터 교체 선택 분기
   const requestComboAttack = (playerIndex: 0 | 1, cardId: string) => {
+    if (isSpectator) return;
     if (
       gameState.pendingChoice ||
       gameState.lastEffectDraw ||
@@ -778,6 +799,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   };
 
   const handleExitClick = () => {
+    if (isSpectator) {
+      if (onExitToLobby) onExitToLobby();
+      return;
+    }
     if (gameState.phase !== 'GAME_OVER' && gameState.winner === null) {
       setShowExitConfirm(true);
     } else if (onExitToLobby) {
@@ -787,6 +812,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // 백(서포터)에서 리더로 교체 시 Join Team 고유 보이스 재생 래퍼
   const onSwitchLeaderWithSound = (playerIndex: 0 | 1, slotName: 'leftSupport' | 'rightSupport') => {
+    if (isSpectator) return;
     if (
       gameState.pendingChoice ||
       gameState.lastEffectDraw ||
@@ -1272,14 +1298,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [gameState, isHost]);
 
-  // [멀티플레이] 게스트: 상태 동기화 및 기권 수신
+  // [멀티플레이] 게스트 및 관전자: 상태 동기화 및 기권 수신
   useEffect(() => {
-    if (gameState.gameMode !== 'MULTIPLAYER' || !isGuest) return;
+    if (gameState.gameMode !== 'MULTIPLAYER' || (!isGuest && !isSpectator)) return;
 
     const unsub = multiplayerService.onMessage((msg) => {
       if (msg.type === 'SYNC_GAME_STATE') {
         setGameState(msg.gameState);
         multiplayerService.saveSession(msg.gameState);
+      } else if (msg.type === 'SPECTATOR_INIT') {
+        setGameState(msg.gameState);
+        multiplayerService.saveSession(msg.gameState);
+        if (msg.timeLimitConfig) setTimeLimitConfig(msg.timeLimitConfig);
+        if (msg.p0TotalTime !== undefined) setP0TotalTime(msg.p0TotalTime);
+        if (msg.p1TotalTime !== undefined) setP1TotalTime(msg.p1TotalTime);
+        if (msg.currentTurnTime !== undefined) setCurrentTurnTime(msg.currentTurnTime);
       } else if (msg.type === 'RECONNECT_ACCEPT') {
         setGameState(msg.gameState);
         multiplayerService.saveSession(msg.gameState);
@@ -1446,6 +1479,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     const unsubMsg = multiplayerService.onMessage((msg) => {
       if (msg.type === 'PONG') {
         setPingLatency(multiplayerService.pingMs);
+      } else if (msg.type === 'SPECTATOR_COUNT') {
+        setSpectatorCount(msg.count);
       }
     });
 
@@ -1480,8 +1515,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [gameState.logs.length]);
 
-  // 현재 조종 중인 플레이어 상태 및 시점 (멀티플레이에서는 호스트/게스트에 따라 상단/하단 분리)
-  const viewerPlayerIndex: 0 | 1 = isMultiplayer ? (isGuest ? 1 : 0) : 0;
+  // 현재 조종 중인 플레이어 상태 및 시점 (멀티플레이에서는 호스트/게스트에 따라 상단/하단 분리, 관전자는 선택한 시점 반영)
+  const viewerPlayerIndex: 0 | 1 = isMultiplayer
+    ? isSpectator
+      ? controlledPlayerIndex
+      : isGuest
+      ? 1
+      : 0
+    : 0;
   const myPlayerIndex: 0 | 1 = controlledPlayerIndex;
   const oppPlayerIndex: 0 | 1 = controlledPlayerIndex === 0 ? 1 : 0;
   const activeControlledPlayer = gameState.players[myPlayerIndex];
@@ -1915,6 +1956,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // 레벨업 버튼 클릭 시 가능한 진화 후보 계산 (공식 룰 603.1.2.2: 동일 레벨 또는 +1 레벨의 동명 카드)
   const openUpgradeModal = (slotName: 'leader' | 'leftSupport' | 'rightSupport', playerIdx: 0 | 1 = 0) => {
+    if (isSpectator) return;
     const targetPlayer = gameState.players[playerIdx];
     const currentChar = targetPlayer.slots[slotName];
     if (!currentChar) return;
@@ -2078,9 +2120,51 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   {pingLatency}ms
                 </span>
               )}
-              <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40">
-                {multiplayerRole === 'GUEST' ? 'GUEST' : 'HOST'}
+              <span className={`text-[10px] font-black px-1.5 py-0.2 rounded border ${
+                isSpectator
+                  ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                  : 'bg-violet-500/20 text-violet-300 border-violet-500/40'
+              }`}>
+                {isSpectator ? 'SPECTATOR' : (multiplayerRole === 'GUEST' ? 'GUEST' : 'HOST')}
               </span>
+            </div>
+          )}
+
+          {/* 관전자 시점 전환 컨트롤러 (P1 시점 vs P2 시점) */}
+          {isSpectator && (
+            <div className="flex items-center gap-1 bg-[#0c101b] p-0.5 rounded border border-indigo-500/50">
+              <button
+                onClick={() => setControlledPlayerIndex(0)}
+                className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-black transition cursor-pointer ${
+                  controlledPlayerIndex === 0
+                    ? 'bg-amber-500 text-slate-950 font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="P1(호스트) 시점으로 전장 보기"
+              >
+                <Eye className="w-3 h-3" />
+                <span>P1 시점</span>
+              </button>
+              <button
+                onClick={() => setControlledPlayerIndex(1)}
+                className={`flex items-center gap-1 px-2 py-0.5 text-[11px] font-black transition cursor-pointer ${
+                  controlledPlayerIndex === 1
+                    ? 'bg-cyan-500 text-slate-950 font-black'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+                title="P2(도전자) 시점으로 전장 보기"
+              >
+                <Eye className="w-3 h-3" />
+                <span>P2 시점</span>
+              </button>
+            </div>
+          )}
+
+          {/* 관전자 수 실시간 배지 */}
+          {isMultiplayer && spectatorCount > 0 && (
+            <div className="hidden sm:flex items-center gap-1 bg-indigo-950/80 border border-indigo-500/50 px-2 py-0.5 rounded text-[11px] font-black text-indigo-300 shadow-[0_0_10px_rgba(99,102,241,0.25)]">
+              <Eye className="w-3.5 h-3.5 text-indigo-400" />
+              <span>관전 {spectatorCount}명</span>
             </div>
           )}
         </div>
@@ -3279,16 +3363,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   actionArea={activeControlledPlayer.actionArea}
                   phase={gameState.phase}
                   isTurnPlayer={isCurrentControlledTurn}
-                  canChargeConcerto={!isActionLockedByModal && !activeControlledPlayer.actionFlags.chargedConcerto && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
-                  canSetClashCard={!isActionLockedByModal && gameState.phase === 'CLASH_SET' && !activeControlledPlayer.clashCardReady && (isCurrentControlledTurn || gameState.players[gameState.activePlayerIndex].clashCardReady)}
-                  isComboStep={!isActionLockedByModal && gameState.phase === 'COMBO_STEP' && isPlayerComboPhase && (Boolean(activeControlledPlayer.comboUnlimited) || activeControlledPlayer.comboCount > 0)}
+                  canChargeConcerto={!isSpectator && !isActionLockedByModal && !activeControlledPlayer.actionFlags.chargedConcerto && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
+                  canSetClashCard={!isSpectator && !isActionLockedByModal && gameState.phase === 'CLASH_SET' && !activeControlledPlayer.clashCardReady && (isCurrentControlledTurn || gameState.players[gameState.activePlayerIndex].clashCardReady)}
+                  isComboStep={!isSpectator && !isActionLockedByModal && gameState.phase === 'COMBO_STEP' && isPlayerComboPhase && (Boolean(activeControlledPlayer.comboUnlimited) || activeControlledPlayer.comboCount > 0)}
                   comboCount={activeControlledPlayer.comboCount}
                   comboUnlimited={activeControlledPlayer.comboUnlimited}
                   selectedOverflowCardIds={selectedOverflowIds}
-                  onSelectOverflowCard={toggleOverflowCard}
-                  onChargeConcerto={(cardId) => handleChargeConcerto(controlledPlayerIndex, cardId)}
-                  onSetClashCard={(cardId) => requestSetClashCard(controlledPlayerIndex, cardId)}
-                  onComboAttack={(cardId) => requestComboAttack(controlledPlayerIndex, cardId)}
+                  onSelectOverflowCard={isSpectator ? () => {} : toggleOverflowCard}
+                  onChargeConcerto={(cardId) => (!isSpectator && handleChargeConcerto(controlledPlayerIndex, cardId))}
+                  onSetClashCard={(cardId) => (!isSpectator && requestSetClashCard(controlledPlayerIndex, cardId))}
+                  onComboAttack={(cardId) => (!isSpectator && requestComboAttack(controlledPlayerIndex, cardId))}
                   onHover={(card) => setPreviewCard(card, true)}
                 />
               </div>
@@ -3379,6 +3463,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
               {/* 1. 메인 페이즈 (행동 단계) */}
               {gameState.phase === 'ACTION_PHASE' && !isAiThinking && (
+                isSpectator ? (
+                  <div className="flex flex-col gap-2 p-3 bg-[#0c101b] border border-indigo-500/50 text-center">
+                    <div className="flex items-center justify-center gap-1.5 text-xs font-black text-indigo-300">
+                      <Eye className="w-4 h-4 text-indigo-400" />
+                      <span>실시간 관전 진행 중</span>
+                    </div>
+                    <div className="text-xs text-slate-300">
+                      현재 <strong className="text-amber-300">{gameState.players[gameState.activePlayerIndex].name}</strong>의 메인 페이즈입니다.
+                    </div>
+                  </div>
+                ) : (
                 <>
                   {isCurrentControlledTurn ? (
                     <>
@@ -3493,7 +3588,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   )}
                 </>
-              )}
+              )
+            )}
 
               {/* 2. 대결 세트 단계 (CLASH_SET) */}
               {gameState.phase === 'CLASH_SET' && (() => {
@@ -3541,7 +3637,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                       </>
                     )}
 
-                    {!activeControlledPlayer.clashCardReady ? (
+                    {isSpectator ? (
+                      <div className="p-3 bg-[#111520] border border-indigo-500/50 text-indigo-200 text-xs text-center font-bold animate-pulse">
+                        👁️ 양 플레이어가 대결(CLASH) 카드를 세트하는 중입니다...
+                      </div>
+                    ) : !activeControlledPlayer.clashCardReady ? (
                       <>
                         {!isTurnPlayer && !turnPlayerReady ? (
                           <div className="p-2.5 bg-[#111520] border border-cyan-500/50 text-cyan-200 text-xs text-center font-bold animate-pulse">
@@ -3635,7 +3735,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
               {/* 3. 연격 단계 (COMBO_STEP) */}
               {gameState.phase === 'COMBO_STEP' && (
-                isPlayerComboPhase ? (
+                isSpectator ? (
+                  <div className="p-3 bg-[#111520] border border-indigo-500/50 text-indigo-200 text-xs text-center font-bold animate-pulse">
+                    👁️ 연격(COMBO) 단계 진행 중입니다...
+                  </div>
+                ) : isPlayerComboPhase ? (
                   <div className="flex flex-col gap-2">
                     {canPlayerExecuteCombo(activeControlledPlayer) ? (
                       <div className="p-2.5 bg-red-950/90 border border-red-500 text-red-200 font-black text-xs sm:text-sm flex items-center justify-between animate-pulse">
@@ -3676,6 +3780,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
               {/* 4. 패 초과 버리기 단계 (DISCARD_OVERFLOW) */}
               {gameState.phase === 'DISCARD_OVERFLOW' && (
+                isSpectator ? (
+                  <div className="p-3 bg-[#111520] border border-indigo-500/50 text-indigo-200 text-xs text-center font-bold animate-pulse">
+                    👁️ 손패 상한 초과 카드 정리 중입니다...
+                  </div>
+                ) : (
                 <div className="flex flex-col gap-2">
                   {activeControlledPlayer.hand.length > 8 ? (
                     <>
@@ -3703,6 +3812,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                     </div>
                   )}
                 </div>
+                )
               )}
             </div>
           </div>
@@ -3955,7 +4065,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 시작 리더 카드 선택 모달 (주사위 결정 연출 완료 후 노출) */}
       {gameState.phase === 'LEADER_SELECT' && !isInitiativeRolling && (
-        isMultiplayer && hasSelectedMyLeader ? (
+        isSpectator ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
+            <div className="bg-[#0c101b]/95 border border-indigo-500/70 p-6 shadow-2xl max-w-sm w-full text-center flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+              <div className="text-white font-bold text-sm">
+                대결 준비 중 (리더 선택)
+              </div>
+              <div className="text-xs text-slate-400">
+                양 플레이어가 시작 리더를 선택하는 중입니다... ⏳
+              </div>
+            </div>
+          </div>
+        ) : isMultiplayer && hasSelectedMyLeader ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
             <div className="bg-[#0c101b]/95 border border-[#f97316]/70 p-6 shadow-2xl max-w-sm w-full text-center flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-2 border-[#f97316] border-t-transparent rounded-full animate-spin" />
@@ -3998,7 +4120,19 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
       {/* 멀리건 모달 (시작 리더 선택 완료 후 노출) */}
       {gameState.phase === 'MULLIGAN' && !isInitiativeRolling && (
-        isMultiplayer && hasCompletedMyMulligan ? (
+        isSpectator ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
+            <div className="bg-[#0c101b]/95 border border-indigo-500/70 p-6 shadow-2xl max-w-sm w-full text-center flex flex-col items-center gap-3">
+              <div className="w-10 h-10 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+              <div className="text-white font-bold text-sm">
+                대결 준비 중 (패 교체)
+              </div>
+              <div className="text-xs text-slate-400">
+                양 플레이어가 초기 손패 멀리건을 진행하고 있습니다... ⏳
+              </div>
+            </div>
+          </div>
+        ) : isMultiplayer && hasCompletedMyMulligan ? (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
             <div className="bg-[#0c101b]/95 border border-[#22d3ee]/70 p-6 shadow-2xl max-w-sm w-full text-center flex flex-col items-center gap-3">
               <div className="w-10 h-10 border-2 border-[#22d3ee] border-t-transparent rounded-full animate-spin" />
@@ -4514,6 +4648,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* 선택 발동 효과 모달 (대결 결과 확인 창, 레벨업 및 연격 참격, 효과 드로우 연출 완료 후 표출) */}
       <EffectChoiceModal
         choice={
+          !isSpectator &&
           (!isMultiplayer || gameState.pendingChoice?.playerIndex === controlledPlayerIndex) &&
           !activeUpgrade &&
           !gameState.lastUpgrade &&

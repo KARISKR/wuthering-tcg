@@ -151,6 +151,33 @@ export type MultiplayerMessage =
       type: 'EMOTE';
       playerIndex: 0 | 1;
       emote: string;
+    }
+  | {
+      type: 'SPECTATOR_JOIN';
+      spectatorName: string;
+      spectatorSessionId: string;
+    }
+  | {
+      type: 'SPECTATOR_INIT';
+      gameState: GameState;
+      hostProfile: MultiplayerPlayerProfile;
+      guestProfile: MultiplayerPlayerProfile;
+      timeLimitConfig?: TimeLimitConfig;
+      p0TotalTime?: number;
+      p1TotalTime?: number;
+      currentTurnTime?: number;
+    }
+  | {
+      type: 'SPECTATOR_REJECT';
+      reason: string;
+    }
+  | {
+      type: 'SPECTATOR_LEAVE';
+      spectatorSessionId: string;
+    }
+  | {
+      type: 'SPECTATOR_COUNT';
+      count: number;
     };
 
 export interface MultiplayerRoomInfo {
