@@ -4027,6 +4027,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           p0Name={p0.name}
           p1Name={p1.name}
           onDismiss={handleDismissMatchOpening}
+          myPlayerIndex={viewerPlayerIndex}
         />
       )}
 

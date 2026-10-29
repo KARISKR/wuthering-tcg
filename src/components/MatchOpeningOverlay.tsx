@@ -10,6 +10,7 @@ interface MatchOpeningOverlayProps {
   p0Name?: string;
   p1Name?: string;
   onDismiss: () => void;
+  myPlayerIndex?: 0 | 1;
 }
 
 export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.memo(({
@@ -18,12 +19,22 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
   p0Name = '플레이어',
   p1Name = '상대',
   onDismiss,
+  myPlayerIndex = 0,
 }) => {
-  const p0CharName = p0Leader.characterName || p0Leader.nameKr;
-  const p1CharName = p1Leader.characterName || p1Leader.nameKr;
+  const isP1Viewer = myPlayerIndex === 1;
 
-  const p0Quote = getCharacterOpeningQuote(p0CharName);
-  const p1Quote = getCharacterOpeningQuote(p1CharName);
+  // 좌측: 항상 현재 보는 플레이어(나), 우측: 상대방(대전자)
+  const myLeader = isP1Viewer ? p1Leader : p0Leader;
+  const oppLeader = isP1Viewer ? p0Leader : p1Leader;
+
+  const myName = isP1Viewer ? p1Name : p0Name;
+  const oppName = isP1Viewer ? p0Name : p1Name;
+
+  const myCharName = myLeader.characterName || myLeader.nameKr;
+  const oppCharName = oppLeader.characterName || oppLeader.nameKr;
+
+  const myQuote = getCharacterOpeningQuote(myCharName);
+  const oppQuote = getCharacterOpeningQuote(oppCharName);
 
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
@@ -31,10 +42,10 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
   const hasPlayedVoiceRef = useRef(false);
 
   useEffect(() => {
-    // 1. 오프닝 사운드 / 보이스 단 1회 안정적 실행
+    // 1. 현재 보는 플레이어(나)의 리더 오프닝 사운드 / 보이스 단 1회 안정적 실행
     if (!hasPlayedVoiceRef.current) {
       hasPlayedVoiceRef.current = true;
-      soundEffects.playLeaderOpening(p0CharName);
+      soundEffects.playLeaderOpening(myCharName);
     }
 
     // 2. 3.2초 후 자동 닫기 (클릭 시 즉시 스킵)
@@ -45,7 +56,7 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
     return () => {
       clearTimeout(autoClose);
     };
-  }, [p0CharName]);
+  }, [myCharName]);
 
   return (
     <div
@@ -83,15 +94,15 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
           </h1>
         </div>
 
-        {/* 중앙 VS 대치 영역 (좌측: P0 내 리더, 중앙: VS 엠블럼, 우측: P1 상대 리더) */}
+        {/* 중앙 VS 대치 영역 (좌측: 내 리더, 중앙: VS 엠블럼, 우측: 상대 리더) */}
         <div className="w-full grid grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-6 sm:gap-8">
-          {/* [좌측] P0 내 리더 컷인 */}
+          {/* [좌측] 내 리더 컷인 */}
           <div className="flex flex-col items-center md:items-end text-center md:text-right gap-4">
             {/* 플레이어 태그 */}
             <div className="flex items-center gap-2.5">
               <span className="w-3 h-3 rounded-full bg-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.9)]" />
               <span className="text-sm sm:text-base font-mono font-black text-amber-400 uppercase tracking-wider">
-                {p0Name} (YOU)
+                {myName} (YOU)
               </span>
             </div>
 
@@ -100,18 +111,18 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
               {/* 리더 카드 프레임 (대폭 확대) */}
               <div className="relative w-44 sm:w-52 md:w-60 aspect-[5/7] rounded-2xl overflow-hidden border-2 border-amber-400 bg-slate-950 shadow-[0_0_45px_rgba(245,158,11,0.55)] shrink-0 group">
                 <img
-                  src={(p0Leader as any).artUrl}
-                  alt={p0Leader.nameKr}
+                  src={(myLeader as any).artUrl}
+                  alt={myLeader.nameKr}
                   className="w-full h-full object-cover object-top"
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent p-2.5 sm:p-3 flex flex-col items-center gap-0.5">
                   <span className="text-base sm:text-xl font-black text-white truncate max-w-full drop-shadow">
-                    {p0Leader.nameKr}
+                    {myLeader.nameKr}
                   </span>
                   <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-amber-300">
-                    <span>Lv.{p0Leader.level}</span>
+                    <span>Lv.{myLeader.level}</span>
                     <span>•</span>
-                    <span>{getElementKr(p0Leader.element)}</span>
+                    <span>{getElementKr(myLeader.element)}</span>
                   </div>
                 </div>
               </div>
@@ -124,7 +135,7 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
                     <span>출격 오프닝 대사</span>
                   </div>
                   <button
-                    onClick={() => soundEffects.playLeaderOpening(p0CharName)}
+                    onClick={() => soundEffects.playLeaderOpening(myCharName)}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-xs font-bold text-amber-300 border border-amber-500/40 transition cursor-pointer"
                     title="보이스 다시 듣기"
                   >
@@ -133,7 +144,7 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
                   </button>
                 </div>
                 <p className="text-base sm:text-lg text-amber-100 font-bold leading-relaxed italic drop-shadow">
-                  "{p0Quote}"
+                  "{myQuote}"
                 </p>
               </div>
             </div>
@@ -151,13 +162,13 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
             </div>
           </div>
 
-          {/* [우측] P1 상대 리더 컷인 */}
+          {/* [우측] 상대 리더 컷인 */}
           <div className="flex flex-col items-center md:items-start text-center md:text-left gap-4">
             {/* 상대 플레이어 태그 */}
             <div className="flex items-center gap-2.5">
               <span className="w-3 h-3 rounded-full bg-cyan-400 shadow-[0_0_10px_rgba(6,182,212,0.9)]" />
               <span className="text-sm sm:text-base font-mono font-black text-cyan-400 uppercase tracking-wider">
-                {p1Name} (OPPONENT)
+                {oppName} (OPPONENT)
               </span>
             </div>
 
@@ -166,18 +177,18 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
               {/* 리더 카드 프레임 (대폭 확대) */}
               <div className="relative w-44 sm:w-52 md:w-60 aspect-[5/7] rounded-2xl overflow-hidden border-2 border-cyan-400 bg-slate-950 shadow-[0_0_45px_rgba(6,182,212,0.55)] shrink-0 group">
                 <img
-                  src={(p1Leader as any).artUrl}
-                  alt={p1Leader.nameKr}
+                  src={(oppLeader as any).artUrl}
+                  alt={oppLeader.nameKr}
                   className="w-full h-full object-cover object-top"
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/75 to-transparent p-2.5 sm:p-3 flex flex-col items-center gap-0.5">
                   <span className="text-base sm:text-xl font-black text-white truncate max-w-full drop-shadow">
-                    {p1Leader.nameKr}
+                    {oppLeader.nameKr}
                   </span>
                   <div className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-cyan-300">
-                    <span>Lv.{p1Leader.level}</span>
+                    <span>Lv.{oppLeader.level}</span>
                     <span>•</span>
-                    <span>{getElementKr(p1Leader.element)}</span>
+                    <span>{getElementKr(oppLeader.element)}</span>
                   </div>
                 </div>
               </div>
@@ -189,9 +200,17 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
                     <MessageSquareQuote className="w-4 h-4" />
                     <span>출격 오프닝 대사</span>
                   </div>
+                  <button
+                    onClick={() => soundEffects.playLeaderOpening(oppCharName)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-cyan-500/20 hover:bg-cyan-500/30 text-xs font-bold text-cyan-300 border border-cyan-500/40 transition cursor-pointer"
+                    title="상대 보이스 듣기"
+                  >
+                    <Volume2 className="w-3.5 h-3.5" />
+                    <span>보이스</span>
+                  </button>
                 </div>
                 <p className="text-base sm:text-lg text-cyan-100 font-bold leading-relaxed italic drop-shadow">
-                  "{p1Quote}"
+                  "{oppQuote}"
                 </p>
               </div>
             </div>

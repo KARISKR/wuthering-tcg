@@ -381,8 +381,16 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
                 />
               </div>
               <div className="text-left">
-                <div className="text-xs font-black text-cyan-300">{player0.name}</div>
-                <div className="text-[10px] text-slate-400 font-bold">1P (나)</div>
+                <div className={`text-xs font-black ${myPlayerIndex === 0 ? 'text-cyan-300' : 'text-slate-300'}`}>
+                  {player0.name}
+                </div>
+                <div className="text-[10px] font-bold">
+                  {myPlayerIndex === 0 ? (
+                    <span className="text-cyan-400">1P (나)</span>
+                  ) : (
+                    <span className="text-slate-400">1P (상대)</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -446,8 +454,16 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
                 />
               </div>
               <div className="text-left">
-                <div className="text-xs font-black text-purple-300">{player1.name}</div>
-                <div className="text-[10px] text-slate-400 font-bold">2P (상대)</div>
+                <div className={`text-xs font-black ${myPlayerIndex === 1 ? 'text-cyan-300' : 'text-purple-300'}`}>
+                  {player1.name}
+                </div>
+                <div className="text-[10px] font-bold">
+                  {myPlayerIndex === 1 ? (
+                    <span className="text-cyan-400">2P (나)</span>
+                  ) : (
+                    <span className="text-slate-400">2P (상대)</span>
+                  )}
+                </div>
               </div>
             </div>
 
