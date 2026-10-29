@@ -20,3 +20,21 @@ CREATE TABLE IF NOT EXISTS community_data (
   data TEXT NOT NULL,
   updated_at INTEGER
 );
+
+-- battle_telemetry: 멀티플레이 실전 대결 텔레메트리 (AI 학습 및 승률/메타 분석용)
+CREATE TABLE IF NOT EXISTS battle_telemetry (
+  id TEXT PRIMARY KEY,
+  timestamp INTEGER NOT NULL,
+  duration_sec INTEGER NOT NULL,
+  winner_index INTEGER NOT NULL,
+  p0_leader TEXT NOT NULL,
+  p1_leader TEXT NOT NULL,
+  p0_deck_summary TEXT,
+  p1_deck_summary TEXT,
+  total_turns INTEGER NOT NULL,
+  logs_json TEXT,
+  created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_telemetry_timestamp ON battle_telemetry(timestamp);
+CREATE INDEX IF NOT EXISTS idx_telemetry_leaders ON battle_telemetry(p0_leader, p1_leader);

@@ -21,6 +21,7 @@ import { GameOverModal } from './GameOverModal';
 import { CinematicFinisherOverlay } from './CinematicFinisherOverlay';
 import { BattleReplayModal } from './BattleReplayModal';
 import { createBattleReplayData, BattleReplayData } from '../utils/replayManager';
+import { telemetryService } from '../services/telemetryService';
 import { CardListModal } from './CardListModal';
 import { ConcertoSelectModal } from './ConcertoSelectModal';
 import { EffectChoiceModal } from './EffectChoiceModal';
@@ -584,6 +585,40 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       gameState.gameMode
     );
   }, [gameState.phase, gameState.winner, gameState.players, gameState.logs, gameState.turn, gameState.gameMode]);
+
+  // [텔레메트리] 멀티플레이 경기 종료 시 AI 학습용 실전 배틀 데이터 자동 수집 및 전송 (호스트 기준)
+  const matchStartTimeRef = useRef<number>(Date.now());
+  const hasSentTelemetryRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    if (gameState.phase !== 'GAME_OVER' || gameState.winner === null) {
+      hasSentTelemetryRef.current = false;
+      return;
+    }
+
+    if (isMultiplayer && isHost && !hasSentTelemetryRef.current) {
+      hasSentTelemetryRef.current = true;
+      const durationSec = Math.max(1, (Date.now() - matchStartTimeRef.current) / 1000);
+      const matchId = `match-${multiplayerService.sessionId || Date.now()}-${gameState.turn}`;
+
+      telemetryService.sendMatchTelemetry(
+        matchId,
+        gameState,
+        gameState.winner as 0 | 1,
+        durationSec,
+        customDeck,
+        opponentDeck
+      );
+    }
+  }, [
+    gameState.phase,
+    gameState.winner,
+    isMultiplayer,
+    isHost,
+    gameState,
+    customDeck,
+    opponentDeck,
+  ]);
 
   // 트래시, 협주, 캐릭터 덱 카드 목록 뷰어 모달 상태
   const [cardListModalState, setCardListModalState] = useState<{
