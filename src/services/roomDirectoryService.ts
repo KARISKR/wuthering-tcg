@@ -32,6 +32,7 @@ class RoomDirectoryService {
     totalTimeSec?: number;
     turnTimeSec?: number;
     clashTimeSec?: number;
+    allowSpectating?: boolean;
   }): Promise<void> {
     this.currentRoomCode = info.roomCode;
     try {
@@ -61,6 +62,7 @@ class RoomDirectoryService {
     totalTimeSec?: number;
     turnTimeSec?: number;
     clashTimeSec?: number;
+    allowSpectating?: boolean;
   }) {
     this.stopHeartbeat();
     this.currentRoomCode = info.roomCode;

@@ -1,6 +1,6 @@
 import { GameState, CustomDeckConfig } from './tcg';
 
-export type MultiplayerRole = 'HOST' | 'GUEST';
+export type MultiplayerRole = 'HOST' | 'GUEST' | 'SPECTATOR';
 
 export type MultiplayerConnectionStatus =
   | 'IDLE'
@@ -35,6 +35,7 @@ export interface MultiplayerSessionData {
   opponentProfile?: MultiplayerPlayerProfile;
   lastGameState?: GameState | null;
   timeLimitConfig?: TimeLimitConfig;
+  allowSpectating?: boolean;
   p0TotalTime?: number;
   p1TotalTime?: number;
   currentTurnTime?: number;
@@ -68,10 +69,12 @@ export type MultiplayerMessage =
       type: 'LOBBY_ACCEPT';
       hostProfile: MultiplayerPlayerProfile;
       timeLimitConfig?: TimeLimitConfig;
+      allowSpectating?: boolean;
     }
   | {
       type: 'ROOM_CONFIG_UPDATE';
-      timeLimitConfig: TimeLimitConfig;
+      timeLimitConfig?: TimeLimitConfig;
+      allowSpectating?: boolean;
     }
   | {
       type: 'LOBBY_READY';
@@ -160,6 +163,7 @@ export interface MultiplayerRoomInfo {
   totalTimeSec?: number;
   turnTimeSec?: number;
   clashTimeSec?: number;
+  allowSpectating?: boolean;
   status: 'WAITING' | 'PLAYING';
   playerCount: number;
   createdAt: number;

@@ -51,6 +51,7 @@ class MultiplayerService {
     turnTimeSec: 90,
     clashTimeSec: 30,
   };
+  public allowSpectating: boolean = true;
   public p0TotalTime: number = 300;
   public p1TotalTime: number = 300;
   public currentTurnTime: number = 90;
@@ -96,6 +97,9 @@ class MultiplayerService {
       if (parsed.timeLimitConfig) {
         this.timeLimitConfig = parsed.timeLimitConfig;
       }
+      if (parsed.allowSpectating !== undefined) {
+        this.allowSpectating = parsed.allowSpectating;
+      }
       if (parsed.p0TotalTime !== undefined) this.p0TotalTime = parsed.p0TotalTime;
       if (parsed.p1TotalTime !== undefined) this.p1TotalTime = parsed.p1TotalTime;
       if (parsed.currentTurnTime !== undefined) this.currentTurnTime = parsed.currentTurnTime;
@@ -121,6 +125,7 @@ class MultiplayerService {
         opponentProfile: this.opponentProfile || existing?.opponentProfile || undefined,
         lastGameState: lastGameState || this.latestGameState || existing?.lastGameState || undefined,
         timeLimitConfig: this.timeLimitConfig || existing?.timeLimitConfig,
+        allowSpectating: this.allowSpectating !== undefined ? this.allowSpectating : existing?.allowSpectating,
         p0TotalTime: this.p0TotalTime,
         p1TotalTime: this.p1TotalTime,
         currentTurnTime: this.currentTurnTime,
@@ -432,16 +437,23 @@ class MultiplayerService {
         type: 'LOBBY_ACCEPT',
         hostProfile: this.myProfile!,
         timeLimitConfig: this.timeLimitConfig,
+        allowSpectating: this.allowSpectating,
       });
     } else if (msg.type === 'LOBBY_ACCEPT') {
       this.opponentProfile = msg.hostProfile;
       if (msg.timeLimitConfig) {
         this.timeLimitConfig = msg.timeLimitConfig;
       }
+      if (msg.allowSpectating !== undefined) {
+        this.allowSpectating = msg.allowSpectating;
+      }
       this.saveSession();
     } else if (msg.type === 'ROOM_CONFIG_UPDATE') {
       if (msg.timeLimitConfig) {
         this.timeLimitConfig = msg.timeLimitConfig;
+      }
+      if (msg.allowSpectating !== undefined) {
+        this.allowSpectating = msg.allowSpectating;
       }
     } else if (msg.type === 'GAME_START') {
       if (msg.timeLimitConfig) {

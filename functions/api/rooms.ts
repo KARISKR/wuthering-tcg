@@ -33,6 +33,7 @@ export interface MultiplayerRoomInfo {
   totalTimeSec?: number;
   turnTimeSec?: number;
   clashTimeSec?: number;
+  allowSpectating?: boolean;
   status: 'WAITING' | 'PLAYING';
   playerCount: number;
   createdAt: number;
@@ -114,6 +115,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         totalTimeSec?: number;
         turnTimeSec?: number;
         clashTimeSec?: number;
+        allowSpectating?: boolean;
       };
 
       const { action, roomCode } = body;
@@ -161,6 +163,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           totalTimeSec: body.totalTimeSec ?? 300,
           turnTimeSec: body.turnTimeSec ?? 90,
           clashTimeSec: body.clashTimeSec ?? 30,
+          allowSpectating: body.allowSpectating !== false,
           status: 'WAITING',
           playerCount: 1,
           createdAt: now,
@@ -174,6 +177,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           if (body.totalTimeSec !== undefined) target.totalTimeSec = body.totalTimeSec;
           if (body.turnTimeSec !== undefined) target.turnTimeSec = body.turnTimeSec;
           if (body.clashTimeSec !== undefined) target.clashTimeSec = body.clashTimeSec;
+          if (body.allowSpectating !== undefined) target.allowSpectating = body.allowSpectating;
         } else {
           // 혹시 만료되었거나 누락된 방 복구
           currentRooms.unshift({
@@ -186,6 +190,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             totalTimeSec: body.totalTimeSec ?? 300,
             turnTimeSec: body.turnTimeSec ?? 90,
             clashTimeSec: body.clashTimeSec ?? 30,
+            allowSpectating: body.allowSpectating !== false,
             status: 'WAITING',
             playerCount: 1,
             createdAt: now,
