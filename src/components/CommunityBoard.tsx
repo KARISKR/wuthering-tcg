@@ -87,10 +87,92 @@ export const findCardByUrl = (url: string): OfficialCardData | undefined => {
   try {
     const filename = decodeURIComponent(norm.split('/').pop()?.split('.')[0] || '');
     if (filename) {
-      return OFFICIAL_CARDS.find((c) => filename.includes(c.code) || (c.nameKr && filename.includes(c.nameKr)));
+      return (
+        OFFICIAL_CARDS.find((c) => filename.includes(c.id.replace(/^card-/, ''))) ||
+        OFFICIAL_CARDS.find((c) => filename.includes(c.code)) ||
+        OFFICIAL_CARDS.find((c) => c.nameKr && filename.includes(c.nameKr))
+      );
     }
   } catch {}
   return undefined;
+};
+
+// 동명 카드(예: 산화 SD02-003 vs BP01-031) 구분을 위한 고유 단축키 반환 헬퍼
+export const getCardShortcodeKey = (card: OfficialCardData): string => {
+  return card.id ? card.id.replace(/^card-/, '') : card.code;
+};
+
+// 단축 태그 [카드:쿼리]를 해석할 때 고유 코드/ID를 최우선 매칭하고, 구버전 [카드:산화] 태그는 첨부된 postImages 순서대로 정확히 매칭
+export const resolveCardByQuery = (
+  rawQuery: string,
+  postImages: string[],
+  usedCardIndices?: Set<number>
+): { card?: OfficialCardData; cardArt?: string } => {
+  const q = rawQuery.trim();
+  const qLower = q.toLowerCase();
+  const cardUrls = postImages.filter((u) => u.startsWith('/cards/'));
+
+  // 1순위: 고유 ID(예: BP01-031, BP01-031_2055) 또는 정확한 카드 코드(예: SD02-003, BP01-031) 매칭
+  let exactCard = OFFICIAL_CARDS.find(
+    (c) =>
+      c.id.replace(/^card-/, '').toLowerCase() === qLower ||
+      c.id.toLowerCase() === qLower
+  );
+  if (!exactCard) {
+    // 코드가 같은 패러렐 카드가 postImages에 첨부되어 있다면 해당 이미지를 우선 사용
+    const matchingUrlIdx = cardUrls.findIndex((u, idx) => {
+      if (usedCardIndices && usedCardIndices.has(idx)) return false;
+      const fc = findCardByUrl(u);
+      return fc && fc.code.toLowerCase() === qLower;
+    });
+    if (matchingUrlIdx >= 0) {
+      if (usedCardIndices) usedCardIndices.add(matchingUrlIdx);
+      const fc = findCardByUrl(cardUrls[matchingUrlIdx]);
+      return { card: fc, cardArt: cardUrls[matchingUrlIdx] };
+    }
+    exactCard = OFFICIAL_CARDS.find((c) => c.code.toLowerCase() === qLower);
+  }
+  if (exactCard) {
+    const matchIdx = cardUrls.findIndex(
+      (u, idx) => (!usedCardIndices || !usedCardIndices.has(idx)) && normalizeCardUrl(u) === normalizeCardUrl(exactCard!.artUrl)
+    );
+    if (matchIdx >= 0 && usedCardIndices) usedCardIndices.add(matchIdx);
+    return { card: exactCard, cardArt: exactCard.artUrl };
+  }
+
+  // 2순위: 한글 카드명(예: 구버전 [카드:산화])인 경우, postImages에 첨부된 해당 이름의 카드를 미사용 순서대로 우선 매칭!
+  const attachedMatchIdx = cardUrls.findIndex((u, idx) => {
+    if (usedCardIndices && usedCardIndices.has(idx)) return false;
+    const fc = findCardByUrl(u);
+    return (
+      fc &&
+      (fc.nameKr.toLowerCase() === qLower ||
+        fc.characterName.toLowerCase() === qLower ||
+        u.includes(q) ||
+        q === '카드')
+    );
+  });
+  if (attachedMatchIdx >= 0) {
+    if (usedCardIndices) usedCardIndices.add(attachedMatchIdx);
+    const art = cardUrls[attachedMatchIdx];
+    return { card: findCardByUrl(art), cardArt: art };
+  }
+
+  // 3순위: 전체 공식 카드 목록에서 이름 매칭 폴백
+  const nameCard =
+    OFFICIAL_CARDS.find((c) => c.nameKr === q || c.characterName === q) ||
+    OFFICIAL_CARDS.find((c) => c.nameKr.toLowerCase() === qLower || c.characterName.toLowerCase() === qLower);
+  if (nameCard) {
+    return { card: nameCard, cardArt: nameCard.artUrl };
+  }
+
+  // 4순위: 첨부된 첫 번째 카드 폴백
+  if (cardUrls.length > 0) {
+    const fallbackArt = cardUrls[0];
+    return { card: findCardByUrl(fallbackArt), cardArt: fallbackArt };
+  }
+
+  return {};
 };
 
 export function renderFormattedContent(rawContent: string, postImages: string[] = []): string {
@@ -138,20 +220,14 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
     return '';
   });
 
-  // 2. 단축 태그: [카드:카드명], [카드:코드|140px] 치환 (콤보 설명 시 가로 나란히 정렬 완벽 지원)
+  // 2. 단축 태그: [카드:카드명], [카드:코드|140px] 치환 (콤보 설명 시 가로 나란히 정렬 및 동명 카드 완벽 구분)
+  const usedRenderCardIndices = new Set<number>();
   safe = safe.replace(/\[카드\s*:\s*([^\]|]+)(?:\|([^\]]+))?\]/gi, (_match, cardQuery, sizeOpt) => {
     const q = cardQuery.trim();
-    let card = OFFICIAL_CARDS.find((c) => c.nameKr === q || c.code === q || c.characterName === q);
-    if (!card) {
-      card = OFFICIAL_CARDS.find((c) => c.nameKr.toLowerCase() === q.toLowerCase() || c.code.toLowerCase() === q.toLowerCase());
-    }
-    let cardArt = card ? card.artUrl : postImages.find((u) => u.startsWith('/cards/') && (u.includes(q) || q === '카드'));
-    if (!cardArt && postImages.some((u) => u.startsWith('/cards/'))) {
-      cardArt = postImages.find((u) => u.startsWith('/cards/'));
-    }
+    const { card, cardArt } = resolveCardByQuery(q, postImages, usedRenderCardIndices);
     if (cardArt) {
-      const foundCard = findCardByUrl(cardArt);
-      const name = card ? card.nameKr : (foundCard ? foundCard.nameKr : (q !== '카드' ? q : '공식 카드'));
+      const foundCard = card || findCardByUrl(cardArt);
+      const name = foundCard ? `${foundCard.nameKr} (${foundCard.code})` : (q !== '카드' ? q : '공식 카드');
       const sizeStyle = sizeOpt ? `style="width: ${sizeOpt.trim()}; max-width: 100%;"` : '';
       const defaultSizeClass = sizeOpt ? '' : 'w-[140px] sm:w-[170px] max-h-[260px]';
       return (
@@ -281,24 +357,19 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       return '';
     });
 
-    // 2. [카드:이름], [카드:이름|140px] 치환
+    // 2. [카드:이름], [카드:코드|140px] 치환
+    const usedEditorCardIndices = new Set<number>();
     html = html.replace(/\[카드\s*:\s*([^\]|]+)(?:\|([^\]]+))?\]/gi, (_match, cardQuery, sizeOpt) => {
       const q = cardQuery.trim();
-      let card = OFFICIAL_CARDS.find((c) => c.nameKr === q || c.code === q || c.characterName === q);
-      if (!card) {
-        card = OFFICIAL_CARDS.find((c) => c.nameKr.toLowerCase() === q.toLowerCase() || c.code.toLowerCase() === q.toLowerCase());
-      }
-      let cardArt = card ? card.artUrl : postImages.find((u) => u.startsWith('/cards/') && (u.includes(q) || q === '카드'));
-      if (!cardArt && postImages.some((u) => u.startsWith('/cards/'))) {
-        cardArt = postImages.find((u) => u.startsWith('/cards/'));
-      }
+      const { card, cardArt } = resolveCardByQuery(q, postImages, usedEditorCardIndices);
       if (cardArt) {
-        const foundCard = findCardByUrl(cardArt);
-        const name = card ? card.nameKr : (foundCard ? foundCard.nameKr : (q !== '카드' ? q : '공식 카드'));
+        const foundCard = card || findCardByUrl(cardArt);
+        const shortKey = foundCard ? getCardShortcodeKey(foundCard) : (q !== '카드' ? q : '공식 카드');
+        const name = foundCard ? `${foundCard.nameKr} (${foundCard.code})` : shortKey;
         const w = sizeOpt ? sizeOpt.trim() : '';
         const sizeAttr = w ? `data-width="${w}" style="width: ${w}; max-width: 100%;"` : '';
         const defaultCls = w ? '' : 'w-[140px] sm:w-[165px] max-h-[260px]';
-        return `<img src="${cardArt}" data-shortcode="[카드:${name}]" data-no-lod="true" ${sizeAttr} alt="${name}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />`;
+        return `<img src="${cardArt}" data-shortcode="[카드:${shortKey}]" data-no-lod="true" ${sizeAttr} alt="${name}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />`;
       }
       return '';
     });
@@ -310,11 +381,12 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       const url = cardImages[idx];
       if (url) {
         const foundCard = findCardByUrl(url);
-        const name = foundCard ? foundCard.nameKr : `카드 ${numStr}`;
+        const shortKey = foundCard ? getCardShortcodeKey(foundCard) : `카드 ${numStr}`;
+        const name = foundCard ? `${foundCard.nameKr} (${foundCard.code})` : shortKey;
         const w = sizeOpt ? sizeOpt.trim() : '';
         const sizeAttr = w ? `data-width="${w}" style="width: ${w}; max-width: 100%;"` : '';
         const defaultCls = w ? '' : 'w-[140px] sm:w-[165px] max-h-[260px]';
-        return `<img src="${url}" data-shortcode="[카드:${name}]" data-no-lod="true" ${sizeAttr} alt="${name}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />`;
+        return `<img src="${url}" data-shortcode="[카드:${shortKey}]" data-no-lod="true" ${sizeAttr} alt="${name}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />`;
       }
       return '';
     });
@@ -324,8 +396,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       const isCard = url.startsWith('/cards/');
       if (isCard) {
         const foundCard = findCardByUrl(url);
-        const name = foundCard ? foundCard.nameKr : (alt || '카드');
-        return `<img src="${url}" data-shortcode="[카드:${name}]" data-no-lod="true" alt="${name}" class="my-1.5 mr-2 w-[140px] sm:w-[165px] max-h-[260px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer" />`;
+        const shortKey = foundCard ? getCardShortcodeKey(foundCard) : (alt || '카드');
+        const name = foundCard ? `${foundCard.nameKr} (${foundCard.code})` : shortKey;
+        return `<img src="${url}" data-shortcode="[카드:${shortKey}]" data-no-lod="true" alt="${name}" class="my-1.5 mr-2 w-[140px] sm:w-[165px] max-h-[260px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer" />`;
       }
       const pIdx = uploadedPhotos.indexOf(url);
       const shortTag = pIdx >= 0 ? `[사진${pIdx + 1}]` : '';
@@ -338,7 +411,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     return html;
   };
 
-  // 위지윅 에디터 DOM을 단축 태그([사진1], [카드:이름|140px]) + 서식 문자열로 직렬화 (가로 나란히 배치 보존!)
+  // 위지윅 에디터 DOM을 단축 태그([사진1], [카드:코드|140px]) + 서식 문자열로 직렬화 (가로 나란히 배치 보존!)
   const wysiwygDomToContent = (container: HTMLElement, currentImages: string[] = images): string => {
     const clone = container.cloneNode(true) as HTMLElement;
     const uploadedPhotos = currentImages.filter((u) => !u.startsWith('/cards/'));
@@ -348,18 +421,25 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       const customW = img.getAttribute('data-width') || img.style.width || '';
       let baseCode = img.getAttribute('data-shortcode') || '';
 
-      // data-shortcode가 이미 [카드:이름] 형태로 올바르게 지정되어 있으면 우선 보존!
+      // src가 공식 카드 이미지면 항상 고유 카드 키([카드:코드])로 직렬화하여 동명 카드 충돌 방지!
+      if (src.startsWith('/cards/') || src.includes('/cards/')) {
+        const foundCard = findCardByUrl(src);
+        if (foundCard) {
+          baseCode = `[카드:${getCardShortcodeKey(foundCard)}]`;
+        }
+      }
+
       if (!baseCode || baseCode === '[카드:카드]') {
         if (src.startsWith('/cards/') || src.includes('/cards/')) {
           const foundCard = findCardByUrl(src);
-          const name = foundCard ? foundCard.nameKr : (img.getAttribute('alt') || '');
-          if (name && name !== '카드') {
-            baseCode = `[카드:${name}]`;
+          const key = foundCard ? getCardShortcodeKey(foundCard) : (img.getAttribute('alt') || '');
+          if (key && key !== '카드') {
+            baseCode = `[카드:${key}]`;
           } else {
             const firstCard = currentImages.find((u) => u.startsWith('/cards/'));
             const fallbackCard = firstCard ? findCardByUrl(firstCard) : null;
-            const validName = fallbackCard?.nameKr || (name && name !== '카드' ? name : '');
-            baseCode = validName ? `[카드:${validName}]` : `![카드](${src})`;
+            const validKey = fallbackCard ? getCardShortcodeKey(fallbackCard) : (key && key !== '카드' ? key : '');
+            baseCode = validKey ? `[카드:${validKey}]` : `![카드](${src})`;
           }
         } else {
           const pIdx = uploadedPhotos.indexOf(src) + 1;
@@ -643,9 +723,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     let displayAlt = label;
     if (isCard) {
       const foundCard = findCardByUrl(url);
-      const cardName = foundCard ? foundCard.nameKr : (label && label !== '카드' ? label : '공식 카드');
-      shortTag = `[카드:${cardName}]`;
-      displayAlt = cardName;
+      const cardKey = foundCard ? getCardShortcodeKey(foundCard) : (label && label !== '카드' ? label : '공식 카드');
+      shortTag = `[카드:${cardKey}]`;
+      displayAlt = foundCard ? `${foundCard.nameKr} (${foundCard.code})` : cardKey;
     } else {
       const uploadedPhotos = activeImages.filter((u) => !u.startsWith('/cards/'));
       let photoIdx = uploadedPhotos.indexOf(url) + 1;
@@ -1175,11 +1255,13 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       if (urlToRemove.startsWith('/cards/')) {
         const foundCard = findCardByUrl(urlToRemove);
         if (foundCard) {
+          const escKey = getCardShortcodeKey(foundCard).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const escName = foundCard.nameKr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const escCode = foundCard.code.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           updated = updated
-            .replace(new RegExp(`\\[카드:${escName}(?:\\|[^\\]]+)?\\]`, 'g'), '')
-            .replace(new RegExp(`\\[카드:${escCode}(?:\\|[^\\]]+)?\\]`, 'g'), '');
+            .replace(new RegExp(`\\[카드:${escKey}(?:\\|[^\\]]+)?\\]`, 'g'), '')
+            .replace(new RegExp(`\\[카드:${escCode}(?:\\|[^\\]]+)?\\]`, 'g'), '')
+            .replace(new RegExp(`\\[카드:${escName}(?:\\|[^\\]]+)?\\]`, 'g'), '');
         }
       } else if (removedPhotoIdx > 0) {
         updated = updated.replace(new RegExp(`\\[(?:사진|이미지)\\s*${removedPhotoIdx}(?:\\|[^\\]]+)?\\]`, 'g'), '');
@@ -1818,9 +1900,12 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     }
                   } else {
                     const foundCard = findCardByUrl(url);
+                    const cardKey = foundCard ? getCardShortcodeKey(foundCard) : '';
                     if (
                       (foundCard &&
-                        (selectedPost.content.includes(`[카드:${foundCard.nameKr}]`) ||
+                        (selectedPost.content.includes(`[카드:${cardKey}]`) ||
+                          selectedPost.content.includes(`[카드:${cardKey}|`) ||
+                          selectedPost.content.includes(`[카드:${foundCard.nameKr}]`) ||
                           selectedPost.content.includes(`[카드:${foundCard.nameKr}|`) ||
                           selectedPost.content.includes(`[카드:${foundCard.code}]`) ||
                           selectedPost.content.includes(`[카드:${foundCard.code}|`))) ||
@@ -2976,12 +3061,12 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         const foundCard = isCard ? findCardByUrl(imgUrl) : null;
                         const uploadedPhotos = images.filter((u) => !u.startsWith('/cards/'));
                         const photoIdx = !isCard ? uploadedPhotos.indexOf(imgUrl) + 1 : 0;
-                        const tag = isCard ? `[카드:${foundCard ? foundCard.nameKr : '공식 카드'}]` : `[사진${photoIdx}]`;
+                        const tag = isCard ? `[카드:${foundCard ? getCardShortcodeKey(foundCard) : '공식 카드'}]` : `[사진${photoIdx}]`;
                         return (
                           <div
                             key={idx}
                             className="relative w-11 h-11 rounded border border-[#363b48] bg-black/50 overflow-hidden shrink-0 group cursor-pointer"
-                            onClick={() => insertImageIntoContent(imgUrl, isCard ? (foundCard ? foundCard.nameKr : '공식 카드') : `사진 ${photoIdx}`)}
+                            onClick={() => insertImageIntoContent(imgUrl, isCard ? (foundCard ? getCardShortcodeKey(foundCard) : '공식 카드') : `사진 ${photoIdx}`)}
                             title={`클릭하여 본문 커서 위치에 ${tag} 가로로 재삽입`}
                           >
                             <img src={imgUrl} alt="" className="w-full h-full object-cover" />

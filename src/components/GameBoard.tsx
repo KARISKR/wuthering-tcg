@@ -1077,12 +1077,38 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     return localStorage.getItem('wuthering_left_panel_collapsed') === 'true';
   });
 
-  // 전장(플레이매트) 배율 줌 상태 (기본 1.0 / 100% -> 실제 화면 렌더링 1.2배율 기준)
+  // 전장(플레이매트) 사용자 배율 줌 상태 (기본 1.0 = 현재 화면 크기에 100% 맞춤)
   const [arenaZoom, setArenaZoom] = useState<number>(() => {
-    const saved = localStorage.getItem('wuthering_arena_zoom_v2');
+    const saved = localStorage.getItem('wuthering_arena_zoom_v3');
     if (saved) return parseFloat(saved);
     return 1.0;
   });
+
+  // 화면 해상도(높이/너비)에 맞춰 4단 전장 + 손패가 잘리지 않고 한눈에 들어오도록 자동 계산되는 반응형 스케일
+  const [viewportScale, setViewportScale] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0.92;
+    const availH = Math.max(540, window.innerHeight - 50);
+    const sideW = window.innerWidth >= 1536 ? 760 : window.innerWidth >= 1280 ? 680 : 580;
+    const availW = Math.max(640, window.innerWidth - sideW);
+    const scaleH = availH / 1015;
+    const scaleW = availW / 1080;
+    return Math.min(1.15, Math.max(0.62, Math.min(scaleH, scaleW)));
+  });
+
+  useEffect(() => {
+    const updateViewportScale = () => {
+      const availH = Math.max(540, window.innerHeight - 50);
+      const leftW = isLeftPanelCollapsed ? 48 : window.innerWidth >= 1536 ? 420 : window.innerWidth >= 1280 ? 370 : 310;
+      const rightW = window.innerWidth >= 1536 ? 340 : window.innerWidth >= 1280 ? 310 : 280;
+      const availW = Math.max(640, window.innerWidth - leftW - rightW);
+      const scaleH = availH / 1015;
+      const scaleW = availW / 1080;
+      setViewportScale(Math.min(1.15, Math.max(0.62, Math.min(scaleH, scaleW))));
+    };
+    updateViewportScale();
+    window.addEventListener('resize', updateViewportScale);
+    return () => window.removeEventListener('resize', updateViewportScale);
+  }, [isLeftPanelCollapsed]);
 
   const changeLeftPanelSize = (size: LeftPanelSize) => {
     setLeftPanelSize(size);
@@ -1102,14 +1128,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const changeArenaZoom = (delta: number) => {
     setArenaZoom((prev) => {
       const next = Math.max(0.7, Math.min(1.4, Math.round((prev + delta) * 10) / 10));
-      localStorage.setItem('wuthering_arena_zoom_v2', String(next));
+      localStorage.setItem('wuthering_arena_zoom_v3', String(next));
       return next;
     });
   };
 
   const resetArenaZoom = () => {
     setArenaZoom(1.0);
-    localStorage.setItem('wuthering_arena_zoom_v2', '1.0');
+    localStorage.setItem('wuthering_arena_zoom_v3', '1.0');
   };
 
   const leftPanelWidthClass = isLeftPanelCollapsed
@@ -2286,7 +2312,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div
             ref={leftPanelRef}
             onWheel={handleLeftPanelWheel}
-            className="w-92 lg:w-[420px] xl:w-[460px] 2xl:w-[500px] shrink-0 bg-[#090d16]/95 border-r border-white/10 p-4 flex flex-col justify-between overflow-hidden select-text relative h-full min-h-0 z-20"
+            className="w-76 lg:w-[320px] xl:w-[370px] 2xl:w-[420px] shrink-0 bg-[#090d16]/95 border-r border-white/10 p-3 sm:p-4 flex flex-col justify-between overflow-hidden select-text relative h-full min-h-0 z-20"
           >
             {/* 단말기 상단 헤더 바 */}
             <div className="flex items-center justify-between gap-1.5 mb-2.5 pb-2 border-b border-white/10 shrink-0">
@@ -2498,8 +2524,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <div
           ref={centerArenaRef}
           onScroll={handleArenaScroll}
-          className="flex-1 flex flex-col justify-between min-h-0 py-1.5 px-2.5 sm:px-4 gap-1.5 overflow-hidden relative bg-[#060810]"
-          style={{ zoom: Math.round(arenaZoom * 1.2 * 100) / 100 }}
+          className="flex-1 flex flex-col justify-between min-h-0 py-1 px-2 sm:px-3.5 gap-1 overflow-y-auto overflow-x-hidden custom-scrollbar relative bg-[#060810]"
+          style={{ zoom: Math.round(arenaZoom * viewportScale * 100) / 100 }}
         >
           {/* 배경 은은한 그리드 & 광원 */}
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_50%_at_50%_50%,rgba(223,194,134,0.04),transparent_80%)]" />
@@ -2687,7 +2713,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             </div>
 
             {/* 상대 필드 가로 1열: 좌측(캐릭터덱/협주) - 중앙(서포트 + 상대 리더 + 서포트) - 우측(액션덱/트래시) */}
-            <div className="w-full max-w-[1580px] mx-auto grid grid-cols-[270px_1fr_270px] sm:grid-cols-[285px_1fr_285px] xl:grid-cols-[305px_1fr_305px] gap-2 sm:gap-2.5 items-center">
+            <div className="w-full max-w-[1580px] mx-auto grid grid-cols-[220px_1fr_220px] sm:grid-cols-[250px_1fr_250px] xl:grid-cols-[285px_1fr_285px] gap-1.5 sm:gap-2 items-center">
               {/* 좌측 끝: 상대 캐릭터덱 + 협주 존 */}
               <div className="grid grid-cols-2 gap-1.5">
                 <DeckStack
@@ -3093,7 +3119,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           {/* ------------------------------------------------------- */}
           <div className="relative z-10 w-full flex flex-col gap-1.5 shrink-0">
             {/* 내 필드 가로 1열: 좌측(캐릭터덱 + 협주 존) - 중앙(서포트 + 내 리더 + 서포트) - 우측(트래시 + 액션덱) */}
-            <div className="w-full max-w-[1580px] mx-auto grid grid-cols-[270px_1fr_270px] sm:grid-cols-[285px_1fr_285px] xl:grid-cols-[305px_1fr_305px] gap-2 sm:gap-2.5 items-center">
+            <div className="w-full max-w-[1580px] mx-auto grid grid-cols-[220px_1fr_220px] sm:grid-cols-[250px_1fr_250px] xl:grid-cols-[285px_1fr_285px] gap-1.5 sm:gap-2 items-center">
               {/* 좌측 끝: 캐릭터 덱(입체 다중 그림자) + 협주 존(홀로그램 슬롯) */}
               <div className="grid grid-cols-2 gap-1.5">
                 <DeckStack
@@ -3383,7 +3409,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* --------------------------------------------------------- */}
         {/* [우측 패널] 택티컬 콘솔 (상단) + 실시간 배틀 로그 (하단 내부 스크롤) */}
         {/* --------------------------------------------------------- */}
-        <div className="w-80 lg:w-84 xl:w-92 h-full max-h-full min-h-0 shrink-0 bg-[#090d16]/95 border-l border-white/10 flex flex-col justify-between overflow-hidden select-text z-20">
+        <div className="w-68 lg:w-76 xl:w-84 2xl:w-90 h-full max-h-full min-h-0 shrink-0 bg-[#090d16]/95 border-l border-white/10 flex flex-col justify-between overflow-hidden select-text z-20">
           {/* ======================================================= */}
           {/* 1. 상단: 택티컬 콘솔 (TACTICAL CONSOLE) */}
           {/* ======================================================= */}

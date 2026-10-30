@@ -61,21 +61,13 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
     setIsSubmitting(false);
     setIsFieldPeek(false);
     if (choice) {
-      if (
-        choice.onResolveType === 'ADD_TO_HAND' ||
-        choice.onResolveType === 'DRAW_THEN_DISCARD_CONFIRM' ||
-        choice.onResolveType === 'SHOREKEEPER_SWITCH_DRAW' ||
-        choice.onResolveType === 'PAY_CLASH_CONCERTO_COST'
-      ) {
+      const isNonCardPrompt =
+        choice.onResolveType === 'VIEW_ONLY' ||
+        choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' ||
+        choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' ||
+        choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT';
+      if (!isNonCardPrompt && displayCards.length > 0 && (choice.maxSelect ?? 0) > 0) {
         setSelectedIds(displayCards.slice(0, choice.maxSelect).map((c) => c.id));
-      } else if (
-        choice.onResolveType !== 'SELECT_EFFECT_UPGRADE' &&
-        choice.onResolveType !== 'SWAP_LEADER' &&
-        (choice.minSelect ?? 0) > 0 &&
-        choice.maxSelect === 1 &&
-        displayCards.length === 1
-      ) {
-        setSelectedIds([displayCards[0].id]);
       } else {
         setSelectedIds([]);
       }
@@ -125,13 +117,22 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
     setSelectedIds([]);
   };
 
+  const requiredConfirmCount =
+    choice.onResolveType === 'VIEW_ONLY' ||
+    choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' ||
+    choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' ||
+    choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' ||
+    displayCards.length === 0
+      ? 0
+      : Math.max(1, minSelect);
+
   const handleConfirm = () => {
     if (isSubmittingRef.current || isSubmitting) return;
     const isPrompt =
       choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT';
-    if (choice.onResolveType !== 'VIEW_ONLY' && !isPrompt && selectedIds.length < minSelect) return;
+    if (choice.onResolveType !== 'VIEW_ONLY' && !isPrompt && selectedIds.length < requiredConfirmCount) return;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     if (choice.onResolveType === 'VIEW_ONLY') {
@@ -589,8 +590,8 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                 </button>
               ) : (
                 <div className="text-xs sm:text-sm font-bold text-[#f97316]">
-                  {selectedIds.length < minSelect
-                    ? `⚠️ 위 목록에서 카드를 클릭하여 ${minSelect}장 선택해주세요.`
+                  {selectedIds.length < requiredConfirmCount
+                    ? `⚠️ 위 목록에서 카드를 클릭하여 ${requiredConfirmCount}장 이상 선택해주세요. (발동하지 않으려면 좌측 넘어가기 버튼 클릭)`
                     : '✓ 대상 카드가 선택되었습니다. 우측 버튼을 눌러 확정하세요.'}
                 </div>
               )}
@@ -601,14 +602,14 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                   (choice.onResolveType !== 'SHOREKEEPER_SWITCH_PROMPT' &&
                     choice.onResolveType !== 'SHOREKEEPER_0_DRAW_PROMPT' &&
                     choice.onResolveType !== 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' &&
-                    selectedIds.length < minSelect)
+                    selectedIds.length < requiredConfirmCount)
                 }
                 onClick={handleConfirm}
                 className={`flex items-center gap-2.5 px-7 py-3 text-sm sm:text-base font-black transition [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)] ${
                   choice.onResolveType !== 'SHOREKEEPER_SWITCH_PROMPT' &&
                   choice.onResolveType !== 'SHOREKEEPER_0_DRAW_PROMPT' &&
                   choice.onResolveType !== 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' &&
-                  selectedIds.length < minSelect
+                  selectedIds.length < requiredConfirmCount
                     ? 'bg-[#111520] text-slate-500 border border-white/10 cursor-not-allowed'
                     : 'bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] text-white hover:brightness-110 shadow-lg shadow-[#f97316]/25 cursor-pointer'
                 }`}
