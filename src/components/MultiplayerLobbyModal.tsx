@@ -315,14 +315,6 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         setOpponentProfile(msg.profile);
         soundEffects.playCardPlace();
         // 게스트에게 방장 정보 및 현재 설정된 경기 규칙 응답 (덱은 비공개)
-        const currentConfig: TimeLimitConfig = {
-          hasTimeLimit: timeLimitMode === 'STANDARD',
-          totalTimeSec: timeLimitMode === 'STANDARD' ? 300 : 0,
-          turnTimeSec: timeLimitMode === 'STANDARD' ? 90 : 0,
-          clashTimeSec: timeLimitMode === 'STANDARD' ? 30 : 0,
-        };
-        multiplayerService.timeLimitConfig = currentConfig;
-        multiplayerService.allowSpectating = allowSpectating;
         multiplayerService.saveSession();
 
         multiplayerService.send({
@@ -332,8 +324,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
             sessionId: multiplayerService.sessionId,
             customDeck: null,
           },
-          timeLimitConfig: currentConfig,
-          allowSpectating,
+          timeLimitConfig: multiplayerService.timeLimitConfig,
+          allowSpectating: multiplayerService.allowSpectating,
         });
       } else if (msg.type === 'LOBBY_ACCEPT') {
         // 게스트: 호스트 수락 수신
@@ -396,7 +388,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       unsubStatus();
       unsubMsg();
     };
-  }, [isOpen, playerName, selectedDeckConfig, onStartMatch]);
+  }, [isOpen, playerName, selectedDeckConfig, onStartMatch, timeLimitMode, allowSpectating, activeOverlay]);
 
   // 닉네임 적용 함수 (로컬 저장 + 대기실 내 실시간 동기화)
   const applyPlayerName = (rawName: string) => {
@@ -612,6 +604,17 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     setIsGuestReady(false);
     setActiveOverlay('GUEST_CONNECTING');
 
+    // 방 목록에 등록된 방 정보를 미리 확인하여 입장 즉시 UI에 규칙 동기화
+    const matchedRoom = rooms.find((r) => r.roomCode.toUpperCase() === targetRoomCode.toUpperCase());
+    if (matchedRoom) {
+      if (matchedRoom.hasTimeLimit !== undefined) {
+        setTimeLimitMode(matchedRoom.hasTimeLimit === false ? 'UNLIMITED' : 'STANDARD');
+      }
+      if (matchedRoom.allowSpectating !== undefined) {
+        setAllowSpectating(matchedRoom.allowSpectating);
+      }
+    }
+
     try {
       const profile: MultiplayerPlayerProfile = {
         name: playerName.trim() || '방랑자',
@@ -674,6 +677,16 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     setOpponentProfile(null);
     setIsGuestReady(false);
     setActiveOverlay('GUEST_CONNECTING');
+
+    // 입력한 방 코드와 일치하는 방 정보가 있을 경우 입장 즉시 UI 동기화
+    if (matchedRoom) {
+      if (matchedRoom.hasTimeLimit !== undefined) {
+        setTimeLimitMode(matchedRoom.hasTimeLimit === false ? 'UNLIMITED' : 'STANDARD');
+      }
+      if (matchedRoom.allowSpectating !== undefined) {
+        setAllowSpectating(matchedRoom.allowSpectating);
+      }
+    }
 
     try {
       const profile: MultiplayerPlayerProfile = {
