@@ -148,7 +148,7 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onBypass }
             <span className="text-xs sm:text-sm font-black text-[#f97316] flex items-center gap-1.5">
               <span>✦ BETA 2.0 주요 업데이트 내역</span>
             </span>
-            <span className="text-[10px] font-mono text-slate-500">v2.0.0</span>
+            <span className="text-[10px] font-mono text-slate-500">v2.2.0</span>
           </div>
 
           <ul className="text-xs text-slate-300 space-y-2 leading-relaxed">

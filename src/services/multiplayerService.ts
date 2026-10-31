@@ -129,7 +129,12 @@ class MultiplayerService {
       if (lastGameState) {
         this.latestGameState = lastGameState;
       }
-      const existing = this.getSavedSession();
+      let existing: MultiplayerSessionData | null = null;
+      try {
+        const raw = localStorage.getItem(SESSION_STORAGE_KEY);
+        if (raw) existing = JSON.parse(raw);
+      } catch {}
+
       const sessionData: MultiplayerSessionData = {
         role: this.role,
         roomCode: this.roomCode,

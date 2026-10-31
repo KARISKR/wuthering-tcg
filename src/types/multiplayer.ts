@@ -57,6 +57,7 @@ export type MultiplayerActionType =
   | 'DISCARD_OVERFLOW'
   | 'END_PHASE'
   | 'PENDING_CHOICE'
+  | 'FINISH_EFFECT_DRAW'
   | 'INITIATIVE_ROLL'
   | 'CHOOSE_ORDER';
 
@@ -75,6 +76,10 @@ export type MultiplayerMessage =
       type: 'ROOM_CONFIG_UPDATE';
       timeLimitConfig?: TimeLimitConfig;
       allowSpectating?: boolean;
+    }
+  | {
+      type: 'ROOM_CLOSED';
+      reason?: string;
     }
   | {
       type: 'LOBBY_READY';

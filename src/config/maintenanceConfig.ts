@@ -10,7 +10,7 @@ export interface MaintenanceConfig {
 
 export const MAINTENANCE_CONFIG: MaintenanceConfig = {
   enabled: false,
-  version: 'v2.1 OPTIMIZED',
+  version: 'v2.2',
   title: '서버 정기 점검 및 시스템 최적화 완료',
   subtitle: '명조 TCG 웹 시뮬레이터 로딩 속도 최적화, 메모리 개선 및 커뮤니티 고도화 작업이 완료되었습니다.',
   targetEndTime: '2026-10-26T01:00:00+09:00',

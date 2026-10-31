@@ -15,6 +15,7 @@ interface InitiativeDiceModalProps {
   player1: PlayerState;
   myPlayerIndex?: 0 | 1;
   isMultiplayer?: boolean;
+  isSpectator?: boolean;
   onComplete: (
     firstPlayerIndex: 0 | 1,
     roll0: number,
@@ -64,6 +65,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
   player1,
   myPlayerIndex = 0,
   isMultiplayer = false,
+  isSpectator = false,
   onComplete,
   onSendDiceRoll,
   onSendOrderChoice,
@@ -300,17 +302,18 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
       setP0Value(1);
       setP1Value(1);
 
-      if (isMultiplayer && myPlayerIndex === 1) {
-        // 게스트는 호스트의 주사위 굴림 대기 (자동 시작 안함)
-      } else {
-        // 1.4초 동안 조작 없으면 자동 굴림
+      const canControlRoll = !isSpectator && (!isMultiplayer || myPlayerIndex === 0);
+
+      if (canControlRoll) {
+        // 1.4초 동안 조작 없으면 자동 굴림 (호스트 또는 싱글플레이 전용)
         autoStartTimerRef.current = window.setTimeout(() => {
           startRoll();
         }, 1400);
       }
 
-      // 스페이스바 / 엔터 키 입력 시 즉시 굴림
+      // 스페이스바 / 엔터 키 입력 시 즉시 굴림 (관전자 및 게스트 차단)
       const handleKeyDown = (e: KeyboardEvent) => {
+        if (!canControlRoll) return;
         if (e.code === 'Space' || e.code === 'Enter') {
           if (!isRollingRef.current && !hasCompletedRef.current) {
             e.preventDefault();
@@ -327,7 +330,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
     } else {
       clearAllTimers();
     }
-  }, [isOpen]);
+  }, [isOpen, isSpectator, isMultiplayer, myPlayerIndex]);
 
   if (!isOpen) return null;
 
@@ -343,15 +346,17 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
         <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
         <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
 
-        {/* 상단 스킵 버튼 */}
-        <button
-          onClick={handleSkip}
-          className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer border border-white/15 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
-          title="주사위 연출을 건너뛰고 즉시 게임을 시작합니다"
-        >
-          <span>스킵</span>
-          <FastForward className="w-3.5 h-3.5" />
-        </button>
+        {/* 상단 스킵 버튼 (관전자 및 멀티플레이 게스트에게는 노출하지 않음) */}
+        {!isSpectator && (!isMultiplayer || myPlayerIndex === 0) && (
+          <button
+            onClick={handleSkip}
+            className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer border border-white/15 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
+            title="주사위 연출을 건너뛰고 즉시 게임을 시작합니다"
+          >
+            <span>스킵</span>
+            <FastForward className="w-3.5 h-3.5" />
+          </button>
+        )}
 
         {/* 상단 타이틀 */}
         <div className="text-center space-y-1.5 mb-8">
@@ -533,6 +538,22 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
               );
             }
 
+            // 1-B) 관전 모드: 버튼 없이 양 플레이어의 주사위 승리 및 선택 대기 상태 표시
+            if (isSpectator) {
+              return (
+                <div className="w-full py-4 px-5 text-center font-black bg-[#0d1220]/95 border-2 border-indigo-500/60 rounded-2xl text-slate-200 shadow-xl flex flex-col items-center justify-center gap-2 animate-in zoom-in-95 duration-200">
+                  <div className="flex items-center gap-2 text-sm sm:text-base text-indigo-300 font-black">
+                    <Crown className="w-5 h-5 text-amber-400" />
+                    <span>⚔️ [{winnerPlayer.name}] 주사위 승리!</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-400">
+                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+                    <span>관전 중 — 승리 플레이어가 선공/후공을 선택하고 있습니다... ⏳</span>
+                  </div>
+                </div>
+              );
+            }
+
             // 2) 멀티플레이에서 내가 패배한 경우: 상대방 선택 대기창 표출 (선택 버튼 절대 안 나옴!)
             if (isMultiplayer && !isWinner) {
               return (
@@ -603,7 +624,14 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
           })()}
 
           {/* 굴리기 시작 버튼 (READY 단계) */}
-          {phase === 'READY' && (!isMultiplayer || myPlayerIndex === 0) && (
+          {phase === 'READY' && isSpectator && (
+            <div className="text-xs text-slate-400 font-bold animate-pulse flex items-center gap-1.5 py-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
+              <span>관전 중 — 양 플레이어가 선/후공 결정을 준비하고 있습니다...</span>
+            </div>
+          )}
+
+          {phase === 'READY' && !isSpectator && (!isMultiplayer || myPlayerIndex === 0) && (
             <button
               onClick={startRoll}
               className="w-full py-3.5 px-6 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-sm sm:text-base tracking-wide shadow-[0_0_20px_rgba(249,115,22,0.3)] transition cursor-pointer flex items-center justify-center gap-2 [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
@@ -612,7 +640,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
             </button>
           )}
 
-          {phase === 'READY' && isMultiplayer && myPlayerIndex === 1 && (
+          {phase === 'READY' && !isSpectator && isMultiplayer && myPlayerIndex === 1 && (
             <div className="text-xs text-slate-400 font-bold animate-pulse flex items-center gap-1.5 py-2">
               <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
               <span>방장(호스트)이 주사위를 굴리기를 기다리는 중...</span>

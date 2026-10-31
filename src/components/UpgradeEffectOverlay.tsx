@@ -23,10 +23,10 @@ export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = React.m
       soundEffects.playUpgrade(effect.character.characterName || effect.character.nameKr, effect.newLevel);
     }
 
-    // 5초 후 자동 퇴장 (또는 클릭/키보드로 즉시 닫기)
+    // 2.4초 후 자동 퇴장 (또는 클릭/키보드로 즉시 닫기 — 후속 효과 선택창으로 빠르게 전환)
     const timer = setTimeout(() => {
       onDismissRef.current();
-    }, 5000);
+    }, 2400);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {

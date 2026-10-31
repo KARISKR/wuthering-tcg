@@ -3948,6 +3948,16 @@ export function finishClashJudgment(state: GameState): GameState {
       if (blueIdx !== -1) {
         const [blueCard] = winnerPlayer.dropZone.splice(blueIdx, 1);
         addCardsToHand(winnerPlayer, [blueCard as ActionCard]);
+        triggeredEffects.push({
+          id: `eff-${Date.now()}-bp01-070`,
+          sourceCardName: winCard.nameKr,
+          sourceCardArt: winCard.artUrl,
+          effectType: 'DRAW',
+          title: '트래시 청색 카드 회수',
+          description: `트래시 에리어에서 청색 카드 [${blueCard.nameKr}]을(를) 패에 회수했습니다.`,
+          playerIndex: winnerIndex,
+          timestamp: Date.now(),
+        });
         newState = addLog(
           newState,
           `[트래시 회수] [바람의 영역 BP01-070 효과] 트래시 에리어에서 청색 카드 [${blueCard.nameKr}]을(를) 패에 회수했습니다!`,
@@ -3967,6 +3977,16 @@ export function finishClashJudgment(state: GameState): GameState {
       }
       if (chargedList.length > 0) {
         addCardsToConcertoZone(winnerPlayer, chargedList);
+        triggeredEffects.push({
+          id: `eff-${Date.now()}-sd02-015`,
+          sourceCardName: winCard.nameKr,
+          sourceCardArt: winCard.artUrl,
+          effectType: 'CHARGE',
+          title: `협주 에리어 +${chargedList.length}장 배치`,
+          description: `판정 승리로 덱 위 카드 ${chargedList.length}장을 협주 에리어에 배치했습니다!`,
+          playerIndex: winnerIndex,
+          timestamp: Date.now(),
+        });
         newState = addLog(
           newState,
           `[협주 충전] [만년적설 SD02-015 효과] 판정 승리로 덱에서 ${chargedList.map((c) => `[${c.nameKr}]`).join(', ')}을(를) 협주 에리어에 충전했습니다! (현재 협주: ${winnerPlayer.concertoZone.length}/10)`,
@@ -4002,6 +4022,16 @@ export function finishClashJudgment(state: GameState): GameState {
         const [card] = winnerPlayer.actionDeck.splice(targetIdx, 1);
         card.isRevealed = true;
         winnerPlayer.actionDeck = shuffleActionDeck(winnerPlayer.actionDeck);
+        triggeredEffects.push({
+          id: `eff-${Date.now()}-rainbow`,
+          sourceCardName: winCard.nameKr,
+          sourceCardArt: winCard.artUrl,
+          effectType: 'DRAW',
+          title: '용을 타고 하늘로 향해 서치',
+          description: '덱에서 [용을 타고 하늘로 향해]를 찾아 패에 추가하고 덱을 셔플합니다.',
+          playerIndex: winnerIndex,
+          timestamp: Date.now(),
+        });
         if (winnerPlayer.isAi) {
           addCardsToHand(winnerPlayer, [card]);
           if (!newState.players[0].isAi) {
@@ -4021,16 +4051,6 @@ export function finishClashJudgment(state: GameState): GameState {
             };
             newState = queueChoice(newState, oppRainbowReveal, true);
           }
-          triggeredEffects.push({
-            id: `eff-${Date.now()}-rainbow`,
-            sourceCardName: winCard.nameKr,
-            sourceCardArt: winCard.artUrl,
-            effectType: 'DRAW',
-            title: '용을 타고 하늘로 향해 서치',
-            description: '덱에서 [용을 타고 하늘로 향해]를 찾아 패에 추가하고 덱을 셔플했습니다.',
-            playerIndex: winnerIndex,
-            timestamp: Date.now(),
-          });
           newState = addLog(
             newState,
             `[카드 공개] [창공의 무지개 BP01-073 효과] 덱에서 [${card.nameKr}]을(를) 공개하여 패에 추가하고 덱을 셔플했습니다!`,
@@ -4061,6 +4081,16 @@ export function finishClashJudgment(state: GameState): GameState {
     // 결말의 순환 [BP01-057] 배틀 효과: 이번 턴에 다음 사용한 2장의 <변주 스킬>은 『【콤보】카드 1장을 뽑는다.』 획득
     if (winCard.code === 'BP01-057') {
       winnerPlayer.introSkillBonusDrawCount = 2;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-bp01-057`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'BUFF',
+        title: '변주 스킬 드로우 부여',
+        description: '이번 턴에 다음 사용할 2장의 <변주 스킬>에 【콤보】카드 1장 드로우 효과가 부여되었습니다!',
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
       newState = addLog(
         newState,
         `[결말의 순환 BP01-057 효과] 이번 턴에 다음 사용할 2장의 <변주 스킬>에 드로우 효과가 부여되었습니다!`,
@@ -4104,17 +4134,17 @@ export function finishClashJudgment(state: GameState): GameState {
       }
       if (drawnCards.length > 0) {
         addCardsToHand(winnerPlayer, drawnCards);
+        triggeredEffects.push({
+          id: `eff-${Date.now()}-draw`,
+          sourceCardName: winCard.nameKr,
+          sourceCardArt: winCard.artUrl,
+          effectType: 'DRAW',
+          title: `카드 드로우 +${drawnCards.length}장`,
+          description: `덱에서 카드 ${drawnCards.length}장을 뽑아 패에 추가합니다.`,
+          playerIndex: winnerIndex,
+          timestamp: Date.now(),
+        });
         if (winnerPlayer.isAi) {
-          triggeredEffects.push({
-            id: `eff-${Date.now()}-draw`,
-            sourceCardName: winCard.nameKr,
-            sourceCardArt: winCard.artUrl,
-            effectType: 'DRAW',
-            title: '카드 드로우 효과',
-            description: `덱에서 카드 ${drawnCards.length}장을 뽑아 패에 추가했습니다.`,
-            playerIndex: winnerIndex,
-            timestamp: Date.now(),
-          });
           newState = addLog(
             newState,
             `[효과 드로우] [${winCard.nameKr}]의 효과로 카드 ${drawnCards.length}장(${drawnCards.map((c) => `[${c.nameKr}]`).join(', ')})을 뽑아 패에 보충했습니다.`,
@@ -4156,6 +4186,16 @@ export function finishClashJudgment(state: GameState): GameState {
     if (winCard.code === 'SD01-020' || winCard.code === 'SD02-020') {
       const loserIndex = (winnerIndex === 0 ? 1 : 0) as 0 | 1;
       const loserPlayer = loserIndex === 0 ? p0 : p1;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-scan`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'BUFF',
+        title: '상대의 패 확인 [스캔]',
+        description: `상대방(${loserPlayer.name})의 패(${loserPlayer.hand.length}장)를 모두 확인합니다.`,
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
       if (!winnerPlayer.isAi) {
         const scanChoice: PendingChoice = {
           id: `choice-${Date.now()}-scan`,
@@ -4184,6 +4224,18 @@ export function finishClashJudgment(state: GameState): GameState {
     // 소리의 변화·회피 [SD01-018 / SD02-018]: 승리 시 1장 드로우 후 패 1장 버리기
     if (winCard.code === 'SD01-018' || winCard.code === 'SD02-018') {
       const drawn = drawSingleCardFromDeck(winnerPlayer);
+      if (drawn) {
+        triggeredEffects.push({
+          id: `eff-${Date.now()}-sd018-draw-discard`,
+          sourceCardName: winCard.nameKr,
+          sourceCardArt: winCard.artUrl,
+          effectType: 'DRAW',
+          title: '1장 드로우 후 패 1장 버리기',
+          description: '판정 승리로 카드 1장을 뽑고, 자신의 패 1장을 트래시 에리어로 버립니다.',
+          playerIndex: winnerIndex,
+          timestamp: Date.now(),
+        });
+      }
       if (winnerPlayer.isAi) {
         if (drawn) addCardsToHand(winnerPlayer, [drawn]);
         let discardedCard: ActionCard | undefined;
@@ -4439,6 +4491,16 @@ export function finishClashJudgment(state: GameState): GameState {
     if (winCard.code === 'SD01-016') {
       loserPlayer.tempCostPenaltyRed = (loserPlayer.tempCostPenaltyRed || 0) + 1;
       loserPlayer.tempCostPenaltyRedTurns = activeIdx === loserIndex ? 2 : 1;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-sd01-016`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'CANCEL',
+        title: '상대 적색 카드 COST +1',
+        description: '다음 상대의 턴 종료 시까지 상대가 사용하는 적색 카드의 코스트가 +1 증가합니다!',
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
       newState = addLog(
         newState,
         `[북풍의 소용돌이 SD01-016 효과] 다음 턴에 상대방의 적색 카드 코스트가 +1 증가합니다!`,
@@ -4452,6 +4514,16 @@ export function finishClashJudgment(state: GameState): GameState {
     if (winCard.code === 'SD02-016') {
       loserPlayer.comboBlockedNextTurn = true;
       loserPlayer.comboBlockedTurns = activeIdx === loserIndex ? 2 : 1;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-sd02-016`,
+        sourceCardName: winCard.nameKr,
+        sourceCardArt: winCard.artUrl,
+        effectType: 'CANCEL',
+        title: '다음 턴 상대 콤보 봉쇄',
+        description: '다음 상대의 턴 종료 시까지 상대는 콤보를 발동할 수 없습니다!',
+        playerIndex: winnerIndex,
+        timestamp: Date.now(),
+      });
       newState = addLog(
         newState,
         `[죽음의 눈보라 SD02-016 효과] 다음 턴에 상대방은 콤보를 발동할 수 없습니다!`,
@@ -4527,6 +4599,16 @@ export function finishClashJudgment(state: GameState): GameState {
       loserPlayer.actionArea = (loserPlayer.actionArea || []).filter((c) => c.id !== loserCard.id);
       addCardsToHand(loserPlayer, [loserCard]);
       loserPlayer.clashCard = null;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-sd01-010-recover`,
+        sourceCardName: loserCard.nameKr,
+        sourceCardArt: loserCard.artUrl,
+        effectType: 'DRAW',
+        title: '청색 카드 패배 시 패 회수',
+        description: '청색 카드에 패배하여 [투쟁의 마음]을(를) 패로 회수했습니다!',
+        playerIndex: loserIndex,
+        timestamp: Date.now(),
+      });
       newState = addLog(newState, `[투쟁의 마음 SD01-010 효과] 청색 카드에 패배하여 패로 회수했습니다!`, 'ACTION', loserIndex);
     }
 
@@ -4541,6 +4623,16 @@ export function finishClashJudgment(state: GameState): GameState {
       winnerCard?.color === 'RED'
     ) {
       loserPlayer.ankePendingRetaliationDmg = loserCard.damage;
+      triggeredEffects.push({
+        id: `eff-${Date.now()}-anke-retaliation`,
+        sourceCardName: loserPlayer.slots.leader.nameKr,
+        sourceCardArt: loserPlayer.slots.leader.artUrl,
+        effectType: 'DAMAGE',
+        title: `배틀 종료 반격 ${loserCard.damage} 데미지 예약`,
+        description: `적색 카드에 패배하여 배틀 페이즈 종료 시 상대에게 ${loserCard.damage} 데미지를 입힙니다!`,
+        playerIndex: loserIndex,
+        timestamp: Date.now(),
+      });
       newState = addLog(
         newState,
         `[앙코 Lv.1 BP01-014 리더 효과] 적색 카드에 패배하여 배틀 페이즈 종료 시 ${loserCard.damage} 반격 데미지가 예약되었습니다!`,
@@ -6515,6 +6607,21 @@ export function resolvePendingChoice(
       const drawn = drawSingleCardFromDeck(player);
       if (drawn) {
         addCardsToHand(player, [drawn]);
+        if (newState.phase === 'CLASH_REVEAL' && !newState.clashResult) {
+          newState.battleStepEffects = [
+            ...(newState.battleStepEffects || []),
+            {
+              id: `eff-${Date.now()}-sk0-battle-draw`,
+              sourceCardName: '파수인 Lv.0 [BP01-010]',
+              sourceCardArt: state.pendingChoice.sourceCardArt || drawn.artUrl,
+              effectType: 'DRAW',
+              title: '배틀 스킬 [카드 1장 드로우]',
+              description: '녹색 카드를 내어 덱에서 카드 1장을 드로우했습니다!',
+              playerIndex,
+              timestamp: Date.now(),
+            },
+          ];
+        }
         newState.lastEffectDraw = {
           id: `eff-draw-${Date.now()}`,
           playerIndex,
@@ -6693,6 +6800,21 @@ export function resolvePendingChoice(
           nextPendingChoice: null,
         };
       }
+      if (newState.phase === 'CLASH_REVEAL' && !newState.clashResult) {
+        newState.battleStepEffects = [
+          ...(newState.battleStepEffects || []),
+          {
+            id: `eff-${Date.now()}-battle-add-hand`,
+            sourceCardName,
+            sourceCardArt: state.pendingChoice.sourceCardArt || chosenActionCards[0]?.artUrl,
+            effectType: 'DRAW',
+            title: `배틀 스킬 [카드 +${chosenActionCards.length}장 추가]`,
+            description: `[${sourceCardName}] 효과로 카드 ${chosenActionCards.length}장을 패에 추가했습니다!`,
+            playerIndex,
+            timestamp: Date.now(),
+          },
+        ];
+      }
     }
 
     newState = addLog(
@@ -6714,6 +6836,22 @@ export function resolvePendingChoice(
           }
         : undefined
     );
+  }
+
+  // 배틀 스텝(판정 이전 CLASH_REVEAL)에서 협주 배치/트래시 회수/리더 교체/레벨업 등으로 lastEffectEvent가 생성된 경우 battleStepEffects에도 누적
+  if (
+    newState.phase === 'CLASH_REVEAL' &&
+    !newState.clashResult &&
+    newState.lastEffectEvent &&
+    newState.lastEffectEvent.id !== state.lastEffectEvent?.id
+  ) {
+    newState.battleStepEffects = [
+      ...(newState.battleStepEffects || []),
+      {
+        ...newState.lastEffectEvent,
+        sourceCardArt: state.pendingChoice.sourceCardArt || newState.lastEffectEvent.sourceCardArt,
+      },
+    ];
   }
 
   // 0. 만약 clashResult가 없는 상태(배틀 스텝 또는 판정 직후)에서 deferredChoices에 들어간 항목이 있다면 pendingChoiceQueue로 즉시 흡수

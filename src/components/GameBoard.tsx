@@ -177,7 +177,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     clearLastUpgrade,
     clearLastComboStrike,
     clearLastEffectEvent,
-    handleFinishEffectDraw,
+    handleFinishEffectDraw: engineFinishEffectDraw,
   } = useGame(
     undefined,
     undefined,
@@ -394,6 +394,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [isSpectator, isGuest, engineResolvePendingChoice]);
 
+  const handleFinishEffectDraw = useCallback(() => {
+    if (isSpectator) return;
+    if (isGuest) {
+      multiplayerService.sendAction('FINISH_EFFECT_DRAW', 1);
+    } else {
+      engineFinishEffectDraw();
+    }
+  }, [isSpectator, isGuest, engineFinishEffectDraw]);
+
   // 드로우 페이즈 연출 및 카드 매수 계산 (공식 룰 602.1.3: 게임의 맨 첫 번째 턴(선공의 턴 1)은 1장, 그 외 모든 턴은 2장)
   const currentTurnDrawCount = getTurnDrawCount(gameState);
   const canP0Draw =
@@ -406,8 +415,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     !gameState.players[1].isAi &&
     !isDrawFlightActive;
 
-  // 선공 결정 주사위 연출 상태 (게임 시작 시 LEADER_SELECT 단계에서 활성화)
+  // 선공 결정 주사위 연출 상태 (게임 시작 시 LEADER_SELECT 단계에서 활성화, 관전자는 주사위를 굴리지 않음)
   const [isInitiativeRolling, setIsInitiativeRolling] = useState(() => {
+    if (multiplayerRole === 'SPECTATOR') {
+      return false;
+    }
     if (initialSavedSession?.lastGameState) {
       const p = initialSavedSession.lastGameState.phase;
       const t = initialSavedSession.lastGameState.turn;
@@ -728,6 +740,16 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [gameState.lastUpgrade?.id, gameState.clashResult]);
 
+  // 현재 화면에서 레벨업 각성 오버레이가 표시 중이거나(activeUpgrade),
+  // 방금 새 lastUpgrade가 도착해 첫 이펙트 실행 직전(1프레임)인 경우를 정확히 판별
+  const isUpgradeOverlayActive =
+    Boolean(activeUpgrade) ||
+    Boolean(
+      gameState.lastUpgrade &&
+        !gameState.clashResult &&
+        seenUpgradeIdRef.current !== gameState.lastUpgrade.id
+    );
+
   const handleDismissUpgrade = useCallback(() => {
     setActiveUpgrade(null);
     clearLastUpgrade();
@@ -786,8 +808,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     setShowMatchOpening(false);
   }, []);
 
-  // 게임 진행 중 나가기 확인 팝업 모달 상태 및 핸들러
+  // 게임 진행 중 나가기 및 항복 확인 팝업 모달 상태 및 핸들러
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
 
   const handleRestartBattle = () => {
     setIsInitiativeRolling(true);
@@ -808,6 +831,51 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     } else if (onExitToLobby) {
       onExitToLobby();
     }
+  };
+
+  const handleSurrenderConfirm = () => {
+    if (isSpectator || gameState.phase === 'GAME_OVER' || gameState.winner !== null) return;
+    setShowSurrenderConfirm(false);
+    setShowExitConfirm(false);
+    setIsInitiativeRolling(false);
+    setActiveUpgrade(null);
+    setActiveComboStrike(null);
+
+    const surrenderIdx: 0 | 1 = isMultiplayer ? (isGuest ? 1 : 0) : controlledPlayerIndex;
+    const winnerIdx: 0 | 1 = surrenderIdx === 0 ? 1 : 0;
+
+    if (isMultiplayer) {
+      multiplayerService.sendSurrender(surrenderIdx);
+    }
+
+    setGameState((prev) => {
+      const surrenderName = prev.players[surrenderIdx].name;
+      const winnerName = prev.players[winnerIdx].name;
+      return {
+        ...prev,
+        phase: 'GAME_OVER',
+        winner: winnerIdx,
+        clashResult: null,
+        pendingChoice: null,
+        pendingChoiceQueue: [],
+        lastEffectDraw: null,
+        deferredEffectDraws: [],
+        deferredEffectDraw: null,
+        lastComboStrike: null,
+        lastUpgrade: null,
+        logs: [
+          ...prev.logs,
+          {
+            id: `log-surrender-${Date.now()}`,
+            turn: prev.turn,
+            text: `🏳️ [항복 선언] ${surrenderName}이(가) 항복을 선언하여 ${winnerName}이(가) 승리했습니다!`,
+            type: 'SYSTEM',
+            playerIndex: surrenderIdx,
+            timestamp: Date.now(),
+          },
+        ],
+      };
+    });
   };
 
   // 백(서포터)에서 리더로 교체 시 Join Team 고유 보이스 재생 래퍼
@@ -1333,6 +1401,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         setGameState(msg.gameState);
         multiplayerService.saveSession(msg.gameState);
       } else if (msg.type === 'SPECTATOR_INIT') {
+        setIsInitiativeRolling(false);
         setGameState(msg.gameState);
         multiplayerService.saveSession(msg.gameState);
         if (msg.timeLimitConfig) setTimeLimitConfig(msg.timeLimitConfig);
@@ -1367,16 +1436,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           setExternalOrderChoice(msg.payload.order);
         }
       } else if (msg.type === 'SURRENDER') {
-        const winner = msg.playerIndex !== undefined ? (msg.playerIndex === 0 ? 1 : 0) : 1;
+        const surrenderIdx: 0 | 1 = msg.playerIndex !== undefined ? msg.playerIndex : 0;
+        const winner: 0 | 1 = surrenderIdx === 0 ? 1 : 0;
+        setIsInitiativeRolling(false);
+        setActiveUpgrade(null);
+        setActiveComboStrike(null);
         setGameState((prev) => ({
           ...prev,
           phase: 'GAME_OVER',
           winner,
+          clashResult: null,
+          pendingChoice: null,
+          pendingChoiceQueue: [],
+          lastEffectDraw: null,
+          deferredEffectDraws: [],
+          deferredEffectDraw: null,
+          lastComboStrike: null,
+          lastUpgrade: null,
+          logs: [
+            ...prev.logs,
+            {
+              id: `log-surrender-${Date.now()}`,
+              turn: prev.turn,
+              text: `🏳️ [항복 선언] ${prev.players[surrenderIdx].name}이(가) 항복을 선언하여 ${prev.players[winner].name}이(가) 승리했습니다!`,
+              type: 'SYSTEM',
+              playerIndex: surrenderIdx,
+              timestamp: Date.now(),
+            },
+          ],
         }));
       }
     });
     return unsub;
-  }, [gameState.gameMode, isGuest, setGameState]);
+  }, [gameState.gameMode, isGuest, isSpectator, setGameState]);
 
   // [멀티플레이] 호스트: 게스트의 액션 수신 및 실행
   useEffect(() => {
@@ -1448,15 +1540,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           case 'PENDING_CHOICE':
             engineResolvePendingChoice(payload.optionId);
             break;
+          case 'FINISH_EFFECT_DRAW':
+            engineFinishEffectDraw();
+            break;
           default:
             break;
         }
       } else if (msg.type === 'SURRENDER') {
-        const winner = msg.playerIndex !== undefined ? (msg.playerIndex === 0 ? 1 : 0) : 0;
+        const surrenderIdx: 0 | 1 = msg.playerIndex !== undefined ? msg.playerIndex : 1;
+        const winner: 0 | 1 = surrenderIdx === 0 ? 1 : 0;
+        setIsInitiativeRolling(false);
+        setActiveUpgrade(null);
+        setActiveComboStrike(null);
         setGameState((prev) => ({
           ...prev,
           phase: 'GAME_OVER',
           winner,
+          clashResult: null,
+          pendingChoice: null,
+          pendingChoiceQueue: [],
+          lastEffectDraw: null,
+          deferredEffectDraws: [],
+          deferredEffectDraw: null,
+          lastComboStrike: null,
+          lastUpgrade: null,
+          logs: [
+            ...prev.logs,
+            {
+              id: `log-surrender-${Date.now()}`,
+              turn: prev.turn,
+              text: `🏳️ [항복 선언] ${prev.players[surrenderIdx].name}이(가) 항복을 선언하여 ${prev.players[winner].name}이(가) 승리했습니다!`,
+              type: 'SYSTEM',
+              playerIndex: surrenderIdx,
+              timestamp: Date.now(),
+            },
+          ],
         }));
       }
     });
@@ -2056,6 +2174,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             >
               <Home className="w-3.5 h-3.5 text-[#f97316]" />
               <span>대기실</span>
+            </button>
+          )}
+
+          {!isSpectator && gameState.phase !== 'GAME_OVER' && gameState.winner === null && (
+            <button
+              onClick={() => setShowSurrenderConfirm(true)}
+              className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-950/70 hover:bg-rose-900/90 text-rose-300 hover:text-white border border-rose-500/50 text-xs font-black transition cursor-pointer [clip-path:polygon(5px_0,100%_0,100%_calc(100%-5px),calc(100%-5px)_100%,0_100%,0_5px)]"
+              title="현재 배틀 항복(기권)하기"
+            >
+              <span>🏳️</span>
+              <span>항복</span>
             </button>
           )}
 
@@ -4043,7 +4172,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* 효과 드로우 & 손패 비행 연출 오버레이 (대결 결과창 및 연격/레벨업 오버레이 진행 중에는 화면 겹침 방지를 위해 대기) */}
       <EffectDrawOverlay
         effectDraw={
-          !gameState.clashResult && !activeComboStrike && !gameState.lastComboStrike && !activeUpgrade && !gameState.lastUpgrade
+          !gameState.clashResult && !activeComboStrike && !gameState.lastComboStrike && !isUpgradeOverlayActive
             ? gameState.lastEffectDraw || null
             : null
         }
@@ -4056,13 +4185,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         }
       />
 
-      {/* 선공 결정 주사위 모달 (양측 주사위 투척 연출) */}
+      {/* 선공 결정 주사위 모달 (양측 주사위 투척 연출, 관전자는 제외) */}
       <InitiativeDiceModal
-        isOpen={isInitiativeRolling && (gameState.phase === 'LEADER_SELECT' || gameState.phase === 'MULLIGAN')}
+        isOpen={!isSpectator && isInitiativeRolling && (gameState.phase === 'LEADER_SELECT' || gameState.phase === 'MULLIGAN')}
         player0={gameState.players[0]}
         player1={gameState.players[1]}
         myPlayerIndex={isGuest ? 1 : 0}
         isMultiplayer={isMultiplayer}
+        isSpectator={isSpectator}
         externalDiceResult={externalDiceResult}
         externalOrderChoice={externalOrderChoice}
         onSendDiceRoll={(val0, val1, winIdx) => {
@@ -4390,12 +4520,61 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <button
                 onClick={() => {
                   setShowExitConfirm(false);
+                  if (isMultiplayer && !isSpectator && gameState.phase !== 'GAME_OVER' && gameState.winner === null) {
+                    multiplayerService.sendSurrender(isGuest ? 1 : 0);
+                  }
                   if (onExitToLobby) onExitToLobby();
                 }}
                 className="w-full sm:flex-1 py-2.5 px-3 bg-rose-700 hover:bg-rose-600 text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-[0_0_15px_rgba(225,29,72,0.3)] flex items-center justify-center gap-1.5 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
               >
                 <Home className="w-3.5 h-3.5" />
-                <span>나가기</span>
+                <span>{isMultiplayer ? '항복 후 나가기' : '나가기'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 항복(기권) 확인 모달 */}
+      {showSurrenderConfirm && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
+          <div className="relative w-full max-w-md bg-[#0c101b]/95 backdrop-blur-md border border-rose-500/70 p-6 shadow-[0_0_50px_rgba(0,0,0,0.95)] text-slate-100 flex flex-col items-center text-center overflow-hidden">
+            <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-rose-500" />
+            <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-rose-500" />
+            <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
+            <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
+
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-3/4 h-0.5 bg-gradient-to-r from-transparent via-rose-500 to-transparent shadow-[0_0_15px_#f43f5e]" />
+
+            <div className="w-14 h-14 bg-[#111520] text-rose-400 flex items-center justify-center border border-rose-500/40 mb-3 shadow-[0_0_15px_rgba(244,63,94,0.2)] text-2xl">
+              🏳️
+            </div>
+
+            <h3 className="text-xl font-black text-white mb-2 tracking-wide font-mono">
+              항복 확인
+            </h3>
+
+            <p className="text-sm font-bold text-rose-400 mb-1">
+              현재 대결을 포기하고 항복하시겠습니까?
+            </p>
+
+            <p className="text-xs text-slate-400 mb-6 leading-relaxed">
+              항복을 선언하면 즉시 패배 처리되며 상대방의 승리로 경기가 종료됩니다.
+            </p>
+
+            <div className="w-full grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setShowSurrenderConfirm(false)}
+                className="py-2.5 px-4 bg-[#111520] hover:bg-[#1a2234] text-slate-300 font-bold text-xs sm:text-sm transition cursor-pointer border border-white/15 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSurrenderConfirm}
+                className="py-2.5 px-4 bg-rose-700 hover:bg-rose-600 text-white font-black text-xs sm:text-sm transition cursor-pointer shadow-[0_0_15px_rgba(225,29,72,0.4)] flex items-center justify-center gap-1.5 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+              >
+                <span>🏳️</span>
+                <span>항복 선언</span>
               </button>
             </div>
           </div>
@@ -4676,8 +4855,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         choice={
           !isSpectator &&
           (!isMultiplayer || gameState.pendingChoice?.playerIndex === controlledPlayerIndex) &&
-          !activeUpgrade &&
-          !gameState.lastUpgrade &&
+          !isUpgradeOverlayActive &&
           !activeComboStrike &&
           !gameState.lastComboStrike &&
           !gameState.lastEffectDraw &&
@@ -4688,13 +4866,22 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
       />
 
-      {/* 멀티플레이 상대방 효과 선택 중 대기 오버레이 */}
-      {isMultiplayer && gameState.pendingChoice && gameState.pendingChoice.playerIndex !== controlledPlayerIndex && (
+      {/* 멀티플레이 상대방 효과 선택 중 대기 오버레이 (레벨업/연격/대결 결과/드로우 연출이 모두 끝난 뒤 표시) */}
+      {isMultiplayer &&
+        gameState.pendingChoice &&
+        (isSpectator || gameState.pendingChoice.playerIndex !== controlledPlayerIndex) &&
+        !isUpgradeOverlayActive &&
+        !activeComboStrike &&
+        !gameState.lastComboStrike &&
+        !gameState.lastEffectDraw &&
+        !gameState.clashResult && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs select-none">
           <div className="bg-[#0c101b]/95 border border-cyan-400/60 p-6 shadow-2xl max-w-sm w-full text-center flex flex-col items-center gap-3">
             <div className="w-10 h-10 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
             <div className="text-white font-bold text-sm">
-              상대방({otherPlayer.name})이 효과를 선택하고 있습니다...
+              {isSpectator
+                ? `${gameState.players[gameState.pendingChoice.playerIndex].name} 선수가 효과를 선택하고 있습니다...`
+                : `상대방(${otherPlayer.name})이 효과를 선택하고 있습니다...`}
             </div>
             <div className="text-xs text-slate-400">
               선택 완료 시 자동으로 진행됩니다. ⏳

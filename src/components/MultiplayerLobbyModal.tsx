@@ -289,15 +289,42 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       setConnectionStatus(status);
       if (status === 'CONNECTED') {
         soundEffects.playCardPlace();
+      } else if ((status === 'DISCONNECTED' || status === 'ERROR') && activeOverlay === 'GUEST_CONNECTING') {
+        multiplayerService.cleanUp();
+        setActiveOverlay('NONE');
+        setOpponentProfile(null);
+        setIsGuestReady(false);
+        guestDeckRef.current = null;
+        setErrorMessage('방장과의 연결이 끊겨 대기실에서 퇴장되었습니다.');
+        fetchRoomList(false);
       }
     });
 
     const unsubMsg = multiplayerService.onMessage((msg: MultiplayerMessage) => {
-      if (msg.type === 'LOBBY_JOIN') {
+      if (msg.type === 'ROOM_CLOSED') {
+        // 게스트: 방장이 방을 나감 -> 안내 후 방 목록으로 자동 복귀
+        multiplayerService.cleanUp();
+        setActiveOverlay('NONE');
+        setOpponentProfile(null);
+        setIsGuestReady(false);
+        guestDeckRef.current = null;
+        setErrorMessage(msg.reason || '방장이 방을 나가 대기방이 해산되었습니다.');
+        fetchRoomList(false);
+      } else if (msg.type === 'LOBBY_JOIN') {
         // 호스트: 게스트 입장 수신
         setOpponentProfile(msg.profile);
         soundEffects.playCardPlace();
-        // 게스트에게 방장 정보 및 경기 규칙 응답 (덱은 비공개)
+        // 게스트에게 방장 정보 및 현재 설정된 경기 규칙 응답 (덱은 비공개)
+        const currentConfig: TimeLimitConfig = {
+          hasTimeLimit: timeLimitMode === 'STANDARD',
+          totalTimeSec: timeLimitMode === 'STANDARD' ? 300 : 0,
+          turnTimeSec: timeLimitMode === 'STANDARD' ? 90 : 0,
+          clashTimeSec: timeLimitMode === 'STANDARD' ? 30 : 0,
+        };
+        multiplayerService.timeLimitConfig = currentConfig;
+        multiplayerService.allowSpectating = allowSpectating;
+        multiplayerService.saveSession();
+
         multiplayerService.send({
           type: 'LOBBY_ACCEPT',
           hostProfile: {
@@ -305,27 +332,33 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
             sessionId: multiplayerService.sessionId,
             customDeck: null,
           },
-          timeLimitConfig: multiplayerService.timeLimitConfig,
+          timeLimitConfig: currentConfig,
           allowSpectating,
         });
       } else if (msg.type === 'LOBBY_ACCEPT') {
         // 게스트: 호스트 수락 수신
         setOpponentProfile(msg.hostProfile);
         if (msg.timeLimitConfig) {
+          multiplayerService.timeLimitConfig = msg.timeLimitConfig;
           setTimeLimitMode(msg.timeLimitConfig.hasTimeLimit ? 'STANDARD' : 'UNLIMITED');
         }
         if (msg.allowSpectating !== undefined) {
+          multiplayerService.allowSpectating = msg.allowSpectating;
           setAllowSpectating(msg.allowSpectating);
         }
+        multiplayerService.saveSession();
         soundEffects.playCardPlace();
       } else if (msg.type === 'ROOM_CONFIG_UPDATE') {
         // 방장이 시간 규칙 및 관전 허용 변경 시 게스트 실시간 동기화
         if (msg.timeLimitConfig) {
+          multiplayerService.timeLimitConfig = msg.timeLimitConfig;
           setTimeLimitMode(msg.timeLimitConfig.hasTimeLimit ? 'STANDARD' : 'UNLIMITED');
         }
         if (msg.allowSpectating !== undefined) {
+          multiplayerService.allowSpectating = msg.allowSpectating;
           setAllowSpectating(msg.allowSpectating);
         }
+        multiplayerService.saveSession();
         soundEffects.playCardPlace();
       } else if (msg.type === 'LOBBY_READY') {
         // 호스트: 게스트의 덱 선택 완료 및 준비 신호 수신
@@ -422,7 +455,15 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
 
   // 모달 닫기 시 전체 정리
   const handleClose = () => {
-    roomDirectoryService.closeRoom(createdRoomCode);
+    if (activeOverlay === 'HOST_WAITING') {
+      try {
+        multiplayerService.send({
+          type: 'ROOM_CLOSED',
+          reason: '방장이 대기방을 나갔습니다.',
+        });
+      } catch {}
+      roomDirectoryService.closeRoom(createdRoomCode);
+    }
     multiplayerService.cleanUp();
     setActiveOverlay('NONE');
     setIsGuestReady(false);
@@ -441,13 +482,6 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     setActiveOverlay('HOST_WAITING');
 
     try {
-      const profile: MultiplayerPlayerProfile = {
-        name: playerName.trim() || '방랑자',
-        customDeck: null, // 매칭 완료 전 덱 비공개
-        sessionId: multiplayerService.sessionId,
-      };
-      await multiplayerService.createRoom(targetCode, profile);
-
       const nextConfig: TimeLimitConfig = {
         hasTimeLimit: timeLimitMode === 'STANDARD',
         totalTimeSec: timeLimitMode === 'STANDARD' ? 300 : 0,
@@ -455,6 +489,17 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         clashTimeSec: timeLimitMode === 'STANDARD' ? 30 : 0,
       };
       multiplayerService.timeLimitConfig = nextConfig;
+      multiplayerService.allowSpectating = allowSpectating;
+
+      const profile: MultiplayerPlayerProfile = {
+        name: playerName.trim() || '방랑자',
+        customDeck: null, // 매칭 완료 전 덱 비공개
+        sessionId: multiplayerService.sessionId,
+      };
+      await multiplayerService.createRoom(targetCode, profile);
+      multiplayerService.timeLimitConfig = nextConfig;
+      multiplayerService.allowSpectating = allowSpectating;
+      multiplayerService.saveSession();
 
       // 공개 방 목록 디렉토리에 등록 (덱과 리더는 비공개로 등록!)
       await roomDirectoryService.registerRoom({
@@ -488,6 +533,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
       clashTimeSec: mode === 'STANDARD' ? 30 : 0,
     };
     multiplayerService.timeLimitConfig = nextConfig;
+    multiplayerService.saveSession();
     multiplayerService.send({
       type: 'ROOM_CONFIG_UPDATE',
       timeLimitConfig: nextConfig,
@@ -513,6 +559,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   const handleToggleAllowSpectating = (allow: boolean) => {
     setAllowSpectating(allow);
     multiplayerService.allowSpectating = allow;
+    multiplayerService.saveSession();
     soundEffects.playCardPlace();
 
     multiplayerService.send({
@@ -714,6 +761,12 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   // 대기실 방 나가기 (공개 방 목록으로 복귀)
   const handleCancelOverlay = () => {
     if (activeOverlay === 'HOST_WAITING') {
+      try {
+        multiplayerService.send({
+          type: 'ROOM_CLOSED',
+          reason: '방장이 대기방을 나갔습니다.',
+        });
+      } catch {}
       roomDirectoryService.closeRoom(createdRoomCode);
     }
     multiplayerService.cleanUp();
