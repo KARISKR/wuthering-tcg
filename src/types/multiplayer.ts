@@ -82,6 +82,10 @@ export type MultiplayerMessage =
       reason?: string;
     }
   | {
+      type: 'LOBBY_LEAVE';
+      reason?: string;
+    }
+  | {
       type: 'LOBBY_READY';
       isReady: boolean;
       profile: MultiplayerPlayerProfile;

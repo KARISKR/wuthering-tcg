@@ -441,6 +441,20 @@ class MultiplayerService {
     });
   }
 
+  public handleGuestLeftLobby() {
+    this.stopHeartbeat();
+    this.stopDisconnectTimer();
+    if (this.connection) {
+      try {
+        this.connection.close();
+      } catch {}
+      this.connection = null;
+    }
+    this.opponentProfile = null;
+    this.saveSession();
+    this.setStatus('WAITING_FOR_GUEST');
+  }
+
   public resetPeerOnly() {
     this.stopHeartbeat();
     if (this.connection) {
@@ -793,6 +807,10 @@ class MultiplayerService {
         timeLimitConfig: this.timeLimitConfig,
         allowSpectating: this.allowSpectating,
       });
+    } else if (msg.type === 'LOBBY_LEAVE') {
+      if (this.role === 'HOST') {
+        this.handleGuestLeftLobby();
+      }
     } else if (msg.type === 'LOBBY_ACCEPT') {
       this.opponentProfile = msg.hostProfile;
       if (msg.timeLimitConfig) {

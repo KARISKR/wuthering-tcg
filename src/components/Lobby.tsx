@@ -1031,6 +1031,11 @@ export const Lobby: React.FC<LobbyProps> = ({
               clearHash();
               setIsMultiplayerModalOpen(false);
             }}
+            onOpenDeckBuilder={() => {
+              clearHash();
+              setIsMultiplayerModalOpen(false);
+              onOpenDeckBuilder();
+            }}
             onStartMatch={(role, myDeck, opponentDeck) => {
               clearHash();
               setIsMultiplayerModalOpen(false);

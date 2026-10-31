@@ -50,6 +50,7 @@ import { soundEffects } from '../utils/soundEffects';
 interface MultiplayerLobbyModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenDeckBuilder?: () => void;
   onStartMatch: (
     role: MultiplayerRole,
     myDeck: CustomDeckConfig | null,
@@ -85,8 +86,12 @@ function findLeaderArt(charName?: string): string | undefined {
 export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   isOpen,
   onClose,
+  onOpenDeckBuilder,
   onStartMatch,
 }) => {
+  // 방/로비 떠나기 확인 모달 상태 ('LEAVE_ROOM' | 'DECK_BUILDER' | 'CLOSE_LOBBY' | null)
+  const [confirmLeaveAction, setConfirmLeaveAction] = useState<'LEAVE_ROOM' | 'DECK_BUILDER' | 'CLOSE_LOBBY' | null>(null);
+
   // 플레이어 닉네임 및 닉네임 설정 모달 상태
   const [playerName, setPlayerName] = useState<string>(() => {
     try {
@@ -247,7 +252,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     return () => clearInterval(timer);
   }, [isOpen, activeOverlay, fetchRoomList]);
 
-  // 브라우저 탭 종료/새로고침 시 생성된 공개 방 즉각 해제 (sendBeacon)
+  // 브라우저 탭 종료/새로고침 시 생성된 공개 방 즉각 해제 (sendBeacon) 및 게스트 퇴장 알림
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (createdRoomCode && activeOverlay === 'HOST_WAITING') {
@@ -256,6 +261,10 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
             type: 'application/json',
           });
           navigator.sendBeacon('/api/rooms', blob);
+        } catch {}
+      } else if (activeOverlay === 'GUEST_CONNECTING') {
+        try {
+          multiplayerService.send({ type: 'LOBBY_LEAVE' });
         } catch {}
       }
     };
@@ -297,6 +306,12 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         guestDeckRef.current = null;
         setErrorMessage('방장과의 연결이 끊겨 대기실에서 퇴장되었습니다.');
         fetchRoomList(false);
+      } else if ((status === 'DISCONNECTED' || status === 'ERROR') && activeOverlay === 'HOST_WAITING') {
+        multiplayerService.handleGuestLeftLobby();
+        setOpponentProfile(null);
+        setIsGuestReady(false);
+        guestDeckRef.current = null;
+        setErrorMessage('도전자와의 연결이 끊겨 대기 상태(1/2)로 전환되었습니다.');
       }
     });
 
@@ -310,6 +325,15 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         guestDeckRef.current = null;
         setErrorMessage(msg.reason || '방장이 방을 나가 대기방이 해산되었습니다.');
         fetchRoomList(false);
+      } else if (msg.type === 'LOBBY_LEAVE') {
+        // 호스트: 게스트가 방을 나감
+        if (activeOverlay === 'HOST_WAITING') {
+          multiplayerService.handleGuestLeftLobby();
+          setOpponentProfile(null);
+          setIsGuestReady(false);
+          guestDeckRef.current = null;
+          setErrorMessage('도전자가 방을 나갔습니다. 새로운 상대를 기다립니다.');
+        }
       } else if (msg.type === 'LOBBY_JOIN') {
         // 호스트: 게스트 입장 수신
         setOpponentProfile(msg.profile);
@@ -455,6 +479,13 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         });
       } catch {}
       roomDirectoryService.closeRoom(createdRoomCode);
+    } else if (activeOverlay === 'GUEST_CONNECTING') {
+      try {
+        multiplayerService.send({
+          type: 'LOBBY_LEAVE',
+          reason: '도전자가 대기방을 나갔습니다.',
+        });
+      } catch {}
     }
     multiplayerService.cleanUp();
     setActiveOverlay('NONE');
@@ -781,6 +812,13 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         });
       } catch {}
       roomDirectoryService.closeRoom(createdRoomCode);
+    } else if (activeOverlay === 'GUEST_CONNECTING') {
+      try {
+        multiplayerService.send({
+          type: 'LOBBY_LEAVE',
+          reason: '도전자가 대기방을 나갔습니다.',
+        });
+      } catch {}
     }
     multiplayerService.cleanUp();
     setActiveOverlay('NONE');
@@ -827,7 +865,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         <div className="flex items-center gap-3 sm:gap-4 min-w-0">
           {isInRoom ? (
             <button
-              onClick={handleCancelOverlay}
+              onClick={() => setConfirmLeaveAction('LEAVE_ROOM')}
               className="px-3.5 py-2 rounded-xl border-2 border-rose-500/70 bg-rose-950/50 text-rose-300 hover:bg-rose-600 hover:text-white flex items-center gap-1.5 font-black text-xs sm:text-sm transition cursor-pointer shadow-lg shrink-0"
               title="방을 나가고 대기실 목록으로 돌아갑니다"
             >
@@ -836,7 +874,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
             </button>
           ) : (
             <button
-              onClick={handleClose}
+              onClick={() => setConfirmLeaveAction('CLOSE_LOBBY')}
               className="w-10 h-10 rounded-full border-2 border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-slate-950 flex items-center justify-center transition cursor-pointer shadow-[0_0_15px_rgba(251,191,36,0.25)] shrink-0"
               title="메인 로비로 나가기"
             >
@@ -1373,41 +1411,55 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                     </div>
                   </div>
 
-                  {/* 마이 덱 vs 추천 덱 탭 전환 버튼 */}
-                  <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800 shrink-0 self-start lg:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleTabChange('MY_DECKS')}
-                      className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
-                        deckTab === 'MY_DECKS'
-                          ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                      }`}
-                    >
-                      <span>⭐ 마이 덱</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                        deckTab === 'MY_DECKS' ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-300'
-                      }`}>
-                        {myDecks.length}
-                      </span>
-                    </button>
+                  {/* 마이 덱 vs 추천 덱 탭 전환 버튼 및 덱 빌더 바로가기 버튼 */}
+                  <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-start lg:self-auto">
+                    {onOpenDeckBuilder && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmLeaveAction('DECK_BUILDER')}
+                        className="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-1.5 cursor-pointer bg-slate-900 hover:bg-slate-800 text-amber-300 border border-amber-500/50 hover:border-amber-400 shadow-md"
+                        title="덱 빌더로 이동하여 새로운 덱을 만들거나 편집합니다"
+                      >
+                        <Layers className="w-4 h-4 text-amber-400" />
+                        <span>덱 빌더 바로가기</span>
+                      </button>
+                    )}
 
-                    <button
-                      type="button"
-                      onClick={() => handleTabChange('REC_DECKS')}
-                      className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
-                        deckTab === 'REC_DECKS'
-                          ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.35)]'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                      }`}
-                    >
-                      <span>🤖 추천 & 프리셋</span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                        deckTab === 'REC_DECKS' ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-300'
-                      }`}>
-                        {recDecks.length}
-                      </span>
-                    </button>
+                    <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => handleTabChange('MY_DECKS')}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+                          deckTab === 'MY_DECKS'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <span>⭐ 마이 덱</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          deckTab === 'MY_DECKS' ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-300'
+                        }`}>
+                          {myDecks.length}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleTabChange('REC_DECKS')}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+                          deckTab === 'REC_DECKS'
+                            ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.35)]'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <span>🤖 추천 & 프리셋</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          deckTab === 'REC_DECKS' ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-300'
+                        }`}>
+                          {recDecks.length}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1423,6 +1475,16 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                         ? '메인 화면의 [덱 빌더]에서 나만의 덱을 생성하고 저장하거나 상단의 [추천 & 프리셋] 탭을 이용해 보세요.'
                         : '기본 프리셋 데이터를 불러오는 중입니다.'}
                     </p>
+                    {deckTab === 'MY_DECKS' && onOpenDeckBuilder && (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmLeaveAction('DECK_BUILDER')}
+                        className="mt-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-xs sm:text-sm shadow-md hover:brightness-110 flex items-center gap-2 cursor-pointer"
+                      >
+                        <Layers className="w-4 h-4" />
+                        <span>덱 빌더로 이동하여 덱 만들기</span>
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -1869,8 +1931,19 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
               </button>
             </div>
 
-            {/* 우측: 새 방 만들기 & 새로고침 */}
-            <div className="flex items-center gap-3 shrink-0">
+            {/* 우측: 덱 빌더 바로가기, 새 방 만들기 & 새로고침 */}
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              {onOpenDeckBuilder && (
+                <button
+                  onClick={() => setConfirmLeaveAction('DECK_BUILDER')}
+                  className="px-3.5 sm:px-4 py-2.5 rounded-xl bg-slate-850 hover:bg-slate-800 text-amber-300 border border-amber-500/50 hover:border-amber-400 text-xs sm:text-sm font-black transition cursor-pointer flex items-center gap-1.5 shadow-md"
+                  title="덱 빌더로 이동하여 내 덱을 편집합니다"
+                >
+                  <Layers className="w-4 h-4 text-amber-400" />
+                  <span>덱 빌더 바로가기</span>
+                </button>
+              )}
+
               <button
                 onClick={() => fetchRoomList(true)}
                 disabled={isRefreshing}
@@ -1958,6 +2031,92 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
               >
                 <Check className="w-4 h-4 stroke-[3]" />
                 <span>닉네임 저장 완료</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 5. [로비/대기방 떠나기 확인 팝업 모달] */}
+      {/* ========================================================= */}
+      {confirmLeaveAction !== null && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md bg-slate-900 border-2 border-amber-400/80 rounded-3xl p-6 sm:p-7 shadow-[0_0_50px_rgba(245,158,11,0.3)] flex flex-col space-y-4 text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-amber-400" />
+                <h3 className="text-base sm:text-lg font-black text-white">
+                  {confirmLeaveAction === 'DECK_BUILDER'
+                    ? '덱 빌더로 이동'
+                    : confirmLeaveAction === 'LEAVE_ROOM'
+                    ? '방 나가기 확인'
+                    : '멀티배틀 종료 확인'}
+                </h3>
+              </div>
+              <button
+                onClick={() => setConfirmLeaveAction(null)}
+                className="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-sm text-slate-300 leading-relaxed">
+              {confirmLeaveAction === 'DECK_BUILDER' ? (
+                isInRoom ? (
+                  isHostView ? (
+                    <>현재 <strong className="text-amber-300">방장 대기실</strong> 상태입니다. 덱 빌더로 이동하면 개설된 방이 해산됩니다.<br />정말 이동하시겠습니까?</>
+                  ) : (
+                    <>현재 대기방에서 퇴장하고 <strong className="text-amber-300">덱 빌더</strong>로 이동하시겠습니까?</>
+                  )
+                ) : (
+                  <>멀티배틀 로비를 닫고 <strong className="text-amber-300">덱 빌더</strong>로 이동하시겠습니까?</>
+                )
+              ) : confirmLeaveAction === 'LEAVE_ROOM' ? (
+                isHostView ? (
+                  <>대기실을 나가면 개설된 방이 해산되며 참가 중인 상대방도 퇴장됩니다.<br />정말 방을 나가시겠습니까?</>
+                ) : (
+                  <>현재 참가 중인 대기실을 나가 방 목록으로 돌아가시겠습니까?</>
+                )
+              ) : (
+                isInRoom ? (
+                  isHostView ? (
+                    <>대기방이 닫히고 개설된 방이 해산됩니다.<br />멀티배틀을 종료하고 메인 화면으로 돌아가시겠습니까?</>
+                  ) : (
+                    <>대기실에서 퇴장하고 메인 화면으로 돌아가시겠습니까?</>
+                  )
+                ) : (
+                  <>멀티배틀 로비를 닫고 메인 화면으로 돌아가시겠습니까?</>
+                )
+              )}
+            </p>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setConfirmLeaveAction(null)}
+                className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs sm:text-sm transition cursor-pointer"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const action = confirmLeaveAction;
+                  setConfirmLeaveAction(null);
+                  if (action === 'LEAVE_ROOM') {
+                    handleCancelOverlay();
+                  } else if (action === 'CLOSE_LOBBY') {
+                    handleClose();
+                  } else if (action === 'DECK_BUILDER') {
+                    handleClose();
+                    onOpenDeckBuilder?.();
+                  }
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:brightness-110 text-white font-black text-xs sm:text-sm shadow-md transition cursor-pointer"
+              >
+                확인 (이동하기)
               </button>
             </div>
           </div>
