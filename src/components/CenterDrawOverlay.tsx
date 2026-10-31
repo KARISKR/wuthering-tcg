@@ -10,6 +10,7 @@ interface CenterDrawOverlayProps {
   activePlayer: PlayerState;
   drawCount: number;
   onExecuteDraw: (playerIndex: 0 | 1) => void;
+  isSpectator?: boolean;
 }
 
 type DrawStage = 'READY' | 'PULLING' | 'REVEAL' | 'FLYING' | 'COMPLETED';
@@ -21,12 +22,13 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
   activePlayer,
   drawCount = 2,
   onExecuteDraw,
+  isSpectator = false,
 }) => {
   const [stage, setStage] = useState<DrawStage>('READY');
   const [revealedCards, setRevealedCards] = useState<ActionCard[]>([]);
   const hasTriggeredRef = useRef(false);
 
-  const isUserTurn = activePlayerIndex === controlledPlayerIndex && !activePlayer.isAi;
+  const isUserTurn = !isSpectator && activePlayerIndex === controlledPlayerIndex && !activePlayer.isAi;
   const isAi = activePlayer.isAi;
 
   // 드로우 대상 카드 사전 추출 (덱 맨 위에서 drawCount장)
@@ -60,6 +62,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
 
   // 드로우 액션 실행 (사용자 클릭 또는 AI 자동)
   const handleTriggerDraw = () => {
+    if (isSpectator && !isAi) return;
     if (hasTriggeredRef.current || stage !== 'READY') return;
     hasTriggeredRef.current = true;
 
@@ -109,7 +112,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
             <Bot className="w-4 h-4 text-cyan-400 animate-pulse" />
           )}
           <span className="font-mono text-xs font-black tracking-wider text-amber-300 uppercase">
-            {isUserTurn ? 'DRAW PHASE · YOUR TURN' : "DRAW PHASE · OPPONENT'S TURN"}
+            {isUserTurn ? 'DRAW PHASE · YOUR TURN' : isSpectator ? 'DRAW PHASE · SPECTATING' : "DRAW PHASE · OPPONENT'S TURN"}
           </span>
         </div>
 
@@ -117,13 +120,19 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
           {stage === 'READY'
             ? isUserTurn
               ? '덱을 클릭하여 카드를 드로우하세요!'
+              : isSpectator
+              ? `${activePlayer.name} 선수가 카드를 드로우하고 있습니다...`
               : '상대가 카드를 드로우하고 있습니다...'
             : stage === 'REVEAL'
             ? isUserTurn
               ? `드로우 카드 확인 (${revealedCards.length}장)`
+              : isSpectator
+              ? `${activePlayer.name} 선수가 카드 ${revealedCards.length}장을 드로우했습니다`
               : `상대가 카드 ${revealedCards.length}장을 드로우했습니다`
             : isUserTurn
             ? '손패로 카드가 이동합니다...'
+            : isSpectator
+            ? `${activePlayer.name} 선수의 패로 카드가 이동합니다...`
             : '상대의 패로 카드가 이동합니다...'}
         </h2>
 
@@ -179,7 +188,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                   <Layers className="w-8 h-8 text-amber-300 animate-pulse" />
                 </div>
                 <span className="text-sm sm:text-base font-black text-amber-200 drop-shadow">
-                  {isUserTurn ? '클릭하여 드로우' : '상대 덱'}
+                  {isUserTurn ? '클릭하여 드로우' : isSpectator ? `${activePlayer.name} 선수의 덱` : '상대 덱'}
                 </span>
                 <span className="text-xs font-mono font-bold text-slate-300 mt-0.5">
                   남은 {activePlayer.actionDeck.length}장

@@ -406,10 +406,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 드로우 페이즈 연출 및 카드 매수 계산 (공식 룰 602.1.3: 게임의 맨 첫 번째 턴(선공의 턴 1)은 1장, 그 외 모든 턴은 2장)
   const currentTurnDrawCount = getTurnDrawCount(gameState);
   const canP0Draw =
+    !isSpectator &&
     gameState.phase === 'DRAW_PHASE' &&
     gameState.activePlayerIndex === 0 &&
     !isDrawFlightActive;
   const canP1Draw =
+    !isSpectator &&
     gameState.phase === 'DRAW_PHASE' &&
     gameState.activePlayerIndex === 1 &&
     !gameState.players[1].isAi &&
@@ -2127,6 +2129,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   // 슬롯별 레벨업 가능 여부 체크 (동일 레벨 중첩 또는 +1 레벨 진화)
   const checkCanUpgradeSlot = (slotName: 'leader' | 'leftSupport' | 'rightSupport', playerIdx: 0 | 1 = 0) => {
+    if (isSpectator) return false;
     const targetPlayer = gameState.players[playerIdx];
     const isPlayerTurn = gameState.activePlayerIndex === playerIdx;
 
@@ -3272,7 +3275,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   role="leftSupport"
                   isOwnerActive={isCurrentControlledTurn}
                   canUpgrade={checkCanUpgradeSlot('leftSupport', myPlayerIndex)}
-                  canSwitch={!isActionLockedByModal && !activeControlledPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
+                  canSwitch={!isSpectator && !isActionLockedByModal && !activeControlledPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
                   onUpgradeClick={() => openUpgradeModal('leftSupport', myPlayerIndex)}
                   onCardClick={() => {
                     if (gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn && checkCanUpgradeSlot('leftSupport', myPlayerIndex)) {
@@ -3330,7 +3333,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   role="rightSupport"
                   isOwnerActive={isCurrentControlledTurn}
                   canUpgrade={checkCanUpgradeSlot('rightSupport', myPlayerIndex)}
-                  canSwitch={!isActionLockedByModal && !activeControlledPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
+                  canSwitch={!isSpectator && !isActionLockedByModal && !activeControlledPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn}
                   onUpgradeClick={() => openUpgradeModal('rightSupport', myPlayerIndex)}
                   onCardClick={() => {
                     if (gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn && checkCanUpgradeSlot('rightSupport', myPlayerIndex)) {
@@ -4167,6 +4170,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         activePlayer={gameState.players[gameState.activePlayerIndex]}
         drawCount={currentTurnDrawCount}
         onExecuteDraw={(pIdx) => handleDrawCards(pIdx)}
+        isSpectator={isSpectator}
       />
 
       {/* 효과 드로우 & 손패 비행 연출 오버레이 (대결 결과창 및 연격/레벨업 오버레이 진행 중에는 화면 겹침 방지를 위해 대기) */}
