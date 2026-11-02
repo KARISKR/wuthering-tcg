@@ -527,6 +527,8 @@ class SoundEffectsEngine {
     }
 
     if (typeof window !== 'undefined') {
+      // 첫 사용자 입력 시 오디오 컨텍스트 해제 + 핵심 효과음만 우선 로드
+      // (페이지 로드 직후 약 2MB 효과음을 내려받으면 배경/폰트/JS와 대역폭을 다투므로 지연)
       const unlockAudio = () => {
         this.getAudioContext();
         this.preloadAllCustomSounds();
@@ -536,18 +538,42 @@ class SoundEffectsEngine {
       window.addEventListener('pointerdown', unlockAudio, { once: true, capture: true });
       window.addEventListener('keydown', unlockAudio, { once: true, capture: true });
 
-      // 초기 마운트 시점에도 백그라운드 프리로드 즉시 개시 (첫 클릭 이전에도 디코딩 완료 보장)
-      window.setTimeout(() => {
-        this.preloadAllCustomSounds();
-      }, 50);
+      // 입력이 없더라도 페이지 로드 완료 + 유휴 시점에 조용히 백그라운드 프리로드
+      const scheduleIdlePreload = () => {
+        const run = () => this.preloadAllCustomSounds();
+        window.setTimeout(() => {
+          if ('requestIdleCallback' in window) {
+            (window as any).requestIdleCallback(run, { timeout: 5000 });
+          } else {
+            run();
+          }
+        }, 6000);
+      };
+      if (document.readyState === 'complete') {
+        scheduleIdlePreload();
+      } else {
+        window.addEventListener('load', scheduleIdlePreload, { once: true });
+      }
     }
   }
+
+  private hasStartedFullPreload = false;
+  private fullPreloadPromise: Promise<void> | null = null;
 
   /**
    * 게임 내 모든 필수 시스템 사운드 사전 비동기 로드
    * 대결(카드 오픈/격돌/대미지/무기/페이즈/연격) 시 끊김이나 합성음 폴백 없이 고음질 오디오 즉시 재생
    */
-  public async preloadAllCustomSounds() {
+  public preloadAllCustomSounds(): Promise<void> {
+    if (this.hasStartedFullPreload && this.fullPreloadPromise) {
+      return this.fullPreloadPromise;
+    }
+    this.hasStartedFullPreload = true;
+    this.fullPreloadPromise = this.runFullPreload();
+    return this.fullPreloadPromise;
+  }
+
+  private async runFullPreload(): Promise<void> {
     // 1순위: 카드 오픈(clash_reveal), 격돌(clash), 무기 타격(직검/대검/권총/증폭기), 카드 세트(card), 딜링(card_deal) 등 핵심 대결 사운드 최우선 로드
     const priorityCategories: string[] = [
       'clash_reveal',

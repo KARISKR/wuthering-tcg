@@ -107,6 +107,9 @@ export default defineConfig({
             if (id.includes('lucide-react') || id.includes('canvas-confetti')) {
               return 'vendor-ui';
             }
+            if (id.includes('peerjs')) {
+              return 'vendor-peer';
+            }
             return 'vendor-libs';
           }
         },

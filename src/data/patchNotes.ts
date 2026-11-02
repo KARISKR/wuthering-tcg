@@ -910,7 +910,8 @@ export const patchNotes: PatchNote[] = [
 ];
 
 // 최신 버전 정보 추출 헬퍼 (시스템 전체 단일 출처)
-export const CURRENT_GAME_VERSION = patchNotes[0].version;
+import { CURRENT_GAME_VERSION } from './gameVersion';
+export { CURRENT_GAME_VERSION };
 export const LATEST_PATCH_NOTE = patchNotes[0];
 
 

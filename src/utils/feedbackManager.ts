@@ -1,4 +1,4 @@
-import { CURRENT_GAME_VERSION } from '../data/patchNotes';
+import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 
 export type FeedbackCategory = 'NOTICE' | 'GENERAL' | 'DECK' | 'TIP' | 'FEEDBACK' | 'BUG' | 'RULE' | 'FEATURE';
 
@@ -194,6 +194,25 @@ export function getFeedbackList(): FeedbackItem[] {
     memoryPostsCache = SEED_POSTS;
     return SEED_POSTS;
   }
+}
+
+export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
+  try {
+    const res = await fetch(`/api/community?type=board&summary=1&t=${Date.now()}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.deletedIds)) {
+        mergeDeletedIds(data.deletedIds);
+      }
+      if (Array.isArray(data?.posts)) {
+        const deletedSet = new Set(getDeletedFeedbackIds());
+        return data.posts.filter((p: any) => p && p.id && !deletedSet.has(p.id));
+      }
+    }
+  } catch {}
+  return getFeedbackList();
 }
 
 export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {

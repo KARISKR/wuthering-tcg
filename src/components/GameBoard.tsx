@@ -786,6 +786,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     if (chars.length > 0) {
       soundEffects.preloadCharacters(chars);
     }
+    // 배틀 진입 시 시스템 효과음 전체 프리로드 보장 (이미 로드 중/완료면 무시)
+    soundEffects.preloadAllCustomSounds();
     // 배틀에 사용되는 양측 덱·슬롯·진화 카드 이미지 백그라운드 선행 프리로드
     preloadBattleCards(gameState);
   }, [gameState.players]);

@@ -1,4 +1,4 @@
-import { Peer, DataConnection } from 'peerjs';
+import type { Peer, DataConnection } from 'peerjs';
 import {
   MultiplayerRole,
   MultiplayerConnectionStatus,
@@ -83,6 +83,13 @@ class MultiplayerService {
       window.addEventListener('beforeunload', handleUnload);
       window.addEventListener('pagehide', handleUnload);
     }
+  }
+
+  private async createPeerInstance(id: string): Promise<Peer> {
+    const { Peer } = await import('peerjs');
+    return new Peer(id, {
+      debug: 1,
+    });
   }
 
   private getOrInitSessionId(): string {
@@ -227,11 +234,9 @@ class MultiplayerService {
 
     const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
-        this.peer = new Peer(hostPeerId, {
-          debug: 1,
-        });
+        this.peer = await this.createPeerInstance(hostPeerId);
 
         this.peer.on('open', () => {
           this.setStatus('WAITING_FOR_GUEST');
@@ -277,11 +282,9 @@ class MultiplayerService {
     const guestPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-guest-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
     const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
-        this.peer = new Peer(guestPeerId, {
-          debug: 1,
-        });
+        this.peer = await this.createPeerInstance(guestPeerId);
 
         const connectTimeout = setTimeout(() => {
           this.setStatus('ERROR');
@@ -338,11 +341,9 @@ class MultiplayerService {
     const spectatorPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-spectator-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
     const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
       try {
-        this.peer = new Peer(spectatorPeerId, {
-          debug: 1,
-        });
+        this.peer = await this.createPeerInstance(spectatorPeerId);
 
         const connectTimeout = setTimeout(() => {
           this.setStatus('ERROR');
@@ -505,12 +506,12 @@ class MultiplayerService {
           resolve(result);
         };
 
-        const tryCreateHost = (retryCount = 0) => {
+        const tryCreateHost = async (retryCount = 0) => {
           try {
             if (this.peer) {
               try { this.peer.destroy(); } catch {}
             }
-            this.peer = new Peer(hostPeerId, { debug: 1 });
+            this.peer = await this.createPeerInstance(hostPeerId);
             this.peer.on('open', () => {
               this.setStatus('WAITING_FOR_GUEST');
               finish(true);
@@ -538,7 +539,7 @@ class MultiplayerService {
     } else {
       const guestPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-guest-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
       const hostPeerId = `${PEER_ID_PREFIX}-${this.roomCode}-host`;
-      return new Promise((resolve) => {
+      return new Promise(async (resolve) => {
         let settled = false;
         const timeoutId = setTimeout(() => {
           console.warn('[Multiplayer] Guest reconnect attempt timed out (8s)');
@@ -555,7 +556,7 @@ class MultiplayerService {
         };
 
         try {
-          this.peer = new Peer(guestPeerId, { debug: 1 });
+          this.peer = await this.createPeerInstance(guestPeerId);
           this.peer.on('open', () => {
             const conn = this.peer!.connect(hostPeerId, { reliable: true });
             this.setupConnectionListeners(conn, () => {
