@@ -266,7 +266,7 @@ export function App() {
 
   return (
     <div className="w-full min-h-screen bg-[#070a13]">
-      <MobileOrientationGuard />
+      {(currentView === 'BATTLE' || currentView === 'REPLAY_STAGE') && <MobileOrientationGuard />}
       {/* 이전 멀티플레이 세션 재접속 알림 토스트 배너 */}
       {savedSessionToResume && currentView === 'LOBBY' && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full px-4 animate-in fade-in slide-in-from-top-4 duration-300">
