@@ -95,7 +95,7 @@ export function App() {
       } else if (hash === '#tutorial-battle') {
         setIsTutorialBattle(true);
         setCurrentView('BATTLE');
-      } else if (hash === '#battle-stage') {
+      } else if (hash === '#battle-stage' || hash === '#m-battle-stage' || hash === '#m-battle') {
         setIsTutorialBattle(false);
         bgmManager.unlockTrack();
         setCurrentView('BATTLE');
@@ -130,9 +130,21 @@ export function App() {
     }
   }, [currentView, isTutorialBattle]);
 
+  const isMobileClient = () => {
+    if (typeof window === 'undefined') return false;
+    return (
+      window.location.hostname.startsWith('m.') ||
+      window.innerWidth < 1024 ||
+      window.innerHeight < 560 ||
+      /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    );
+  };
+
+  const getBattleHash = () => (isMobileClient() ? '#m-battle-stage' : '#battle-stage');
+
   const handleStartGame = (mode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER', myDeck?: CustomDeckConfig, oppDeck?: CustomDeckConfig) => {
     setIsTutorialBattle(false);
-    window.location.hash = '#battle-stage';
+    window.location.hash = getBattleHash();
     setCustomDeck(myDeck ?? null);
     setOpponentDeck(oppDeck ?? null);
     setBattleMode(mode);
@@ -147,7 +159,7 @@ export function App() {
   ) => {
     setIsTutorialBattle(false);
     bgmManager.unlockTrack();
-    window.location.hash = '#battle-stage';
+    window.location.hash = getBattleHash();
     setCustomDeck(myDeck ?? null);
     setOpponentDeck(oppDeck ?? null);
     setMultiplayerRole(role);
@@ -159,7 +171,7 @@ export function App() {
     if (!savedSessionToResume) return;
     setIsTutorialBattle(false);
     bgmManager.unlockTrack();
-    window.location.hash = '#battle-stage';
+    window.location.hash = getBattleHash();
     setBattleMode('MULTIPLAYER');
     setMultiplayerRole(savedSessionToResume.role);
     setCustomDeck(savedSessionToResume.myProfile.customDeck || null);
@@ -181,7 +193,7 @@ export function App() {
   const handleStartBattleWithCustomDeck = (deck: CustomDeckConfig) => {
     setIsTutorialBattle(false);
     bgmManager.unlockTrack();
-    window.location.hash = '#battle-stage';
+    window.location.hash = getBattleHash();
     setCustomDeck(deck);
     setOpponentDeck(null);
     setBattleMode('AI');

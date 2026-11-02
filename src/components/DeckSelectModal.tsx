@@ -97,8 +97,8 @@ const DeckColumn: React.FC<{
   return (
     <div className="flex flex-col min-h-0 bg-[#0e1322]/90 border border-slate-700/80 rounded-2xl overflow-hidden shadow-2xl">
       {/* 컬럼 헤더 */}
-      <div className="px-5 py-3.5 border-b border-slate-800 shrink-0 bg-[#12182c]/90">
-        <div className="flex items-center justify-between">
+      <div className="px-3.5 py-2.5 sm:px-5 sm:py-3.5 border-b border-slate-800 shrink-0 bg-[#12182c]/90">
+        <div className="hidden md:flex items-center justify-between">
           <div>
             <div className={`font-black text-base sm:text-lg ${titleColor}`}>{title}</div>
             <div className="text-xs text-slate-400 mt-0.5">{subtitle}</div>
@@ -109,7 +109,7 @@ const DeckColumn: React.FC<{
         </div>
 
         {/* 4종 카테고리 탭 (보유 덱 | AI추천 | 공식 | 프리셋 | 전체) */}
-        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        <div className="mt-0 md:mt-3 flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
           {CATEGORY_TABS.map((tab) => {
             const count = counts[tab.id];
             const isActive = activeCategory === tab.id;
@@ -117,7 +117,7 @@ const DeckColumn: React.FC<{
               <button
                 key={tab.id}
                 onClick={() => setActiveCategory(tab.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+                className={`px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 sm:gap-1.5 shrink-0 cursor-pointer ${
                   isActive
                     ? badgeActive
                     : 'bg-slate-900/80 hover:bg-slate-800 text-slate-300 border border-slate-700/60'
@@ -125,7 +125,7 @@ const DeckColumn: React.FC<{
               >
                 <span>{tab.label}</span>
                 <span
-                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  className={`text-[9px] sm:text-[10px] px-1 sm:px-1.5 py-0.2 rounded-full font-mono ${
                     isActive ? 'bg-black/30 text-white font-black' : 'bg-slate-800 text-slate-400'
                   }`}
                 >
@@ -138,24 +138,24 @@ const DeckColumn: React.FC<{
       </div>
 
       {/* 덱 목록 스크롤 영역 */}
-      <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5 min-h-0 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-2 sm:p-3.5 space-y-2 sm:space-y-2.5 min-h-0 custom-scrollbar">
         {allowRandom && (
           <button
             onClick={() => onSelect(RANDOM_ID)}
-            className={`w-full p-3.5 sm:p-4 rounded-2xl border text-left flex items-center gap-3.5 transition cursor-pointer shadow-md ${
+            className={`w-full p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border text-left flex items-center gap-2.5 sm:gap-3.5 transition cursor-pointer shadow-md ${
               selectedId === RANDOM_ID
                 ? `${ring} bg-slate-900`
                 : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-900/80'
             }`}
           >
-            <div className="w-12 h-12 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300 shrink-0 shadow">
-              <Shuffle className="w-6 h-6 text-indigo-400" />
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-slate-800 flex items-center justify-center text-slate-300 shrink-0 shadow">
+              <Shuffle className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-black text-base text-white">랜덤 덱</div>
-              <div className="text-xs text-slate-400 mt-0.5">보관함의 덱 중 하나를 무작위로 선택</div>
+              <div className="font-black text-sm sm:text-base text-white">랜덤 덱</div>
+              <div className="text-[11px] sm:text-xs text-slate-400 mt-0.5">보관함의 덱 중 하나를 무작위로 선택</div>
             </div>
-            {selectedId === RANDOM_ID && <Check className="w-5 h-5 text-emerald-400 shrink-0" />}
+            {selectedId === RANDOM_ID && <Check className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0" />}
           </button>
         )}
 
@@ -194,16 +194,16 @@ const DeckColumn: React.FC<{
               <button
                 key={preset.id}
                 onClick={() => onSelect(preset.id)}
-                className={`w-full p-3.5 sm:p-4 rounded-2xl border text-left transition cursor-pointer shadow-md ${
+                className={`w-full p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border text-left transition cursor-pointer shadow-md ${
                   selected
                     ? `${ring} bg-slate-900/95`
                     : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-900/80'
                 }`}
               >
-                <div className="flex items-center justify-between gap-2 mb-2.5">
-                  <div className="min-w-0 flex items-center gap-2">
+                <div className="flex items-center justify-between gap-1.5 mb-1.5 sm:mb-2.5">
+                  <div className="min-w-0 flex items-center gap-1.5 sm:gap-2">
                     <span
-                      className={`shrink-0 text-xs font-black px-2 py-0.5 rounded-md ${
+                      className={`shrink-0 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.2 sm:py-0.5 rounded-md ${
                         isUser
                           ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50'
                           : isAi
@@ -214,34 +214,34 @@ const DeckColumn: React.FC<{
                       }`}
                     >
                       {isUser
-                        ? '★ 보유 덱'
+                        ? '★ 보유'
                         : isAi
-                        ? '🤖 AI 추천'
+                        ? '🤖 AI추천'
                         : isOff
                         ? '👑 공식'
                         : '📜 프리셋'}
                     </span>
-                    <span className="font-black text-base text-white truncate">{preset.name}</span>
+                    <span className="font-black text-sm sm:text-base text-white truncate">{preset.name}</span>
                   </div>
-                  {selected && <Check className="w-5 h-5 text-emerald-400 shrink-0" />}
+                  {selected && <Check className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 shrink-0" />}
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center justify-between gap-2 sm:gap-3">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                     {[deck.leader, deck.leftSupport, deck.rightSupport].map((c, i) => (
                       <div
                         key={i}
-                        className={`relative w-11 h-15 sm:w-13 sm:h-17 rounded-lg overflow-hidden border shrink-0 shadow-md ${
+                        className={`relative w-8 h-11 sm:w-13 sm:h-17 rounded sm:rounded-lg overflow-hidden border shrink-0 shadow-md ${
                           i === 0 ? 'border-amber-400 ring-1 ring-amber-400/50' : 'border-slate-600'
                         }`}
                         title={c.nameKr}
                       >
                         <img src={c.artUrl} alt={c.nameKr} className="w-full h-full object-cover object-top" />
-                        {i === 0 && <Crown className="absolute top-0.5 left-0.5 w-3.5 h-3.5 text-amber-300 drop-shadow" />}
+                        {i === 0 && <Crown className="absolute top-0.5 left-0.5 w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-amber-300 drop-shadow" />}
                       </div>
                     ))}
-                    <div className="ml-1 text-xs sm:text-sm text-slate-200 font-bold leading-tight min-w-0 truncate">
+                    <div className="ml-1 text-[11px] sm:text-sm text-slate-200 font-bold leading-tight min-w-0 truncate">
                       <div className="truncate">{deck.leader.nameKr}</div>
-                      <div className="text-xs text-slate-400 font-normal mt-0.5 truncate">
+                      <div className="text-[10px] sm:text-xs text-slate-400 font-normal mt-0.5 truncate">
                         {deck.leftSupport.nameKr} · {deck.rightSupport.nameKr}
                       </div>
                     </div>
@@ -251,7 +251,7 @@ const DeckColumn: React.FC<{
                       <span className="text-red-400 font-black">R{r}</span> <span className="text-emerald-400 font-black">G{g}</span>{' '}
                       <span className="text-cyan-400 font-black">B{b}</span>
                     </div>
-                    <div className={`text-xs font-mono mt-0.5 ${valid ? 'text-slate-400 font-bold' : 'text-red-400 font-black'}`}>
+                    <div className={`text-[10px] sm:text-xs font-mono mt-0.5 ${valid ? 'text-slate-400 font-bold' : 'text-red-400 font-black'}`}>
                       {deck.actionCards.length}/40장
                     </div>
                   </div>
@@ -319,22 +319,21 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-6 animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-0 sm:p-6 animate-in fade-in duration-150"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-[#0a0e1c]/95 border-2 border-amber-400/80 shadow-[0_0_50px_rgba(245,158,11,0.28)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
-        style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
+        className="relative w-full max-w-6xl xl:max-w-7xl h-[100dvh] sm:h-[94vh] sm:max-h-[960px] bg-[#0a0e1c]/95 border-0 sm:border-2 border-amber-400/80 shadow-[0_0_50px_rgba(245,158,11,0.28)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 내부 인셋 라인 */}
-        <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-30" />
+        <div className="hidden sm:block absolute inset-1.5 border border-amber-400/25 pointer-events-none z-30" />
 
-        {/* 네 모서리 골드 코너 브라켓 장식 */}
-        <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
-        <div className="absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
+        {/* 네 모서리 골드 코너 브라켓 장식 (데스크톱 전용) */}
+        <div className="hidden sm:block absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="hidden sm:block absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="hidden sm:block absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="hidden sm:block absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
 
         {/* 모달 상단 헤더 */}
         <header className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-amber-400/20 bg-[#0d1224]/90 flex items-center justify-between shrink-0 relative z-20">
@@ -374,30 +373,84 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
           </button>
         </header>
 
-        {/* 모바일 전용 1P / 2P(AI) 탭 전환 바 (< md 전용) */}
-        <div className="flex md:hidden px-3 pt-2 pb-1 gap-2 bg-[#0c101d] border-b border-slate-800/80 shrink-0 relative z-20">
-          <button
-            onClick={() => setMobileActiveSide('MY')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 border ${
-              mobileActiveSide === 'MY'
-                ? 'bg-amber-500/20 text-amber-300 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
-                : 'bg-slate-900/60 text-slate-400 border-slate-800'
-            }`}
-          >
-            <Crown className="w-3.5 h-3.5 text-amber-400" />
-            <span className="truncate">1P (내 덱): {decksById.get(myId)?.name || '선택'}</span>
-          </button>
-          <button
-            onClick={() => setMobileActiveSide('OPP')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 border ${
-              mobileActiveSide === 'OPP'
-                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.3)]'
-                : 'bg-slate-900/60 text-slate-400 border-slate-800'
-            }`}
-          >
-            <Bot className="w-3.5 h-3.5 text-indigo-400" />
-            <span className="truncate">{isAi ? '2P (AI 봇)' : '2P 덱'}: {oppId === RANDOM_ID ? '랜덤' : decksById.get(oppId)?.name || '선택'}</span>
-          </button>
+        {/* 모바일 전용 1P / 2P(AI) 상단 매치업 선택 슬롯 바 (< md 전용) */}
+        <div className="flex md:hidden px-2.5 pt-2 pb-1.5 gap-2 bg-[#0c101d] border-b border-slate-800/80 shrink-0 relative z-20">
+          {/* 1P 내 덱 선택 슬롯 */}
+          {(() => {
+            const myPreset = decksById.get(myId);
+            const myDeck = myPreset ? presetToCustomDeck(myPreset) : null;
+            const isSelected = mobileActiveSide === 'MY';
+            return (
+              <button
+                onClick={() => setMobileActiveSide('MY')}
+                className={`flex-1 p-2 rounded-xl text-left transition flex items-center gap-2 border relative overflow-hidden ${
+                  isSelected
+                    ? 'bg-amber-950/40 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/60'
+                    : 'bg-slate-900/60 border-slate-800 opacity-75'
+                }`}
+              >
+                {myDeck ? (
+                  <div className="relative w-8 h-10 rounded overflow-hidden border border-amber-400/60 shrink-0">
+                    <img src={myDeck.leader.artUrl} alt="" className="w-full h-full object-cover object-top" />
+                    <Crown className="absolute top-0.5 left-0.5 w-2.5 h-2.5 text-amber-300" />
+                  </div>
+                ) : (
+                  <div className="w-8 h-10 rounded bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                    <Crown className="w-4 h-4 text-amber-400" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] font-mono text-amber-400/90 font-bold flex items-center justify-between">
+                    <span>1P 내 덱</span>
+                    {isSelected && <span className="text-[9px] bg-amber-400 text-slate-950 font-black px-1 rounded">선택 중</span>}
+                  </div>
+                  <div className="text-xs font-black text-white truncate mt-0.5">
+                    {myPreset?.name || '덱 선택 필요'}
+                  </div>
+                </div>
+              </button>
+            );
+          })()}
+
+          {/* 2P 상대 덱 선택 슬롯 */}
+          {(() => {
+            const oppPreset = oppId === RANDOM_ID ? null : decksById.get(oppId);
+            const oppDeck = oppPreset ? presetToCustomDeck(oppPreset) : null;
+            const isSelected = mobileActiveSide === 'OPP';
+            return (
+              <button
+                onClick={() => setMobileActiveSide('OPP')}
+                className={`flex-1 p-2 rounded-xl text-left transition flex items-center gap-2 border relative overflow-hidden ${
+                  isSelected
+                    ? 'bg-indigo-950/40 border-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.25)] ring-1 ring-indigo-400/60'
+                    : 'bg-slate-900/60 border-slate-800 opacity-75'
+                }`}
+              >
+                {oppId === RANDOM_ID ? (
+                  <div className="w-8 h-10 rounded bg-indigo-950 border border-indigo-400/60 flex items-center justify-center shrink-0">
+                    <Shuffle className="w-4 h-4 text-indigo-400" />
+                  </div>
+                ) : oppDeck ? (
+                  <div className="relative w-8 h-10 rounded overflow-hidden border border-indigo-400/60 shrink-0">
+                    <img src={oppDeck.leader.artUrl} alt="" className="w-full h-full object-cover object-top" />
+                  </div>
+                ) : (
+                  <div className="w-8 h-10 rounded bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">
+                    <Bot className="w-4 h-4 text-indigo-400" />
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] font-mono text-indigo-400/90 font-bold flex items-center justify-between">
+                    <span>{isAi ? '2P AI 봇' : '2P 상대'}</span>
+                    {isSelected && <span className="text-[9px] bg-indigo-500 text-white font-black px-1 rounded">선택 중</span>}
+                  </div>
+                  <div className="text-xs font-black text-white truncate mt-0.5">
+                    {oppId === RANDOM_ID ? '🎲 랜덤 덱' : oppPreset?.name || '덱 선택 필요'}
+                  </div>
+                </div>
+              </button>
+            );
+          })()}
         </div>
 
         {/* 덱 컬럼 영역 (모바일: 현재 탭만 1개 표시, 데스크톱: 좌우 2개 분할) */}

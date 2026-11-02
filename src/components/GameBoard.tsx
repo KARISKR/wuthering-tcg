@@ -89,6 +89,7 @@ import {
   Wifi,
   WifiOff,
   Clock,
+  X,
 } from 'lucide-react';
 
 import { BgmPlayer } from './BgmPlayer';
@@ -1156,6 +1157,27 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [leftPanelSize, setLeftPanelSize] = useState<LeftPanelSize>(() => {
     return (localStorage.getItem('wuthering_left_panel_size') as LeftPanelSize) || 'normal';
   });
+
+  // 모바일 전용 배틀 모드 상태 (URL 해시 #m-battle, 모바일 기기 UA, 또는 뷰포트 너비 < 1024 / 높이 < 580)
+  const [isMobileBattle, setIsMobileBattle] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const isMobileHash = window.location.hash.includes('m-battle');
+    const isMobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isSmallScreen = window.innerWidth < 1024 || window.innerHeight < 580;
+    return isMobileHash || isMobileUa || isSmallScreen;
+  });
+
+  const [showMobileCardModal, setShowMobileCardModal] = useState<boolean>(false);
+  const [showMobileLogModal, setShowMobileLogModal] = useState<boolean>(false);
+
+  // 모바일 팝업/모달 자동 다운스케일 줌 계산 (가로 1120, 세로 680 기준)
+  const [modalZoomScale, setModalZoomScale] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0.58;
+    const sW = window.innerWidth / 1120;
+    const sH = window.innerHeight / 680;
+    return Math.min(1, Math.max(0.42, Math.min(sW, sH)));
+  });
+
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && (window.innerWidth < 1180 || window.innerHeight < 600)) {
       return true;
@@ -1198,8 +1220,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 화면 해상도(높이/너비)에 맞춰 4단 전장 + 손패가 잘리지 않고 한눈에 들어오도록 자동 계산되는 반응형 스케일
   const [viewportScale, setViewportScale] = useState<number>(() => {
     if (typeof window === 'undefined') return 0.92;
-    const availH = Math.max(280, window.innerHeight - 40);
-    const sideW = (isLeftPanelCollapsed ? 48 : 310) + (isRightPanelCollapsed ? 48 : 280);
+    const availH = Math.max(280, window.innerHeight - 38);
+    const sideW = isMobileBattle
+      ? 0
+      : (isLeftPanelCollapsed ? 48 : 310) + (isRightPanelCollapsed ? 48 : 280);
     const availW = Math.max(320, window.innerWidth - sideW);
     const scaleH = availH / 1000;
     const scaleW = availW / 1080;
@@ -1208,18 +1232,38 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   useEffect(() => {
     const updateViewportScale = () => {
-      const availH = Math.max(280, window.innerHeight - 40);
-      const leftW = isLeftPanelCollapsed ? 48 : window.innerWidth >= 1536 ? 420 : window.innerWidth >= 1280 ? 370 : 310;
-      const rightW = isRightPanelCollapsed ? 48 : window.innerWidth >= 1536 ? 340 : window.innerWidth >= 1280 ? 310 : 272;
+      const availH = Math.max(280, window.innerHeight - 38);
+      const leftW = isMobileBattle
+        ? 0
+        : isLeftPanelCollapsed
+        ? 48
+        : window.innerWidth >= 1536
+        ? 420
+        : window.innerWidth >= 1280
+        ? 370
+        : 310;
+      const rightW = isMobileBattle
+        ? 0
+        : isRightPanelCollapsed
+        ? 48
+        : window.innerWidth >= 1536
+        ? 340
+        : window.innerWidth >= 1280
+        ? 310
+        : 272;
       const availW = Math.max(320, window.innerWidth - leftW - rightW);
       const scaleH = availH / 1000;
       const scaleW = availW / 1080;
       setViewportScale(Math.min(1.15, Math.max(0.32, Math.min(scaleH, scaleW))));
+
+      const sW = window.innerWidth / 1120;
+      const sH = window.innerHeight / 680;
+      setModalZoomScale(Math.min(1, Math.max(0.42, Math.min(sW, sH))));
     };
     updateViewportScale();
     window.addEventListener('resize', updateViewportScale);
     return () => window.removeEventListener('resize', updateViewportScale);
-  }, [isLeftPanelCollapsed, isRightPanelCollapsed]);
+  }, [isLeftPanelCollapsed, isRightPanelCollapsed, isMobileBattle]);
 
   const changeLeftPanelSize = (size: LeftPanelSize) => {
     setLeftPanelSize(size);
@@ -2204,7 +2248,14 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const officialPreview = previewCard ? getOfficialCardByCode(previewCard.code) : null;
 
   return (
-    <div className="relative h-screen max-h-screen w-full bg-[#060810] text-slate-100 flex flex-col justify-between overflow-hidden select-none">
+    <div
+      className={`relative h-screen max-h-screen w-full bg-[#060810] text-slate-100 flex flex-col justify-between overflow-hidden select-none ${
+        isMobileBattle ? 'mobile-battle-mode' : ''
+      }`}
+      style={{
+        ['--modal-zoom' as any]: `${modalZoomScale}`,
+      }}
+    >
       {/* ========================================================= */}
       {/* 1. 상단 명조 택티컬 네비게이션 헤더 (모바일 40px / 데스크톱 48px) */}
       {/* ========================================================= */}
@@ -2230,6 +2281,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <span>🏳️</span>
               <span>항복</span>
             </button>
+          )}
+
+          {/* 모바일 / PC 뷰 강제 전환 토글 */}
+          <button
+            onClick={() => setIsMobileBattle((prev) => !prev)}
+            className={`px-2 py-1 text-[11px] font-bold border transition cursor-pointer flex items-center gap-1 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)] ${
+              isMobileBattle
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/60'
+                : 'bg-[#111520] text-slate-400 border-white/10 hover:text-white'
+            }`}
+            title={isMobileBattle ? '데스크톱 뷰(사이드바 포함)로 전환' : '모바일 풀스크린 뷰로 전환'}
+          >
+            <span>{isMobileBattle ? '📱모바일' : '🖥️PC'}</span>
+          </button>
+
+          {/* 모바일 헤더 퀵 모달 호출 버튼 */}
+          {isMobileBattle && (
+            <>
+              <button
+                onClick={() => setShowMobileCardModal(true)}
+                className="px-2 py-1 bg-[#111520] hover:bg-cyan-950/60 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center gap-1 cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
+                title="선택된 카드 상세 정보 보기"
+              >
+                <Eye className="w-3 h-3 text-cyan-400" />
+                <span>카드</span>
+              </button>
+              <button
+                onClick={() => setShowMobileLogModal(true)}
+                className="px-2 py-1 bg-[#111520] hover:bg-amber-950/60 text-amber-300 border border-amber-500/40 text-[11px] font-bold flex items-center gap-1 cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
+                title="실시간 배틀 로그 보기"
+              >
+                <ScrollText className="w-3 h-3 text-amber-400" />
+                <span>로그</span>
+              </button>
+            </>
           )}
 
           <div className="hidden lg:flex items-center gap-2">
@@ -2454,10 +2540,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       {/* ========================================================= */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         {/* --------------------------------------------------------- */}
-        {/* [좌측 패널] 명조 카드 상세 단말기 (고정 높이 100%, 내부 스크롤) */}
+        {/* [좌측 패널] 명조 카드 상세 단말기 (모바일에서는 전장 100% 확보를 위해 숨김) */}
         {/* --------------------------------------------------------- */}
-        {isLeftPanelCollapsed ? (
-          <div className="w-11 shrink-0 bg-[#090d16] border-r border-white/10 py-3 flex flex-col items-center justify-between h-full select-none z-20">
+        {!isMobileBattle && (
+          isLeftPanelCollapsed ? (
+            <div className="w-11 shrink-0 bg-[#090d16] border-r border-white/10 py-3 flex flex-col items-center justify-between h-full select-none z-20">
             <div className="flex flex-col items-center gap-3">
               <button
                 onClick={toggleLeftPanelCollapsed}
@@ -2698,7 +2785,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               </div>
             )}
           </div>
-        )}
+        ))}
 
         {/* ========================================================= */}
         {/* [중앙 메인 보드] 100vh 원스크린 4단 수직 분할 (전체 스크롤 없음) */}
@@ -3655,10 +3742,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         </div>
 
         {/* --------------------------------------------------------- */}
-        {/* [우측 패널] 택티컬 콘솔 (상단) + 실시간 배틀 로그 (하단 내부 스크롤) */}
+        {/* [우측 패널] 택티컬 콘솔 (상단) + 실시간 배틀 로그 (모바일에서는 전장 100% 확보를 위해 숨김) */}
         {/* --------------------------------------------------------- */}
-        {isRightPanelCollapsed ? (
-          <div className="w-11 shrink-0 bg-[#090d16] border-l border-white/10 py-3 flex flex-col items-center justify-between h-full select-none z-20">
+        {!isMobileBattle && (
+          isRightPanelCollapsed ? (
+            <div className="w-11 shrink-0 bg-[#090d16] border-l border-white/10 py-3 flex flex-col items-center justify-between h-full select-none z-20">
             <div className="flex flex-col items-center gap-3">
               <button
                 onClick={() => setIsRightPanelCollapsed(false)}
@@ -4287,17 +4375,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             )}
           </div>
         </div>
-        )}
+        ))}
       </div>
 
-      {/* 우측 패널 접힘 시 모바일 엄지용 플로팅 퀵 액션 컨트롤 바 */}
-      {isRightPanelCollapsed && !isSpectator && (
-        <div className="fixed bottom-3 right-14 z-40 flex items-center gap-2 bg-[#0c101b]/95 border border-[#f97316]/70 p-1.5 shadow-[0_0_25px_rgba(0,0,0,0.9)] backdrop-blur-md animate-in fade-in slide-in-from-right-3">
+      {/* 우측 패널 접힘 시 또는 모바일 배틀 모드일 때 엄지용 플로팅 퀵 액션 컨트롤 바 */}
+      {(isMobileBattle || isRightPanelCollapsed) && !isSpectator && (
+        <div className={`fixed z-40 flex items-center gap-1.5 bg-[#0c101b]/95 border border-[#f97316]/70 p-1.5 shadow-[0_0_25px_rgba(0,0,0,0.9)] backdrop-blur-md animate-in fade-in slide-in-from-right-3 ${
+          isMobileBattle ? 'bottom-2.5 right-2 rounded-lg' : 'bottom-3 right-14'
+        }`}>
+          {/* 모바일 퀵 도구 버튼: 카드 상세 & 배틀 로그 */}
+          {isMobileBattle && (
+            <>
+              <button
+                onClick={() => setShowMobileCardModal(true)}
+                className="px-2.5 py-2 bg-[#111520] hover:bg-[#1a2234] text-cyan-300 border border-cyan-500/40 text-xs font-black rounded transition cursor-pointer flex items-center gap-1"
+                title="선택된 카드 상세 정보"
+              >
+                <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="hidden sm:inline">카드</span>
+              </button>
+              <button
+                onClick={() => setShowMobileLogModal(true)}
+                className="px-2.5 py-2 bg-[#111520] hover:bg-[#1a2234] text-amber-300 border border-amber-500/40 text-xs font-black rounded transition cursor-pointer flex items-center gap-1"
+                title="배틀 로그 보기"
+              >
+                <ScrollText className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">로그</span>
+              </button>
+            </>
+          )}
+
           {/* 드로우 단계 */}
           {gameState.phase === 'DRAW_PHASE' && (canP0Draw || canP1Draw) && isCurrentControlledTurn && (
             <button
               onClick={() => handleDrawCards(controlledPlayerIndex)}
-              className="px-3.5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 text-white font-black text-xs rounded shadow transition cursor-pointer flex items-center gap-1.5 animate-pulse"
+              className="px-3.5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1.5 animate-pulse"
             >
               <span>🎴 드로우 ({currentTurnDrawCount}장)</span>
             </button>
@@ -4312,7 +4424,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   setIsConfirmingEndTurn(false);
                   handleDecideClash(true);
                 }}
-                className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs rounded shadow transition cursor-pointer flex items-center gap-1"
+                className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1"
               >
                 <Swords className="w-3.5 h-3.5" />
                 <span>배틀 선언</span>
@@ -4320,7 +4432,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <button
                 disabled={isActionLockedByModal}
                 onClick={() => setIsConfirmingEndTurn(true)}
-                className="px-3 py-2 bg-[#111520] hover:bg-slate-800 text-slate-300 font-bold text-xs rounded border border-white/20 transition cursor-pointer"
+                className="px-3 py-2 bg-[#111520] hover:bg-slate-800 text-slate-300 font-bold text-xs sm:text-sm rounded border border-white/20 transition cursor-pointer"
               >
                 턴 종료
               </button>
@@ -4332,7 +4444,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             <button
               disabled={isActionLockedByModal}
               onClick={() => handleSetClashCard(controlledPlayerIndex, null)}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs rounded border border-amber-500/40 transition cursor-pointer"
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs sm:text-sm rounded border border-amber-500/40 transition cursor-pointer"
             >
               카드 없이 패스
             </button>
@@ -4345,10 +4457,28 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 setNoComboCountdown(null);
                 handleFinishCombo(controlledPlayerIndex);
               }}
-              className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] to-[#fb923c] text-white font-black text-xs rounded shadow transition cursor-pointer flex items-center gap-1 animate-pulse"
+              className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] to-[#fb923c] text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1 animate-pulse"
             >
               <span>연격 종료</span>
               <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+
+          {/* 패 초과 버리기 단계 */}
+          {gameState.phase === 'DISCARD_OVERFLOW' && activeControlledPlayer.hand.length > 8 && (
+            <button
+              disabled={selectedOverflowIds.length !== activeControlledPlayer.hand.length - 8}
+              onClick={() => {
+                handleDiscardOverflow(controlledPlayerIndex, selectedOverflowIds);
+                setSelectedOverflowIds([]);
+              }}
+              className={`px-3 py-2 rounded text-xs sm:text-sm font-black transition ${
+                selectedOverflowIds.length === activeControlledPlayer.hand.length - 8
+                  ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer animate-pulse'
+                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              버리기 ({selectedOverflowIds.length}/{activeControlledPlayer.hand.length - 8})
             </button>
           )}
         </div>
@@ -5168,6 +5298,116 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             multiplayerService.attemptReconnect();
           }}
         />
+      )}
+
+      {/* [모바일 전용] 선택 카드 상세 정보 팝업 모달 */}
+      {showMobileCardModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
+          <div className="relative mobile-modal-scaled w-full max-w-sm max-h-[92dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/98 border border-[#f97316]/70 p-4 shadow-[0_0_50px_rgba(0,0,0,0.95)] flex flex-col gap-3">
+            <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
+            <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
+            <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
+            <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
+
+            <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+              <div className="flex items-center gap-1.5 font-black text-sm text-[#f97316]">
+                <span>✦ CARD PREVIEW</span>
+              </div>
+              <button
+                onClick={() => setShowMobileCardModal(false)}
+                className="p-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white border border-white/15 cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
+                title="닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {previewCard ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-44 aspect-[5/7] rounded-xl overflow-hidden border-2 border-[#f97316]/60 shadow-2xl bg-slate-950">
+                  <img
+                    src={(previewCard as any).artUrl}
+                    alt={previewCard.nameKr}
+                    className="w-full h-full object-contain"
+                  />
+                </div>
+                <div className="w-full text-center space-y-1">
+                  <h3 className="font-black text-lg text-white">{previewCard.nameKr}</h3>
+                  <div className="flex items-center justify-center gap-2 text-xs font-mono">
+                    <span className="px-2 py-0.5 bg-[#141a29] text-[#f97316] border border-[#f97316]/40">
+                      {previewCard.kind}
+                    </span>
+                    {previewCard.kind === 'ACTION' ? (
+                      <span className="px-2 py-0.5 bg-slate-800 text-cyan-300">
+                        비용 {previewCard.cost} · 피해 {previewCard.damage}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 bg-slate-800 text-cyan-300">
+                        Lv.{previewCard.level} {getElementKr(previewCard.element)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {previewCard.description && (
+                  <div className="w-full bg-[#111520] p-3 border border-white/10 rounded text-xs leading-relaxed text-slate-200 text-left">
+                    {formatEffectText(previewCard.description, 'sm')}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-slate-400 text-xs font-mono">
+                현재 선택된 카드가 없습니다.<br />손패나 필드의 카드를 터치하세요.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* [모바일 전용] 배틀 로그 팝업 모달 */}
+      {showMobileLogModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
+          <div className="relative mobile-modal-scaled w-full max-w-md h-[80dvh] bg-[#0c101b]/98 border border-[#22d3ee]/70 p-4 shadow-[0_0_50px_rgba(0,0,0,0.95)] flex flex-col gap-2">
+            <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#22d3ee]" />
+            <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#22d3ee]" />
+            <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#f97316]" />
+            <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#f97316]" />
+
+            <div className="flex items-center justify-between border-b border-white/10 pb-2 shrink-0">
+              <div className="flex items-center gap-1.5 font-black text-sm text-[#22d3ee]">
+                <ScrollText className="w-4 h-4" />
+                <span>실시간 배틀 로그 ({gameState.logs.length}건)</span>
+              </div>
+              <button
+                onClick={() => setShowMobileLogModal(false)}
+                className="p-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white border border-white/15 cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
+                title="닫기"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar min-h-0 text-xs">
+              {gameState.logs.slice().reverse().map((log, idx) => (
+                <div
+                  key={log.id || idx}
+                  className={`p-2 border rounded ${
+                    log.type === 'DAMAGE'
+                      ? 'bg-red-950/30 border-red-500/40 text-red-200'
+                      : log.type === 'HEAL'
+                      ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-200'
+                      : 'bg-[#111520] border-white/10 text-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 mb-0.5">
+                    <span className="font-mono font-bold text-[#f97316]">TURN {log.turn}</span>
+                    <span className="uppercase font-mono">{log.type}</span>
+                  </div>
+                  <div className="leading-snug">{formatBattleLogText(getDisplayLogText(log))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

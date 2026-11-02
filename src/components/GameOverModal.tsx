@@ -194,7 +194,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
       )}
 
       {/* 메인 결과 팝업 카드 */}
-      <div className={`relative w-full max-w-2xl bg-[#0c101b]/95 border p-6 sm:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center text-center text-slate-100 z-10 overflow-hidden ${
+      <div className={`relative mobile-modal-scaled w-full max-w-2xl bg-[#0c101b]/95 border p-6 sm:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center text-center text-slate-100 z-10 overflow-hidden ${
         isPlayerWinner ? 'border-[#f97316]/70 shadow-[0_0_50px_rgba(249,115,22,0.25)]' : 'border-rose-500/70 shadow-[0_0_50px_rgba(244,63,94,0.25)]'
       }`}>
         {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}

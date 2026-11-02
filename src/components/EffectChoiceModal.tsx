@@ -178,7 +178,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
-      <div className="relative w-full max-w-3xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/70 p-3.5 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-3 sm:gap-4">
+      <div className="relative mobile-modal-scaled w-full max-w-3xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/70 p-3.5 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-3 sm:gap-4">
         {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />

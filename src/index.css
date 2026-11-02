@@ -833,6 +833,21 @@
   animation: finisher-crack-pulse 0.2s infinite alternate;
 }
 
+/* =====================================================================
+   모바일 전용 전투 모드: 전장 위 모든 팝업/모달/오버레이 일괄 비례 축소
+   기존 1080p 기준 팝업들이 모바일 화면을 집어삼키는 문제 원천 차단
+   ===================================================================== */
+.mobile-battle-mode .mobile-modal-scaled {
+  zoom: var(--modal-zoom, 0.55);
+}
+
+@supports not (zoom: 1) {
+  .mobile-battle-mode .mobile-modal-scaled {
+    transform: scale(var(--modal-zoom, 0.55));
+    transform-origin: center center;
+  }
+}
+
 
 
 

@@ -1071,9 +1071,9 @@ export const Lobby: React.FC<LobbyProps> = ({
 
       {/* 대전 모드 선택 모달 (명조 택티컬 챔퍼 테두리 스타일) */}
       {showModeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-150">
           <div
-            className="relative bg-[#0b0e19]/95 backdrop-blur-2xl border-2 border-amber-400/80 p-6 sm:p-7 max-w-lg w-full shadow-[0_0_40px_rgba(245,158,11,0.3)] text-slate-100 space-y-5"
+            className="relative bg-[#0b0e19]/95 backdrop-blur-2xl border-2 border-amber-400/80 p-4 sm:p-7 max-w-lg w-full shadow-[0_0_40px_rgba(245,158,11,0.3)] text-slate-100 space-y-3 sm:space-y-5"
             style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
           >
             {/* 내부 얇은 인셋 골드 라인 */}
@@ -1086,11 +1086,11 @@ export const Lobby: React.FC<LobbyProps> = ({
             <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
 
             {/* 모달 헤더 */}
-            <div className="flex items-center justify-between pb-3 border-b border-amber-400/20 relative z-10">
-              <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-between pb-2.5 sm:pb-3 border-b border-amber-400/20 relative z-10">
+              <div className="flex items-center gap-2 sm:gap-2.5">
                 <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <h3 className="font-black text-lg sm:text-xl text-white tracking-wide">대전 모드 선택</h3>
-                <span className="text-[11px] font-mono text-amber-400/80 px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/30">
+                <h3 className="font-black text-base sm:text-xl text-white tracking-wide">대전 모드 선택</h3>
+                <span className="text-[10px] sm:text-[11px] font-mono text-amber-400/80 px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-amber-400/10 border border-amber-400/30">
                   MODE SELECT
                 </span>
               </div>
@@ -1099,7 +1099,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                   clearHash();
                   setShowModeModal(false);
                 }}
-                className="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer"
                 title="닫기"
               >
                 ✕
@@ -1107,29 +1107,29 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
 
             {/* 모드 선택 카드 버튼들 */}
-            <div className="space-y-3 relative z-10">
+            <div className="space-y-2.5 sm:space-y-3 relative z-10">
               <button
                 onClick={() => {
                   setShowModeModal(false);
                   setDeckSelectMode('AI');
                 }}
-                className="w-full p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a2035] border-2 border-amber-400/60 hover:border-amber-400 transition-all duration-200 flex items-center gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:shadow-[0_0_30px_rgba(245,158,11,0.35)] transform hover:-translate-y-0.5"
+                className="w-full p-3 sm:p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a2035] border-2 border-amber-400/60 hover:border-amber-400 transition-all duration-200 flex items-center gap-3 sm:gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:shadow-[0_0_30px_rgba(245,158,11,0.35)] transform hover:-translate-y-0.5"
               >
-                <div className="w-13 h-13 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition shadow">
-                  <Bot className="w-7 h-7" />
+                <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center font-bold text-lg sm:text-xl group-hover:scale-105 transition shadow shrink-0">
+                  <Bot className="w-5 h-5 sm:w-7 sm:h-7" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-black text-white group-hover:text-amber-300 transition text-base flex items-center gap-2">
+                  <div className="font-black text-white group-hover:text-amber-300 transition text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
                     <span>AI 봇 대전</span>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    <span className="text-[9px] sm:text-[11px] font-mono px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
                       SINGLE
                     </span>
                   </div>
-                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  <div className="text-[11px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed line-clamp-2">
                     기초 상성과 카운터를 학습한 스마트 AI 봇을 상대로 듀얼을 진행합니다.
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-amber-400/60 group-hover:text-amber-300 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400/60 group-hover:text-amber-300 group-hover:translate-x-1 transition-transform shrink-0" />
               </button>
 
               <button
@@ -1137,23 +1137,23 @@ export const Lobby: React.FC<LobbyProps> = ({
                   setShowModeModal(false);
                   setDeckSelectMode('SOLO_DUAL');
                 }}
-                className="w-full p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a2035] border-2 border-indigo-400/60 hover:border-indigo-400 transition-all duration-200 flex items-center gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.15)] hover:shadow-[0_0_30px_rgba(99,102,241,0.35)] transform hover:-translate-y-0.5"
+                className="w-full p-3 sm:p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a2035] border-2 border-indigo-400/60 hover:border-indigo-400 transition-all duration-200 flex items-center gap-3 sm:gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.15)] hover:shadow-[0_0_30px_rgba(99,102,241,0.35)] transform hover:-translate-y-0.5"
               >
-                <div className="w-13 h-13 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition shadow">
-                  <User className="w-7 h-7" />
+                <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center font-bold text-lg sm:text-xl group-hover:scale-105 transition shadow shrink-0">
+                  <User className="w-5 h-5 sm:w-7 sm:h-7" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-black text-white group-hover:text-indigo-300 transition text-base flex items-center gap-2">
+                  <div className="font-black text-white group-hover:text-indigo-300 transition text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
                     <span>1인 2역 연습 듀얼</span>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                    <span className="text-[9px] sm:text-[11px] font-mono px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
                       SELF TEST
                     </span>
                   </div>
-                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  <div className="text-[11px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed line-clamp-2">
                     혼자서 양 플레이어를 모두 조작하여 덱 테스트와 룰을 연습합니다.
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-indigo-400/60 group-hover:text-indigo-300 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400/60 group-hover:text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
               </button>
 
               <button
@@ -1162,23 +1162,23 @@ export const Lobby: React.FC<LobbyProps> = ({
                   setHash('#multiplayer');
                   setIsMultiplayerModalOpen(true);
                 }}
-                className="w-full p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a142e] border-2 border-violet-400/60 hover:border-violet-400 transition-all duration-200 flex items-center gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(139,92,246,0.15)] hover:shadow-[0_0_30px_rgba(139,92,246,0.35)] transform hover:-translate-y-0.5"
+                className="w-full p-3 sm:p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a142e] border-2 border-violet-400/60 hover:border-violet-400 transition-all duration-200 flex items-center gap-3 sm:gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(139,92,246,0.15)] hover:shadow-[0_0_30px_rgba(139,92,246,0.35)] transform hover:-translate-y-0.5"
               >
-                <div className="w-13 h-13 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-400/40 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition shadow">
-                  <Users className="w-7 h-7" />
+                <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-400/40 flex items-center justify-center font-bold text-lg sm:text-xl group-hover:scale-105 transition shadow shrink-0">
+                  <Users className="w-5 h-5 sm:w-7 sm:h-7" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-black text-white group-hover:text-violet-300 transition text-base flex items-center gap-2">
+                  <div className="font-black text-white group-hover:text-violet-300 transition text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
                     <span>온라인 1:1 대전 (P2P)</span>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40">
+                    <span className="text-[9px] sm:text-[11px] font-mono px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40">
                       MULTIPLAYER
                     </span>
                   </div>
-                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">
+                  <div className="text-[11px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed line-clamp-2">
                     초대 코드 또는 공유 링크로 친구와 실시간 대결을 진행합니다. (재접속 지원)
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-violet-400/60 group-hover:text-violet-300 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400/60 group-hover:text-violet-300 group-hover:translate-x-1 transition-transform shrink-0" />
               </button>
             </div>
 
@@ -1187,7 +1187,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 clearHash();
                 setShowModeModal(false);
               }}
-              className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold cursor-pointer transition relative z-10"
+              className="w-full py-2 sm:py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold cursor-pointer transition relative z-10"
             >
               닫기
             </button>
