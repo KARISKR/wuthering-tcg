@@ -294,7 +294,7 @@ export const BgmPlayer: React.FC = () => {
       {showPlaylist && (
         <div
           ref={playlistRef}
-          className="absolute right-0 top-full mt-2 w-84 bg-slate-900/98 border-2 border-amber-500/50 rounded-2xl p-3 shadow-2xl shadow-black/95 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute left-1/2 -translate-x-1/2 md:left-auto md:right-0 md:translate-x-0 top-full mt-2 w-84 max-w-[92vw] bg-slate-900/98 border-2 border-amber-500/50 rounded-2xl p-3 shadow-2xl shadow-black/95 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
         >
           {/* 상단 통합 사운드 마스터 볼륨 설정 카드 */}
           <div className="p-2.5 bg-slate-950/90 rounded-xl mb-2.5 border border-slate-800 space-y-2">

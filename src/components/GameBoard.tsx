@@ -1198,23 +1198,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 화면 해상도(높이/너비)에 맞춰 4단 전장 + 손패가 잘리지 않고 한눈에 들어오도록 자동 계산되는 반응형 스케일
   const [viewportScale, setViewportScale] = useState<number>(() => {
     if (typeof window === 'undefined') return 0.92;
-    const availH = Math.max(320, window.innerHeight - 44);
+    const availH = Math.max(280, window.innerHeight - 40);
     const sideW = (isLeftPanelCollapsed ? 48 : 310) + (isRightPanelCollapsed ? 48 : 280);
-    const availW = Math.max(480, window.innerWidth - sideW);
-    const scaleH = availH / 980;
-    const scaleW = availW / 1060;
-    return Math.min(1.15, Math.max(0.42, Math.min(scaleH, scaleW)));
+    const availW = Math.max(320, window.innerWidth - sideW);
+    const scaleH = availH / 1000;
+    const scaleW = availW / 1080;
+    return Math.min(1.15, Math.max(0.32, Math.min(scaleH, scaleW)));
   });
 
   useEffect(() => {
     const updateViewportScale = () => {
-      const availH = Math.max(320, window.innerHeight - 44);
+      const availH = Math.max(280, window.innerHeight - 40);
       const leftW = isLeftPanelCollapsed ? 48 : window.innerWidth >= 1536 ? 420 : window.innerWidth >= 1280 ? 370 : 310;
       const rightW = isRightPanelCollapsed ? 48 : window.innerWidth >= 1536 ? 340 : window.innerWidth >= 1280 ? 310 : 272;
-      const availW = Math.max(480, window.innerWidth - leftW - rightW);
-      const scaleH = availH / 980;
-      const scaleW = availW / 1060;
-      setViewportScale(Math.min(1.15, Math.max(0.42, Math.min(scaleH, scaleW))));
+      const availW = Math.max(320, window.innerWidth - leftW - rightW);
+      const scaleH = availH / 1000;
+      const scaleW = availW / 1080;
+      setViewportScale(Math.min(1.15, Math.max(0.32, Math.min(scaleH, scaleW))));
     };
     updateViewportScale();
     window.addEventListener('resize', updateViewportScale);
@@ -2206,25 +2206,25 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   return (
     <div className="relative h-screen max-h-screen w-full bg-[#060810] text-slate-100 flex flex-col justify-between overflow-hidden select-none">
       {/* ========================================================= */}
-      {/* 1. 상단 명조 택티컬 네비게이션 헤더 (48px / h-12) */}
+      {/* 1. 상단 명조 택티컬 네비게이션 헤더 (모바일 40px / 데스크톱 48px) */}
       {/* ========================================================= */}
-      <header className="h-12 border-b border-white/10 bg-[#090d16]/95 backdrop-blur-md px-3 sm:px-4 flex items-center justify-between z-30 shrink-0">
-        <div className="flex items-center gap-2.5">
+      <header className="h-10 sm:h-12 border-b border-white/10 bg-[#090d16]/95 backdrop-blur-md px-2 sm:px-4 flex items-center justify-between z-30 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
           {onExitToLobby && (
             <button
               onClick={handleExitClick}
-              className="flex items-center gap-1.5 px-3 py-1 bg-[#111520] hover:bg-[#1c2334] text-[#f97316] border border-[#f97316]/50 text-xs font-black transition cursor-pointer [clip-path:polygon(5px_0,100%_0,100%_calc(100%-5px),calc(100%-5px)_100%,0_100%,0_5px)]"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 bg-[#111520] hover:bg-[#1c2334] text-[#f97316] border border-[#f97316]/50 text-[11px] sm:text-xs font-black transition cursor-pointer [clip-path:polygon(5px_0,100%_0,100%_calc(100%-5px),calc(100%-5px)_100%,0_100%,0_5px)]"
               title="대기실(메인 메뉴)로 나가기"
             >
-              <Home className="w-3.5 h-3.5 text-[#f97316]" />
-              <span>대기실</span>
+              <Home className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#f97316]" />
+              <span className="hidden xs:inline">대기실</span>
             </button>
           )}
 
           {!isSpectator && gameState.phase !== 'GAME_OVER' && gameState.winner === null && (
             <button
               onClick={() => setShowSurrenderConfirm(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-950/70 hover:bg-rose-900/90 text-rose-300 hover:text-white border border-rose-500/50 text-xs font-black transition cursor-pointer [clip-path:polygon(5px_0,100%_0,100%_calc(100%-5px),calc(100%-5px)_100%,0_100%,0_5px)]"
+              className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 bg-rose-950/70 hover:bg-rose-900/90 text-rose-300 hover:text-white border border-rose-500/50 text-[11px] sm:text-xs font-black transition cursor-pointer [clip-path:polygon(5px_0,100%_0,100%_calc(100%-5px),calc(100%-5px)_100%,0_100%,0_5px)]"
               title="현재 배틀 항복(기권)하기"
             >
               <span>🏳️</span>
@@ -2232,7 +2232,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             </button>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2">
             <span className="text-[#f97316] text-base leading-none drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]">✦</span>
             <h1 className="text-xs sm:text-sm font-black tracking-widest text-white flex items-center gap-2 font-mono">
               <span>WUTHERING WAVES :</span>

@@ -177,8 +177,8 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
-      <div className="relative w-full max-w-3xl bg-[#0c101b]/95 border border-[#f97316]/70 p-6 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-4 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
+      <div className="relative w-full max-w-3xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/70 p-3.5 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-3 sm:gap-4">
         {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -547,7 +547,8 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
         )}
 
         {/* 하단 확인 버튼들 */}
-        <div className="flex items-center justify-between pt-3 border-t border-white/10 flex-wrap gap-3">
+        {/* 하단 확정 / 스킵 액션 바 (sticky 배치로 모바일에서도 상시 노출) */}
+        <div className="sticky bottom-0 z-20 bg-[#0c101b]/95 backdrop-blur-md pt-2 pb-1 flex items-center justify-between border-t border-white/10 flex-wrap gap-2 sm:gap-3">
           {choice.onResolveType === 'VIEW_ONLY' ? (
             <div className="w-full flex justify-end">
               <button

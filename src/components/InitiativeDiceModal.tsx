@@ -338,8 +338,8 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
   const isP1Win = winnerIndex === 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      <div className="relative w-full max-w-2xl bg-[#0c101b]/95 border border-[#f97316]/60 p-6 sm:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
+      <div className="relative w-full max-w-2xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/60 p-3.5 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center">
         {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -350,24 +350,24 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
         {!isSpectator && (!isMultiplayer || myPlayerIndex === 0) && (
           <button
             onClick={handleSkip}
-            className="absolute top-4 right-4 flex items-center gap-1 px-3 py-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white text-xs font-bold transition cursor-pointer border border-white/15 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
+            className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white text-[11px] sm:text-xs font-bold transition cursor-pointer border border-white/15 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
             title="주사위 연출을 건너뛰고 즉시 게임을 시작합니다"
           >
             <span>스킵</span>
-            <FastForward className="w-3.5 h-3.5" />
+            <FastForward className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
           </button>
         )}
 
         {/* 상단 타이틀 */}
-        <div className="text-center space-y-1.5 mb-8">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#111520] border border-[#f97316]/40 text-[#f97316] text-xs font-black tracking-wider shadow-inner">
-            <Sparkles className="w-3.5 h-3.5 text-[#f97316] animate-spin" style={{ animationDuration: '4s' }} />
+        <div className="text-center space-y-1 mb-3 sm:mb-6">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-0.5 sm:py-1 bg-[#111520] border border-[#f97316]/40 text-[#f97316] text-[10px] sm:text-xs font-black tracking-wider shadow-inner">
+            <Sparkles className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#f97316] animate-spin" style={{ animationDuration: '4s' }} />
             <span>선공/후공 결정전 (INITIATIVE ROLL)</span>
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-wide flex items-center justify-center gap-2">
+          <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-white tracking-wide flex items-center justify-center gap-2">
             <span>🎲 운명의 주사위 대결</span>
           </h2>
-          <p className="text-xs text-slate-400">
+          <p className="text-[11px] sm:text-xs text-slate-400 hidden sm:block">
             주사위에서 승리한 플레이어가 1턴 선공(First) 또는 후공(Second)을 직접 선택합니다.
           </p>
         </div>
@@ -401,7 +401,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
             {/* 1P 3D 주사위 큐브 */}
             <div
-              className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl flex items-center justify-center transition-all duration-300 ${
+              className={`relative w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl sm:rounded-3xl flex items-center justify-center transition-all duration-300 ${
                 phase === 'ROLLING'
                   ? 'animate-dice-roll shadow-[0_0_40px_rgba(34,211,238,0.5)] border-cyan-400/80 bg-slate-900'
                   : isP0Win
@@ -474,7 +474,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
             {/* 2P 3D 주사위 큐브 */}
             <div
-              className={`relative w-28 h-28 sm:w-32 sm:h-32 rounded-3xl flex items-center justify-center transition-all duration-300 ${
+              className={`relative w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl sm:rounded-3xl flex items-center justify-center transition-all duration-300 ${
                 phase === 'ROLLING'
                   ? 'animate-dice-roll shadow-[0_0_40px_rgba(168,85,247,0.5)] border-purple-400/80 bg-slate-900'
                   : isP1Win
@@ -513,8 +513,8 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
           </div>
         </div>
 
-        {/* 하단 상태 피드백 및 액션 버튼 */}
-        <div className="mt-6 w-full max-w-lg flex flex-col items-center space-y-3">
+        {/* 하단 상태 피드백 및 액션 버튼 (sticky 배치로 모바일에서도 상시 노출) */}
+        <div className="mt-3 sm:mt-6 w-full max-w-lg flex flex-col items-center space-y-2 sm:space-y-3 sticky bottom-0 bg-[#0c101b]/95 backdrop-blur-md pt-2 pb-1 z-20">
           {/* 주사위 결과 화면 */}
           {phase === 'RESULT' && winnerIndex !== null && (() => {
             const isWinner = isMultiplayer

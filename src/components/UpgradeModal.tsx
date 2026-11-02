@@ -62,8 +62,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
     selectedDiscardIds.length === effectiveRequiredDiscard;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 sm:p-6 animate-in fade-in duration-200">
-      <div className="relative bg-[#0c101b]/95 border border-[#f97316]/60 max-w-5xl xl:max-w-6xl w-full p-5 sm:p-7 md:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-4 sm:gap-5 text-slate-100 max-h-[96vh] overflow-y-auto custom-scrollbar overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-6 animate-in fade-in duration-200">
+      <div className="relative bg-[#0c101b]/95 border border-[#f97316]/60 max-w-5xl xl:max-w-6xl w-full p-3.5 sm:p-7 md:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-3 sm:gap-5 text-slate-100 max-h-[96dvh] overflow-y-auto custom-scrollbar">
         {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -252,8 +252,8 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
           </div>
         </div>
 
-        {/* 하단 푸터 버튼 */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-white/10 pt-3">
+        {/* 하단 푸터 버튼 (sticky 배치로 모바일에서도 상시 노출) */}
+        <div className="sticky bottom-0 z-20 bg-[#0c101b]/95 backdrop-blur-md pt-2 pb-1 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 border-t border-white/10">
           <div className="text-xs sm:text-sm text-slate-400 font-semibold">
             {!selectedUpgradeId ? (
               <span>진화할 캐릭터 카드를 선택해주세요.</span>

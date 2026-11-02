@@ -357,7 +357,9 @@ export const Lobby: React.FC<LobbyProps> = ({
             </>
           )}
 
-          <BgmPlayer />
+          <div className="hidden md:block">
+            <BgmPlayer />
+          </div>
         </div>
       </header>
 
@@ -368,9 +370,14 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       )}
 
-      {/* 1.5 실시간 방문자 & 접속자 현황 위젯 (좌측 상단 고정 배치) */}
-      <div className="w-full px-4 sm:px-8 pt-2 sm:absolute sm:top-18 sm:left-8 sm:w-auto sm:pt-0 z-30 pointer-events-auto">
+      {/* 1.5 실시간 방문자 & 접속자 현황 위젯 (데스크톱에서는 좌측 상단 고정, 모바일에서는 숨김) */}
+      <div className="hidden md:block sm:absolute sm:top-18 sm:left-8 sm:w-auto z-30 pointer-events-auto">
         <VisitorStatsWidget />
+      </div>
+
+      {/* 모바일 전용 음악 선택기 (방문자 수 위젯 자리인 상단 중앙에 배치) */}
+      <div className="w-full flex md:hidden justify-center px-4 pt-2.5 z-30 pointer-events-auto">
+        <BgmPlayer />
       </div>
 
 

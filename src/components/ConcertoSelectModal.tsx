@@ -68,8 +68,8 @@ export const ConcertoSelectModal: React.FC<ConcertoSelectModalProps> = ({
   const isReady = selectedIds.length === requiredCost;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
-      <div className="relative w-full max-w-2xl bg-[#0c101b]/98 border border-[#f97316]/80 p-6 shadow-[0_0_80px_rgba(0,0,0,0.95),0_0_25px_rgba(249,115,22,0.3)] flex flex-col gap-4 overflow-hidden animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
+      <div className="relative w-full max-w-2xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/98 border border-[#f97316]/80 p-3.5 sm:p-6 shadow-[0_0_80px_rgba(0,0,0,0.95),0_0_25px_rgba(249,115,22,0.3)] flex flex-col gap-3 sm:gap-4 animate-in zoom-in-95 duration-150">
         {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -174,8 +174,8 @@ export const ConcertoSelectModal: React.FC<ConcertoSelectModalProps> = ({
           </div>
         </div>
 
-        {/* 액션 버튼 */}
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+        {/* 액션 버튼 (sticky 배치로 모바일에서도 상시 노출) */}
+        <div className="sticky bottom-0 z-20 bg-[#0c101b]/98 backdrop-blur-md pt-2 pb-1 flex items-center justify-end gap-2 sm:gap-3 border-t border-white/10">
           <button
             onClick={onClose}
             className="px-5 py-2.5 text-xs font-bold text-slate-300 bg-[#111520] hover:bg-[#1a2234] hover:text-white border border-white/15 transition cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"

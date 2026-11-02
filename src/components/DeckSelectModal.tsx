@@ -269,6 +269,7 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
   const [presets, setPresets] = useState<DeckPreset[]>([]);
   const [myId, setMyId] = useState('');
   const [oppId, setOppId] = useState('');
+  const [mobileActiveSide, setMobileActiveSide] = useState<'MY' | 'OPP'>('MY');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -336,88 +337,131 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
         <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
 
         {/* 모달 상단 헤더 */}
-        <header className="px-6 py-4.5 border-b border-amber-400/20 bg-[#0d1224]/90 flex items-center justify-between shrink-0 relative z-20">
-          <div className="flex items-center gap-3.5">
-            {/* 좌상단 대기실로 나가기 버튼 */}
+        <header className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-b border-amber-400/20 bg-[#0d1224]/90 flex items-center justify-between shrink-0 relative z-20">
+          <div className="flex items-center gap-2 sm:gap-3.5">
+            {/* 좌상단 나가기 버튼 */}
             <button
               onClick={onClose}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 py-1.5 sm:px-4 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
               title="대기실로 나가기"
             >
-              <ArrowLeft className="w-4 h-4 text-amber-400" />
-              <span>대기실로 나가기</span>
+              <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400" />
+              <span className="hidden xs:inline">대기실로 나가기</span>
+              <span className="xs:hidden">나가기</span>
             </button>
             <div className="h-6 w-px bg-slate-800 hidden sm:block" />
-            <div className={`p-2.5 rounded-2xl ${isAi ? 'bg-amber-500/20 text-amber-400' : 'bg-indigo-500/20 text-indigo-400'} hidden sm:flex`}>
-              {isAi ? <Bot className="w-6 h-6" /> : <Users className="w-6 h-6" />}
+            <div className={`p-2 rounded-xl sm:p-2.5 sm:rounded-2xl ${isAi ? 'bg-amber-500/20 text-amber-400' : 'bg-indigo-500/20 text-indigo-400'} hidden sm:flex`}>
+              {isAi ? <Bot className="w-5 h-5 sm:w-6 sm:h-6" /> : <Users className="w-5 h-5 sm:w-6 sm:h-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-black text-lg sm:text-xl text-white">덱 선택 · {isAi ? 'AI 봇 대전' : '1인 2역 연습 듀얼'}</h3>
-                <span className="text-[11px] font-mono text-amber-400/80 px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/30">
+                <h3 className="font-black text-sm sm:text-xl text-white truncate">덱 선택 · {isAi ? 'AI 봇 대전' : '1인 2역 연습'}</h3>
+                <span className="text-[10px] sm:text-[11px] font-mono text-amber-400/80 px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-amber-400/10 border border-amber-400/30 hidden xs:inline">
                   DECK SELECT
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-slate-400 mt-0.5 hidden sm:block">
                 상단 4종 탭(보유 덱, AI추천, 공식, 프리셋)을 통해 원하는 덱을 자유롭게 선택하세요.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition border border-slate-700/60"
+            className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition border border-slate-700/60"
             title="닫기"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </header>
 
-        {/* 덱 컬럼 영역 (좌: 1P/플레이어, 우: 2P/AI) */}
-        <div className="flex-1 min-h-0 p-4 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 overflow-hidden relative z-20">
-          <DeckColumn
-            title={isAi ? '🎴 내 덱 (플레이어)' : '🎴 1P 덱'}
-            subtitle="선공 플레이어가 사용할 덱을 고르세요"
-            accent="amber"
-            presets={presets}
-            selectedId={myId}
-            onSelect={setMyId}
-            defaultCategory="USER"
-          />
-          <DeckColumn
-            title={isAi ? '🤖 상대 덱 (AI 봇)' : '🎴 2P 덱'}
-            subtitle={isAi ? 'AI 봇이 사용할 덱을 고르세요' : '후공 플레이어가 사용할 덱을 고르세요'}
-            accent="indigo"
-            presets={presets}
-            selectedId={oppId}
-            onSelect={setOppId}
-            defaultCategory="AI_REC"
-            allowRandom
-          />
+        {/* 모바일 전용 1P / 2P(AI) 탭 전환 바 (< md 전용) */}
+        <div className="flex md:hidden px-3 pt-2 pb-1 gap-2 bg-[#0c101d] border-b border-slate-800/80 shrink-0 relative z-20">
+          <button
+            onClick={() => setMobileActiveSide('MY')}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 border ${
+              mobileActiveSide === 'MY'
+                ? 'bg-amber-500/20 text-amber-300 border-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.3)]'
+                : 'bg-slate-900/60 text-slate-400 border-slate-800'
+            }`}
+          >
+            <Crown className="w-3.5 h-3.5 text-amber-400" />
+            <span className="truncate">1P (내 덱): {decksById.get(myId)?.name || '선택'}</span>
+          </button>
+          <button
+            onClick={() => setMobileActiveSide('OPP')}
+            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition flex items-center justify-center gap-1.5 border ${
+              mobileActiveSide === 'OPP'
+                ? 'bg-indigo-500/20 text-indigo-300 border-indigo-400 shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+                : 'bg-slate-900/60 text-slate-400 border-slate-800'
+            }`}
+          >
+            <Bot className="w-3.5 h-3.5 text-indigo-400" />
+            <span className="truncate">{isAi ? '2P (AI 봇)' : '2P 덱'}: {oppId === RANDOM_ID ? '랜덤' : decksById.get(oppId)?.name || '선택'}</span>
+          </button>
+        </div>
+
+        {/* 덱 컬럼 영역 (모바일: 현재 탭만 1개 표시, 데스크톱: 좌우 2개 분할) */}
+        <div className="flex-1 min-h-0 p-2 sm:p-5 grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5 overflow-hidden relative z-20">
+          <div className={`${mobileActiveSide === 'MY' ? 'flex flex-col min-h-0 h-full' : 'hidden'} md:flex md:flex-col md:min-h-0 md:h-full`}>
+            <DeckColumn
+              title={isAi ? '🎴 내 덱 (플레이어)' : '🎴 1P 덱'}
+              subtitle="선공 플레이어가 사용할 덱을 고르세요"
+              accent="amber"
+              presets={presets}
+              selectedId={myId}
+              onSelect={(id) => {
+                setMyId(id);
+                // 모바일에서는 내 덱을 선택하면 상대 덱 탭으로 자연스럽게 안내
+                if (window.innerWidth < 768 && !oppId) {
+                  setMobileActiveSide('OPP');
+                }
+              }}
+              defaultCategory="USER"
+            />
+          </div>
+
+          <div className={`${mobileActiveSide === 'OPP' ? 'flex flex-col min-h-0 h-full' : 'hidden'} md:flex md:flex-col md:min-h-0 md:h-full`}>
+            <DeckColumn
+              title={isAi ? '🤖 상대 덱 (AI 봇)' : '🎴 2P 덱'}
+              subtitle={isAi ? 'AI 봇이 사용할 덱을 고르세요' : '후공 플레이어가 사용할 덱을 고르세요'}
+              accent="indigo"
+              presets={presets}
+              selectedId={oppId}
+              onSelect={setOppId}
+              defaultCategory="AI_REC"
+              allowRandom
+            />
+          </div>
         </div>
 
         {/* 하단 푸터 */}
-        <footer className="px-6 py-4.5 border-t border-amber-400/20 flex items-center justify-between gap-4 shrink-0 bg-[#0d1224]/90 relative z-20">
-          <div className="text-sm sm:text-base text-slate-300 font-bold flex items-center gap-2.5 min-w-0">
-            <Layers className="w-5 h-5 text-amber-400 shrink-0" />
-            <span className="truncate">
-              <strong className="text-amber-300 font-black">{decksById.get(myId)?.name ?? '-'}</strong>{' '}
-              <span className="text-slate-500 font-mono">VS</span>{' '}
-              <strong className="text-indigo-300 font-black">{oppId === RANDOM_ID ? '랜덤 덱' : decksById.get(oppId)?.name ?? '-'}</strong>
+        <footer className="px-3.5 py-2.5 sm:px-6 sm:py-4 border-t border-amber-400/20 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4 shrink-0 bg-[#0d1224]/90 relative z-20">
+          <div className="text-xs sm:text-base text-slate-300 font-bold flex items-center justify-between sm:justify-start gap-2 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
+              <Layers className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="truncate">
+                <strong className="text-amber-300 font-black">{decksById.get(myId)?.name ?? '-'}</strong>{' '}
+                <span className="text-slate-500 font-mono text-xs">VS</span>{' '}
+                <strong className="text-indigo-300 font-black">{oppId === RANDOM_ID ? '랜덤 덱' : decksById.get(oppId)?.name ?? '-'}</strong>
+              </span>
+            </div>
+            <span className="sm:hidden text-[11px] text-slate-400 shrink-0">
+              {canStart ? '준비 완료' : '덱 선택 필요'}
             </span>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm sm:text-base font-bold cursor-pointer transition border border-slate-700/60"
+              className="flex-1 sm:flex-none px-4 py-2 sm:px-5 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-base font-bold cursor-pointer transition border border-slate-700/60"
             >
               취소
             </button>
             <button
               onClick={handleStart}
               disabled={!canStart}
-              className="px-7 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 disabled:opacity-40 text-slate-950 text-base sm:text-lg font-black flex items-center gap-2.5 shadow-xl shadow-amber-500/30 cursor-pointer transition transform hover:scale-[1.02] active:scale-[0.98]"
+              className="flex-2 sm:flex-none px-5 py-2 sm:px-7 sm:py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 disabled:opacity-40 text-slate-950 text-xs sm:text-lg font-black flex items-center justify-center gap-1.5 sm:gap-2.5 shadow-xl shadow-amber-500/30 cursor-pointer transition transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              <Swords className="w-5 h-5 fill-slate-950" />
+              <Swords className="w-4 h-4 sm:w-5 sm:h-5 fill-slate-950" />
               <span>대전 시작</span>
             </button>
           </div>
