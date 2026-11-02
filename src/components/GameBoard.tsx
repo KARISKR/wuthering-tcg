@@ -1157,8 +1157,36 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     return (localStorage.getItem('wuthering_left_panel_size') as LeftPanelSize) || 'normal';
   });
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && (window.innerWidth < 1180 || window.innerHeight < 600)) {
+      return true;
+    }
     return localStorage.getItem('wuthering_left_panel_collapsed') === 'true';
   });
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && (window.innerWidth < 1180 || window.innerHeight < 600)) {
+      return true;
+    }
+    return false;
+  });
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen?.();
+      } else {
+        await document.exitFullscreen?.();
+      }
+    } catch {}
+  };
 
   // 전장(플레이매트) 사용자 배율 줌 상태 (기본 1.0 = 현재 화면 크기에 100% 맞춤)
   const [arenaZoom, setArenaZoom] = useState<number>(() => {
@@ -1170,28 +1198,28 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   // 화면 해상도(높이/너비)에 맞춰 4단 전장 + 손패가 잘리지 않고 한눈에 들어오도록 자동 계산되는 반응형 스케일
   const [viewportScale, setViewportScale] = useState<number>(() => {
     if (typeof window === 'undefined') return 0.92;
-    const availH = Math.max(540, window.innerHeight - 50);
-    const sideW = window.innerWidth >= 1536 ? 760 : window.innerWidth >= 1280 ? 680 : 580;
-    const availW = Math.max(640, window.innerWidth - sideW);
-    const scaleH = availH / 1015;
-    const scaleW = availW / 1080;
-    return Math.min(1.15, Math.max(0.62, Math.min(scaleH, scaleW)));
+    const availH = Math.max(320, window.innerHeight - 44);
+    const sideW = (isLeftPanelCollapsed ? 48 : 310) + (isRightPanelCollapsed ? 48 : 280);
+    const availW = Math.max(480, window.innerWidth - sideW);
+    const scaleH = availH / 980;
+    const scaleW = availW / 1060;
+    return Math.min(1.15, Math.max(0.42, Math.min(scaleH, scaleW)));
   });
 
   useEffect(() => {
     const updateViewportScale = () => {
-      const availH = Math.max(540, window.innerHeight - 50);
+      const availH = Math.max(320, window.innerHeight - 44);
       const leftW = isLeftPanelCollapsed ? 48 : window.innerWidth >= 1536 ? 420 : window.innerWidth >= 1280 ? 370 : 310;
-      const rightW = window.innerWidth >= 1536 ? 340 : window.innerWidth >= 1280 ? 310 : 280;
-      const availW = Math.max(640, window.innerWidth - leftW - rightW);
-      const scaleH = availH / 1015;
-      const scaleW = availW / 1080;
-      setViewportScale(Math.min(1.15, Math.max(0.62, Math.min(scaleH, scaleW))));
+      const rightW = isRightPanelCollapsed ? 48 : window.innerWidth >= 1536 ? 340 : window.innerWidth >= 1280 ? 310 : 272;
+      const availW = Math.max(480, window.innerWidth - leftW - rightW);
+      const scaleH = availH / 980;
+      const scaleW = availW / 1060;
+      setViewportScale(Math.min(1.15, Math.max(0.42, Math.min(scaleH, scaleW))));
     };
     updateViewportScale();
     window.addEventListener('resize', updateViewportScale);
     return () => window.removeEventListener('resize', updateViewportScale);
-  }, [isLeftPanelCollapsed]);
+  }, [isLeftPanelCollapsed, isRightPanelCollapsed]);
 
   const changeLeftPanelSize = (size: LeftPanelSize) => {
     setLeftPanelSize(size);
@@ -2346,7 +2374,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div className="flex items-center gap-0.5 bg-[#0c101b] px-1.5 py-0.5 border border-white/10">
             <button
               onClick={() => changeArenaZoom(-0.1)}
-              disabled={arenaZoom <= 0.7}
+              disabled={arenaZoom <= 0.5}
               className="p-0.5 hover:bg-white/10 disabled:opacity-30 text-slate-400 hover:text-white transition cursor-pointer"
               title="전장 축소 (-10%)"
             >
@@ -2368,6 +2396,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
               <ZoomIn className="w-3.5 h-3.5 text-[#f97316]" />
             </button>
           </div>
+
+          {/* 모바일 전체화면 토글 버튼 */}
+          <button
+            onClick={toggleFullscreen}
+            className="p-1 bg-[#111520] hover:bg-[#1c2334] text-cyan-400 border border-white/10 transition cursor-pointer"
+            title={isFullscreen ? "전체화면 종료" : "전체화면 전환"}
+          >
+            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+          </button>
 
           <div className="hidden lg:block mr-1">
             <BgmPlayer />
@@ -2908,6 +2945,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   onUpgradeClick={() => {
                     if (gameState.gameMode === 'SOLO_DUAL') openUpgradeModal('leftSupport', oppPlayerIndex);
                   }}
+                  onCardClick={() => {
+                    if (otherPlayer.slots.leftSupport) {
+                      setPreviewCard(otherPlayer.slots.leftSupport);
+                      setEvolutionModalChar(otherPlayer.slots.leftSupport);
+                    }
+                  }}
                   onSwitchClick={() => {
                     if (gameState.gameMode === 'SOLO_DUAL') onSwitchLeaderWithSound(oppPlayerIndex, 'leftSupport');
                   }}
@@ -2927,6 +2970,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   onUpgradeClick={() => {
                     if (gameState.gameMode === 'SOLO_DUAL') openUpgradeModal('leader', oppPlayerIndex);
                   }}
+                  onCardClick={() => {
+                    if (otherPlayer.slots.leader) {
+                      setPreviewCard(otherPlayer.slots.leader);
+                      setEvolutionModalChar(otherPlayer.slots.leader);
+                    }
+                  }}
                   onMouseEnter={() => setPreviewCard(otherPlayer.slots.leader)}
                   onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
                   onHoverUnderlyingCard={(c) => setPreviewCard(c)}
@@ -2942,6 +2991,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   canSwitch={!isActionLockedByModal && gameState.gameMode === 'SOLO_DUAL' && !otherPlayer.actionFlags.switchedLeader && gameState.phase === 'ACTION_PHASE' && gameState.activePlayerIndex === oppPlayerIndex}
                   onUpgradeClick={() => {
                     if (gameState.gameMode === 'SOLO_DUAL') openUpgradeModal('rightSupport', oppPlayerIndex);
+                  }}
+                  onCardClick={() => {
+                    if (otherPlayer.slots.rightSupport) {
+                      setPreviewCard(otherPlayer.slots.rightSupport);
+                      setEvolutionModalChar(otherPlayer.slots.rightSupport);
+                    }
                   }}
                   onSwitchClick={() => {
                     if (gameState.gameMode === 'SOLO_DUAL') onSwitchLeaderWithSound(oppPlayerIndex, 'rightSupport');
@@ -3602,26 +3657,56 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         {/* --------------------------------------------------------- */}
         {/* [우측 패널] 택티컬 콘솔 (상단) + 실시간 배틀 로그 (하단 내부 스크롤) */}
         {/* --------------------------------------------------------- */}
-        <div className="w-68 lg:w-76 xl:w-84 2xl:w-90 h-full max-h-full min-h-0 shrink-0 bg-[#090d16]/95 border-l border-white/10 flex flex-col justify-between overflow-hidden select-text z-20">
-          {/* ======================================================= */}
-          {/* 1. 상단: 택티컬 콘솔 (TACTICAL CONSOLE) */}
-          {/* ======================================================= */}
-          <div className="p-3.5 border-b border-white/10 bg-[#0c101b]/90 shrink-0 flex flex-col gap-2.5 relative">
-            <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#f97316]" />
-            <span className="pointer-events-none absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-[#f97316]" />
+        {isRightPanelCollapsed ? (
+          <div className="w-11 shrink-0 bg-[#090d16] border-l border-white/10 py-3 flex flex-col items-center justify-between h-full select-none z-20">
+            <div className="flex flex-col items-center gap-3">
+              <button
+                onClick={() => setIsRightPanelCollapsed(false)}
+                className="w-7 h-7 bg-[#111520] hover:bg-[#f97316]/20 text-slate-400 hover:text-[#f97316] border border-white/10 hover:border-[#f97316]/60 flex items-center justify-center transition cursor-pointer"
+                title="택티컬 콘솔 펼치기"
+              >
+                <PanelLeftClose className="w-4 h-4 rotate-180" />
+              </button>
 
-            {/* 콘솔 타이틀 & 턴 */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[#f97316] text-sm">✦</span>
-                <h3 className="font-black text-sm text-white tracking-wider uppercase">
-                  택티컬 콘솔
-                </h3>
+              <div
+                onClick={() => setIsRightPanelCollapsed(false)}
+                className="cursor-pointer text-xs font-black tracking-widest text-slate-400 hover:text-[#f97316] py-4 transition flex items-center gap-2 font-mono"
+                style={{ writingMode: 'vertical-rl' }}
+              >
+                <span>✦ TACTICAL CONSOLE</span>
               </div>
-              <span className="text-xs font-mono font-black text-[#f97316] bg-[#111520] border border-[#f97316]/40 px-2 py-0.5">
-                TURN {gameState.turn}
-              </span>
             </div>
+          </div>
+        ) : (
+          <div className="w-68 lg:w-76 xl:w-84 2xl:w-90 h-full max-h-full min-h-0 shrink-0 bg-[#090d16]/95 border-l border-white/10 flex flex-col justify-between overflow-hidden select-text z-20">
+            {/* ======================================================= */}
+            {/* 1. 상단: 택티컬 콘솔 (TACTICAL CONSOLE) */}
+            {/* ======================================================= */}
+            <div className="p-3.5 border-b border-white/10 bg-[#0c101b]/90 shrink-0 flex flex-col gap-2.5 relative">
+              <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#f97316]" />
+              <span className="pointer-events-none absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-[#f97316]" />
+
+              {/* 콘솔 타이틀 & 턴 */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#f97316] text-sm">✦</span>
+                  <h3 className="font-black text-sm text-white tracking-wider uppercase">
+                    택티컬 콘솔
+                  </h3>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-mono font-black text-[#f97316] bg-[#111520] border border-[#f97316]/40 px-2 py-0.5">
+                    TURN {gameState.turn}
+                  </span>
+                  <button
+                    onClick={() => setIsRightPanelCollapsed(true)}
+                    className="p-1 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white border border-white/10 transition cursor-pointer"
+                    title="우측 콘솔 접기 (전장 최대화)"
+                  >
+                    <PanelLeftOpen className="w-3.5 h-3.5 rotate-180 text-[#f97316]" />
+                  </button>
+                </div>
+              </div>
 
             {/* 페이즈 진행 바 (UP ▸ [MAIN] ▸ BATTLE ▸ END) */}
             <div className="grid grid-cols-4 gap-1 p-1 bg-[#070a12] border border-white/10 text-center font-mono text-xs font-black">
@@ -4202,7 +4287,72 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             )}
           </div>
         </div>
+        )}
       </div>
+
+      {/* 우측 패널 접힘 시 모바일 엄지용 플로팅 퀵 액션 컨트롤 바 */}
+      {isRightPanelCollapsed && !isSpectator && (
+        <div className="fixed bottom-3 right-14 z-40 flex items-center gap-2 bg-[#0c101b]/95 border border-[#f97316]/70 p-1.5 shadow-[0_0_25px_rgba(0,0,0,0.9)] backdrop-blur-md animate-in fade-in slide-in-from-right-3">
+          {/* 드로우 단계 */}
+          {gameState.phase === 'DRAW_PHASE' && (canP0Draw || canP1Draw) && isCurrentControlledTurn && (
+            <button
+              onClick={() => handleDrawCards(controlledPlayerIndex)}
+              className="px-3.5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 text-white font-black text-xs rounded shadow transition cursor-pointer flex items-center gap-1.5 animate-pulse"
+            >
+              <span>🎴 드로우 ({currentTurnDrawCount}장)</span>
+            </button>
+          )}
+
+          {/* 메인 액션 페이즈 */}
+          {gameState.phase === 'ACTION_PHASE' && isCurrentControlledTurn && (
+            <>
+              <button
+                disabled={isActionLockedByModal}
+                onClick={() => {
+                  setIsConfirmingEndTurn(false);
+                  handleDecideClash(true);
+                }}
+                className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs rounded shadow transition cursor-pointer flex items-center gap-1"
+              >
+                <Swords className="w-3.5 h-3.5" />
+                <span>배틀 선언</span>
+              </button>
+              <button
+                disabled={isActionLockedByModal}
+                onClick={() => setIsConfirmingEndTurn(true)}
+                className="px-3 py-2 bg-[#111520] hover:bg-slate-800 text-slate-300 font-bold text-xs rounded border border-white/20 transition cursor-pointer"
+              >
+                턴 종료
+              </button>
+            </>
+          )}
+
+          {/* 대결 세트 단계 카드 없이 패스 */}
+          {gameState.phase === 'CLASH_SET' && !activeControlledPlayer.clashCardReady && (
+            <button
+              disabled={isActionLockedByModal}
+              onClick={() => handleSetClashCard(controlledPlayerIndex, null)}
+              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs rounded border border-amber-500/40 transition cursor-pointer"
+            >
+              카드 없이 패스
+            </button>
+          )}
+
+          {/* 연격 단계 연격 종료 */}
+          {gameState.phase === 'COMBO_STEP' && isPlayerComboPhase && (
+            <button
+              onClick={() => {
+                setNoComboCountdown(null);
+                handleFinishCombo(controlledPlayerIndex);
+              }}
+              className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] to-[#fb923c] text-white font-black text-xs rounded shadow transition cursor-pointer flex items-center gap-1 animate-pulse"
+            >
+              <span>연격 종료</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* ========================================================= */}
       {/* 4. 모달 오버레이들 */}

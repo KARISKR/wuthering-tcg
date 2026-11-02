@@ -55,6 +55,8 @@ export const HandView: React.FC<HandViewProps> = ({
 }) => {
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
+  const [isHandCollapsed, setIsHandCollapsed] = useState<boolean>(false);
+  const [zoomedCard, setZoomedCard] = useState<ActionCard | null>(null);
 
   // 새로 드로우된 카드 추적 및 드로우 애니메이션 활성화 상태
   const [animatingDrawIds, setAnimatingDrawIds] = useState<Set<string>>(new Set());
@@ -156,6 +158,13 @@ export const HandView: React.FC<HandViewProps> = ({
           >
             {hand.length} / 8
           </span>
+          <button
+            type="button"
+            onClick={() => setIsHandCollapsed((prev) => !prev)}
+            className="px-2 py-0.5 text-[10px] font-bold bg-[#111624] hover:bg-[#1a2234] text-cyan-300 border border-cyan-500/40 rounded transition cursor-pointer flex items-center gap-1"
+          >
+            {isHandCollapsed ? `▲ 펼치기 (${hand.length}장)` : '▼ 손패 접기'}
+          </button>
           {isOverflowPhase && (
             <span className="text-red-400 text-[11px] font-bold animate-pulse">
               ⚠️ 상한 초과: 버릴 카드 {hand.length - 8}장 선택
@@ -186,7 +195,16 @@ export const HandView: React.FC<HandViewProps> = ({
       </div>
 
       {/* 하단 플로팅 & 도킹 손패 카드 리스트 (-space-x-2 겹침 + 부채꼴 아치 + 호버 시 위로 솟구침) */}
-      <div className="relative flex items-end justify-center -space-x-2 sm:-space-x-3 overflow-visible max-w-full px-6 pt-3 pb-0.5 min-h-[170px] sm:min-h-[188px]">
+      <div
+        className={`relative flex items-end justify-center -space-x-2 sm:-space-x-3 max-w-full px-6 pt-3 pb-0.5 transition-all duration-300 ${
+          isHandCollapsed
+            ? 'h-8 min-h-[32px] overflow-hidden opacity-60 cursor-pointer hover:opacity-90'
+            : 'overflow-visible min-h-[170px] sm:min-h-[188px]'
+        }`}
+        onClick={() => {
+          if (isHandCollapsed) setIsHandCollapsed(false);
+        }}
+      >
         {hand.length === 0 ? (
           <div className="my-auto py-4 px-8 border border-white/10 bg-[#0c101b]/70 text-slate-500 text-xs font-mono">
             ✦ 패에 보유한 카드가 없습니다
@@ -478,6 +496,16 @@ export const HandView: React.FC<HandViewProps> = ({
                 </button>
               )}
 
+              {/* 4. 모바일 터치용 카드 크게 보기 */}
+              <button
+                type="button"
+                onClick={() => setZoomedCard(selectedCard)}
+                className="flex items-center gap-1 px-2.5 py-1.5 bg-[#111624] hover:bg-[#1a2234] text-slate-300 hover:text-white border border-white/20 text-xs font-bold rounded transition cursor-pointer"
+                title="카드 크게 보기"
+              >
+                <span>🔍 상세</span>
+              </button>
+
               {/* 닫기 버튼 */}
               <button
                 onClick={() => setSelectedCardId(null)}
@@ -489,6 +517,59 @@ export const HandView: React.FC<HandViewProps> = ({
           </div>
         );
       })()}
+      {/* 카드 상세 줌 모달 */}
+      {zoomedCard && (
+        <div
+          onClick={() => setZoomedCard(null)}
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in select-none"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative bg-[#0c101b]/98 border-2 border-[#f97316] p-5 max-w-sm w-full flex flex-col items-center gap-3 shadow-[0_0_50px_rgba(0,0,0,0.95),0_0_25px_rgba(249,115,22,0.4)]"
+          >
+            <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
+            <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
+            <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-cyan-400" />
+            <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-cyan-400" />
+
+            <button
+              onClick={() => setZoomedCard(null)}
+              className="absolute top-2.5 right-2.5 p-1 bg-[#111520] hover:bg-[#1a2234] border border-white/15 text-slate-300 hover:text-white cursor-pointer rounded"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {zoomedCard.artUrl && (
+              <div className="w-full max-h-[48vh] aspect-[5/7] flex items-center justify-center overflow-hidden bg-black/40 border border-[#f97316]/40 shadow-xl rounded-lg">
+                <img src={zoomedCard.artUrl} alt={zoomedCard.nameKr} className="w-full h-full object-contain" />
+              </div>
+            )}
+
+            <div className="w-full text-left space-y-2">
+              <div className="flex items-center justify-between border-b border-white/10 pb-1.5">
+                <h4 className="font-black text-base text-white">{zoomedCard.nameKr}</h4>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded font-mono ${
+                  zoomedCard.color === 'RED' ? 'bg-red-950 text-red-300 border border-red-500/50' :
+                  zoomedCard.color === 'GREEN' ? 'bg-emerald-950 text-emerald-300 border border-emerald-500/50' :
+                  'bg-cyan-950 text-cyan-300 border border-cyan-500/50'
+                }`}>
+                  {zoomedCard.color}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs font-mono text-slate-300 bg-[#111624] px-2.5 py-1 border border-white/10 rounded">
+                <span>COST <strong className="text-amber-300 font-black">{zoomedCard.cost}</strong></span>
+                <span>SPD <strong className="text-cyan-300 font-black">{zoomedCard.speed ?? '-'}</strong></span>
+                <span>DMG <strong className="text-red-400 font-black">{zoomedCard.damage}</strong></span>
+              </div>
+              {zoomedCard.description && (
+                <div className="text-xs text-slate-100 leading-relaxed bg-[#090d16] p-2.5 border border-white/10 font-medium whitespace-pre-line rounded">
+                  {formatEffectText(zoomedCard.description, 'md')}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -170,6 +170,18 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
           className="transition-transform duration-200"
         />
 
+        {/* 모바일/컴팩트 화면용 고대비 레벨·이름 하단 배지 */}
+        {card && (
+          <div className="absolute bottom-1 inset-x-1 z-20 pointer-events-none bg-black/85 border border-white/20 px-1.5 py-0.5 rounded flex items-center justify-between text-[10px] sm:text-[11px] shadow-md backdrop-blur-xs">
+            <span className="font-mono font-black text-[#f97316]">
+              Lv.{card.level}
+            </span>
+            <span className="font-black text-white truncate max-w-[70%]">
+              {card.nameKr}
+            </span>
+          </div>
+        )}
+
         {/* 레벨업 가능 시 펄스 버튼 오버레이 (플레이어만 조작 가능) */}
         {!isAi && canUpgrade && isOwnerActive && (
           <button
