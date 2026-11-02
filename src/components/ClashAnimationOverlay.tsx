@@ -12,6 +12,7 @@ interface ClashAnimationOverlayProps {
   onDismiss: () => void;
   /** 화면을 보는 플레이어 인덱스 (멀티플레이 게스트=1). 항상 '나'를 좌측에 배치합니다. */
   myPlayerIndex?: 0 | 1;
+  isMultiplayer?: boolean;
 }
 
 // 게스트(P1) 시점일 때 좌/우(P0/P1) 데이터를 뒤집어 '나'가 항상 좌측(승/패 배지 포함)에 오도록 변환
@@ -42,6 +43,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
   players: rawPlayers,
   onDismiss,
   myPlayerIndex = 0,
+  isMultiplayer = false,
 }) => {
   // useEffect([clashResult]) 타이머가 매 렌더마다 재시작되지 않도록 참조 안정화
   const clashResult = useMemo(
@@ -189,6 +191,10 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
 
   // 클릭 또는 스페이스바/Enter 입력 시: 진행 중이면 즉시 결과로 스킵, 결과 상태면 닫기
   const handleFastForwardOrDismiss = useCallback(() => {
+    if (isMultiplayer) {
+      // 멀티플레이에서는 연출 스킵 비활성화 (결과 상태에서 버튼 클릭으로만 퇴장)
+      return;
+    }
     if (stage !== 'RESULT') {
       timersRef.current.forEach(clearTimeout);
       timersRef.current = [];
@@ -222,10 +228,11 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
     } else {
       onDismiss();
     }
-  }, [stage, clashResult, onDismiss, p0, p1, winnerWeapon, p0HealTotal, p1HealTotal]);
+  }, [stage, clashResult, onDismiss, p0, p1, winnerWeapon, p0HealTotal, p1HealTotal, isMultiplayer]);
 
-  // 키보드 Space/Enter 키 핸들러
+  // 키보드 Space/Enter 키 핸들러 (멀티플레이에서는 스킵 방지)
   useEffect(() => {
+    if (isMultiplayer) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === ' ' || e.key === 'Enter') {
         e.preventDefault();
@@ -234,7 +241,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleFastForwardOrDismiss]);
+  }, [handleFastForwardOrDismiss, isMultiplayer]);
 
   return (
     <div
@@ -769,8 +776,8 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
           )}
         </div>
 
-        {/* 하단 스킵 안내 툴팁 */}
-        {stage !== 'RESULT' && (
+        {/* 하단 스킵 안내 툴팁 (멀티플레이에서는 스킵 불가) */}
+        {!isMultiplayer && stage !== 'RESULT' && (
           <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 animate-pulse">
             <Zap className="w-3.5 h-3.5 text-amber-400" />
             <span>클릭 또는 스페이스바를 누르면 즉시 결과로 스킵합니다</span>

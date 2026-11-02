@@ -6,7 +6,6 @@
  */
 import { GameState, ActionCard, CharacterCard } from '../types/tcg';
 import { BattleReplayData } from './replayManager';
-import { OFFICIAL_CARDS } from '../data/officialCards';
 
 const preloadedUrls = new Set<string>();
 const inFlightUrls = new Set<string>();
@@ -148,16 +147,9 @@ export function startIdleCardPreload() {
     }
   }
 
-  // LOD 256px 주소로 변환하여 3MB만 가볍게 프리로드
-  const cardsToPreload = OFFICIAL_CARDS.map((c) => {
-    if (!c.artUrl) return '';
-    const dot = c.artUrl.lastIndexOf('.');
-    const base = dot > -1 ? c.artUrl.slice(0, dot) : c.artUrl;
-    return base.replace('/cards/card_images/', '/cards/card_images_lod/256/') + '.webp';
-  }).filter(Boolean);
-
   let batchIndex = 0;
   const BATCH_SIZE = 4; // 한 번에 4장씩 초저부하 백그라운드 로드
+  let cardsToPreload: string[] = [];
 
   const scheduleNext = (fn: () => void) => {
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
@@ -168,6 +160,20 @@ export function startIdleCardPreload() {
   };
 
   const loadNextBatch = async () => {
+    if (cardsToPreload.length === 0) {
+      try {
+        const { OFFICIAL_CARDS } = await import('../data/officialCards');
+        cardsToPreload = OFFICIAL_CARDS.map((c) => {
+          if (!c.artUrl) return '';
+          const dot = c.artUrl.lastIndexOf('.');
+          const base = dot > -1 ? c.artUrl.slice(0, dot) : c.artUrl;
+          return base.replace('/cards/card_images/', '/cards/card_images_lod/256/') + '.webp';
+        }).filter(Boolean);
+      } catch {
+        return;
+      }
+    }
+
     if (batchIndex >= cardsToPreload.length) return;
     const batch = cardsToPreload.slice(batchIndex, batchIndex + BATCH_SIZE);
     batchIndex += BATCH_SIZE;

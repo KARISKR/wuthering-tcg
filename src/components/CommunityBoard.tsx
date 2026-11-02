@@ -1084,12 +1084,16 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         return;
       }
     }
-    deleteFeedback(id);
+    // UI 상태 즉시 삭제 반영 (로컬 스토리지 및 인메모리 즉각 제거)
+    setItems((prev) => prev.filter((item) => item.id !== id));
     if (selectedPostId === id) {
       setSelectedPostId(null);
     }
-    refreshList();
     showToast('🗑️ 게시글이 삭제되었습니다.');
+
+    deleteFeedback(id).then(() => {
+      refreshList();
+    });
   };
 
   const handleAddComment = (postId: string) => {

@@ -11,6 +11,7 @@ interface MatchOpeningOverlayProps {
   p1Name?: string;
   onDismiss: () => void;
   myPlayerIndex?: 0 | 1;
+  isMultiplayer?: boolean;
 }
 
 export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.memo(({
@@ -20,6 +21,7 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
   p1Name = '상대',
   onDismiss,
   myPlayerIndex = 0,
+  isMultiplayer = false,
 }) => {
   const isP1Viewer = myPlayerIndex === 1;
 
@@ -60,8 +62,12 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
 
   return (
     <div
-      onClick={() => onDismissRef.current()}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 sm:p-6 overflow-hidden select-none cursor-pointer animate-in fade-in duration-300"
+      onClick={() => {
+        if (!isMultiplayer) onDismissRef.current();
+      }}
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-xl p-4 sm:p-6 overflow-hidden select-none animate-in fade-in duration-300 ${
+        isMultiplayer ? 'cursor-default' : 'cursor-pointer'
+      }`}
     >
       {/* 배경 방사형 라이트 빔 (깜빡임 애니메이션을 제거하고 안정적인 앰비언트 글로우 적용) */}
       <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-30 overflow-hidden">
@@ -69,11 +75,13 @@ export const MatchOpeningOverlay: React.FC<MatchOpeningOverlayProps> = React.mem
         <div className="absolute w-[1250px] h-[1250px] border border-amber-500/20 rounded-full animate-spin [animation-duration:45s]" />
       </div>
 
-      {/* 우측 상단 건너뛰기 안내 */}
-      <div className="absolute top-5 right-6 flex items-center gap-2 text-xs sm:text-sm font-mono font-bold text-slate-300 bg-slate-900/85 px-4 py-2 rounded-full border border-slate-700/80 shadow">
-        <span>화면을 클릭하면 건너뜁니다</span>
-        <X className="w-4 h-4 text-slate-300" />
-      </div>
+      {/* 우측 상단 건너뛰기 안내 (싱글에서만 표시) */}
+      {!isMultiplayer && (
+        <div className="absolute top-5 right-6 flex items-center gap-2 text-xs sm:text-sm font-mono font-bold text-slate-300 bg-slate-900/85 px-4 py-2 rounded-full border border-slate-700/80 shadow">
+          <span>화면을 클릭하면 건너뜁니다</span>
+          <X className="w-4 h-4 text-slate-300" />
+        </div>
+      )}
 
       {/* 메인 대결 오프닝 컨테이너 */}
       <div

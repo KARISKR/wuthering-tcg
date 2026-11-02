@@ -6,11 +6,13 @@ import { soundEffects } from '../utils/soundEffects';
 interface UpgradeEffectOverlayProps {
   effect: UpgradeEffect;
   onDismiss: () => void;
+  isMultiplayer?: boolean;
 }
 
 export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = React.memo(({
   effect,
   onDismiss,
+  isMultiplayer = false,
 }) => {
   const hasPlayedRef = useRef<string | null>(null);
   const onDismissRef = useRef(onDismiss);
@@ -23,12 +25,13 @@ export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = React.m
       soundEffects.playUpgrade(effect.character.characterName || effect.character.nameKr, effect.newLevel);
     }
 
-    // 2.4초 후 자동 퇴장 (또는 클릭/키보드로 즉시 닫기 — 후속 효과 선택창으로 빠르게 전환)
+    // 2.4초 후 자동 퇴장 (또는 클릭/키보드로 즉시 닫기 — 멀티플레이에서는 스킵 차단)
     const timer = setTimeout(() => {
       onDismissRef.current();
     }, 2400);
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (isMultiplayer) return;
       if (e.key === 'Escape' || e.key === ' ' || e.key === 'Enter') {
         onDismissRef.current();
       }
@@ -39,7 +42,7 @@ export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = React.m
       clearTimeout(timer);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [effect.id]);
+  }, [effect.id, isMultiplayer]);
 
   const { character, playerName, previousLevel, newLevel, slotName } = effect;
   const slotLabel =
@@ -47,8 +50,12 @@ export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = React.m
 
   return (
     <div
-      onClick={() => onDismissRef.current()}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md cursor-pointer select-none animate-in fade-in duration-200 overflow-hidden"
+      onClick={() => {
+        if (!isMultiplayer) onDismissRef.current();
+      }}
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-md select-none animate-in fade-in duration-200 overflow-hidden ${
+        isMultiplayer ? 'cursor-default' : 'cursor-pointer'
+      }`}
     >
       {/* 황금빛/공명 파티클 앰비언트 글로우 */}
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.3)_0%,rgba(0,0,0,0.85)_75%)]" />
@@ -122,7 +129,9 @@ export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = React.m
             <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-400 animate-progress-5s" />
           </div>
           <div className="text-[11px] text-amber-300/80 font-medium">
-            (5초 후 자동으로 닫히거나, 화면 또는 키[Space/ESC]를 눌러 즉시 닫기)
+            {isMultiplayer
+              ? '(잠시 후 자동으로 대결이 계속 진행됩니다 ⏳)'
+              : '(5초 후 자동으로 닫히거나, 화면 또는 키[Space/ESC]를 눌러 즉시 닫기)'}
           </div>
         </div>
       </div>

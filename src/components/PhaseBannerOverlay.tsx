@@ -10,6 +10,7 @@ interface PhaseBannerOverlayProps {
   isAiTurn: boolean;
   disabled?: boolean;
   drawCount?: number;
+  isMultiplayer?: boolean;
 }
 
 interface BannerData {
@@ -28,6 +29,7 @@ export const PhaseBannerOverlay: React.FC<PhaseBannerOverlayProps> = React.memo(
   isAiTurn,
   disabled = false,
   drawCount,
+  isMultiplayer = false,
 }) => {
   const [currentBanner, setCurrentBanner] = useState<BannerData | null>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -276,11 +278,15 @@ export const PhaseBannerOverlay: React.FC<PhaseBannerOverlayProps> = React.memo(
         isFadingOut ? 'opacity-0 scale-95' : 'opacity-100 scale-100 animate-in zoom-in-95 fade-in duration-300'
       }`}
     >
-      {/* 배너 중앙 띠 - 배너 클릭 시 즉시 닫기 지원 (pointer-events-auto는 배너 본체에만 부여하여 하단 카드 조작 차단 방지) */}
+      {/* 배너 중앙 띠 - 배너 클릭 시 즉시 닫기 지원 (멀티플레이에서는 스킵 차단) */}
       <div
-        onClick={handleDismiss}
-        className="w-full relative py-6 sm:py-8 flex flex-col items-center justify-center overflow-hidden shadow-2xl pointer-events-auto cursor-pointer group"
-        title="클릭 시 배너를 즉시 닫습니다"
+        onClick={() => {
+          if (!isMultiplayer) handleDismiss();
+        }}
+        className={`w-full relative py-6 sm:py-8 flex flex-col items-center justify-center overflow-hidden shadow-2xl pointer-events-auto group ${
+          isMultiplayer ? 'cursor-default' : 'cursor-pointer'
+        }`}
+        title={isMultiplayer ? undefined : '클릭 시 배너를 즉시 닫습니다'}
       >
         {/* 그라데이션 베이스 바 */}
         <div

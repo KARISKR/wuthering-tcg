@@ -112,6 +112,38 @@ export const ACTIVE_CATEGORIES: FeedbackCategory[] = ['NOTICE', 'GENERAL', 'DECK
 // 가짜 시드 글을 완전히 비워 유저 실제 글만 표시되도록 함
 const SEED_POSTS: FeedbackItem[] = [];
 
+let memoryPostsCache: FeedbackItem[] | null = null;
+
+function persistLocalPosts(posts: FeedbackItem[]): void {
+  memoryPostsCache = posts;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
+  } catch (err) {
+    console.warn('[feedbackManager] localStorage setItem failed, trying sanitized payload:', err);
+    try {
+      // 5MB 용량 초과 방어: Base64 data:image 문자열이 포함된 경우 비우고 가볍게 캐시
+      const sanitized = posts.map((p) => {
+        let hasBase64 = false;
+        const newImages = (p.images || []).map((img) => {
+          if (img.startsWith('data:image/')) {
+            hasBase64 = true;
+            return '';
+          }
+          return img;
+        }).filter(Boolean);
+        return {
+          ...p,
+          imageUrl: p.imageUrl?.startsWith('data:image/') ? undefined : p.imageUrl,
+          images: hasBase64 ? newImages : p.images,
+        };
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
+    } catch (fallbackErr) {
+      console.warn('[feedbackManager] Sanitized cache persistence also failed:', fallbackErr);
+    }
+  }
+}
+
 export function getDeletedFeedbackIds(): string[] {
   try {
     const raw = localStorage.getItem(DELETED_KEY);
@@ -119,6 +151,18 @@ export function getDeletedFeedbackIds(): string[] {
   } catch {
     return [];
   }
+}
+
+export function mergeDeletedIds(remoteIds: string[]): string[] {
+  if (!Array.isArray(remoteIds) || remoteIds.length === 0) return getDeletedFeedbackIds();
+  const current = getDeletedFeedbackIds();
+  const set = new Set([...current, ...remoteIds]);
+  // 최근 500개 유지
+  const merged = Array.from(set).slice(-500);
+  try {
+    localStorage.setItem(DELETED_KEY, JSON.stringify(merged));
+  } catch {}
+  return merged;
 }
 
 export function recordDeletedId(id: string): void {
@@ -132,21 +176,29 @@ export function recordDeletedId(id: string): void {
 }
 
 export function getFeedbackList(): FeedbackItem[] {
+  const deletedSet = new Set(getDeletedFeedbackIds());
+  if (memoryPostsCache) {
+    return memoryPostsCache.filter((p) => p && p.id && !deletedSet.has(p.id));
+  }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
+      memoryPostsCache = SEED_POSTS;
       return SEED_POSTS;
     }
     const list: FeedbackItem[] = JSON.parse(raw);
-    return Array.isArray(list) ? list : SEED_POSTS;
+    const valid = Array.isArray(list) ? list.filter((p) => p && p.id && !deletedSet.has(p.id)) : SEED_POSTS;
+    memoryPostsCache = valid;
+    return valid;
   } catch {
+    memoryPostsCache = SEED_POSTS;
     return SEED_POSTS;
   }
 }
 
 export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
   let remotePosts: FeedbackItem[] | null = null;
-  const deletedIds = getDeletedFeedbackIds();
+  let deletedIds = getDeletedFeedbackIds();
 
   // 1순위: Cloudflare Pages Function (/api/community?type=board)
   try {
@@ -155,6 +207,9 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
     });
     if (res.ok) {
       const data = await res.json();
+      if (Array.isArray(data?.deletedIds)) {
+        deletedIds = mergeDeletedIds(data.deletedIds);
+      }
       if (Array.isArray(data?.posts)) {
         remotePosts = data.posts;
       }
@@ -172,6 +227,9 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
           const blobRes = await fetch(`https://bytebin.lucko.me/${blobKey}`);
           if (blobRes.ok) {
             const blobData = await blobRes.json();
+            if (Array.isArray(blobData?.deletedIds)) {
+              deletedIds = mergeDeletedIds(blobData.deletedIds);
+            }
             if (Array.isArray(blobData?.posts)) {
               remotePosts = blobData.posts;
             }
@@ -182,13 +240,28 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
   }
 
   const localPosts = getFeedbackList();
-  const allPosts = remotePosts ? [...remotePosts, ...localPosts] : localPosts;
+  const deletedSet = new Set(deletedIds);
+
+  let mergedSource: FeedbackItem[];
+  if (remotePosts !== null) {
+    const remoteIdSet = new Set(remotePosts.map((p) => p.id));
+    const now = Date.now();
+    // 로컬 글 중 서버에 아직 없는 글은 최근 2분 이내 작성된 신규 글만 보존, 삭제된 오래된 캐시는 제외!
+    const recentPendingLocalPosts = localPosts.filter((p) => {
+      if (!p || !p.id || remoteIdSet.has(p.id) || deletedSet.has(p.id)) return false;
+      const createdTime = p.createdAt ? new Date(p.createdAt).getTime() : 0;
+      return now - createdTime < 2 * 60 * 1000;
+    });
+    mergedSource = [...remotePosts, ...recentPendingLocalPosts];
+  } else {
+    mergedSource = localPosts;
+  }
 
   // 원격 게시글과 로컬 게시글을 ID 기준으로 병합 (삭제된 글 제외)
   const mergedMap = new Map<string, FeedbackItem>();
-  for (const p of allPosts) {
+  for (const p of mergedSource) {
     if (!p || !p.id) continue;
-    if (deletedIds.includes(p.id)) continue; // 삭제된 글 부활 방지
+    if (deletedSet.has(p.id)) continue; // 삭제된 글 부활 방지
 
     const existing = mergedMap.get(p.id);
     if (!existing) {
@@ -199,7 +272,7 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
       for (const c of [...(existing.comments || []), ...(p.comments || [])]) {
         if (c && c.id) commentMap.set(c.id, c);
       }
-      // updatedAt 비교: 더 최신에 수정된 버전(또는 로컬 최신본 p)을 우선 채택하여 삭제된 이미지가 부활하는 현상 방지
+      // updatedAt 비교: 더 최신에 수정된 버전 우선 채택
       const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
       const incomingTime = p.updatedAt ? new Date(p.updatedAt).getTime() : 0;
       const newer = incomingTime >= existingTime ? p : existing;
@@ -221,17 +294,17 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
   }
 
   const merged = Array.from(mergedMap.values());
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-  } catch {}
+  persistLocalPosts(merged);
   return merged;
 }
 
 export async function syncFeedbackListToCloud(postsToSync?: FeedbackItem[]): Promise<void> {
   try {
     const mergedPosts = postsToSync || (await fetchGlobalFeedbackList());
+    const deletedIds = getDeletedFeedbackIds();
     const payload = JSON.stringify({
       posts: mergedPosts.map(({ likedByMe, dislikedByMe, ...rest }) => rest),
+      deletedIds,
       updatedAt: Date.now(),
     });
 
@@ -287,19 +360,13 @@ export function saveFeedback(
     ...data,
   };
   const updated = [newItem, ...list];
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to persist feedback list:', err);
-  }
+  persistLocalPosts(updated);
 
   // 글로벌 클라우드 병합 및 동기화
   fetchGlobalFeedbackList().then((latest) => {
     const exists = latest.some((item) => item.id === newItem.id);
     const finalPosts = exists ? latest : [newItem, ...latest];
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(finalPosts));
-    } catch {}
+    persistLocalPosts(finalPosts);
     syncFeedbackListToCloud(finalPosts);
   });
 
@@ -314,11 +381,7 @@ export function incrementViewCount(id: string): void {
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to increment views:', err);
-  }
+  persistLocalPosts(updated);
 }
 
 export function toggleLikeFeedback(id: string): { likes: number; likedByMe: boolean } {
@@ -333,11 +396,7 @@ export function toggleLikeFeedback(id: string): { likes: number; likedByMe: bool
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to toggle like:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
   return result;
 }
@@ -354,11 +413,7 @@ export function toggleDislikeFeedback(id: string): { dislikes: number; dislikedB
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to toggle dislike:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
   return result;
 }
@@ -392,11 +447,7 @@ export function addCommentToFeedback(
     return item;
   });
 
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to add comment:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
   return newComment;
 }
@@ -415,24 +466,17 @@ export function updateFeedback(id: string, updates: Partial<Omit<FeedbackItem, '
       updatedAt: new Date().toISOString(),
     };
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to update feedback:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
 }
 
-export function deleteFeedback(id: string): void {
+export async function deleteFeedback(id: string): Promise<FeedbackItem[]> {
   recordDeletedId(id);
   const list = getFeedbackList();
   const filtered = list.filter((item) => item.id !== id);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to delete feedback:', err);
-  }
-  syncFeedbackListToCloud(filtered);
+  persistLocalPosts(filtered);
+  await syncFeedbackListToCloud(filtered);
+  return filtered;
 }
 
 export function clearAllFeedback(): void {

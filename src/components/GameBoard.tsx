@@ -689,6 +689,17 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     cards: AnyCard[];
   } | null>(null);
 
+  const openRevealedOppHandModal = () => {
+    const revealedCards = otherPlayer.hand.filter((c) => gameState.isOpponentHandScanned || c.isRevealed);
+    if (revealedCards.length === 0) return;
+    setCardListModalState({
+      isOpen: true,
+      title: `👁️ ${otherPlayer.name}의 공개된 손패 (${revealedCards.length}장)`,
+      type: 'TRASH', // 모달 뷰어 UI 재사용
+      cards: revealedCards,
+    });
+  };
+
   const openCardListModal = (type: 'TRASH' | 'CONCERTO' | 'CHARACTER', playerIndex: 0 | 1) => {
     const player = gameState.players[playerIndex];
     const cards =
@@ -2792,16 +2803,24 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         <strong className="text-white font-mono text-xs sm:text-sm">{visibleOppHand.length}장</strong>
                       </span>
                       {gameState.isOpponentHandScanned ? (
-                        <span className="text-[10px] font-black text-[#f97316] bg-amber-950/80 px-1.5 py-0.2 border border-[#f97316]/50 animate-pulse">
-                          스캔됨
-                        </span>
-                      ) : revealedCount > 0 ? (
-                        <span
-                          className="text-[10px] font-black text-amber-300 bg-amber-950/80 px-1.5 py-0.2 border border-amber-400/50"
-                          title="효과로 공개되어 앞면이 확인된 상대 손패 수"
+                        <button
+                          type="button"
+                          onClick={openRevealedOppHandModal}
+                          className="text-[10px] font-black text-[#f97316] bg-amber-950/80 hover:bg-amber-900 px-1.5 py-0.5 border border-[#f97316]/50 animate-pulse cursor-pointer transition"
+                          title="상대 손패가 스캔되었습니다 (클릭하여 카드 목록 확인)"
                         >
-                          👁️ 공개 {revealedCount}
-                        </span>
+                          👁️ 스캔됨 ({revealedCount || visibleOppHand.length})
+                        </button>
+                      ) : revealedCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={openRevealedOppHandModal}
+                          className="text-[10px] font-black text-amber-300 bg-amber-950/80 hover:bg-amber-900/90 px-1.5 py-0.5 border border-amber-400/50 cursor-pointer transition shadow-[0_0_8px_rgba(245,158,11,0.3)] flex items-center gap-1"
+                          title="효과로 공개된 상대 손패 (클릭하여 확대 확인)"
+                        >
+                          <span>👁️ 공개 {revealedCount}장</span>
+                          <span className="text-[9px] text-amber-400/80 underline">(확인)</span>
+                        </button>
                       ) : null}
                       <div className="flex items-center -space-x-2 py-0.5 pl-1">
                         {visibleOppHand.map((c, i) => {
@@ -2809,23 +2828,26 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                           return (
                             <div
                               key={c.id || i}
-                              style={{ zIndex: i + 1 }}
+                              style={{ zIndex: isCardVisible ? i + 10 : i + 1 }}
                               onMouseEnter={() => {
                                 if (isCardVisible) setPreviewCard(c);
                               }}
                               onClick={() => {
-                                if (isCardVisible) setPreviewCard(c);
+                                if (isCardVisible) {
+                                  setPreviewCard(c);
+                                  openRevealedOppHandModal();
+                                }
                               }}
-                              className={`relative w-4.5 h-6.5 rounded-xs overflow-hidden border transition-transform ${
+                              className={`relative rounded-xs overflow-hidden border transition-transform ${
                                 isCardVisible
-                                  ? 'border-[#f97316] ring-1 ring-amber-400/60 hover:scale-150 hover:z-30 cursor-pointer'
-                                  : 'border-cyan-400/50'
+                                  ? 'w-6 h-8.5 border-[#f97316] ring-1 ring-amber-400/80 shadow-[0_0_8px_rgba(249,115,22,0.6)] hover:scale-125 cursor-pointer z-20'
+                                  : 'w-4.5 h-6.5 border-cyan-400/50'
                               }`}
                               title={
                                 gameState.isOpponentHandScanned
-                                  ? `[스캔 공개] ${c.nameKr} (${c.color})`
+                                  ? `[스캔 공개] ${c.nameKr} (${c.color}) — 클릭하여 큰 카드로 확인`
                                   : c.isRevealed
-                                  ? `[효과로 공개됨] ${c.nameKr} (${c.color}) — 마우스를 올려 상세 확인`
+                                  ? `[효과로 공개됨] ${c.nameKr} (${c.color}) — 클릭하여 큰 카드로 확인`
                                   : `상대 손패 (${i + 1}/${visibleOppHand.length})`
                               }
                             >
@@ -3509,7 +3531,44 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             });
 
             return (
-              <div className="w-full shrink-0 z-30 overflow-visible">
+              <div className="w-full shrink-0 z-30 overflow-visible flex flex-col gap-1.5">
+                {/* [내 손패 바로 위 플로팅 알림] 연격(추격) 불가 시 손패 바로 위에서 사유 안내 및 즉시 턴 넘기기 버튼 */}
+                {!isSpectator &&
+                  isPlayerComboPhase &&
+                  !canPlayerExecuteCombo(activeControlledPlayer) &&
+                  !activeComboStrike &&
+                  !gameState.lastComboStrike &&
+                  !isUpgradeOverlayActive &&
+                  !gameState.pendingChoice &&
+                  !gameState.lastEffectDraw &&
+                  !introSwapModalState.isOpen &&
+                  !concertoModalState.isOpen && (
+                    <div className="w-full max-w-[1200px] mx-auto px-3 py-2 bg-[#0c101b]/95 border-2 border-[#f97316] rounded-xl shadow-[0_0_25px_rgba(249,115,22,0.4)] flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <AlertCircle className="w-4 h-4 text-[#f97316] shrink-0 animate-bounce" />
+                        <span className="text-xs sm:text-sm font-black text-white truncate">
+                          {!activeControlledPlayer.comboUnlimited && (activeControlledPlayer.comboCount ?? 0) === 0
+                            ? '⚡ 남은 추격(연격) 횟수를 모두 소진했습니다.'
+                            : '⚠️ 손패에 사용 가능한 적색(RED) 연격 카드가 없거나 협주 코스트가 부족합니다.'}
+                        </span>
+                        <span className="hidden md:inline text-xs text-slate-300">
+                          (연격을 종료하고 턴을 넘기세요)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNoComboCountdown(null);
+                          handleFinishCombo(controlledPlayerIndex);
+                        }}
+                        className="shrink-0 px-3.5 py-1.5 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs sm:text-sm rounded-lg shadow-md transition transform hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center gap-1.5"
+                      >
+                        <span>연격 종료 (턴 넘기기)</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+
                 <HandView
                   hand={displayedHand}
                   concertoCount={activeControlledPlayer.concertoZone.length}
@@ -3910,8 +3969,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         </span>
                       </div>
                     ) : (
-                      <div className="p-2.5 bg-[#111520] border border-[#f97316]/50 text-[#f97316] text-xs font-bold text-center">
-                        배틀이 완료되었습니다. 우측의 [턴 종료] 버튼을 눌러 턴을 마치세요.
+                      <div className="p-2.5 bg-[#111520] border border-[#f97316]/60 text-xs font-bold text-center flex flex-col gap-1">
+                        <span className="text-[#f97316] font-black">
+                          {!activeControlledPlayer.comboUnlimited && (activeControlledPlayer.comboCount ?? 0) === 0
+                            ? '⚡ 추격(연격) 횟수 소진 완료'
+                            : '⚠️ 연격 가능한 적색 카드 / 협주 코스트 부족'}
+                        </span>
+                        <span className="text-slate-300 text-[11px]">
+                          아래 [연격 종료] 버튼을 눌러 턴을 마치세요.
+                        </span>
                       </div>
                     )}
                     <button
@@ -3919,7 +3985,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                         setNoComboCountdown(null);
                         handleFinishCombo(controlledPlayerIndex);
                       }}
-                      className="w-full py-3 px-4 bg-gradient-to-r from-red-600 via-amber-500 to-orange-500 hover:brightness-110 text-white font-black text-xs sm:text-sm transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2"
+                      className={`w-full py-3 px-4 bg-gradient-to-r from-red-600 via-amber-500 to-orange-500 hover:brightness-110 text-white font-black text-xs sm:text-sm transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] shadow-lg shadow-orange-500/25 flex items-center justify-center gap-2 ${
+                        !canPlayerExecuteCombo(activeControlledPlayer) ? 'ring-2 ring-[#f97316] animate-pulse' : ''
+                      }`}
                     >
                       <RotateCcw className="w-4 h-4" />
                       <span>
@@ -4146,6 +4214,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         isAiTurn={gameState.activePlayerIndex === 1 && gameState.players[1].isAi}
         disabled={showMatchOpening}
         drawCount={currentTurnDrawCount}
+        isMultiplayer={isMultiplayer}
       />
 
       {/* 액션 덱 -> 손패 카드 드로우 비행 연출 오버레이 */}
@@ -4187,6 +4256,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           !!gameState.lastEffectDraw &&
           gameState.lastEffectDraw.playerIndex !== viewerPlayerIndex
         }
+        isMultiplayer={isMultiplayer}
       />
 
       {/* 선공 결정 주사위 모달 (양측 주사위 투척 연출, 관전자는 제외) */}
@@ -4322,6 +4392,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           p1Name={p1.name}
           onDismiss={handleDismissMatchOpening}
           myPlayerIndex={viewerPlayerIndex}
+          isMultiplayer={isMultiplayer}
         />
       )}
 
@@ -4387,6 +4458,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           players={gameState.players}
           onDismiss={handleProceedAfterClash}
           myPlayerIndex={viewerPlayerIndex}
+          isMultiplayer={isMultiplayer}
         />
       )}
 
@@ -4396,6 +4468,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           key={(activeComboStrike || gameState.lastComboStrike)!.id}
           strike={(activeComboStrike || gameState.lastComboStrike)!}
           onDismiss={handleDismissComboStrike}
+          isMultiplayer={isMultiplayer}
         />
       )}
 
@@ -4404,6 +4477,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         <UpgradeEffectOverlay
           effect={activeUpgrade}
           onDismiss={handleDismissUpgrade}
+          isMultiplayer={isMultiplayer}
         />
       )}
 
@@ -4457,6 +4531,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             players={gameState.players}
             onComplete={() => setIsFinisherFinished(true)}
             myPlayerIndex={viewerPlayerIndex}
+            isMultiplayer={isMultiplayer}
           />
         ) : (
           <GameOverModal

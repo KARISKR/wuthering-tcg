@@ -2,10 +2,10 @@ import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BgmPlayer } from './BgmPlayer';
 import { CURRENT_GAME_VERSION } from '../data/patchNotes';
 import type { CustomDeckConfig } from '../types/tcg';
-import { DeckSelectModal } from './DeckSelectModal';
 import { VisitorStatsWidget } from './VisitorStatsWidget';
 import { startIdleCardPreload } from '../utils/cardImagePreloader';
 
+const DeckSelectModal = lazy(() => import('./DeckSelectModal').then((m) => ({ default: m.DeckSelectModal })));
 const OfficialManualModal = lazy(() => import('./OfficialManualModal').then((m) => ({ default: m.OfficialManualModal })));
 const CardCatalogModal = lazy(() => import('./CardCatalogModal').then((m) => ({ default: m.CardCatalogModal })));
 const DeckPresetModal = lazy(() => import('./DeckPresetModal').then((m) => ({ default: m.DeckPresetModal })));
@@ -44,6 +44,7 @@ import {
 import { BattleReplayData } from '../utils/replayManager';
 import {
   fetchGlobalFeedbackList,
+  getFeedbackList,
   getLatestNotice,
   hasNewPosts,
   FeedbackItem,
@@ -84,14 +85,24 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
   const [isMultiplayerModalOpen, setIsMultiplayerModalOpen] = useState(false);
-  const [boardPosts, setBoardPosts] = useState<FeedbackItem[]>([]);
+  const [boardPosts, setBoardPosts] = useState<FeedbackItem[]>(() => {
+    try {
+      return getFeedbackList();
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
-    fetchGlobalFeedbackList().then((posts) => {
-      if (Array.isArray(posts)) {
-        setBoardPosts(posts);
-      }
-    });
+    // 첫 화면 렌더링 블로킹 방지: 800ms 지연 후 백그라운드에서 최신 게시글 갱신
+    const timer = setTimeout(() => {
+      fetchGlobalFeedbackList().then((posts) => {
+        if (Array.isArray(posts)) {
+          setBoardPosts(posts);
+        }
+      });
+    }, 800);
+    return () => clearTimeout(timer);
   }, []);
 
   const latestNotice = useMemo(() => getLatestNotice(boardPosts), [boardPosts]);
@@ -1007,19 +1018,23 @@ export const Lobby: React.FC<LobbyProps> = ({
       )}
 
       {/* 덱 선택 모달 (AI 봇 대전 / 1인 2역) */}
-      <DeckSelectModal
-        isOpen={deckSelectMode !== null}
-        mode={deckSelectMode ?? 'AI'}
-        onClose={() => {
-          clearHash();
-          setDeckSelectMode(null);
-        }}
-        onConfirm={(myDeck, oppDeck) => {
-          const m = deckSelectMode ?? 'AI';
-          setDeckSelectMode(null);
-          onStartGame(m, myDeck, oppDeck);
-        }}
-      />
+      {deckSelectMode !== null && (
+        <Suspense fallback={null}>
+          <DeckSelectModal
+            isOpen={deckSelectMode !== null}
+            mode={deckSelectMode ?? 'AI'}
+            onClose={() => {
+              clearHash();
+              setDeckSelectMode(null);
+            }}
+            onConfirm={(myDeck, oppDeck) => {
+              const m = deckSelectMode ?? 'AI';
+              setDeckSelectMode(null);
+              onStartGame(m, myDeck, oppDeck);
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* 비동기 지연 로드 모달 컴포넌트 풀 (Suspense) */}
       <Suspense fallback={null}>

@@ -2670,6 +2670,9 @@ export function setClashCard(
 
     if (isTurnPlayer) {
       // 공식 룰 604.1.1.2 & FAQ Q9: 낼 수 있는 카드가 없어 패 전체를 공개하고 패스!
+      player.hand.forEach((c) => {
+        c.isRevealed = true;
+      });
       const handCardNames = player.hand.map((c) => `[${c.nameKr}]`).join(', ') || '0장';
       newState = addLog(
         newState,
@@ -3665,24 +3668,27 @@ export function finishClashJudgment(state: GameState): GameState {
       const others = top5.filter((c) => !jinhsiCards.includes(c));
       addCardsToHand(winnerPlayer, jinhsiCards);
       addCardsToDropZone(winnerPlayer, others);
-      if (!newState.players[0].isAi && top5.length > 0) {
-        const jinhsiRevealChoice: PendingChoice = {
-          id: `choice-${Date.now()}-jinhsi-top5-reveal`,
-          playerIndex: 0,
-          title: winnerPlayer.isAi
-            ? '📢 [상대 카드 공개] 금희 Lv.2 판정 효과 (덱 위 5장 공개)'
-            : '📢 [양측 공개] 금희 Lv.2 판정 효과 (덱 위 5장 공개)',
-          sourceCardName: '금희 Lv.2 [BP01-028]',
-          sourceCardArt: winnerPlayer.slots.leader.artUrl,
-          description: `${winnerPlayer.name}이(가) [금희 Lv.2] 판정 효과로 덱 위 ${top5.length}장을 공개했습니다! 【금희】 카드 ${jinhsiCards.length}장(${jinhsiCards.map((c) => `[${c.nameKr}]`).join(', ') || '없음'})을 패에 추가하고, 나머지 ${others.length}장을 트래시로 보냅니다.`,
-          revealedCards: top5,
-          minSelect: 0,
-          maxSelect: 0,
-          onResolveType: 'VIEW_ONLY',
-          sourceZone: 'DECK',
-          isPublicReveal: true,
-        };
-        newState = queueChoice(newState, jinhsiRevealChoice, true);
+      if (top5.length > 0) {
+        ([0, 1] as const).forEach((idx) => {
+          if (!newState.players[idx].isAi) {
+            const jinhsiRevealChoice: PendingChoice = {
+              id: `choice-${Date.now()}-jinhsi-top5-reveal-${idx}`,
+              playerIndex: idx,
+              title: idx === winnerIndex
+                ? '📢 [양측 공개] 금희 Lv.2 판정 효과 (덱 위 5장 공개)'
+                : '📢 [상대 카드 공개] 금희 Lv.2 판정 효과 (덱 위 5장 공개)',
+              sourceCardName: '금희 Lv.2 [BP01-028]',
+              sourceCardArt: winnerPlayer.slots.leader.artUrl,
+              description: `${winnerPlayer.name}이(가) [금희 Lv.2] 판정 효과로 덱 위 ${top5.length}장을 공개했습니다!\n• 【금희】 카드(${jinhsiCards.length}장): ${jinhsiCards.map((c) => `[${c.nameKr}]`).join(', ') || '없음'} ➔ 손패 추가\n• 나머지 카드(${others.length}장): ${others.map((c) => `[${c.nameKr}]`).join(', ') || '없음'} ➔ 트래시 이동`,
+              revealedCards: top5,
+              minSelect: 0,
+              maxSelect: 0,
+              onResolveType: 'VIEW_ONLY',
+              sourceZone: 'DECK',
+            };
+            newState = queueChoice(newState, jinhsiRevealChoice, true);
+          }
+        });
       }
       newState = addLog(
         newState,
@@ -6787,6 +6793,31 @@ export function resolvePendingChoice(
       player.actionDeck = [...unchosenCards, ...player.actionDeck];
     } else {
       player.actionDeck = [...player.actionDeck, ...unchosenCards];
+    }
+
+    // [상대방 실시간 공개 확인 팝업] 상대방이 인간 플레이어인 경우 공개된 카드 확인 모달 큐잉
+    if (state.pendingChoice.isPublicReveal) {
+      const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
+      if (!newState.players[oppIdx].isAi) {
+        const addedNames = chosenActionCards.map((c) => `[${c.nameKr}]`).join(', ') || '없음';
+        const unchosenNames = unchosenCards.map((c) => `[${c.nameKr}]`).join(', ');
+        const oppRevealChoice: PendingChoice = {
+          id: `choice-${Date.now()}-opp-public-reveal-${oppIdx}`,
+          playerIndex: oppIdx,
+          title: `📢 [상대 카드 공개 확인] ${sourceCardName || '공개 효과'}`,
+          sourceCardName: sourceCardName || '카드 공개 효과',
+          sourceCardArt: state.pendingChoice.sourceCardArt || chosenActionCards[0]?.artUrl || revealedCards[0]?.artUrl,
+          description: `상대(${player.name})가 효과로 카드 ${revealedCards.length}장을 공개했습니다.\n• 손패에 추가된 카드: ${addedNames}${
+            unchosenCards.length > 0 ? `\n• 추가하지 않은 카드: ${unchosenNames}` : ''
+          }`,
+          revealedCards: [...revealedCards],
+          minSelect: 0,
+          maxSelect: 0,
+          onResolveType: 'VIEW_ONLY',
+          sourceZone: 'DECK',
+        };
+        newState = queueChoice(newState, oppRevealChoice, false);
+      }
     }
 
     if (chosenActionCards.length > 0) {

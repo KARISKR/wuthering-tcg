@@ -10,6 +10,7 @@ interface EffectDrawOverlayProps {
   viewerPlayerIndex?: 0 | 1;
   /** true면 상대의 드로우이므로 카드 앞면/이름을 숨기고 뒷면만 표시 (멀티플레이 비공개 정보 보호) */
   hideCardFaces?: boolean;
+  isMultiplayer?: boolean;
 }
 
 type DrawStage = 'READY' | 'PULLING' | 'REVEAL' | 'FLYING' | 'SETTLED' | 'COMPLETED';
@@ -19,6 +20,7 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
   onComplete,
   viewerPlayerIndex = 0,
   hideCardFaces = false,
+  isMultiplayer = false,
 }) => {
   const [stage, setStage] = useState<DrawStage>('READY');
   const hasTriggeredRef = useRef(false);
@@ -91,6 +93,7 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
       e.stopPropagation();
       e.preventDefault();
     }
+    if (isMultiplayer) return; // 멀티플레이에서는 클릭 스킵 방지
     if (stage === 'READY') {
       handleTriggerDraw();
     } else if (stage === 'REVEAL') {
@@ -129,7 +132,9 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
   return (
     <div
       onClick={handleSpeedUp}
-      className="fixed inset-0 z-[85] flex flex-col items-center justify-center select-none cursor-pointer overflow-hidden"
+      className={`fixed inset-0 z-[85] flex flex-col items-center justify-center select-none overflow-hidden ${
+        isMultiplayer ? 'cursor-default' : 'cursor-pointer'
+      }`}
     >
       {/* 1. 배경 어두운 비네트 & 블러 */}
       <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[3px] transition-opacity duration-300 animate-fade-in" />

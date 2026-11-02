@@ -7,9 +7,10 @@ import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
 interface ComboStrikeOverlayProps {
   strike: ComboStrikeEffect;
   onDismiss: () => void;
+  isMultiplayer?: boolean;
 }
 
-export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, onDismiss }) => {
+export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, onDismiss, isMultiplayer = false }) => {
   const hasLeaderSwap = Boolean(strike.swappedFromLeader && strike.swappedToLeader);
   const hasComboEffect = hasLeaderSwap || Boolean(strike.comboEffectTitle || strike.comboEffectDesc);
 
@@ -44,12 +45,12 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
       }
     }, step1Duration);
 
-    // 전체 연출 종료 후 퇴장 (치명타 피니시 상황에서는 유저가 데미지를 확인하고 직접 클릭할 때까지 대기)
+    // 전체 연출 종료 후 퇴장 (치명타 피니시 상황에서는 싱글에선 유저가 데미지를 확인하고 직접 클릭할 때까지 대기, 멀티에서는 타이머로 자동 종료)
     let tDismiss: number | undefined = undefined;
-    if (!strike.isLethal) {
+    if (!strike.isLethal || isMultiplayer) {
       tDismiss = window.setTimeout(() => {
         onDismissRef.current();
-      }, totalDuration);
+      }, isMultiplayer && strike.isLethal ? totalDuration + 800 : totalDuration);
     }
 
     return () => {
@@ -57,11 +58,12 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
       if (tDismiss) clearTimeout(tDismiss);
       soundEffects.stopComboSounds();
     };
-  }, [strike.id, hasComboEffect, hasLeaderSwap]);
+  }, [strike.id, hasComboEffect, hasLeaderSwap, isMultiplayer]);
 
   const comboNum = strike.comboCount || 1;
 
   const handleOverlayClick = () => {
+    if (isMultiplayer) return; // 멀티플레이에서는 화면 클릭 스킵 비활성화
     if (step === 'COMBO_EFFECT' && hasComboEffect) {
       setStep('DAMAGE_STEP');
       return;
@@ -291,9 +293,9 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
         <div className="mt-4 text-xs font-bold text-slate-300">
           {strike.isLethal ? (
             <span className="text-amber-300 animate-pulse bg-red-950/80 px-4 py-1.5 rounded-full border border-red-500/60 shadow-[0_0_15px_rgba(239,68,68,0.5)]">
-              💥 결정타 적중! 화면을 클릭하여 피니시(카드 파쇄) 연출로 이동 💥
+              💥 결정타 적중! {isMultiplayer ? '잠시 후 피니시(카드 파쇄) 연출로 전환됩니다 ⏳' : '화면을 클릭하여 피니시(카드 파쇄) 연출로 이동 💥'}
             </span>
-          ) : (
+          ) : isMultiplayer ? null : (
             '(클릭하여 다음 스텝으로 즉시 진행)'
           )}
         </div>

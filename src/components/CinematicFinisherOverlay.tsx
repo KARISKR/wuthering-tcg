@@ -10,6 +10,7 @@ interface CinematicFinisherOverlayProps {
   onComplete: () => void;
   /** 화면을 보는 플레이어 인덱스 (멀티플레이 게스트=1) */
   myPlayerIndex?: 0 | 1;
+  isMultiplayer?: boolean;
 }
 
 // 20개의 폴리곤 조각 정의 (카드를 틈새 없이 분할하며, 폭발 시 각 조각이 고유한 3D 궤적으로 비산)
@@ -289,6 +290,7 @@ export const CinematicFinisherOverlay: React.FC<CinematicFinisherOverlayProps> =
   players,
   onComplete,
   myPlayerIndex = 0,
+  isMultiplayer = false,
 }) => {
   const isPlayerWinner = winner === myPlayerIndex;
   const loserIdx = winner === 0 ? 1 : 0;
@@ -304,12 +306,14 @@ export const CinematicFinisherOverlay: React.FC<CinematicFinisherOverlayProps> =
   const [stage, setStage] = useState<'FOCUS' | 'CRACK' | 'SHATTER' | 'DONE'>('FOCUS');
   const [shardsExploded, setShardsExploded] = useState(false);
 
-  // 건너뛰기 핸들러
+  // 건너뛰기 핸들러 (멀티플레이에서는 스킵 차단)
   const handleSkip = () => {
+    if (isMultiplayer) return;
     onComplete();
   };
 
   useEffect(() => {
+    if (isMultiplayer) return;
     // 키보드 Space, Enter, Escape 누를 시 즉시 스킵
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === ' ' || e.key === 'Enter' || e.key === 'Escape') {
@@ -319,7 +323,7 @@ export const CinematicFinisherOverlay: React.FC<CinematicFinisherOverlayProps> =
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [isMultiplayer]);
 
   useEffect(() => {
     // 통합 4초 사운드 재생 (균열 쩌적 소리부터 폭발 파쇄 및 잔향까지 1개의 파일로 통합 재생)
@@ -640,16 +644,18 @@ export const CinematicFinisherOverlay: React.FC<CinematicFinisherOverlayProps> =
         </div>
       )}
 
-      {/* 6. 우측 하단 스킵 안내 배너 */}
-      <div className="pointer-events-none absolute bottom-6 right-6 z-30">
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-black/70 border border-slate-700/80 text-slate-300 text-xs sm:text-sm font-medium backdrop-blur-sm shadow-lg hover:border-slate-500">
-          <span>클릭 또는</span>
-          <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-amber-400 font-mono font-bold text-xs">
-            SPACE
-          </kbd>
-          <span>스킵</span>
+      {/* 6. 우측 하단 스킵 안내 배너 (싱글에서만 표시) */}
+      {!isMultiplayer && (
+        <div className="pointer-events-none absolute bottom-6 right-6 z-30">
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-black/70 border border-slate-700/80 text-slate-300 text-xs sm:text-sm font-medium backdrop-blur-sm shadow-lg hover:border-slate-500">
+            <span>클릭 또는</span>
+            <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-600 text-amber-400 font-mono font-bold text-xs">
+              SPACE
+            </kbd>
+            <span>스킵</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
