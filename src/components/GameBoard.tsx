@@ -1171,12 +1171,12 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [showMobileCardModal, setShowMobileCardModal] = useState<boolean>(false);
   const [showMobileLogModal, setShowMobileLogModal] = useState<boolean>(false);
 
-  // 모바일 팝업/모달 자동 다운스케일 줌 계산 (가로 1120, 세로 680 기준)
+  // 모바일 팝업/모달 자동 다운스케일 줌 계산 (가로 1140, 세로 780 기준: 가로모드 360px~400px 높이에서도 잘림 없이 한 화면 수용)
   const [modalZoomScale, setModalZoomScale] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0.58;
-    const sW = window.innerWidth / 1120;
-    const sH = window.innerHeight / 680;
-    return Math.min(1, Math.max(0.42, Math.min(sW, sH)));
+    if (typeof window === 'undefined') return 0.52;
+    const sW = window.innerWidth / 1140;
+    const sH = window.innerHeight / 780;
+    return Math.min(1, Math.max(0.38, Math.min(sW, sH)));
   });
 
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
@@ -1257,9 +1257,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
       const scaleW = availW / 1080;
       setViewportScale(Math.min(1.15, Math.max(0.32, Math.min(scaleH, scaleW))));
 
-      const sW = window.innerWidth / 1120;
-      const sH = window.innerHeight / 680;
-      setModalZoomScale(Math.min(1, Math.max(0.42, Math.min(sW, sH))));
+      const sW = window.innerWidth / 1140;
+      const sH = window.innerHeight / 780;
+      setModalZoomScale(Math.min(1, Math.max(0.38, Math.min(sW, sH))));
     };
     updateViewportScale();
     window.addEventListener('resize', updateViewportScale);
@@ -2317,28 +2317,6 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             <span>{isMobileBattle ? '📱모바일' : '🖥️PC'}</span>
           </button>
 
-          {/* 모바일 헤더 퀵 모달 호출 버튼 */}
-          {isMobileBattle && (
-            <>
-              <button
-                onClick={() => setShowMobileCardModal(true)}
-                className="px-2 py-1 bg-[#111520] hover:bg-cyan-950/60 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold flex items-center gap-1 cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
-                title="선택된 카드 상세 정보 보기"
-              >
-                <Eye className="w-3 h-3 text-cyan-400" />
-                <span>카드</span>
-              </button>
-              <button
-                onClick={() => setShowMobileLogModal(true)}
-                className="px-2 py-1 bg-[#111520] hover:bg-amber-950/60 text-amber-300 border border-amber-500/40 text-[11px] font-bold flex items-center gap-1 cursor-pointer [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
-                title="실시간 배틀 로그 보기"
-              >
-                <ScrollText className="w-3 h-3 text-amber-400" />
-                <span>로그</span>
-              </button>
-            </>
-          )}
-
           <div className="hidden lg:flex items-center gap-2">
             <span className="text-[#f97316] text-base leading-none drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]">✦</span>
             <h1 className="text-xs sm:text-sm font-black tracking-widest text-white flex items-center gap-2 font-mono">
@@ -2516,21 +2494,23 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           <div className="hidden lg:block mr-1">
             <BgmPlayer />
           </div>
-          {/* 아브의 튜토리얼 가이드 버튼, 게임 모드 전환, 게임 재시작은 멀티플레이 모드가 아닐 때만 노출 */}
+          {/* 아브의 튜토리얼 가이드 버튼, 게임 모드 전환, 게임 재시작은 멀티플레이 모드가 아닐 때만 노출 (아브 가이드는 상단이 비좁은 모바일에서는 숨김) */}
           {!isMultiplayer && (
             <>
-              <button
-                onClick={() => setShowTutorialOverlay((prev) => !prev)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-black transition cursor-pointer border ${
-                  showTutorialOverlay
-                    ? 'bg-amber-500 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
-                    : 'bg-[#111520] hover:bg-amber-950/40 text-amber-400 border-amber-500/40'
-                }`}
-                title="아브의 인터랙티브 튜토리얼 가이드 열기"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">아브 가이드</span>
-              </button>
+              {!isMobileBattle && (
+                <button
+                  onClick={() => setShowTutorialOverlay((prev) => !prev)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-black transition cursor-pointer border ${
+                    showTutorialOverlay
+                      ? 'bg-amber-500 text-black border-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.5)]'
+                      : 'bg-[#111520] hover:bg-amber-950/40 text-amber-400 border-amber-500/40'
+                  }`}
+                  title="아브의 인터랙티브 튜토리얼 가이드 열기"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">아브 가이드</span>
+                </button>
+              )}
 
               <button
                 onClick={() => setGameMode(gameState.gameMode === 'AI' ? 'SOLO_DUAL' : 'AI')}
@@ -4413,7 +4393,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 title="선택된 카드 상세 정보"
               >
                 <Eye className="w-3.5 h-3.5 text-cyan-400" />
-                <span className="hidden sm:inline">카드</span>
+                <span>카드</span>
               </button>
               <button
                 onClick={() => setShowMobileLogModal(true)}
@@ -4421,7 +4401,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 title="배틀 로그 보기"
               >
                 <ScrollText className="w-3.5 h-3.5 text-amber-400" />
-                <span className="hidden sm:inline">로그</span>
+                <span>로그</span>
               </button>
             </>
           )}
