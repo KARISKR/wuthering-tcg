@@ -318,7 +318,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             onClick={() => setHash('#card-gallery')}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition cursor-pointer"
           >
-            <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
             <span>카드 도감</span>
           </button>
           <button
@@ -540,21 +540,21 @@ export const Lobby: React.FC<LobbyProps> = ({
           {/* ========================================================= */}
           <div className="flex flex-col gap-3.5 h-full">
             
-            {/* [2-1] 덱 빌더 (시안 네온 테두리) */}
+            {/* [2-1] 덱 빌더 (골드/앰버 네온 테두리) */}
             <div
               onClick={onOpenDeckBuilder}
-              className="group relative flex-1 border-2 border-cyan-400/80 hover:border-cyan-300 bg-[#0c101b]/90 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(34,211,238,0.2)] hover:shadow-[0_0_35px_rgba(34,211,238,0.45)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
+              className="group relative flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c101b]/90 hover:bg-[#1a150e]/95 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.22)] hover:shadow-[0_0_35px_rgba(245,158,11,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
               style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
             >
-              <div className="absolute inset-1.5 border border-cyan-400/25 pointer-events-none z-10" />
-              <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-fuchsia-400 z-20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-cyan-300 z-20 pointer-events-none" />
+              <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-10" />
+              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
 
               <div className="relative z-20 flex flex-col justify-center">
-                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-cyan-200 transition-colors tracking-tight drop-shadow">
+                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-amber-200 transition-colors tracking-tight drop-shadow">
                   덱 빌더
                 </h3>
-                <span className="text-[11px] sm:text-xs font-mono font-black text-cyan-400 tracking-wider uppercase mt-1">
+                <span className="text-[11px] sm:text-xs font-mono font-black text-amber-400 tracking-wider uppercase mt-1">
                   (DECK BUILDER)
                 </span>
               </div>
@@ -563,34 +563,34 @@ export const Lobby: React.FC<LobbyProps> = ({
                 <img
                   src="/images/menu_icons/deck-builder.webp"
                   alt="덱 빌더"
-                  className="w-14 h-14 sm:w-18 sm:h-18 object-contain drop-shadow-[0_0_18px_rgba(34,211,238,0.45)] group-hover:scale-110 transition-transform duration-500"
+                  className="w-14 h-14 sm:w-18 sm:h-18 object-contain drop-shadow-[0_0_18px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-500"
                 />
               </div>
             </div>
 
-            {/* [2-2] 카드 도감 (에메랄드/그린 네온 테두리) */}
+            {/* [2-2] 카드 도감 (골드/앰버 네온 테두리) */}
             <div
               onClick={() => setHash('#card-gallery')}
-              className="group relative flex-1 border-2 border-emerald-400/80 hover:border-emerald-300 bg-[#0c101b]/90 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(52,211,153,0.2)] hover:shadow-[0_0_35px_rgba(52,211,153,0.45)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
+              className="group relative flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c101b]/90 hover:bg-[#1a150e]/95 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.22)] hover:shadow-[0_0_35px_rgba(245,158,11,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
               style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
             >
-              <div className="absolute inset-1.5 border border-emerald-400/25 pointer-events-none z-10" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-emerald-300 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-emerald-300 z-20 pointer-events-none" />
+              <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-10" />
+              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
 
               <div className="relative z-20 flex flex-col justify-center">
-                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-emerald-200 transition-colors tracking-tight drop-shadow">
+                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-amber-200 transition-colors tracking-tight drop-shadow">
                   카드 도감
                 </h3>
-                <span className="text-[11px] sm:text-xs font-mono font-black text-emerald-400 tracking-wider uppercase mt-1">
+                <span className="text-[11px] sm:text-xs font-mono font-black text-amber-400 tracking-wider uppercase mt-1">
                   (CARD GALLERY)
                 </span>
               </div>
 
               <div className="relative z-10 w-18 h-18 sm:w-22 sm:h-22 flex items-center justify-center shrink-0">
                 <div className="relative w-16 h-16 sm:w-18 sm:h-18 flex items-center justify-center">
-                  <div className="absolute w-11 h-15 sm:w-13 sm:h-17 rounded-md border border-cyan-400 bg-gradient-to-br from-cyan-500/50 to-blue-900/60 shadow-[0_0_10px_rgba(34,211,238,0.5)] transform -rotate-18 -translate-x-3 group-hover:-translate-x-4 transition-transform duration-500 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-cyan-200" />
+                  <div className="absolute w-11 h-15 sm:w-13 sm:h-17 rounded-md border border-amber-300/70 bg-gradient-to-br from-amber-500/40 to-amber-950/70 shadow-[0_0_10px_rgba(245,158,11,0.45)] transform -rotate-18 -translate-x-3 group-hover:-translate-x-4 transition-transform duration-500 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-amber-200" />
                   </div>
                   <div className="absolute w-13 h-17 sm:w-15 sm:h-19 rounded-md border border-amber-400/80 bg-[#0c1426] shadow-[0_0_14px_rgba(245,158,11,0.4)] transform rotate-6 z-10 group-hover:scale-105 transition-transform duration-500 overflow-hidden flex items-center justify-center">
                     <img
@@ -609,34 +609,34 @@ export const Lobby: React.FC<LobbyProps> = ({
               </div>
             </div>
 
-            {/* [2-3] 멀티배틀 (온라인 1:1 P2P 대전) */}
+            {/* [2-3] 멀티배틀 (온라인 1:1 P2P 대전 - 골드/앰버 네온 테두리) */}
             <div
               onClick={() => {
                 setHash('#multiplayer');
                 setIsMultiplayerModalOpen(true);
               }}
-              className="group relative flex-1 border-2 border-violet-400/80 hover:border-violet-300 bg-[#0c101b]/90 hover:bg-[#161129]/95 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(139,92,246,0.25)] hover:shadow-[0_0_36px_rgba(139,92,246,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
+              className="group relative flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c101b]/90 hover:bg-[#1a150e]/95 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.22)] hover:shadow-[0_0_36px_rgba(245,158,11,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
               style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
             >
-              <div className="absolute inset-1.5 border border-violet-400/25 pointer-events-none z-10" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-violet-300 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-violet-300 z-20 pointer-events-none" />
+              <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-10" />
+              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
 
               <div className="relative z-20 flex flex-col justify-center">
-                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-violet-200 transition-colors tracking-tight drop-shadow">
+                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-amber-200 transition-colors tracking-tight drop-shadow">
                   멀티배틀
                 </h3>
-                <span className="text-[11px] sm:text-xs font-mono font-black text-violet-300 tracking-wider uppercase mt-1">
+                <span className="text-[11px] sm:text-xs font-mono font-black text-amber-400 tracking-wider uppercase mt-1">
                   (ONLINE 1:1 BATTLE)
                 </span>
-                <span className="mt-1.5 inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded border border-emerald-400/60 bg-emerald-500/10 text-emerald-300 text-[11px] font-black tracking-wide">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="mt-1.5 inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded border border-amber-400/60 bg-amber-500/10 text-amber-300 text-[11px] font-black tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                   P2P 온라인 1:1 대전
                 </span>
               </div>
 
               <div className="relative z-10 w-18 h-18 sm:w-22 sm:h-22 flex items-center justify-center shrink-0">
-                <Swords className="w-12 h-12 sm:w-14 sm:h-14 text-violet-300 drop-shadow-[0_0_18px_rgba(139,92,246,0.6)] group-hover:scale-110 transition-transform duration-300" />
+                <Swords className="w-12 h-12 sm:w-14 sm:h-14 text-amber-300 drop-shadow-[0_0_18px_rgba(245,158,11,0.6)] group-hover:scale-110 transition-transform duration-300" />
               </div>
             </div>
 
@@ -681,85 +681,85 @@ export const Lobby: React.FC<LobbyProps> = ({
               <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
             </div>
 
-            {/* 2. 공유된 덱 리스트 (마젠타/퍼플 네온) */}
+            {/* 2. 공유된 덱 리스트 (골드/앰버 네온) */}
             <div
               onClick={() => setHash('#shared-decks')}
-              className="group flex-1 border-2 border-fuchsia-400/80 hover:border-fuchsia-300 bg-[#0c111d]/90 hover:bg-[#1c1228]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(217,70,239,0.2)] hover:shadow-[0_0_30px_rgba(217,70,239,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
+              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.22)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
               style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
             >
-              <div className="absolute inset-1 border border-fuchsia-400/20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-fuchsia-300 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-fuchsia-300 pointer-events-none" />
+              <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
+              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
 
               <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
                 <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
                   <img
                     src="/images/menu_icons/shared-decks.webp"
                     alt="공유된 덱 리스트"
-                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(217,70,239,0.5)] group-hover:scale-110 transition-transform duration-300"
+                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-fuchsia-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
+                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
                   공유된 덱 리스트
                 </span>
               </div>
-              <ChevronRight className="w-5 h-5 text-fuchsia-400/70 group-hover:text-fuchsia-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
+              <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
             </div>
 
-            {/* 3. 대전 리플레이 & 복기 (퍼플/바이올렛 네온) */}
+            {/* 3. 대전 리플레이 & 복기 (골드/앰버 네온) */}
             <div
               onClick={() => setHash('#replay')}
-              className="group flex-1 border-2 border-purple-400/80 hover:border-purple-300 bg-[#0c111d]/90 hover:bg-[#19142b]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(168,85,247,0.2)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
+              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.22)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
               style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
             >
-              <div className="absolute inset-1 border border-purple-400/20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-purple-300 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-purple-300 pointer-events-none" />
+              <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
+              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
 
               <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
                 <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
                   <img
                     src="/images/menu_icons/replay.webp"
                     alt="대전 리플레이 & 복기"
-                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(168,85,247,0.5)] group-hover:scale-110 transition-transform duration-300"
+                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-purple-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
+                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
                   대전 리플레이 & 복기
                 </span>
               </div>
-              <ChevronRight className="w-5 h-5 text-purple-400/70 group-hover:text-purple-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
+              <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
             </div>
 
-            {/* 4. 공식 룰북 & FAQ (딥 스카이 블루 네온) */}
+            {/* 4. 공식 룰북 & FAQ (골드/앰버 네온) */}
             <div
               onClick={() => setHash('#rulebook')}
-              className="group flex-1 border-2 border-blue-400/80 hover:border-blue-300 bg-[#0c111d]/90 hover:bg-[#11192b]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(59,130,246,0.2)] hover:shadow-[0_0_30px_rgba(59,130,246,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
+              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.22)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
               style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
             >
-              <div className="absolute inset-1 border border-blue-400/20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-blue-300 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-blue-300 pointer-events-none" />
+              <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
+              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
 
               <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
                 <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
                   <img
                     src="/images/menu_icons/rulebook.webp"
                     alt="공식 룰북 & FAQ"
-                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(59,130,246,0.5)] group-hover:scale-110 transition-transform duration-300"
+                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-blue-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
+                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
                   공식 룰북 & FAQ
                 </span>
               </div>
-              <ChevronRight className="w-5 h-5 text-blue-400/70 group-hover:text-blue-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
+              <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
             </div>
 
-            {/* 5. 룰 영상 가이드 (앰버/오렌지 네온) */}
+            {/* 5. 룰 영상 가이드 (골드/앰버 네온) */}
             <div
               onClick={() => setHash('#guide')}
-              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#201810]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.2)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
+              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.22)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
               style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
             >
               <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
