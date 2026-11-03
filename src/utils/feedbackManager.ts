@@ -201,15 +201,22 @@ export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data?.posts)) {
+        const remoteIdSet = new Set<string>();
         const merged = (data.posts as FeedbackItem[])
           .filter((p) => p && p.id && !deletedIds.includes(p.id))
           .map((summaryItem) => {
+            remoteIdSet.add(summaryItem.id);
             const localItem = localMap.get(summaryItem.id);
             const cachedFull = postDetailCache.get(summaryItem.id);
+            const localTime = localItem?.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
+            const remoteTime = summaryItem.updatedAt ? new Date(summaryItem.updatedAt).getTime() : 0;
+            const preferLocalMeta = Boolean(localItem && localTime > remoteTime);
+
             const base = cachedFull && !cachedFull.isSummaryOnly ? cachedFull : summaryItem;
             return {
               ...base,
               ...summaryItem,
+              ...(preferLocalMeta ? localItem : {}),
               content: cachedFull && !cachedFull.isSummaryOnly ? cachedFull.content : summaryItem.content || '',
               imageUrl: cachedFull && !cachedFull.isSummaryOnly ? cachedFull.imageUrl : summaryItem.imageUrl,
               images: cachedFull && !cachedFull.isSummaryOnly ? cachedFull.images : summaryItem.images,
@@ -221,8 +228,14 @@ export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
               dislikedByMe: Boolean(localItem?.dislikedByMe),
             };
           });
-        memoryPostsCache = merged;
-        return merged;
+
+        // 방금 로컬에서 작성되어 아직 서버 요약에 반영되기 전인 최신 로컬 글 보존
+        const unsyncedLocal = localPosts.filter(
+          (lp) => lp && lp.id && !deletedIds.includes(lp.id) && !remoteIdSet.has(lp.id)
+        );
+        const finalMerged = [...unsyncedLocal, ...merged];
+        memoryPostsCache = finalMerged;
+        return finalMerged;
       }
     }
   } catch {}
@@ -359,44 +372,57 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
   return merged;
 }
 
+export async function syncSinglePostToCloud(post: FeedbackItem): Promise<void> {
+  try {
+    try {
+      localStorage.removeItem('wuthering_lobby_notice_cache_v1');
+    } catch {}
+    await fetch('/api/community?type=board', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'upsertPost',
+        post,
+        updatedAt: Date.now(),
+      }),
+    });
+  } catch (err) {
+    console.warn('[feedbackManager] 단일 게시글 동기화 실패:', err);
+  }
+}
+
+export async function syncDeletePostToCloud(postId: string): Promise<void> {
+  try {
+    try {
+      localStorage.removeItem('wuthering_lobby_notice_cache_v1');
+    } catch {}
+    await fetch('/api/community?type=board', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'deletePost',
+        postId,
+        updatedAt: Date.now(),
+      }),
+    });
+  } catch (err) {
+    console.warn('[feedbackManager] 게시글 삭제 동기화 실패:', err);
+  }
+}
+
 export async function syncFeedbackListToCloud(postsToSync?: FeedbackItem[]): Promise<void> {
   try {
-    const mergedPosts = postsToSync || (await fetchGlobalFeedbackList());
+    const mergedPosts = postsToSync || getFeedbackList();
     const payload = JSON.stringify({
       posts: mergedPosts.map(({ likedByMe, dislikedByMe, ...rest }) => rest),
       updatedAt: Date.now(),
     });
 
-    let savedViaApi = false;
-    try {
-      const res = await fetch('/api/community?type=board', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      });
-      if (res.ok) savedViaApi = true;
-    } catch {}
-
-    if (!savedViaApi) {
-      const blobRes = await fetch('https://bytebin.lucko.me/post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      });
-      if (blobRes.ok) {
-        const { key } = await blobRes.json();
-        if (key) {
-          await fetch(`https://api.restful-api.dev/objects/${BOARD_POINTER_ID}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: BOARD_POINTER_NAME,
-              data: { key, updatedAt: Date.now() },
-            }),
-          });
-        }
-      }
-    }
+    await fetch('/api/community?type=board', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    });
   } catch (err) {
     console.warn('[feedbackManager] 클라우드 동기화 실패:', err);
   }
@@ -406,9 +432,11 @@ export function saveFeedback(
   data: Omit<FeedbackItem, 'id' | 'createdAt' | 'appVersion'> & { appVersion?: string }
 ): FeedbackItem {
   const list = getFeedbackList();
+  const nowIso = new Date().toISOString();
   const newItem: FeedbackItem = {
     id: `fb-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    createdAt: new Date().toISOString(),
+    createdAt: nowIso,
+    updatedAt: nowIso,
     appVersion: data.appVersion || CURRENT_GAME_VERSION,
     likes: 0,
     dislikes: 0,
@@ -416,18 +444,16 @@ export function saveFeedback(
     likedByMe: false,
     dislikedByMe: false,
     comments: [],
+    hasImage: Boolean(data.imageUrl || (data.images && data.images.length > 0)),
+    isSummaryOnly: false,
     ...data,
   };
+  postDetailCache.set(newItem.id, newItem);
   const updated = [newItem, ...list];
   persistLocalPosts(updated);
 
-  // 글로벌 클라우드 병합 및 동기화
-  fetchGlobalFeedbackList().then((latest) => {
-    const exists = latest.some((item) => item.id === newItem.id);
-    const finalPosts = exists ? latest : [newItem, ...latest];
-    persistLocalPosts(finalPosts);
-    syncFeedbackListToCloud(finalPosts);
-  });
+  // 전체 목록 재다운로드 없이 단일 게시글만 즉시 비동기 업로드
+  syncSinglePostToCloud(newItem);
 
   return newItem;
 }
@@ -436,7 +462,10 @@ export function incrementViewCount(id: string): void {
   const list = getFeedbackList();
   const updated = list.map((item) => {
     if (item.id === id) {
-      return { ...item, views: (item.views || 0) + 1 };
+      const next = { ...item, views: (item.views || 0) + 1 };
+      const cached = postDetailCache.get(id);
+      if (cached) postDetailCache.set(id, { ...cached, views: next.views });
+      return next;
     }
     return item;
   });
@@ -446,34 +475,44 @@ export function incrementViewCount(id: string): void {
 export function toggleLikeFeedback(id: string): { likes: number; likedByMe: boolean } {
   const list = getFeedbackList();
   let result = { likes: 0, likedByMe: false };
+  let targetPost: FeedbackItem | null = null;
   const updated = list.map((item) => {
     if (item.id === id) {
       const liked = !item.likedByMe;
       const likes = Math.max(0, (item.likes || 0) + (liked ? 1 : -1));
       result = { likes, likedByMe: liked };
-      return { ...item, likes, likedByMe: liked };
+      const next = { ...item, likes, likedByMe: liked };
+      targetPost = next;
+      const cached = postDetailCache.get(id);
+      if (cached) postDetailCache.set(id, { ...cached, likes, likedByMe: liked });
+      return next;
     }
     return item;
   });
   persistLocalPosts(updated);
-  syncFeedbackListToCloud(updated);
+  if (targetPost) syncSinglePostToCloud(targetPost);
   return result;
 }
 
 export function toggleDislikeFeedback(id: string): { dislikes: number; dislikedByMe: boolean } {
   const list = getFeedbackList();
   let result = { dislikes: 0, dislikedByMe: false };
+  let targetPost: FeedbackItem | null = null;
   const updated = list.map((item) => {
     if (item.id === id) {
       const disliked = !item.dislikedByMe;
       const dislikes = Math.max(0, (item.dislikes || 0) + (disliked ? 1 : -1));
       result = { dislikes, dislikedByMe: disliked };
-      return { ...item, dislikes, dislikedByMe: disliked };
+      const next = { ...item, dislikes, dislikedByMe: disliked };
+      targetPost = next;
+      const cached = postDetailCache.get(id);
+      if (cached) postDetailCache.set(id, { ...cached, dislikes, dislikedByMe: disliked });
+      return next;
     }
     return item;
   });
   persistLocalPosts(updated);
-  syncFeedbackListToCloud(updated);
+  if (targetPost) syncSinglePostToCloud(targetPost);
   return result;
 }
 
@@ -496,23 +535,30 @@ export function addCommentToFeedback(
     ...(password ? { password: password.trim() } : {}),
   };
 
+  let targetPost: FeedbackItem | null = null;
   const updated = list.map((item) => {
     if (item.id === id) {
-      return {
+      const nextComments = [...(item.comments || []), newComment];
+      const next = {
         ...item,
-        comments: [...(item.comments || []), newComment],
+        comments: nextComments,
       };
+      targetPost = next;
+      const cached = postDetailCache.get(id);
+      if (cached) postDetailCache.set(id, { ...cached, comments: nextComments });
+      return next;
     }
     return item;
   });
 
   persistLocalPosts(updated);
-  syncFeedbackListToCloud(updated);
+  if (targetPost) syncSinglePostToCloud(targetPost);
   return newComment;
 }
 
 export function updateFeedback(id: string, updates: Partial<Omit<FeedbackItem, 'id' | 'createdAt'>>): void {
   const list = getFeedbackList();
+  let targetPost: FeedbackItem | null = null;
   const updated = list.map((item) => {
     if (item.id !== id) return item;
     const nextImages = updates.images !== undefined ? updates.images : (item.images || []);
@@ -527,10 +573,11 @@ export function updateFeedback(id: string, updates: Partial<Omit<FeedbackItem, '
       updatedAt: new Date().toISOString(),
     };
     postDetailCache.set(id, nextItem);
+    targetPost = nextItem;
     return nextItem;
   });
   persistLocalPosts(updated);
-  syncFeedbackListToCloud(updated);
+  if (targetPost) syncSinglePostToCloud(targetPost);
 }
 
 export function deleteFeedback(id: string): void {
@@ -539,7 +586,7 @@ export function deleteFeedback(id: string): void {
   const list = getFeedbackList();
   const filtered = list.filter((item) => item.id !== id);
   persistLocalPosts(filtered);
-  syncFeedbackListToCloud(filtered);
+  syncDeletePostToCloud(id);
 }
 
 export function clearAllFeedback(): void {
@@ -706,34 +753,44 @@ export function updateCommentInFeedback(
 ): boolean {
   if (!newText.trim()) return false;
   const list = getFeedbackList();
+  let targetPost: FeedbackItem | null = null;
   const updated = list.map((item) => {
     if (item.id === postId) {
-      return {
+      targetPost = {
         ...item,
+        updatedAt: new Date().toISOString(),
         comments: (item.comments || []).map((c) =>
           c.id === commentId ? { ...c, text: newText.trim() } : c
         ),
       };
+      return targetPost;
     }
     return item;
   });
   persistLocalPosts(updated);
-  syncFeedbackListToCloud(updated);
+  if (targetPost) {
+    syncSinglePostToCloud(targetPost);
+  }
   return true;
 }
 
 export function deleteCommentFromFeedback(postId: string, commentId: string): boolean {
   const list = getFeedbackList();
+  let targetPost: FeedbackItem | null = null;
   const updated = list.map((item) => {
     if (item.id === postId) {
-      return {
+      targetPost = {
         ...item,
+        updatedAt: new Date().toISOString(),
         comments: (item.comments || []).filter((c) => c.id !== commentId),
       };
+      return targetPost;
     }
     return item;
   });
   persistLocalPosts(updated);
-  syncFeedbackListToCloud(updated);
+  if (targetPost) {
+    syncSinglePostToCloud(targetPost);
+  }
   return true;
 }
