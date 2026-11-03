@@ -41,6 +41,8 @@ import {
   CommentItem,
   CATEGORY_INFO,
   getFeedbackList,
+  fetchBoardSummaryForLobby,
+  fetchFeedbackPostDetail,
   fetchGlobalFeedbackList,
   saveFeedback,
   deleteFeedback,
@@ -69,7 +71,7 @@ import {
   presetToCustomDeck,
   customDeckToPreset,
 } from '../utils/deckCode';
-import { CURRENT_GAME_VERSION } from '../data/patchNotes';
+import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 import type { CustomDeckConfig } from '../types/tcg';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 
@@ -298,6 +300,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   // Selected post detail view (ArcaLive article view)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(initialPostId || null);
+  const [isLoadingPostDetail, setIsLoadingPostDetail] = useState<boolean>(false);
 
   useEffect(() => {
     if (initialPostId) {
@@ -321,6 +324,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const [isDeckPanelOpen, setIsDeckPanelOpen] = useState(false);
   const contentTextareaRef = React.useRef<HTMLTextAreaElement>(null);
   const wysiwygRef = React.useRef<HTMLDivElement>(null);
+  const wysiwygPlaceholderRef = React.useRef<HTMLDivElement>(null);
+  const wysiwygSyncTimerRef = React.useRef<number | null>(null);
   const savedRangeRef = React.useRef<Range | null>(null);
   const selectedEditorImgRef = React.useRef<HTMLImageElement | null>(null);
   const [selectedImgMeta, setSelectedImgMeta] = useState<{ shortcode: string; width: string; src: string } | null>(null);
@@ -911,16 +916,53 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     setTimeout(() => setToastMessage(null), 2500);
   };
 
+  const syncLocalList = () => {
+    setItems([...getFeedbackList()]);
+  };
+
   const refreshList = () => {
-    setItems(getFeedbackList());
-    fetchGlobalFeedbackList().then((globalList) => {
-      setItems(globalList);
+    setItems([...getFeedbackList()]);
+    fetchBoardSummaryForLobby().then((summaryList) => {
+      setItems([...summaryList]);
     });
   };
 
   useEffect(() => {
     refreshList();
   }, []);
+
+  // 게시글을 클릭하여 선택했을 때만 해당 게시글의 본문 및 이미지를 온디맨드로 다운로드
+  useEffect(() => {
+    if (!selectedPostId) {
+      setIsLoadingPostDetail(false);
+      return;
+    }
+    const target = items.find((i) => i.id === selectedPostId);
+    if (target && !target.isSummaryOnly) {
+      setIsLoadingPostDetail(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingPostDetail(true);
+    fetchFeedbackPostDetail(selectedPostId)
+      .then((fullPost) => {
+        if (cancelled) return;
+        if (fullPost) {
+          setItems((prev) => {
+            const exists = prev.some((p) => p.id === fullPost.id);
+            return exists ? prev.map((p) => (p.id === fullPost.id ? fullPost : p)) : [fullPost, ...prev];
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingPostDetail(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPostId, items.length]);
 
   // When post is selected, check password if secret and locked
   const handleSelectPost = (id: string) => {
@@ -934,7 +976,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     }
     incrementViewCount(id);
     setSelectedPostId(id);
-    refreshList();
+    setItems(getFeedbackList());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -950,7 +992,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       setPasswordError(false);
       incrementViewCount(postId);
       setSelectedPostId(postId);
-      refreshList();
+      syncLocalList();
       showToast('🔓 비밀글 잠금이 해제되었습니다.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
@@ -984,7 +1026,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const handleLike = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     toggleLikeFeedback(id);
-    refreshList();
+    syncLocalList();
     showToast('👍 추천(개추)이 반영되었습니다.');
   };
 
@@ -992,7 +1034,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   const handleDislike = (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     toggleDislikeFeedback(id);
-    refreshList();
+    syncLocalList();
     showToast('👎 비추천이 반영되었습니다.');
   };
 
@@ -1011,7 +1053,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     showToast('🔗 게시글 주소가 복사되었습니다.');
   };
 
-  const handleEdit = (post: FeedbackItem) => {
+  const handleEdit = async (post: FeedbackItem) => {
     if (post.isNotice || post.category === 'NOTICE') {
       if (!isUserAdmin()) {
         const input = window.prompt('🔒 공지사항 수정을 위해 관리자 마스터 암호를 입력해주세요:');
@@ -1032,24 +1074,29 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         }
       }
     }
+    let fullPost = post;
+    if (post.isSummaryOnly) {
+      const fetched = await fetchFeedbackPostDetail(post.id);
+      if (fetched) fullPost = fetched;
+    }
     const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
     const postImages =
-      post.images !== undefined
-        ? post.images
-        : post.imageUrl
-        ? [post.imageUrl]
+      fullPost.images !== undefined
+        ? fullPost.images
+        : fullPost.imageUrl
+        ? [fullPost.imageUrl]
         : [];
-    let initialContent = (post.content || '').replace(/\[카드\s*:\s*카드\]/gi, '').trim();
+    let initialContent = (fullPost.content || '').replace(/\[카드\s*:\s*카드\]/gi, '').trim();
 
-    setEditingPostId(post.id);
-    setCategory(post.category);
-    setTitle(post.title);
+    setEditingPostId(fullPost.id);
+    setCategory(fullPost.category);
+    setTitle(fullPost.title);
     setContent(initialContent);
-    setContact(post.contact || '');
-    setDeckCode(post.deckCode || '');
-    setDeckName(post.deckName || '');
-    setIsSecret(Boolean(post.isSecret));
-    setPassword(post.password || savedPw);
+    setContact(fullPost.contact || '');
+    setDeckCode(fullPost.deckCode || '');
+    setDeckName(fullPost.deckName || '');
+    setIsSecret(Boolean(fullPost.isSecret));
+    setPassword(fullPost.password || savedPw);
     setImageUrl(postImages[0] || '');
     setImages(postImages);
     setIsPreviewMode(false);
@@ -1084,16 +1131,12 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         return;
       }
     }
-    // UI 상태 즉시 삭제 반영 (로컬 스토리지 및 인메모리 즉각 제거)
-    setItems((prev) => prev.filter((item) => item.id !== id));
+    deleteFeedback(id);
     if (selectedPostId === id) {
       setSelectedPostId(null);
     }
+    syncLocalList();
     showToast('🗑️ 게시글이 삭제되었습니다.');
-
-    deleteFeedback(id).then(() => {
-      refreshList();
-    });
   };
 
   const handleAddComment = (postId: string) => {
@@ -1120,7 +1163,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     );
     setCommentText('');
     setReplyingTo(null);
-    refreshList();
+    syncLocalList();
     showToast('💬 댓글이 등록되었습니다.');
   };
 
@@ -1146,7 +1189,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     updateCommentInFeedback(postId, commentId, editingCommentText);
     setEditingCommentId(null);
     setEditingCommentText('');
-    refreshList();
+    syncLocalList();
     showToast('✨ 댓글이 수정되었습니다.');
   };
 
@@ -1163,7 +1206,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       if (!window.confirm('정말로 이 댓글을 삭제하시겠습니까?')) return;
     }
     deleteCommentFromFeedback(postId, comment.id);
-    refreshList();
+    syncLocalList();
     showToast('🗑️ 댓글이 삭제되었습니다.');
   };
 
@@ -1298,6 +1341,10 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (wysiwygSyncTimerRef.current) {
+      window.clearTimeout(wysiwygSyncTimerRef.current);
+      wysiwygSyncTimerRef.current = null;
+    }
 
     // 위지윅 모드일 경우 에디터 DOM에 실제로 남아있는 이미지 목록과 최종 동기화 (마지막 1장 삭제 시에도 확실히 비움)
     let finalImages = images;
@@ -1411,7 +1458,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     setIsPreviewMode(false);
     setShowColorPicker(false);
     setIsWriteModalOpen(false);
-    refreshList();
+    syncLocalList();
   };
 
   // Helper date formatter (ArcaLive style: today -> HH:mm, other -> MM.DD)
@@ -1958,26 +2005,35 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
               })()}
 
               {/* 본문 텍스트 (인라인 이미지 + 서식 렌더링 + 줄바꿈 + 클릭 시 이미지 확대 지원) */}
-              <div
-                onClick={(e) => {
-                  const target = e.target as HTMLElement;
-                  if (target.tagName === 'IMG') {
-                    const src = (target as HTMLImageElement).currentSrc || (target as HTMLImageElement).src;
-                    if (src) setZoomedImage(src);
-                  }
-                }}
-                className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans min-h-[140px] select-text"
-                dangerouslySetInnerHTML={{
-                  __html: renderFormattedContent(
-                    selectedPost.content,
-                    selectedPost.images !== undefined
-                      ? selectedPost.images
-                      : selectedPost.imageUrl
-                      ? [selectedPost.imageUrl]
-                      : []
-                  ),
-                }}
-              />
+              {isLoadingPostDetail && selectedPost.isSummaryOnly ? (
+                <div className="py-16 flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs sm:text-sm font-bold text-slate-300">
+                    게시글 본문 및 이미지를 불러오는 중...
+                  </span>
+                </div>
+              ) : (
+                <div
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.tagName === 'IMG') {
+                      const src = (target as HTMLImageElement).currentSrc || (target as HTMLImageElement).src;
+                      if (src) setZoomedImage(src);
+                    }
+                  }}
+                  className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans min-h-[140px] select-text"
+                  dangerouslySetInnerHTML={{
+                    __html: renderFormattedContent(
+                      selectedPost.content,
+                      selectedPost.images !== undefined
+                        ? selectedPost.images
+                        : selectedPost.imageUrl
+                        ? [selectedPost.imageUrl]
+                        : []
+                    ),
+                  }}
+                />
+              )}
 
               {/* 아카라이브 시그니처 대형 추천(개추) / 비추 박스 */}
               <div className="py-7 border-y border-[#262c3d] flex flex-col items-center justify-center gap-3.5 select-none">
@@ -2375,6 +2431,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                             <span className={`truncate text-sm sm:text-base md:text-[17px] ${isCurrentActive ? 'font-black text-amber-200' : ''}`}>
                               {item.title}
                             </span>
+                            {(item.hasImage || item.imageUrl || (item.images && item.images.length > 0)) && (
+                              <ImageIcon className="w-3.5 h-3.5 text-emerald-400/90 shrink-0" />
+                            )}
                             {isPostNew(item) && (
                               <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] tracking-wider uppercase shrink-0 animate-pulse">
                                 NEW
@@ -3197,14 +3256,16 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   ) : (
                     /* 아카라이브 스타일 위지윅(WYSIWYG) 리치 에디터 모드: 이미지와 서식을 실시간으로 보면서 장문 작성 */
                     <div className="relative">
-                      {!content.trim() && (
-                        <div className="pointer-events-none select-none absolute inset-0 p-4 sm:p-5 text-slate-500 text-sm sm:text-[15px] leading-7 space-y-1">
-                          <p>✨ 명조: 워더링 웨이브 배틀 채널 글쓰기 에디터입니다 ✨</p>
-                          <p>🖼️ 여러 이미지나 공식 카드를 연속 삽입하면 <b className="text-slate-400">가로(나란히)로 정렬</b>되며, <b className="text-slate-400">Enter(엔터)</b>를 치면 세로(다음 줄)로 내려갑니다.</p>
-                          <p>📐 본문 속 이미지를 클릭하면 상단에서 <b className="text-slate-400">크기 조절 및 가로/세로 배치 변경</b>을 워드처럼 자유롭게 할 수 있습니다.</p>
-                          <p>💡 클립보드 이미지 붙여넣기(Ctrl+V) 및 마우스 드래그 앤 드롭 업로드도 지원합니다.</p>
-                        </div>
-                      )}
+                      <div
+                        ref={wysiwygPlaceholderRef}
+                        style={{ display: content.trim() ? 'none' : 'block' }}
+                        className="pointer-events-none select-none absolute inset-0 p-4 sm:p-5 text-slate-500 text-sm sm:text-[15px] leading-7 space-y-1"
+                      >
+                        <p>✨ 명조: 워더링 웨이브 배틀 채널 글쓰기 에디터입니다 ✨</p>
+                        <p>🖼️ 여러 이미지나 공식 카드를 연속 삽입하면 <b className="text-slate-400">가로(나란히)로 정렬</b>되며, <b className="text-slate-400">Enter(엔터)</b>를 치면 세로(다음 줄)로 내려갑니다.</p>
+                        <p>📐 본문 속 이미지를 클릭하면 상단에서 <b className="text-slate-400">크기 조절 및 가로/세로 배치 변경</b>을 워드처럼 자유롭게 할 수 있습니다.</p>
+                        <p>💡 클립보드 이미지 붙여넣기(Ctrl+V) 및 마우스 드래그 앤 드롭 업로드도 지원합니다.</p>
+                      </div>
                       <div
                         ref={wysiwygRef}
                         contentEditable
@@ -3212,11 +3273,29 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         onClick={handleWysiwygClick}
                         onInput={() => {
                           saveEditorSelection();
-                          syncFromWysiwyg();
+                          if (wysiwygPlaceholderRef.current && wysiwygRef.current) {
+                            const hasDomContent = Boolean(
+                              wysiwygRef.current.textContent?.trim() || wysiwygRef.current.querySelector('img')
+                            );
+                            wysiwygPlaceholderRef.current.style.display = hasDomContent ? 'none' : 'block';
+                          }
+                          if (wysiwygSyncTimerRef.current) {
+                            window.clearTimeout(wysiwygSyncTimerRef.current);
+                          }
+                          wysiwygSyncTimerRef.current = window.setTimeout(() => {
+                            syncFromWysiwyg();
+                          }, 600);
                         }}
                         onKeyUp={saveEditorSelection}
                         onMouseUp={saveEditorSelection}
-                        onBlur={saveEditorSelection}
+                        onBlur={() => {
+                          saveEditorSelection();
+                          if (wysiwygSyncTimerRef.current) {
+                            window.clearTimeout(wysiwygSyncTimerRef.current);
+                            wysiwygSyncTimerRef.current = null;
+                          }
+                          syncFromWysiwyg();
+                        }}
                         onPaste={handleEditorPaste}
                         onDrop={handleEditorDrop}
                         onDragOver={(e) => e.preventDefault()}

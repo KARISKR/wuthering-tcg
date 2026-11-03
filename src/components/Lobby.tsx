@@ -43,20 +43,23 @@ import {
 
 import { BattleReplayData } from '../utils/replayManager';
 import {
-  fetchGlobalFeedbackList,
-  fetchBoardSummaryForLobby,
-  getFeedbackList,
-  getLatestNotice,
-  hasNewPosts,
-  FeedbackItem,
-} from '../utils/feedbackManager';
-import {
   LobbyLayoutEditor,
   loadLobbyLayout,
   saveLobbyLayout,
   DEFAULT_LOBBY_LAYOUT,
   type LobbyLayoutConfig,
 } from './LobbyLayoutEditor';
+
+interface LobbyNoticeSummary {
+  id: string;
+  title: string;
+  content: string;
+  createdAt: string;
+  contact?: string;
+  commentCount?: number;
+}
+
+const LOBBY_NOTICE_CACHE_KEY = 'wuthering_lobby_notice_cache_v1';
 
 interface LobbyProps {
   onStartGame: (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, opponentDeck?: CustomDeckConfig) => void;
@@ -86,28 +89,60 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
   const [isMultiplayerModalOpen, setIsMultiplayerModalOpen] = useState(false);
-  const [boardPosts, setBoardPosts] = useState<FeedbackItem[]>(() => {
+  const [latestNotice, setLatestNotice] = useState<LobbyNoticeSummary | null>(() => {
     try {
-      return getFeedbackList();
+      const raw = localStorage.getItem(LOBBY_NOTICE_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.latestNotice) return parsed.latestNotice;
+      }
     } catch {
-      return [];
+      // ignore
     }
+    return null;
+  });
+  const [hasNewBoardPosts, setHasNewBoardPosts] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(LOBBY_NOTICE_CACHE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return Boolean(parsed?.hasNewBoardPosts);
+      }
+    } catch {
+      // ignore
+    }
+    return false;
   });
 
   useEffect(() => {
-    // 첫 화면 렌더링 블로킹 방지: 800ms 지연 후 백그라운드에서 경량 요약 게시글 갱신
-    const timer = setTimeout(() => {
-      fetchBoardSummaryForLobby().then((posts) => {
-        if (Array.isArray(posts)) {
-          setBoardPosts(posts);
+    let cancelled = false;
+    fetch('/api/community?type=board&lobby=1', {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        const notice = data.latestNotice || null;
+        const hasNew = Boolean(data.hasNewBoardPosts);
+        setLatestNotice(notice);
+        setHasNewBoardPosts(hasNew);
+        try {
+          localStorage.setItem(
+            LOBBY_NOTICE_CACHE_KEY,
+            JSON.stringify({ latestNotice: notice, hasNewBoardPosts: hasNew })
+          );
+        } catch {
+          // ignore
         }
+      })
+      .catch(() => {
+        // ignore network error in lobby
       });
-    }, 800);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+    };
   }, []);
-
-  const latestNotice = useMemo(() => getLatestNotice(boardPosts), [boardPosts]);
-  const hasNewBoardPosts = useMemo(() => hasNewPosts(boardPosts), [boardPosts]);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
@@ -992,24 +1027,13 @@ export const Lobby: React.FC<LobbyProps> = ({
                     <span className="text-amber-300/90 font-bold">{latestNotice.contact || '운영진'}</span>
                     <span>•</span>
                     <span>{new Date(latestNotice.createdAt).toLocaleDateString('ko-KR')}</span>
-                    {latestNotice.comments && latestNotice.comments.length > 0 && (
+                    {Boolean(latestNotice.commentCount && latestNotice.commentCount > 0) && (
                       <>
                         <span>•</span>
-                        <span className="text-cyan-400 font-bold">댓글 {latestNotice.comments.length}</span>
+                        <span className="text-cyan-400 font-bold">댓글 {latestNotice.commentCount}</span>
                       </>
                     )}
                   </div>
-
-                  {/* 첨부 이미지가 있을 경우 썸네일 노출 */}
-                  {(() => {
-                    const img = (latestNotice.images && latestNotice.images[0]) || latestNotice.imageUrl;
-                    if (!img) return null;
-                    return (
-                      <div className="h-24 sm:h-28 rounded-lg overflow-hidden border border-[#2d354a] bg-black/50 shrink-0 my-0.5">
-                        <img src={img} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                      </div>
-                    );
-                  })()}
 
                   {/* 공지 본문 내용 (서식 및 줄바꿈 안전 렌더링) */}
                   <div

@@ -61,7 +61,7 @@ export const UpgradeEffectOverlay: React.FC<UpgradeEffectOverlayProps> = React.m
       <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,rgba(245,158,11,0.3)_0%,rgba(0,0,0,0.85)_75%)]" />
 
       {/* 중앙 콘텐츠 컨테이너 */}
-      <div className="relative w-full max-w-lg flex flex-col items-center justify-center text-center p-6 animate-in zoom-in-95 duration-250">
+      <div className="mobile-modal-scaled relative w-full max-w-lg flex flex-col items-center justify-center text-center p-4 lg:p-6 animate-in zoom-in-95 duration-250">
         {/* 상단 팡파르 배너 */}
         <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-gradient-to-r from-amber-500/30 via-yellow-400/40 to-amber-500/30 border-2 border-amber-400 text-amber-300 font-black text-sm uppercase tracking-widest shadow-[0_0_40px_rgba(245,158,11,0.6)] animate-pulse mb-4">
           <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />

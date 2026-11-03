@@ -140,7 +140,8 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
       <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-[3px] transition-opacity duration-300 animate-fade-in" />
 
       {/* 2. 상단 타이틀 & 안내 헤더 */}
-      <div className="relative z-10 mb-6 flex flex-col items-center text-center animate-bounce-subtle pointer-events-none">
+      <div className="mobile-modal-scaled flex flex-col items-center justify-center">
+      <div className="relative z-10 mb-3 lg:mb-6 flex flex-col items-center text-center animate-bounce-subtle pointer-events-none">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400/70 shadow-[0_0_25px_rgba(245,158,11,0.5)] mb-2">
           <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
           <span className="font-mono text-xs sm:text-sm font-black tracking-wider text-amber-300 uppercase">
@@ -328,6 +329,7 @@ export const EffectDrawOverlay: React.FC<EffectDrawOverlayProps> = ({
             </div>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

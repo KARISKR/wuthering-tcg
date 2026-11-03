@@ -265,7 +265,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
             e.stopPropagation();
           }
         }}
-        className={`relative w-full max-w-6xl xl:max-w-7xl flex flex-col items-center justify-center my-auto py-4 ${
+        className={`mobile-modal-scaled relative w-full max-w-6xl xl:max-w-7xl flex flex-col items-center justify-center my-auto py-2 lg:py-4 ${
           stage === 'COLLIDE' || stage === 'SLASH' ? 'animate-screen-shake' : ''
         }`}
       >

@@ -85,7 +85,7 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
         }`}
       />
 
-      <div className="relative w-full max-w-4xl px-4 flex flex-col items-center justify-center pointer-events-none">
+      <div className="mobile-modal-scaled relative w-full max-w-4xl px-4 flex flex-col items-center justify-center pointer-events-none">
         {/* 상단: 연격 스텝 진행 인디케이터 (STEP 1: 콤보 효과/리더 교체 -> STEP 2: 데미지 스텝) */}
         <div className="mb-4 flex flex-col items-center gap-2">
           <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-gradient-to-r from-red-600/30 via-amber-500/30 to-red-600/30 border-2 border-red-500/80 text-amber-300 font-black text-sm uppercase tracking-widest shadow-2xl shadow-red-500/40">

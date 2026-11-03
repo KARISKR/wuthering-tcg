@@ -104,7 +104,8 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
       />
 
       {/* 2. 상단 안내 가이드 타이틀 */}
-      <div className="relative z-10 mb-6 flex flex-col items-center text-center animate-bounce-subtle pointer-events-none">
+      <div className="mobile-modal-scaled flex flex-col items-center justify-center">
+      <div className="relative z-10 mb-3 lg:mb-6 flex flex-col items-center text-center animate-bounce-subtle pointer-events-none">
         <div className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] mb-2">
           {isUserTurn ? (
             <Sparkles className="w-4 h-4 text-amber-300 animate-spin" />
@@ -320,6 +321,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
