@@ -101,16 +101,21 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('react') || id.includes('react-dom')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
               return 'vendor-react';
             }
             if (id.includes('lucide-react') || id.includes('canvas-confetti')) {
               return 'vendor-ui';
             }
-            if (id.includes('peerjs')) {
+            if (
+              id.includes('peerjs') ||
+              id.includes('webrtc-adapter') ||
+              id.includes('msgpackr') ||
+              id.includes('eventemitter3') ||
+              id.includes('sdp')
+            ) {
               return 'vendor-peer';
             }
-            return 'vendor-libs';
           }
         },
       },

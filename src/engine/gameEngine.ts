@@ -2352,10 +2352,11 @@ export function applyBossEchoHitEffects(
   defender: PlayerState,
   card: ActionCard,
   dmgDealt: number
-): GameState {
-  if (dmgDealt <= 0 || !attacker.hasDominance) return state;
+): { newState: GameState; triggeredEffects: TriggeredEffectEvent[] } {
+  if (dmgDealt <= 0 || !attacker.hasDominance) return { newState: state, triggeredEffects: [] };
   let newState = { ...state };
   const baseCode = (card.code || '').split('_')[0];
+  const triggeredEffects: TriggeredEffectEvent[] = [];
 
   // BP01-035 지옥불 기사: 【우세】상대에게 데미지를 입힐 시 상대 패 4장당 상대의 패를 무작위로 1장 제거한다.
   if (baseCode === 'BP01-035' && defender.hand.length >= 4) {
@@ -2372,12 +2373,25 @@ export function applyBossEchoHitEffects(
     }
     if (discardedCards.length > 0) {
       addCardsToDropZone(defender, discardedCards);
+      const desc = `상대의 패에서 [${removedNames.join(', ')}] (${discardedCards.length}장)을 트래시 에리어로 제거했습니다!`;
       newState = addLog(
         newState,
-        `[트래시 이동] [지옥불 기사 BP01-035 우세 효과] 상대의 패에서 [${removedNames.join(', ')}] 카드를 트래시 에리어로 제거했습니다!`,
+        `[트래시 이동] [지옥불 기사 BP01-035 우세 효과] ${desc}`,
         'ACTION',
         attackerIndex
       );
+      const eff: TriggeredEffectEvent = {
+        id: `eff-bp01-035-${Date.now()}`,
+        sourceCardName: card.nameKr,
+        sourceCardArt: card.artUrl,
+        effectType: 'DISCARD',
+        title: '지옥불 기사 — 【우세】 패 제거',
+        description: desc,
+        playerIndex: attackerIndex,
+        timestamp: Date.now(),
+      };
+      triggeredEffects.push(eff);
+      newState.lastEffectEvent = eff;
     }
   }
 
@@ -2385,12 +2399,25 @@ export function applyBossEchoHitEffects(
   if (baseCode === 'BP01-037' && defender.concertoZone.length > 0) {
     const [discarded] = defender.concertoZone.splice(0, 1);
     addCardsToDropZone(defender, [discarded]);
+    const desc = `상대의 협주 에너지 [${discarded.nameKr}] 카드를 트래시 에리어로 보냈습니다!`;
     newState = addLog(
       newState,
-      `[트래시 이동] [반디의 군세 BP01-037 우세 효과] 상대의 협주 에너지 [${discarded.nameKr}] 카드를 트래시 에리어로 보냈습니다!`,
+      `[트래시 이동] [반디의 군세 BP01-037 우세 효과] ${desc}`,
       'ACTION',
       attackerIndex
     );
+    const eff: TriggeredEffectEvent = {
+      id: `eff-bp01-037-${Date.now()}`,
+      sourceCardName: card.nameKr,
+      sourceCardArt: card.artUrl,
+      effectType: 'DISCARD',
+      title: '반디의 군세 — 【우세】 협주 파괴',
+      description: desc,
+      playerIndex: attackerIndex,
+      timestamp: Date.now(),
+    };
+    triggeredEffects.push(eff);
+    newState.lastEffectEvent = eff;
   }
 
   // BP01-039 폭주의 고릴라: 【우세】상대에게 데미지를 입힐 시 상대의 패를 무작위로 1장 상대 덱 맨 아래로 되돌린다.
@@ -2399,12 +2426,25 @@ export function applyBossEchoHitEffects(
     const [returnedCard] = defender.hand.splice(randIdx, 1);
     if (returnedCard) {
       defender.actionDeck.push(returnedCard);
+      const desc = `상대의 패 [${returnedCard.nameKr}] 1장을 상대 덱 맨 아래로 되돌렸습니다!`;
       newState = addLog(
         newState,
-        `[폭주의 고릴라 BP01-039 우세 효과] 상대의 패 1장을 상대 덱 맨 아래로 되돌렸습니다!`,
+        `[폭주의 고릴라 BP01-039 우세 효과] ${desc}`,
         'ACTION',
         attackerIndex
       );
+      const eff: TriggeredEffectEvent = {
+        id: `eff-bp01-039-${Date.now()}`,
+        sourceCardName: card.nameKr,
+        sourceCardArt: card.artUrl,
+        effectType: 'DISCARD',
+        title: '폭주의 고릴라 — 【우세】 패 덱 귀환',
+        description: desc,
+        playerIndex: attackerIndex,
+        timestamp: Date.now(),
+      };
+      triggeredEffects.push(eff);
+      newState.lastEffectEvent = eff;
     }
   }
 
@@ -2412,12 +2452,25 @@ export function applyBossEchoHitEffects(
   if (baseCode === 'BP01-041' && defender.actionDeck.length > 0) {
     const milled = defender.actionDeck.splice(0, Math.min(3, defender.actionDeck.length));
     addCardsToDropZone(defender, milled);
+    const desc = `상대의 덱 위에서 [${milled.map((c) => c.nameKr).join(', ')}] (${milled.length}장)을 트래시 에리어로 버렸습니다!`;
     newState = addLog(
       newState,
-      `[트래시 이동] [크라운리스 BP01-041 우세 효과] 상대의 덱 위에서 [${milled.map((c) => c.nameKr).join(', ')}] 카드를 트래시 에리어로 버렸습니다!`,
+      `[트래시 이동] [크라운리스 BP01-041 우세 효과] ${desc}`,
       'ACTION',
       attackerIndex
     );
+    const eff: TriggeredEffectEvent = {
+      id: `eff-bp01-041-${Date.now()}`,
+      sourceCardName: card.nameKr,
+      sourceCardArt: card.artUrl,
+      effectType: 'DISCARD',
+      title: '크라운리스 — 【우세】 덱 밀링',
+      description: desc,
+      playerIndex: attackerIndex,
+      timestamp: Date.now(),
+    };
+    triggeredEffects.push(eff);
+    newState.lastEffectEvent = eff;
   }
 
   // BP01-043 애곡하는 아익스: 【우세】상대에게 데미지를 입힐 시 상대의 트래시 에리어에서 카드를 최대 2장까지 상대의 덱 맨 아래로 되돌린다.
@@ -2432,16 +2485,30 @@ export function applyBossEchoHitEffects(
           defender.actionDeck.push(ret);
         }
       }
+      const returnedNames = toReturn.map((c) => c.nameKr).join(', ');
+      const desc = `상대의 트래시 에리어에서 [${returnedNames}] (${toReturn.length}장)을 상대 덱 맨 아래로 되돌렸습니다!`;
       newState = addLog(
         newState,
-        `[애곡하는 아익스 BP01-043 우세 효과] 상대의 트래시 에리어에서 카드 ${toReturn.length}장을 상대 덱 맨 아래로 되돌렸습니다!`,
+        `[애곡하는 아익스 BP01-043 우세 효과] ${desc}`,
         'ACTION',
         attackerIndex
       );
+      const eff: TriggeredEffectEvent = {
+        id: `eff-bp01-043-${Date.now()}`,
+        sourceCardName: card.nameKr,
+        sourceCardArt: card.artUrl,
+        effectType: 'CANCEL',
+        title: '애곡하는 아익스 — 【우세】 트래시 덱 귀환',
+        description: desc,
+        playerIndex: attackerIndex,
+        timestamp: Date.now(),
+      };
+      triggeredEffects.push(eff);
+      newState.lastEffectEvent = eff;
     }
   }
 
-  return newState;
+  return { newState, triggeredEffects };
 }
 
 // 행동 2: 리더 위치 변경 (교대)
@@ -3655,7 +3722,11 @@ export function finishClashJudgment(state: GameState): GameState {
     }
 
     // 1코스트 보스 에코 5종 (BP01-035, BP01-037, BP01-039, BP01-041, BP01-043) 【우세】 데미지 적중 효과
-    newState = applyBossEchoHitEffects(newState, winnerIndex, winnerPlayer, loserPlayer, winCard, damageDealt);
+    const bossEchoResult = applyBossEchoHitEffects(newState, winnerIndex, winnerPlayer, loserPlayer, winCard, damageDealt);
+    newState = bossEchoResult.newState;
+    if (bossEchoResult.triggeredEffects.length > 0) {
+      triggeredEffects.push(...bossEchoResult.triggeredEffects);
+    }
 
     // 2. 카드/리더 승리 특수 효과 발동
     // 금희 Lv.2 [BP01-028] 리더 판정: 자신의 턴에 승리했을 경우 덱 위 5장 공개, 모든 금희 카드 패 추가
@@ -5594,7 +5665,13 @@ export function executeComboAttack(
   );
 
   // 1코스트 보스 에코 5종 (BP01-035, BP01-037, BP01-039, BP01-041, BP01-043) 【우세】 데미지 적중 효과
-  newState = applyBossEchoHitEffects(newState, playerIndex, player, opponent, card, dmg);
+  const bossEchoResult = applyBossEchoHitEffects(newState, playerIndex, player, opponent, card, dmg);
+  newState = bossEchoResult.newState;
+  if (bossEchoResult.triggeredEffects.length > 0 && !comboEffectTitle) {
+    const firstEff = bossEchoResult.triggeredEffects[0];
+    comboEffectTitle = `【우세】 ${firstEff.title}`;
+    comboEffectDesc = firstEff.description;
+  }
 
   // BP01-060 양치기 소녀의 길·강공격: 상대에게 데미지를 입힐 시, 자신의 리더가 「앙코」인 경우 카드 1장을 뽑는다.
   if (card.code === 'BP01-060' && slotHasCharacterSkill(player.slots.leader, '앙코') && dmg > 0) {
@@ -5694,6 +5771,16 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
           '치샤 Lv.2 [BP01-025]',
           p.slots.leader.artUrl
         );
+        newState.lastEffectEvent = {
+          id: `eff-bp01-025-end-${Date.now()}`,
+          playerIndex: pIdx,
+          effectType: 'DAMAGE',
+          title: '치샤 Lv.2 — 배틀 종료 효과',
+          description: `액션 에리어에 기본 공격이 ${normalAttacksInAction}장 있어 상대 리더에게 ${dealt}pt 피해를 입혔습니다!`,
+          sourceCardName: '치샤 Lv.2 [BP01-025]',
+          sourceCardArt: p.slots.leader.artUrl,
+          timestamp: Date.now(),
+        };
       }
       newState = addLog(
         newState,
@@ -5734,6 +5821,16 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
           '앙코 Lv.1 [BP01-014]',
           p.slots.leader.artUrl
         );
+        newState.lastEffectEvent = {
+          id: `eff-bp01-014-retaliate-${Date.now()}`,
+          playerIndex: pIdx,
+          effectType: 'DAMAGE',
+          title: '앙코 Lv.1 — 배틀 종료 반격',
+          description: `적색 카드에 패배한 반격으로 상대에게 ${dealt}pt 피해를 입혔습니다!`,
+          sourceCardName: '앙코 Lv.1 [BP01-014]',
+          sourceCardArt: p.slots.leader.artUrl,
+          timestamp: Date.now(),
+        };
       }
       newState = addLog(
         newState,
@@ -5873,11 +5970,11 @@ export function discardOverflowCards(
   let newState: GameState = { ...state, players: [p0, p1] };
   newState = addLog(newState, `[트래시 이동] ${player.name}이(가) 패 상한 초과로 ${discarded.length}장(${discarded.map((c) => `[${c.nameKr}]`).join(', ')})을 트래시로 버렸습니다.`, 'ACTION', playerIndex);
 
-  // 패 버리기 완료 후 턴 종료 마무리 처리 (더블 트리거 방지)
-  return { success: true, newState: executeEndPhase(newState) };
+  // 패 버리기 완료 후 턴 종료 마무리 처리 (더블 트리거 방지: skipEndTurnSkills = true)
+  return { success: true, newState: executeEndPhase(newState, true) };
 }
 
-export function executeEndPhase(state: GameState): GameState {
+export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = false): GameState {
   const p0 = clonePlayer(state.players[0]);
   const p1 = clonePlayer(state.players[1]);
   let newState: GameState = {
@@ -5887,116 +5984,165 @@ export function executeEndPhase(state: GameState): GameState {
     lastUpgrade: state.lastUpgrade ?? state.deferredUpgrade ?? null,
     deferredUpgrade: null,
     lastComboStrike: null,
-    lastEffectEvent: null,
+    lastEffectEvent: skipEndTurnSkills ? state.lastEffectEvent : null,
     players: [p0, p1],
   };
 
-  // 605.1.1 턴 종료 스킬 발동 (중첩 스킬 지원)
-  for (let i = 0; i < 2; i++) {
-    const pl = i === 0 ? p0 : p1;
-    const opp = i === 0 ? p1 : p0;
-    const lCards = getAllCardsInSlot(pl.slots.leader);
+  // 605.1.1 턴 종료 스킬 발동 (중첩 스킬 지원, skipEndTurnSkills가 아닐 때만 1회 수행)
+  if (!skipEndTurnSkills) {
+    for (let i = 0; i < 2; i++) {
+      const pl = i === 0 ? p0 : p1;
+      const opp = i === 0 ? p1 : p0;
+      const lCards = getAllCardsInSlot(pl.slots.leader);
 
-    // 방랑자(남) Lv.2 [SD02-001] 리더: 각 턴 종료 시 카드 1장 드로우
-    if (lCards.some((c) => c.code?.startsWith('SD02-001'))) {
-      const drawn = drawSingleCardFromDeck(pl);
-      if (drawn) {
-        addCardsToHand(pl, [drawn]);
-        newState = addLog(newState, `[효과 드로우] [방랑자(남) Lv.2 턴 종료 효과] 덱에서 [${drawn.nameKr}]을(를) 드로우했습니다.`, 'ACTION', i as 0 | 1);
-      }
-    }
-
-    // 산화 Lv.2 [SD02-003] 리더: 각 턴 종료 시 덱 위 1장 협주 에리어에 배치
-    if (lCards.some((c) => c.code?.startsWith('SD02-003'))) {
-      const charged = drawSingleCardFromDeck(pl);
-      if (charged) {
-        addCardsToConcertoZone(pl, [charged]);
-        newState = addLog(newState, `[협주 충전] [산화 Lv.2 턴 종료 효과] [${charged.nameKr}]을(를) 협주 에리어에 충전했습니다! (현재 협주: ${pl.concertoZone.length}/10)`, 'ACTION', i as 0 | 1);
-      }
-    }
-
-    // 앙코 Lv.2 [BP01-012] 리더: 이번 턴에 상대가 데미지를 받은 경우 트래시에서 앙코 카드 1장 패 추가 가능
-    if (lCards.some((c) => c.code?.startsWith('BP01-012')) && opp.actionFlags.damageTakenThisTurn) {
-      const eligibleAnke = pl.dropZone.filter(
-        (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
-      ) as ActionCard[];
-      if (eligibleAnke.length > 0) {
-        if (pl.isAi) {
-          const dropIdx = pl.dropZone.findIndex(
-            (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
-          );
-          if (dropIdx !== -1) {
-            const [ankeCard] = pl.dropZone.splice(dropIdx, 1);
-            const reclaimed = ankeCard as ActionCard;
-            addCardsToHand(pl, [reclaimed]);
-            newState = addLog(
-              newState,
-              `[트래시 회수] [앙코 Lv.2 BP01-012 턴 종료 효과] 이번 턴 상대가 데미지를 받아 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`,
-              'ACTION',
-              i as 0 | 1
-            );
-          }
-        } else {
-          const ankeLeaderCard = lCards.find((c) => c.code?.startsWith('BP01-012')) || pl.slots.leader;
-          const choice: PendingChoice = {
-            id: `choice-${Date.now()}-anke2-end-${i}`,
+      // 방랑자(남) Lv.2 [SD02-001] 리더: 각 턴 종료 시 카드 1장 드로우
+      if (lCards.some((c) => c.code?.startsWith('SD02-001'))) {
+        const drawn = drawSingleCardFromDeck(pl);
+        if (drawn) {
+          addCardsToHand(pl, [drawn]);
+          newState = addLog(newState, `[효과 드로우] [방랑자(남) Lv.2 턴 종료 효과] 덱에서 [${drawn.nameKr}]을(를) 드로우했습니다.`, 'ACTION', i as 0 | 1);
+          newState = queueEffectDraw(newState, {
+            id: `edraw-sd02-001-end-${newState.turn}-${i}-${Date.now()}`,
             playerIndex: i as 0 | 1,
-            title: '앙코 Lv.2 — 턴 종료 트래시 회수',
-            sourceCardName: '앙코 Lv.2 [BP01-012]',
-            sourceCardArt: ankeLeaderCard.artUrl,
-            description: '【자신의 턴 종료 시】이번 턴에 상대가 데미지를 받았습니다. 트래시 에리어에서 【앙코】 카드 1장을 선택해 패에 추가할 수 있습니다.',
-            revealedCards: eligibleAnke,
-            minSelect: 0,
-            maxSelect: 1,
-            onResolveType: 'RECOVER_FROM_DROP',
-            sourceZone: 'DROP',
+            cards: [drawn],
+            sourceCardName: '방랑자(남) Lv.2 [SD02-001] (턴 종료 효과)',
+            sourceCardArt: pl.slots.leader.artUrl,
+          });
+          newState.lastEffectEvent = {
+            id: `eff-sd02-001-end-${newState.turn}-${i}-${Date.now()}`,
+            playerIndex: i as 0 | 1,
+            effectType: 'DRAW',
+            title: '방랑자(남) Lv.2 — 턴 종료 효과',
+            description: `【각 턴 종료 시】 효과로 [${drawn.nameKr}] 카드를 1장 뽑았습니다!`,
+            sourceCardName: '방랑자(남) Lv.2 [SD02-001]',
+            sourceCardArt: pl.slots.leader.artUrl,
+            timestamp: Date.now(),
           };
-          newState = queueChoice(newState, choice, false);
         }
       }
-    }
 
-    // 양양 Lv.2 [BP01-022] 턴 종료: 패 1장 버리고 리더를 양양으로 교체 가능
-    if (i === newState.activePlayerIndex && pl.hand.length > 0) {
-      const yangyangSupportKey = (['leftSupport', 'rightSupport'] as const).find((k) =>
-        getAllCardsInSlot(pl.slots[k]).some((c) => c.code?.startsWith('BP01-022'))
-      );
-      if (yangyangSupportKey && pl.slots[yangyangSupportKey]) {
-        const yangyangCard = pl.slots[yangyangSupportKey]!;
-        if (pl.isAi) {
-          // AI는 현재 리더가 Lv.2 주력이 아니며 패가 충분할 때만 선택적으로 교체
-          const shouldAiSwapYangyang = pl.slots.leader.level < 2 && pl.hand.length >= 5;
-          if (shouldAiSwapYangyang) {
-            const discarded = pl.hand.pop();
-            if (discarded) {
-              addCardsToDropZone(pl, [discarded]);
-              const prevLeader = pl.slots.leader;
-              pl.slots.leader = yangyangCard;
-              pl.slots[yangyangSupportKey] = prevLeader;
-              newState.players = [p0, p1];
-              newState = triggerShorekeeperSwitchSkill(newState, i as 0 | 1, pl, prevLeader, yangyangCard);
+      // 산화 Lv.2 [SD02-003] 리더: 각 턴 종료 시 덱 위 1장 협주 에리어에 배치
+      if (lCards.some((c) => c.code?.startsWith('SD02-003'))) {
+        const charged = drawSingleCardFromDeck(pl);
+        if (charged) {
+          addCardsToConcertoZone(pl, [charged]);
+          newState = addLog(newState, `[협주 충전] [산화 Lv.2 턴 종료 효과] [${charged.nameKr}]을(를) 협주 에리어에 충전했습니다! (현재 협주: ${pl.concertoZone.length}/10)`, 'ACTION', i as 0 | 1);
+          newState.lastEffectEvent = {
+            id: `eff-sd02-003-end-${newState.turn}-${i}-${Date.now()}`,
+            playerIndex: i as 0 | 1,
+            effectType: 'CHARGE',
+            title: '산화 Lv.2 — 턴 종료 협주 충전',
+            description: `【각 턴 종료 시】 덱 위에서 [${charged.nameKr}] 카드를 협주 에리어에 충전했습니다! (현재 협주: ${pl.concertoZone.length}/10)`,
+            sourceCardName: '산화 Lv.2 [SD02-003]',
+            sourceCardArt: pl.slots.leader.artUrl,
+            timestamp: Date.now(),
+          };
+        }
+      }
+
+      // 앙코 Lv.2 [BP01-012] 리더: 이번 턴에 상대가 데미지를 받은 경우 트래시에서 앙코 카드 1장 패 추가 가능
+      if (lCards.some((c) => c.code?.startsWith('BP01-012')) && opp.actionFlags.damageTakenThisTurn) {
+        const eligibleAnke = pl.dropZone.filter(
+          (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
+        ) as ActionCard[];
+        if (eligibleAnke.length > 0) {
+          if (pl.isAi) {
+            const dropIdx = pl.dropZone.findIndex(
+              (c) => c.kind === 'ACTION' && (c.characterExclusive?.includes('앙코') || c.nameKr.includes('앙코'))
+            );
+            if (dropIdx !== -1) {
+              const [ankeCard] = pl.dropZone.splice(dropIdx, 1);
+              const reclaimed = ankeCard as ActionCard;
+              addCardsToHand(pl, [reclaimed]);
               newState = addLog(
                 newState,
-                `[양양 Lv.2 BP01-022 턴 종료 효과] [트래시 이동] 패 [${discarded.nameKr}]을(를) 버리고 리더를 [양양]으로 교체했습니다!`,
+                `[트래시 회수] [앙코 Lv.2 BP01-012 턴 종료 효과] 이번 턴 상대가 데미지를 받아 트래시에서 [${reclaimed.nameKr}]을(를) 패에 추가했습니다.`,
                 'ACTION',
                 i as 0 | 1
               );
+              newState.lastEffectEvent = {
+                id: `eff-bp01-012-end-${newState.turn}-${i}-${Date.now()}`,
+                playerIndex: i as 0 | 1,
+                effectType: 'DRAW',
+                title: '앙코 Lv.2 — 턴 종료 트래시 회수',
+                description: `상대가 데미지를 받아 트래시에서 [${reclaimed.nameKr}]을(를) 패로 회수했습니다!`,
+                sourceCardName: '앙코 Lv.2 [BP01-012]',
+                sourceCardArt: pl.slots.leader.artUrl,
+                timestamp: Date.now(),
+              };
             }
+          } else {
+            const ankeLeaderCard = lCards.find((c) => c.code?.startsWith('BP01-012')) || pl.slots.leader;
+            const choice: PendingChoice = {
+              id: `choice-${Date.now()}-anke2-end-${i}`,
+              playerIndex: i as 0 | 1,
+              title: '앙코 Lv.2 — 턴 종료 트래시 회수',
+              sourceCardName: '앙코 Lv.2 [BP01-012]',
+              sourceCardArt: ankeLeaderCard.artUrl,
+              description: '【자신의 턴 종료 시】이번 턴에 상대가 데미지를 받았습니다. 트래시 에리어에서 【앙코】 카드 1장을 선택해 패에 추가할 수 있습니다.',
+              revealedCards: eligibleAnke,
+              minSelect: 0,
+              maxSelect: 1,
+              onResolveType: 'RECOVER_FROM_DROP',
+              sourceZone: 'DROP',
+            };
+            newState = queueChoice(newState, choice, false);
           }
-        } else {
-          const choice: PendingChoice = {
-            id: `choice-${Date.now()}-yangyang-swap-${i}`,
-            playerIndex: i as 0 | 1,
-            title: '양양 Lv.2 — 리더 교체 선택',
-            sourceCardName: '양양 Lv.2 [BP01-022]',
-            sourceCardArt: yangyangCard.artUrl,
-            description: '【자신의 턴 종료 시】패 1장을 버리고 리더를 [양양]으로 교체하시겠습니까?',
-            revealedCards: pl.hand,
-            minSelect: 0,
-            maxSelect: 1,
-            onResolveType: 'BP01_022_YANGYANG_SWAP',
-          };
-          newState = queueChoice(newState, choice, false);
+        }
+      }
+
+      // 양양 Lv.2 [BP01-022] 턴 종료: 패 1장 버리고 리더를 양양으로 교체 가능
+      if (i === newState.activePlayerIndex && pl.hand.length > 0) {
+        const yangyangSupportKey = (['leftSupport', 'rightSupport'] as const).find((k) =>
+          getAllCardsInSlot(pl.slots[k]).some((c) => c.code?.startsWith('BP01-022'))
+        );
+        if (yangyangSupportKey && pl.slots[yangyangSupportKey]) {
+          const yangyangCard = pl.slots[yangyangSupportKey]!;
+          if (pl.isAi) {
+            // AI는 현재 리더가 Lv.2 주력이 아니며 패가 충분할 때만 선택적으로 교체
+            const shouldAiSwapYangyang = pl.slots.leader.level < 2 && pl.hand.length >= 5;
+            if (shouldAiSwapYangyang) {
+              const discarded = pl.hand.pop();
+              if (discarded) {
+                addCardsToDropZone(pl, [discarded]);
+                const prevLeader = pl.slots.leader;
+                pl.slots.leader = yangyangCard;
+                pl.slots[yangyangSupportKey] = prevLeader;
+                newState.players = [p0, p1];
+                newState = triggerShorekeeperSwitchSkill(newState, i as 0 | 1, pl, prevLeader, yangyangCard);
+                newState = addLog(
+                  newState,
+                  `[양양 Lv.2 BP01-022 턴 종료 효과] [트래시 이동] 패 [${discarded.nameKr}]을(를) 버리고 리더를 [양양]으로 교체했습니다!`,
+                  'ACTION',
+                  i as 0 | 1
+                );
+                newState.lastEffectEvent = {
+                  id: `eff-bp01-022-end-${newState.turn}-${i}-${Date.now()}`,
+                  playerIndex: i as 0 | 1,
+                  effectType: 'BUFF',
+                  title: '양양 Lv.2 — 턴 종료 리더 교체',
+                  description: `패 [${discarded.nameKr}]을(를) 버리고 리더를 [${yangyangCard.characterName || '양양'}]으로 교체했습니다!`,
+                  sourceCardName: '양양 Lv.2 [BP01-022]',
+                  sourceCardArt: yangyangCard.artUrl,
+                  timestamp: Date.now(),
+                };
+              }
+            }
+          } else {
+            const choice: PendingChoice = {
+              id: `choice-${Date.now()}-yangyang-swap-${i}`,
+              playerIndex: i as 0 | 1,
+              title: '양양 Lv.2 — 리더 교체 선택',
+              sourceCardName: '양양 Lv.2 [BP01-022]',
+              sourceCardArt: yangyangCard.artUrl,
+              description: '【자신의 턴 종료 시】패 1장을 버리고 리더를 [양양]으로 교체하시겠습니까?',
+              revealedCards: pl.hand,
+              minSelect: 0,
+              maxSelect: 1,
+              onResolveType: 'BP01_022_YANGYANG_SWAP',
+            };
+            newState = queueChoice(newState, choice, false);
+          }
         }
       }
     }

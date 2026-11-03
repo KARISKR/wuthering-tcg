@@ -39,7 +39,7 @@ import {
   clearDraft,
 } from '../utils/feedbackManager';
 import { getStoredPresets, encodeDeckCode, presetToCustomDeck } from '../utils/deckCode';
-import { CURRENT_GAME_VERSION } from '../data/patchNotes';
+import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 
 interface FeedbackModalProps {
   isOpen: boolean;

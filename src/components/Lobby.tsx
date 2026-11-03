@@ -53,10 +53,10 @@ import {
 interface LobbyNoticeSummary {
   id: string;
   title: string;
-  content: string;
-  createdAt: string;
   contact?: string;
+  createdAt: string;
   commentCount?: number;
+  content?: string;
 }
 
 const LOBBY_NOTICE_CACHE_KEY = 'wuthering_lobby_notice_cache_v1';
@@ -92,53 +92,39 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [latestNotice, setLatestNotice] = useState<LobbyNoticeSummary | null>(() => {
     try {
       const raw = localStorage.getItem(LOBBY_NOTICE_CACHE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.latestNotice) return parsed.latestNotice;
-      }
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed?.latestNotice || null;
     } catch {
-      // ignore
+      return null;
     }
-    return null;
   });
   const [hasNewBoardPosts, setHasNewBoardPosts] = useState<boolean>(() => {
     try {
       const raw = localStorage.getItem(LOBBY_NOTICE_CACHE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return Boolean(parsed?.hasNewBoardPosts);
-      }
+      if (!raw) return false;
+      const parsed = JSON.parse(raw);
+      return Boolean(parsed?.hasNewBoardPosts);
     } catch {
-      // ignore
+      return false;
     }
-    return false;
   });
 
   useEffect(() => {
     let cancelled = false;
     fetch('/api/community?type=board&lobby=1', {
-      method: 'GET',
       headers: { Accept: 'application/json' },
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (cancelled || !data) return;
-        const notice = data.latestNotice || null;
-        const hasNew = Boolean(data.hasNewBoardPosts);
-        setLatestNotice(notice);
-        setHasNewBoardPosts(hasNew);
+        setLatestNotice(data.latestNotice || null);
+        setHasNewBoardPosts(Boolean(data.hasNewBoardPosts));
         try {
-          localStorage.setItem(
-            LOBBY_NOTICE_CACHE_KEY,
-            JSON.stringify({ latestNotice: notice, hasNewBoardPosts: hasNew })
-          );
-        } catch {
-          // ignore
-        }
+          localStorage.setItem(LOBBY_NOTICE_CACHE_KEY, JSON.stringify(data));
+        } catch {}
       })
-      .catch(() => {
-        // ignore network error in lobby
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -392,9 +378,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             </>
           )}
 
-          <div className="hidden md:block">
-            <BgmPlayer />
-          </div>
+          <BgmPlayer />
         </div>
       </header>
 
@@ -405,14 +389,9 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       )}
 
-      {/* 1.5 실시간 방문자 & 접속자 현황 위젯 (데스크톱에서는 좌측 상단 고정, 모바일에서는 숨김) */}
-      <div className="hidden md:block sm:absolute sm:top-18 sm:left-8 sm:w-auto z-30 pointer-events-auto">
+      {/* 1.5 실시간 방문자 & 접속자 현황 위젯 (좌측 상단 고정 배치) */}
+      <div className="w-full px-4 sm:px-8 pt-2 sm:absolute sm:top-18 sm:left-8 sm:w-auto sm:pt-0 z-30 pointer-events-auto">
         <VisitorStatsWidget />
-      </div>
-
-      {/* 모바일 전용 음악 선택기 (방문자 수 위젯 자리인 상단 중앙에 배치) */}
-      <div className="w-full flex md:hidden justify-center px-4 pt-2.5 z-30 pointer-events-auto">
-        <BgmPlayer />
       </div>
 
 
@@ -448,7 +427,7 @@ export const Lobby: React.FC<LobbyProps> = ({
             <img
               src="/images/logo-battle-trans.webp"
               alt="명조 배틀"
-              className="h-20 sm:h-32 md:h-48 lg:h-52 xl:h-56 2xl:h-60 w-auto max-w-[85vw] object-contain drop-shadow-[0_0_36px_rgba(255,255,255,0.35)] hover:scale-[1.02] transition-transform duration-300"
+              className="h-28 sm:h-36 md:h-48 lg:h-52 xl:h-56 2xl:h-60 w-auto max-w-[85vw] object-contain drop-shadow-[0_0_36px_rgba(255,255,255,0.35)] hover:scale-[1.02] transition-transform duration-300"
             />
           </div>
 
@@ -461,189 +440,9 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* 모바일 전용 타일형 레이아웃 (세로 화면에 최적화: 공지바 + 2대형타일 + 3x3타일) */}
+        {/* 비대칭 벤토 그리드 [우측 보조메뉴: 아이콘 및 폰트 꽉 차게 확장 (280px~320px)] */}
         {/* ========================================================= */}
-        <div className="w-full flex md:hidden flex-col gap-3 pb-8 select-none">
-          {/* 1. 상단 슬림 1줄 공지사항 배너 */}
-          <div
-            onClick={() => (latestNotice && onOpenBoard ? onOpenBoard(latestNotice.id) : onOpenBoard && onOpenBoard())}
-            className="w-full bg-[#0c111d]/90 border border-amber-400/60 p-2.5 rounded-xl shadow-md flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] transition backdrop-blur-md"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="shrink-0 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-black border border-amber-400/40">
-                📢 공지
-              </span>
-              <span className="text-xs font-bold text-slate-100 truncate">
-                {latestNotice?.title || '공식 공지사항 및 업데이트 안내'}
-              </span>
-            </div>
-            <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
-          </div>
-
-          {/* 2. 메인 대결 2열 대형 타일 (전투 시작 + 멀티배틀) */}
-          <div className="w-full grid grid-cols-2 gap-2.5">
-            {/* 좌: 싱글 전투 시작 */}
-            <div
-              onClick={() => setHash('#battle')}
-              className="relative h-28 rounded-2xl border-2 border-amber-400/80 bg-[#0d101a] p-3 flex flex-col justify-between overflow-hidden shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer"
-            >
-              <div
-                className="absolute inset-0 bg-cover bg-top opacity-50"
-                style={{ backgroundImage: `url('/images/bg-battle-rovers.webp')`, backgroundPosition: 'center 10%' }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 font-mono text-[9px] font-black border border-amber-400/40">
-                  SINGLE
-                </span>
-                <Swords className="w-4 h-4 text-amber-300" />
-              </div>
-              <div className="relative z-10">
-                <h4 className="text-base font-black text-white drop-shadow">전투 시작</h4>
-                <p className="text-[10px] font-mono font-bold text-amber-300">AI / 1인 2역 듀얼</p>
-              </div>
-            </div>
-
-            {/* 우: 멀티배틀 */}
-            <div
-              onClick={() => {
-                setHash('#multiplayer');
-                setIsMultiplayerModalOpen(true);
-              }}
-              className="relative h-28 rounded-2xl border-2 border-violet-400/80 bg-gradient-to-br from-[#120e24] to-[#1c1236] p-3 flex flex-col justify-between overflow-hidden shadow-lg shadow-violet-500/25 active:scale-95 transition cursor-pointer"
-            >
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[9px] font-black border border-emerald-400/40 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  ONLINE
-                </span>
-                <Users className="w-4 h-4 text-violet-300" />
-              </div>
-              <div className="relative z-10">
-                <h4 className="text-base font-black text-white drop-shadow">멀티배틀</h4>
-                <p className="text-[10px] font-mono font-bold text-violet-300">실시간 1:1 P2P 대전</p>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. 보조 메뉴 3x3 정사각 타일 그리드 */}
-          <div className="w-full grid grid-cols-3 gap-2">
-            {/* 1) 덱 빌더 */}
-            <button
-              onClick={onOpenDeckBuilder}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-cyan-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-cyan-950/60 border border-cyan-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/deck-builder.webp" alt="덱 빌더" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">덱 빌더</span>
-            </button>
-
-            {/* 2) 카드 도감 */}
-            <button
-              onClick={() => setHash('#card-gallery')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-emerald-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-emerald-950/60 border border-emerald-400/40 flex items-center justify-center">
-                <BookOpen className="w-5 h-5 text-emerald-300" />
-              </div>
-              <span className="text-xs font-black text-white">카드 도감</span>
-            </button>
-
-            {/* 3) 튜토리얼 */}
-            <button
-              onClick={() => { if (onStartTutorial) onStartTutorial(); else setHash('#tutorial'); }}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-rose-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-rose-950/60 border border-rose-400/40 flex items-center justify-center overflow-hidden">
-                <img src="/images/tutorial/abby_guide.webp" alt="튜토리얼" className="w-7 h-7 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">튜토리얼</span>
-            </button>
-
-            {/* 4) 자유게시판 */}
-            <button
-              onClick={() => onOpenBoard && onOpenBoard()}
-              className="relative flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              {hasNewBoardPosts && (
-                <span className="absolute top-1.5 right-1.5 px-1 py-0.2 rounded-full bg-red-600 text-white font-black text-[8px] animate-pulse">
-                  NEW
-                </span>
-              )}
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/board.webp" alt="자유게시판" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">자유게시판</span>
-            </button>
-
-            {/* 5) 공유된 덱 */}
-            <button
-              onClick={() => setHash('#shared-decks')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-fuchsia-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-fuchsia-950/60 border border-fuchsia-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/shared-decks.webp" alt="공유된 덱" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">공유된 덱</span>
-            </button>
-
-            {/* 6) 대전 리플레이 */}
-            <button
-              onClick={() => setHash('#replay')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-purple-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-purple-950/60 border border-purple-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/replay.webp" alt="리플레이" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">리플레이</span>
-            </button>
-
-            {/* 7) 공식 룰북 */}
-            <button
-              onClick={() => setHash('#rulebook')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-blue-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-blue-950/60 border border-blue-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/rulebook.webp" alt="공식 룰북" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">공식 룰북</span>
-            </button>
-
-            {/* 8) 룰 영상 가이드 */}
-            <button
-              onClick={() => setHash('#guide')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-orange-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-orange-950/60 border border-orange-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/video-guide.webp" alt="영상 가이드" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">영상 가이드</span>
-            </button>
-
-            {/* 9) 패치노트 */}
-            <button
-              onClick={() => {
-                setHash('#patchnotes');
-                setIsPatchNotesOpen(true);
-              }}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-slate-600/80 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-slate-800/80 border border-slate-600/60 flex items-center justify-center text-amber-300">
-                <ScrollText className="w-5 h-5" />
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-xs font-black text-white">패치노트</span>
-                <span className="text-[9px] font-mono text-amber-400 font-bold">{CURRENT_GAME_VERSION}</span>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* 데스크톱/태블릿 비대칭 벤토 그리드 [md 이상 화면 전용] */}
-        {/* ========================================================= */}
-        <div className="w-full hidden md:grid md:grid-cols-2 lg:grid-cols-[1fr_270px_250px_310px] xl:grid-cols-[1fr_290px_270px_340px] 2xl:grid-cols-[1.05fr_310px_280px_360px] gap-3.5 sm:gap-4.5 lg:h-[500px] xl:h-[520px]">
+        <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_270px_250px_310px] xl:grid-cols-[1fr_290px_270px_340px] 2xl:grid-cols-[1.05fr_310px_280px_360px] gap-3.5 sm:gap-4.5 lg:h-[500px] xl:h-[520px]">
           {/* ========================================================= */}
           {/* [1열] 좌측: 전투 시작 (상단) + 인터랙티브 튜토리얼 (하단) */}
           {/* ========================================================= */}
@@ -1027,7 +826,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                     <span className="text-amber-300/90 font-bold">{latestNotice.contact || '운영진'}</span>
                     <span>•</span>
                     <span>{new Date(latestNotice.createdAt).toLocaleDateString('ko-KR')}</span>
-                    {Boolean(latestNotice.commentCount && latestNotice.commentCount > 0) && (
+                    {(latestNotice.commentCount || 0) > 0 && (
                       <>
                         <span>•</span>
                         <span className="text-cyan-400 font-bold">댓글 {latestNotice.commentCount}</span>
@@ -1095,9 +894,9 @@ export const Lobby: React.FC<LobbyProps> = ({
 
       {/* 대전 모드 선택 모달 (명조 택티컬 챔퍼 테두리 스타일) */}
       {showModeModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-150">
           <div
-            className="relative bg-[#0b0e19]/95 backdrop-blur-2xl border-2 border-amber-400/80 p-4 sm:p-7 max-w-lg w-full shadow-[0_0_40px_rgba(245,158,11,0.3)] text-slate-100 space-y-3 sm:space-y-5"
+            className="relative bg-[#0b0e19]/95 backdrop-blur-2xl border-2 border-amber-400/80 p-6 sm:p-7 max-w-lg w-full shadow-[0_0_40px_rgba(245,158,11,0.3)] text-slate-100 space-y-5"
             style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
           >
             {/* 내부 얇은 인셋 골드 라인 */}
@@ -1110,11 +909,11 @@ export const Lobby: React.FC<LobbyProps> = ({
             <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
 
             {/* 모달 헤더 */}
-            <div className="flex items-center justify-between pb-2.5 sm:pb-3 border-b border-amber-400/20 relative z-10">
-              <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="flex items-center justify-between pb-3 border-b border-amber-400/20 relative z-10">
+              <div className="flex items-center gap-2.5">
                 <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <h3 className="font-black text-base sm:text-xl text-white tracking-wide">대전 모드 선택</h3>
-                <span className="text-[10px] sm:text-[11px] font-mono text-amber-400/80 px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-amber-400/10 border border-amber-400/30">
+                <h3 className="font-black text-lg sm:text-xl text-white tracking-wide">대전 모드 선택</h3>
+                <span className="text-[11px] font-mono text-amber-400/80 px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/30">
                   MODE SELECT
                 </span>
               </div>
@@ -1123,7 +922,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                   clearHash();
                   setShowModeModal(false);
                 }}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer"
+                className="w-8 h-8 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer"
                 title="닫기"
               >
                 ✕
@@ -1131,29 +930,29 @@ export const Lobby: React.FC<LobbyProps> = ({
             </div>
 
             {/* 모드 선택 카드 버튼들 */}
-            <div className="space-y-2.5 sm:space-y-3 relative z-10">
+            <div className="space-y-3 relative z-10">
               <button
                 onClick={() => {
                   setShowModeModal(false);
                   setDeckSelectMode('AI');
                 }}
-                className="w-full p-3 sm:p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a2035] border-2 border-amber-400/60 hover:border-amber-400 transition-all duration-200 flex items-center gap-3 sm:gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:shadow-[0_0_30px_rgba(245,158,11,0.35)] transform hover:-translate-y-0.5"
+                className="w-full p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a2035] border-2 border-amber-400/60 hover:border-amber-400 transition-all duration-200 flex items-center gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(245,158,11,0.15)] hover:shadow-[0_0_30px_rgba(245,158,11,0.35)] transform hover:-translate-y-0.5"
               >
-                <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center font-bold text-lg sm:text-xl group-hover:scale-105 transition shadow shrink-0">
-                  <Bot className="w-5 h-5 sm:w-7 sm:h-7" />
+                <div className="w-13 h-13 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition shadow">
+                  <Bot className="w-7 h-7" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-black text-white group-hover:text-amber-300 transition text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                  <div className="font-black text-white group-hover:text-amber-300 transition text-base flex items-center gap-2">
                     <span>AI 봇 대전</span>
-                    <span className="text-[9px] sm:text-[11px] font-mono px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
                       SINGLE
                     </span>
                   </div>
-                  <div className="text-[11px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed line-clamp-2">
+                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">
                     기초 상성과 카운터를 학습한 스마트 AI 봇을 상대로 듀얼을 진행합니다.
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400/60 group-hover:text-amber-300 group-hover:translate-x-1 transition-transform shrink-0" />
+                <ChevronRight className="w-5 h-5 text-amber-400/60 group-hover:text-amber-300 group-hover:translate-x-1 transition-transform" />
               </button>
 
               <button
@@ -1161,23 +960,23 @@ export const Lobby: React.FC<LobbyProps> = ({
                   setShowModeModal(false);
                   setDeckSelectMode('SOLO_DUAL');
                 }}
-                className="w-full p-3 sm:p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a2035] border-2 border-indigo-400/60 hover:border-indigo-400 transition-all duration-200 flex items-center gap-3 sm:gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.15)] hover:shadow-[0_0_30px_rgba(99,102,241,0.35)] transform hover:-translate-y-0.5"
+                className="w-full p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a2035] border-2 border-indigo-400/60 hover:border-indigo-400 transition-all duration-200 flex items-center gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.15)] hover:shadow-[0_0_30px_rgba(99,102,241,0.35)] transform hover:-translate-y-0.5"
               >
-                <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center font-bold text-lg sm:text-xl group-hover:scale-105 transition shadow shrink-0">
-                  <User className="w-5 h-5 sm:w-7 sm:h-7" />
+                <div className="w-13 h-13 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-400/40 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition shadow">
+                  <User className="w-7 h-7" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-black text-white group-hover:text-indigo-300 transition text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                  <div className="font-black text-white group-hover:text-indigo-300 transition text-base flex items-center gap-2">
                     <span>1인 2역 연습 듀얼</span>
-                    <span className="text-[9px] sm:text-[11px] font-mono px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
                       SELF TEST
                     </span>
                   </div>
-                  <div className="text-[11px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed line-clamp-2">
+                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">
                     혼자서 양 플레이어를 모두 조작하여 덱 테스트와 룰을 연습합니다.
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400/60 group-hover:text-indigo-300 group-hover:translate-x-1 transition-transform shrink-0" />
+                <ChevronRight className="w-5 h-5 text-indigo-400/60 group-hover:text-indigo-300 group-hover:translate-x-1 transition-transform" />
               </button>
 
               <button
@@ -1186,23 +985,23 @@ export const Lobby: React.FC<LobbyProps> = ({
                   setHash('#multiplayer');
                   setIsMultiplayerModalOpen(true);
                 }}
-                className="w-full p-3 sm:p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a142e] border-2 border-violet-400/60 hover:border-violet-400 transition-all duration-200 flex items-center gap-3 sm:gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(139,92,246,0.15)] hover:shadow-[0_0_30px_rgba(139,92,246,0.35)] transform hover:-translate-y-0.5"
+                className="w-full p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a142e] border-2 border-violet-400/60 hover:border-violet-400 transition-all duration-200 flex items-center gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(139,92,246,0.15)] hover:shadow-[0_0_30px_rgba(139,92,246,0.35)] transform hover:-translate-y-0.5"
               >
-                <div className="w-10 h-10 sm:w-13 sm:h-13 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-400/40 flex items-center justify-center font-bold text-lg sm:text-xl group-hover:scale-105 transition shadow shrink-0">
-                  <Users className="w-5 h-5 sm:w-7 sm:h-7" />
+                <div className="w-13 h-13 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-400/40 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition shadow">
+                  <Users className="w-7 h-7" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-black text-white group-hover:text-violet-300 transition text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                  <div className="font-black text-white group-hover:text-violet-300 transition text-base flex items-center gap-2">
                     <span>온라인 1:1 대전 (P2P)</span>
-                    <span className="text-[9px] sm:text-[11px] font-mono px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40">
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40">
                       MULTIPLAYER
                     </span>
                   </div>
-                  <div className="text-[11px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 leading-snug sm:leading-relaxed line-clamp-2">
+                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">
                     초대 코드 또는 공유 링크로 친구와 실시간 대결을 진행합니다. (재접속 지원)
                   </div>
                 </div>
-                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-violet-400/60 group-hover:text-violet-300 group-hover:translate-x-1 transition-transform shrink-0" />
+                <ChevronRight className="w-5 h-5 text-violet-400/60 group-hover:text-violet-300 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
 
@@ -1211,7 +1010,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                 clearHash();
                 setShowModeModal(false);
               }}
-              className="w-full py-2 sm:py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold cursor-pointer transition relative z-10"
+              className="w-full py-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold cursor-pointer transition relative z-10"
             >
               닫기
             </button>
@@ -1219,9 +1018,10 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       )}
 
-      {/* 덱 선택 모달 (AI 봇 대전 / 1인 2역) */}
-      {deckSelectMode !== null && (
-        <Suspense fallback={null}>
+      {/* 비동기 지연 로드 모달 컴포넌트 풀 (Suspense) */}
+      <Suspense fallback={null}>
+        {/* 덱 선택 모달 (AI 봇 대전 / 1인 2역) */}
+        {deckSelectMode !== null && (
           <DeckSelectModal
             isOpen={deckSelectMode !== null}
             mode={deckSelectMode ?? 'AI'}
@@ -1235,11 +1035,8 @@ export const Lobby: React.FC<LobbyProps> = ({
               onStartGame(m, myDeck, oppDeck);
             }}
           />
-        </Suspense>
-      )}
+        )}
 
-      {/* 비동기 지연 로드 모달 컴포넌트 풀 (Suspense) */}
-      <Suspense fallback={null}>
         {/* 온라인 1:1 멀티플레이 로비 모달 */}
         {isMultiplayerModalOpen && (
           <MultiplayerLobbyModal

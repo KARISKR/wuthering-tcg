@@ -46,7 +46,7 @@
   }
 }
 
-/* 카드 썸네일 박스 모서리 계단 현상 및 내부 이미지 떨림 방지 */
+/* 덱 선택, 도감, 필드 등 축소 썸네일 박스 모서리 계단 현상 및 내부 이미지 떨림 방지 */
 .card-img,
 .card-view,
 .card-texture {
@@ -831,25 +831,6 @@
 }
 .animate-finisher-crack-pulse {
   animation: finisher-crack-pulse 0.2s infinite alternate;
-}
-
-/* =====================================================================
-   모바일 전용 전투 모드: 전장 위 모든 팝업/모달/오버레이 일괄 비례 축소
-   기존 1080p 기준 팝업들이 모바일 화면을 집어삼키는 문제 원천 차단
-   zoom 적용 시 dvh 단위가 비축소 기준으로 먼저 잘려 스크롤이 생기는 현상을
-   max-height 역보정(calc(95dvh / zoom))으로 해결하여 드래그 없는 한 화면 표시 보장
-   ===================================================================== */
-.mobile-battle-mode .mobile-modal-scaled {
-  zoom: var(--modal-zoom, 0.58);
-  max-height: calc(95dvh / var(--modal-zoom, 0.58));
-}
-
-@supports not (zoom: 1) {
-  .mobile-battle-mode .mobile-modal-scaled {
-    transform: scale(var(--modal-zoom, 0.58));
-    transform-origin: center center;
-    max-height: calc(95dvh / var(--modal-zoom, 0.58));
-  }
 }
 
 

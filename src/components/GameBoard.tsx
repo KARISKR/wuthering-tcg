@@ -1889,19 +1889,39 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   }, [noComboCountdown, gameState.phase, controlledPlayerIndex, handleFinishCombo]);
 
   // [턴 종료 연출] END_PHASE 배너 표시 후 1초 뒤 다음 턴으로 전환 (finalizeEndPhase)
+  // 단, 턴 종료 효과 드로우(EffectDrawOverlay)나 선택 모달(pendingChoice)이 진행 중이면 완전히 완료될 때까지 대기
   useEffect(() => {
     if (gameState.phase !== 'END_PHASE' || isGuest) return;
-    if (gameState.pendingChoice) return;
+    if (
+      gameState.pendingChoice ||
+      gameState.lastEffectDraw ||
+      (gameState.deferredEffectDraws && gameState.deferredEffectDraws.length > 0)
+    ) {
+      return;
+    }
 
     const timer = setTimeout(() => {
       setGameState((prev) => {
-        if (prev.phase !== 'END_PHASE' || prev.pendingChoice) return prev;
+        if (
+          prev.phase !== 'END_PHASE' ||
+          prev.pendingChoice ||
+          prev.lastEffectDraw ||
+          (prev.deferredEffectDraws && prev.deferredEffectDraws.length > 0)
+        ) {
+          return prev;
+        }
         return finalizeEndPhase(prev);
       });
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [gameState.phase, isGuest, gameState.pendingChoice]);
+  }, [
+    gameState.phase,
+    isGuest,
+    gameState.pendingChoice,
+    Boolean(gameState.lastEffectDraw),
+    gameState.deferredEffectDraws?.length ?? 0,
+  ]);
 
   // [멀티플레이] 시간 초과 패배 처리 핸들러 (호스트 권한)
   const handleTriggerTimeOut = useCallback(
