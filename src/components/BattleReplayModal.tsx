@@ -275,15 +275,6 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
               <span className="hidden md:inline">코드 붙여넣기</span>
             </button>
 
-            <button
-              onClick={handleRestoreSample}
-              className="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-black transition cursor-pointer flex items-center gap-1.5"
-              title="샘플 리플레이 2종 복원"
-            >
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span className="hidden lg:inline">샘플 복원</span>
-            </button>
-
             {replays.length > 0 && (
               <button
                 onClick={handleClearAll}
@@ -353,16 +344,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
               <History className="w-12 h-12 opacity-30 text-purple-400" />
               <p className="font-bold text-base text-slate-300">보관된 리플레이가 없습니다</p>
               <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
-                전투가 끝나면 자동으로 여기에 기록되며,<br />
-                상단 [샘플 복원] 버튼으로 예시 명경기를 즉시 확인해볼 수 있습니다.
+                전투가 끝나면 결과 화면에서 저장하거나,<br />
+                리플레이 파일(.json)을 가져와 감상할 수 있습니다.
               </p>
-              <button
-                onClick={handleRestoreSample}
-                className="mt-2 px-4 py-2 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-black transition cursor-pointer flex items-center gap-1.5"
-              >
-                <Sparkles className="w-4 h-4 text-purple-400" />
-                <span>샘플 리플레이 불러오기</span>
-              </button>
             </div>
           ) : (
             <div className="grid gap-5 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(265px,1fr))] max-w-[1600px] mx-auto">

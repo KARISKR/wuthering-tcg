@@ -49,31 +49,28 @@ const MAX_REPLAYS = 20;
 
 /**
  * 저장된 리플레이 전체 목록 조회 (최신순)
- * 데이터가 없으면 기본 명경기 샘플 리플레이 2종을 자동 시딩합니다.
+ * 사용자가 직접 저장하거나 대전 종료 후 생성된 리플레이만 반환합니다.
  */
 export function getSavedReplays(): BattleReplayData[] {
   try {
     if (typeof localStorage === 'undefined') {
-      return [...SAMPLE_BATTLE_REPLAYS];
+      return [];
     }
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      // 초기 기본 샘플 리플레이 자동 시딩
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_BATTLE_REPLAYS));
-      return [...SAMPLE_BATTLE_REPLAYS];
+      return [];
     }
     const list: BattleReplayData[] = JSON.parse(raw);
-    if (!Array.isArray(list) || list.length === 0) {
-      return [...SAMPLE_BATTLE_REPLAYS];
+    if (!Array.isArray(list)) {
+      return [];
     }
-    // 샘플 리플레이는 최신 수정 데이터로 항상 갱신하고, 사용자가 저장한 리플레이와 합병
+    // 기본 샘플 더미 리플레이 ID는 목록에서 제외
     const sampleIds = new Set(SAMPLE_BATTLE_REPLAYS.map((s) => s.id));
     const userReplays = list.filter((r) => !sampleIds.has(r.id));
-    const merged = [...SAMPLE_BATTLE_REPLAYS, ...userReplays];
-    return merged.sort((a, b) => b.timestamp - a.timestamp);
+    return userReplays.sort((a, b) => b.timestamp - a.timestamp);
   } catch (e) {
     console.error('Failed to parse saved replays:', e);
-    return [...SAMPLE_BATTLE_REPLAYS];
+    return [];
   }
 }
 
@@ -82,11 +79,14 @@ export function getSavedReplays(): BattleReplayData[] {
  */
 export function restoreSampleReplays(): BattleReplayData[] {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(SAMPLE_BATTLE_REPLAYS));
+    const current = getSavedReplays();
+    const merged = [...SAMPLE_BATTLE_REPLAYS, ...current];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    return merged.sort((a, b) => b.timestamp - a.timestamp);
   } catch (e) {
     console.error('Failed to restore sample replays:', e);
+    return [...SAMPLE_BATTLE_REPLAYS];
   }
-  return [...SAMPLE_BATTLE_REPLAYS];
 }
 
 /**
