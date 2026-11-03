@@ -33,6 +33,72 @@ const POINTER_NAMES = {
   board: 'wuthering-tcg-community-board-v2',
 } as const;
 
+function buildSummaryResponse(rawJsonText: string): string {
+  try {
+    const parsed = JSON.parse(rawJsonText);
+    const posts: any[] = Array.isArray(parsed?.posts) ? parsed.posts : [];
+
+    // 최신 공지 1건만 로비 프리뷰용 텍스트(Base64 이미지 제외) 유지
+    const notices = posts
+      .filter((p) => p && (p.isNotice || p.category === 'NOTICE'))
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    const latestNoticeId = notices[0]?.id;
+
+    const summaryPosts = posts.map((p: any) => {
+      const isLatestNotice = Boolean(latestNoticeId && p?.id === latestNoticeId);
+      const safePreviewContent = isLatestNotice && typeof p.content === 'string'
+        ? p.content.replace(/!\[.*?\]\(data:image\/[^)]+\)/g, '').slice(0, 600)
+        : '';
+
+      return {
+        id: p.id,
+        category: p.category,
+        title: p.title,
+        content: safePreviewContent,
+        createdAt: p.createdAt,
+        updatedAt: p.updatedAt,
+        appVersion: p.appVersion,
+        contact: p.contact,
+        deckCode: p.deckCode,
+        deckName: p.deckName,
+        isNotice: p.isNotice,
+        isSecret: p.isSecret,
+        password: p.password,
+        likes: p.likes,
+        dislikes: p.dislikes,
+        views: p.views,
+        comments: Array.isArray(p.comments) ? p.comments : [],
+        hasImage: Boolean(
+          p.imageUrl ||
+          (Array.isArray(p.images) && p.images.length > 0) ||
+          (typeof p.content === 'string' && (p.content.includes('[사진') || p.content.includes('[카드') || p.content.includes('![') || p.content.includes('<img')))
+        ),
+        isSummaryOnly: true,
+      };
+    });
+
+    return JSON.stringify({
+      posts: summaryPosts,
+      deletedIds: parsed?.deletedIds || [],
+    });
+  } catch {
+    return rawJsonText;
+  }
+}
+
+function buildSinglePostResponse(rawJsonText: string, postId: string): string {
+  try {
+    const parsed = JSON.parse(rawJsonText);
+    const posts: any[] = Array.isArray(parsed?.posts) ? parsed.posts : [];
+    const found = posts.find((p) => p && p.id === postId) || null;
+    return JSON.stringify({
+      post: found ? { ...found, isSummaryOnly: false } : null,
+    });
+  } catch {
+    return JSON.stringify({ post: null });
+  }
+}
+
 export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const url = new URL(request.url);
@@ -57,6 +123,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // 1. GET: 데이터 조회
     if (request.method === 'GET') {
       const isSummary = url.searchParams.get('summary') === '1' && type === 'board';
+      const postId = type === 'board' ? url.searchParams.get('postId') : null;
 
       // (A) Cloudflare D1 최우선 조회
       if (env.DB) {
@@ -67,43 +134,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
           if (row?.data) {
             const updatedAt = row.updated_at || 0;
-            const etag = `W/"${type}-${isSummary ? 'sum-' : ''}${updatedAt}"`;
+            const etag = `W/"${type}-${postId ? `post-${postId}-` : isSummary ? 'sum-' : ''}${updatedAt}"`;
             headers.set('ETag', etag);
 
             if (request.headers.get('If-None-Match') === etag) {
               return new Response(null, { status: 304, headers });
             }
 
+            if (postId) {
+              return new Response(buildSinglePostResponse(row.data, postId), { headers });
+            }
+
             if (isSummary) {
-              try {
-                const parsed = JSON.parse(row.data);
-                const summaryPosts = Array.isArray(parsed?.posts)
-                  ? parsed.posts.map((p: any) => ({
-                      id: p.id,
-                      category: p.category,
-                      title: p.title,
-                      createdAt: p.createdAt,
-                      updatedAt: p.updatedAt,
-                      appVersion: p.appVersion,
-                      contact: p.contact,
-                      isNotice: p.isNotice,
-                      likes: p.likes,
-                      dislikes: p.dislikes,
-                      views: p.views,
-                      hasImage: Boolean(p.imageUrl || (p.images && p.images.length > 0)),
-                      commentCount: Array.isArray(p.comments) ? p.comments.length : 0,
-                    }))
-                  : [];
-                return new Response(
-                  JSON.stringify({
-                    posts: summaryPosts,
-                    deletedIds: parsed?.deletedIds || [],
-                  }),
-                  { headers }
-                );
-              } catch {
-                return new Response(row.data, { headers });
-              }
+              return new Response(buildSummaryResponse(row.data), { headers });
             }
 
             return new Response(row.data, { headers });
@@ -127,34 +170,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             });
             if (blobRes.ok) {
               const blobText = await blobRes.text();
+              if (postId) {
+                return new Response(buildSinglePostResponse(blobText, postId), { headers });
+              }
               if (isSummary) {
-                try {
-                  const parsed = JSON.parse(blobText);
-                  const summaryPosts = Array.isArray(parsed?.posts)
-                    ? parsed.posts.map((p: any) => ({
-                        id: p.id,
-                        category: p.category,
-                        title: p.title,
-                        createdAt: p.createdAt,
-                        updatedAt: p.updatedAt,
-                        appVersion: p.appVersion,
-                        contact: p.contact,
-                        isNotice: p.isNotice,
-                        likes: p.likes,
-                        dislikes: p.dislikes,
-                        views: p.views,
-                        hasImage: Boolean(p.imageUrl || (p.images && p.images.length > 0)),
-                        commentCount: Array.isArray(p.comments) ? p.comments.length : 0,
-                      }))
-                    : [];
-                  return new Response(
-                    JSON.stringify({
-                      posts: summaryPosts,
-                      deletedIds: parsed?.deletedIds || [],
-                    }),
-                    { headers }
-                  );
-                } catch {}
+                return new Response(buildSummaryResponse(blobText), { headers });
               }
               return new Response(blobText, { headers });
             }
@@ -164,14 +184,57 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         console.warn('[Community Cloud GET Error]:', cloudErr);
       }
 
-      return new Response(JSON.stringify(type === 'decks' ? { decks: [] } : { posts: [] }), { headers });
+      return new Response(JSON.stringify(type === 'decks' ? { decks: [] } : postId ? { post: null } : { posts: [] }), { headers });
     }
 
-    // 2. POST / PUT: 데이터 저장
+    // 2. POST / PUT: 데이터 저장 (요약본 상태에서 추천/댓글 등이 저장될 때 기존 본문 및 이미지 보존 보장)
     if (request.method === 'POST' || request.method === 'PUT') {
-      const bodyText = await request.text();
+      let bodyText = await request.text();
       const nowTs = Date.now();
       let saved = false;
+
+      if (type === 'board' && env.DB) {
+        try {
+          const existingRow = await env.DB.prepare('SELECT data FROM community_data WHERE type = ?')
+            .bind('board')
+            .first<{ data: string }>();
+          if (existingRow?.data) {
+            const existingParsed = JSON.parse(existingRow.data);
+            const existingPosts: any[] = Array.isArray(existingParsed?.posts) ? existingParsed.posts : [];
+            const existingMap = new Map<string, any>();
+            for (const ep of existingPosts) {
+              if (ep && ep.id) existingMap.set(ep.id, ep);
+            }
+
+            const incomingParsed = JSON.parse(bodyText);
+            if (Array.isArray(incomingParsed?.posts)) {
+              const mergedPosts = incomingParsed.posts.map((inc: any) => {
+                if (!inc || !inc.id) return inc;
+                const old = existingMap.get(inc.id);
+                if (old && inc.isSummaryOnly) {
+                  const { isSummaryOnly, ...restInc } = inc;
+                  return {
+                    ...old,
+                    ...restInc,
+                    content: old.content,
+                    imageUrl: old.imageUrl,
+                    images: old.images,
+                  };
+                }
+                const { isSummaryOnly, ...cleanInc } = inc;
+                return cleanInc;
+              });
+              bodyText = JSON.stringify({
+                ...incomingParsed,
+                posts: mergedPosts,
+                updatedAt: nowTs,
+              });
+            }
+          }
+        } catch (mergeErr) {
+          console.warn('[Community Board Merge Warning]:', mergeErr);
+        }
+      }
 
       // (A) Cloudflare D1 저장
       if (env.DB) {

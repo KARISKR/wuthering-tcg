@@ -35,6 +35,8 @@ export interface FeedbackItem {
   comments?: CommentItem[];
   isSecret?: boolean; // 비밀글 여부 (개인 덱 저장용)
   password?: string; // 비밀글 열람 및 수정/삭제용 비밀번호
+  hasImage?: boolean; // 요약 목록에서 이미지 포함 여부 표시용
+  isSummaryOnly?: boolean; // 목록 조회 시 본문/이미지가 아직 로드되지 않은 요약 상태 여부
 }
 
 const STORAGE_KEY = 'wuthering_tcg_feedbacks_v3';
@@ -114,11 +116,30 @@ const SEED_POSTS: FeedbackItem[] = [];
 
 // 인메모리 캐시: 반복적인 localStorage 대용량 JSON.parse 동기 블로킹 방지
 let memoryPostsCache: FeedbackItem[] | null = null;
+// 개별 게시글 클릭 시 온디맨드로 다운로드된 본문+이미지 캐시
+const postDetailCache = new Map<string, FeedbackItem>();
 
 function persistLocalPosts(posts: FeedbackItem[]): void {
   memoryPostsCache = posts;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
+    // localStorage에는 대용량 Base64 이미지를 제외한 경량 메타데이터 위주로 저장하여 용량 초과 및 초기 파싱 프리징 방지
+    const lightweight = posts.map((p) => {
+      if (!p.isSummaryOnly) {
+        postDetailCache.set(p.id, p);
+      }
+      const hasBase64Img =
+        (p.imageUrl && p.imageUrl.startsWith('data:image')) ||
+        (Array.isArray(p.images) && p.images.some((u) => u.startsWith('data:image')));
+      if (!hasBase64Img) return p;
+      return {
+        ...p,
+        imageUrl: undefined,
+        images: p.images?.filter((u) => !u.startsWith('data:image')),
+        hasImage: true,
+        isSummaryOnly: true,
+      };
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(lightweight));
   } catch (err) {
     console.warn('[feedbackManager] Failed to persist feedback list:', err);
   }
@@ -162,11 +183,17 @@ export function getFeedbackList(): FeedbackItem[] {
 }
 
 /**
- * 로비 초기 진입용 초경량 요약 조회 (본문 및 Base64 첨부 이미지 제외)
- * 초기 로딩 시 수 MB의 게시글 이미지 다운로드를 방지합니다.
+ * 로비 및 게시판 목록 진입용 초경량 요약 조회 (본문 및 Base64 첨부 이미지 제외)
+ * 게시글을 실제로 클릭하기 전까지 수 MB의 게시글 이미지 다운로드를 방지합니다.
  */
 export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
   const deletedIds = getDeletedFeedbackIds();
+  const localPosts = getFeedbackList();
+  const localMap = new Map<string, FeedbackItem>();
+  for (const lp of localPosts) {
+    if (lp && lp.id) localMap.set(lp.id, lp);
+  }
+
   try {
     const res = await fetch('/api/community?type=board&summary=1', {
       headers: { Accept: 'application/json' },
@@ -174,11 +201,81 @@ export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data?.posts)) {
-        return (data.posts as FeedbackItem[]).filter((p) => p && p.id && !deletedIds.includes(p.id));
+        const merged = (data.posts as FeedbackItem[])
+          .filter((p) => p && p.id && !deletedIds.includes(p.id))
+          .map((summaryItem) => {
+            const localItem = localMap.get(summaryItem.id);
+            const cachedFull = postDetailCache.get(summaryItem.id);
+            const base = cachedFull && !cachedFull.isSummaryOnly ? cachedFull : summaryItem;
+            return {
+              ...base,
+              ...summaryItem,
+              content: cachedFull && !cachedFull.isSummaryOnly ? cachedFull.content : summaryItem.content || '',
+              imageUrl: cachedFull && !cachedFull.isSummaryOnly ? cachedFull.imageUrl : summaryItem.imageUrl,
+              images: cachedFull && !cachedFull.isSummaryOnly ? cachedFull.images : summaryItem.images,
+              isSummaryOnly: cachedFull && !cachedFull.isSummaryOnly ? false : Boolean(summaryItem.isSummaryOnly),
+              views: Math.max(summaryItem.views || 0, localItem?.views || 0),
+              likes: Math.max(summaryItem.likes || 0, localItem?.likes || 0),
+              dislikes: Math.max(summaryItem.dislikes || 0, localItem?.dislikes || 0),
+              likedByMe: Boolean(localItem?.likedByMe),
+              dislikedByMe: Boolean(localItem?.dislikedByMe),
+            };
+          });
+        memoryPostsCache = merged;
+        return merged;
       }
     }
   } catch {}
-  return getFeedbackList();
+  return localPosts;
+}
+
+/**
+ * 게시글 클릭 시 해당 게시글 1건의 본문 + 첨부 이미지를 온디맨드로 다운로드합니다.
+ */
+export async function fetchFeedbackPostDetail(postId: string): Promise<FeedbackItem | null> {
+  if (!postId) return null;
+  const cached = postDetailCache.get(postId);
+  if (cached && !cached.isSummaryOnly) {
+    return cached;
+  }
+
+  try {
+    const res = await fetch(`/api/community?type=board&postId=${encodeURIComponent(postId)}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.post && data.post.id) {
+        const list = getFeedbackList();
+        const existing = list.find((p) => p.id === postId);
+        const fullPost: FeedbackItem = {
+          ...existing,
+          ...data.post,
+          views: Math.max(data.post.views || 0, existing?.views || 0),
+          likes: Math.max(data.post.likes || 0, existing?.likes || 0),
+          dislikes: Math.max(data.post.dislikes || 0, existing?.dislikes || 0),
+          likedByMe: Boolean(existing?.likedByMe),
+          dislikedByMe: Boolean(existing?.dislikedByMe),
+          isSummaryOnly: false,
+        };
+        postDetailCache.set(postId, fullPost);
+        if (memoryPostsCache) {
+          memoryPostsCache = memoryPostsCache.map((p) => (p.id === postId ? fullPost : p));
+        }
+        return fullPost;
+      }
+    }
+  } catch {}
+
+  // 폴백: 전체 목록 조회에서 해당 게시글 추출
+  const all = await fetchGlobalFeedbackList();
+  const found = all.find((p) => p.id === postId) || null;
+  if (found) {
+    const full = { ...found, isSummaryOnly: false };
+    postDetailCache.set(postId, full);
+    return full;
+  }
+  return null;
 }
 
 export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
@@ -420,13 +517,17 @@ export function updateFeedback(id: string, updates: Partial<Omit<FeedbackItem, '
     if (item.id !== id) return item;
     const nextImages = updates.images !== undefined ? updates.images : (item.images || []);
     const nextImageUrl = nextImages.length > 0 ? nextImages[0] : undefined;
-    return {
+    const nextItem: FeedbackItem = {
       ...item,
       ...updates,
       images: nextImages,
       imageUrl: nextImageUrl,
+      hasImage: nextImages.length > 0,
+      isSummaryOnly: false,
       updatedAt: new Date().toISOString(),
     };
+    postDetailCache.set(id, nextItem);
+    return nextItem;
   });
   persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
@@ -434,6 +535,7 @@ export function updateFeedback(id: string, updates: Partial<Omit<FeedbackItem, '
 
 export function deleteFeedback(id: string): void {
   recordDeletedId(id);
+  postDetailCache.delete(id);
   const list = getFeedbackList();
   const filtered = list.filter((item) => item.id !== id);
   persistLocalPosts(filtered);

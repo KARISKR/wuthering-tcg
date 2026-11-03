@@ -41,6 +41,8 @@ import {
   CommentItem,
   CATEGORY_INFO,
   getFeedbackList,
+  fetchBoardSummaryForLobby,
+  fetchFeedbackPostDetail,
   fetchGlobalFeedbackList,
   saveFeedback,
   deleteFeedback,
@@ -298,6 +300,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   // Selected post detail view (ArcaLive article view)
   const [selectedPostId, setSelectedPostId] = useState<string | null>(initialPostId || null);
+  const [isLoadingPostDetail, setIsLoadingPostDetail] = useState<boolean>(false);
 
   useEffect(() => {
     if (initialPostId) {
@@ -913,14 +916,47 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   const refreshList = () => {
     setItems(getFeedbackList());
-    fetchGlobalFeedbackList().then((globalList) => {
-      setItems(globalList);
+    fetchBoardSummaryForLobby().then((summaryList) => {
+      setItems(summaryList);
     });
   };
 
   useEffect(() => {
     refreshList();
   }, []);
+
+  // 게시글을 클릭하여 선택했을 때만 해당 게시글의 본문 및 이미지를 온디맨드로 다운로드
+  useEffect(() => {
+    if (!selectedPostId) {
+      setIsLoadingPostDetail(false);
+      return;
+    }
+    const target = items.find((i) => i.id === selectedPostId);
+    if (target && !target.isSummaryOnly) {
+      setIsLoadingPostDetail(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoadingPostDetail(true);
+    fetchFeedbackPostDetail(selectedPostId)
+      .then((fullPost) => {
+        if (cancelled) return;
+        if (fullPost) {
+          setItems((prev) => {
+            const exists = prev.some((p) => p.id === fullPost.id);
+            return exists ? prev.map((p) => (p.id === fullPost.id ? fullPost : p)) : [fullPost, ...prev];
+          });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingPostDetail(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPostId, items.length]);
 
   // When post is selected, check password if secret and locked
   const handleSelectPost = (id: string) => {
@@ -934,7 +970,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     }
     incrementViewCount(id);
     setSelectedPostId(id);
-    refreshList();
+    setItems(getFeedbackList());
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -1011,7 +1047,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     showToast('🔗 게시글 주소가 복사되었습니다.');
   };
 
-  const handleEdit = (post: FeedbackItem) => {
+  const handleEdit = async (post: FeedbackItem) => {
     if (post.isNotice || post.category === 'NOTICE') {
       if (!isUserAdmin()) {
         const input = window.prompt('🔒 공지사항 수정을 위해 관리자 마스터 암호를 입력해주세요:');
@@ -1032,24 +1068,29 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         }
       }
     }
+    let fullPost = post;
+    if (post.isSummaryOnly) {
+      const fetched = await fetchFeedbackPostDetail(post.id);
+      if (fetched) fullPost = fetched;
+    }
     const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
     const postImages =
-      post.images !== undefined
-        ? post.images
-        : post.imageUrl
-        ? [post.imageUrl]
+      fullPost.images !== undefined
+        ? fullPost.images
+        : fullPost.imageUrl
+        ? [fullPost.imageUrl]
         : [];
-    let initialContent = (post.content || '').replace(/\[카드\s*:\s*카드\]/gi, '').trim();
+    let initialContent = (fullPost.content || '').replace(/\[카드\s*:\s*카드\]/gi, '').trim();
 
-    setEditingPostId(post.id);
-    setCategory(post.category);
-    setTitle(post.title);
+    setEditingPostId(fullPost.id);
+    setCategory(fullPost.category);
+    setTitle(fullPost.title);
     setContent(initialContent);
-    setContact(post.contact || '');
-    setDeckCode(post.deckCode || '');
-    setDeckName(post.deckName || '');
-    setIsSecret(Boolean(post.isSecret));
-    setPassword(post.password || savedPw);
+    setContact(fullPost.contact || '');
+    setDeckCode(fullPost.deckCode || '');
+    setDeckName(fullPost.deckName || '');
+    setIsSecret(Boolean(fullPost.isSecret));
+    setPassword(fullPost.password || savedPw);
     setImageUrl(postImages[0] || '');
     setImages(postImages);
     setIsPreviewMode(false);
@@ -1954,26 +1995,35 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
               })()}
 
               {/* 본문 텍스트 (인라인 이미지 + 서식 렌더링 + 줄바꿈 + 클릭 시 이미지 확대 지원) */}
-              <div
-                onClick={(e) => {
-                  const target = e.target as HTMLElement;
-                  if (target.tagName === 'IMG') {
-                    const src = (target as HTMLImageElement).currentSrc || (target as HTMLImageElement).src;
-                    if (src) setZoomedImage(src);
-                  }
-                }}
-                className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans min-h-[140px] select-text"
-                dangerouslySetInnerHTML={{
-                  __html: renderFormattedContent(
-                    selectedPost.content,
-                    selectedPost.images !== undefined
-                      ? selectedPost.images
-                      : selectedPost.imageUrl
-                      ? [selectedPost.imageUrl]
-                      : []
-                  ),
-                }}
-              />
+              {isLoadingPostDetail && selectedPost.isSummaryOnly ? (
+                <div className="py-16 flex flex-col items-center justify-center gap-3 text-slate-400">
+                  <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  <span className="text-xs sm:text-sm font-bold text-slate-300">
+                    게시글 본문 및 이미지를 불러오는 중...
+                  </span>
+                </div>
+              ) : (
+                <div
+                  onClick={(e) => {
+                    const target = e.target as HTMLElement;
+                    if (target.tagName === 'IMG') {
+                      const src = (target as HTMLImageElement).currentSrc || (target as HTMLImageElement).src;
+                      if (src) setZoomedImage(src);
+                    }
+                  }}
+                  className="text-base sm:text-lg md:text-xl text-slate-100 leading-relaxed whitespace-pre-wrap break-words font-sans min-h-[140px] select-text"
+                  dangerouslySetInnerHTML={{
+                    __html: renderFormattedContent(
+                      selectedPost.content,
+                      selectedPost.images !== undefined
+                        ? selectedPost.images
+                        : selectedPost.imageUrl
+                        ? [selectedPost.imageUrl]
+                        : []
+                    ),
+                  }}
+                />
+              )}
 
               {/* 아카라이브 시그니처 대형 추천(개추) / 비추 박스 */}
               <div className="py-7 border-y border-[#262c3d] flex flex-col items-center justify-center gap-3.5 select-none">
@@ -2371,6 +2421,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                             <span className={`truncate text-sm sm:text-base md:text-[17px] ${isCurrentActive ? 'font-black text-amber-200' : ''}`}>
                               {item.title}
                             </span>
+                            {(item.hasImage || item.imageUrl || (item.images && item.images.length > 0)) && (
+                              <ImageIcon className="w-3.5 h-3.5 text-emerald-400/90 shrink-0" />
+                            )}
                             {isPostNew(item) && (
                               <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] tracking-wider uppercase shrink-0 animate-pulse">
                                 NEW
