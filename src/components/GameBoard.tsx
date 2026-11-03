@@ -395,14 +395,15 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     }
   }, [isSpectator, isGuest, engineResolvePendingChoice]);
 
-  const handleFinishEffectDraw = useCallback(() => {
+  const handleFinishEffectDraw = useCallback((completedDrawId?: string) => {
     if (isSpectator) return;
+    const targetDrawId = completedDrawId || gameState.lastEffectDraw?.id;
     if (isGuest) {
-      multiplayerService.sendAction('FINISH_EFFECT_DRAW', 1);
+      multiplayerService.sendAction('FINISH_EFFECT_DRAW', 1, { drawId: targetDrawId });
     } else {
-      engineFinishEffectDraw();
+      engineFinishEffectDraw(targetDrawId);
     }
-  }, [isSpectator, isGuest, engineFinishEffectDraw]);
+  }, [isSpectator, isGuest, engineFinishEffectDraw, gameState.lastEffectDraw?.id]);
 
   // 드로우 페이즈 연출 및 카드 매수 계산 (공식 룰 602.1.3: 게임의 맨 첫 번째 턴(선공의 턴 1)은 1장, 그 외 모든 턴은 2장)
   const currentTurnDrawCount = getTurnDrawCount(gameState);
@@ -519,8 +520,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   const handleFinishEffectDrawWithCooldown = useCallback(() => {
     lastDrawDismissTimeRef.current = Date.now();
-    handleFinishEffectDraw();
-  }, [handleFinishEffectDraw]);
+    handleFinishEffectDraw(gameState.lastEffectDraw?.id);
+  }, [handleFinishEffectDraw, gameState.lastEffectDraw?.id]);
 
   useEffect(() => {
     if (gameState.phase !== 'CLASH_SET') {
@@ -1628,7 +1629,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
             engineResolvePendingChoice(payload.optionId);
             break;
           case 'FINISH_EFFECT_DRAW':
-            engineFinishEffectDraw();
+            engineFinishEffectDraw(payload?.drawId);
             break;
           default:
             break;
@@ -4199,8 +4200,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                 )
               )}
 
-              {/* 4. 패 초과 버리기 단계 (DISCARD_OVERFLOW) */}
-              {gameState.phase === 'DISCARD_OVERFLOW' && (
+              {/* 4. 패 초과 버리기 단계 (DISCARD_OVERFLOW, 드로우 연출이 끝난 후 표출) */}
+              {gameState.phase === 'DISCARD_OVERFLOW' && !gameState.lastEffectDraw && (
                 isSpectator ? (
                   <div className="p-3 bg-[#111520] border border-indigo-500/50 text-indigo-200 text-xs text-center font-bold animate-pulse">
                     👁️ 손패 상한 초과 카드 정리 중입니다...
@@ -4554,9 +4555,11 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         onComplete={handleFinishEffectDrawWithCooldown}
         viewerPlayerIndex={viewerPlayerIndex}
         hideCardFaces={
-          isMultiplayer &&
-          !!gameState.lastEffectDraw &&
-          gameState.lastEffectDraw.playerIndex !== viewerPlayerIndex
+          (isMultiplayer &&
+            !!gameState.lastEffectDraw &&
+            gameState.lastEffectDraw.playerIndex !== viewerPlayerIndex) ||
+          (!!gameState.lastEffectDraw &&
+            Boolean(gameState.players[gameState.lastEffectDraw.playerIndex]?.isAi))
         }
         isMultiplayer={isMultiplayer}
       />

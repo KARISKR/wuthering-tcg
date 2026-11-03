@@ -326,10 +326,13 @@ export function useGame(
     setGameState((prev) => (prev.lastEffectEvent ? { ...prev, lastEffectEvent: null } : prev));
   }, []);
 
-  // 효과 드로우 및 패 비행 연출 완료 후 정리 및 후속 선택 모달 활성화
-  const handleFinishEffectDraw = useCallback(() => {
+  // 효과 드로우 및 패 비행 연출 완료 후 정리 및 후속 선택 모달 활성화 (completedDrawId 전달 시 해당 ID와 일치할 때만 닫기)
+  const handleFinishEffectDraw = useCallback((completedDrawId?: string) => {
     setGameState((prev) => {
       if (!prev.lastEffectDraw) return prev;
+      if (completedDrawId && prev.lastEffectDraw.id !== completedDrawId) {
+        return prev;
+      }
       if (
         !prev.clashResult &&
         !prev.lastComboStrike &&

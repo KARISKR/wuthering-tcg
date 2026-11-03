@@ -2426,7 +2426,8 @@ export function applyBossEchoHitEffects(
     const [returnedCard] = defender.hand.splice(randIdx, 1);
     if (returnedCard) {
       defender.actionDeck.push(returnedCard);
-      const desc = `상대의 패 [${returnedCard.nameKr}] 1장을 상대 덱 맨 아래로 되돌렸습니다!`;
+      // 공식 룰: 상대의 패에서 비공개로 덱 맨 아래로 되돌아가므로 카드 이름은 비공개 유지
+      const desc = `상대의 패를 무작위로 1장 상대 덱 맨 아래로 되돌렸습니다!`;
       newState = addLog(
         newState,
         `[폭주의 고릴라 BP01-039 우세 효과] ${desc}`,
@@ -6000,7 +6001,7 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
         const drawn = drawSingleCardFromDeck(pl);
         if (drawn) {
           addCardsToHand(pl, [drawn]);
-          newState = addLog(newState, `[효과 드로우] [방랑자(남) Lv.2 턴 종료 효과] 덱에서 [${drawn.nameKr}]을(를) 드로우했습니다.`, 'ACTION', i as 0 | 1);
+          newState = addLog(newState, `[효과 드로우] [방랑자(남) Lv.2 턴 종료 효과] 카드 1장을 드로우했습니다.`, 'ACTION', i as 0 | 1);
           newState = queueEffectDraw(newState, {
             id: `edraw-sd02-001-end-${newState.turn}-${i}-${Date.now()}`,
             playerIndex: i as 0 | 1,
@@ -6013,7 +6014,7 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
             playerIndex: i as 0 | 1,
             effectType: 'DRAW',
             title: '방랑자(남) Lv.2 — 턴 종료 효과',
-            description: `【각 턴 종료 시】 효과로 [${drawn.nameKr}] 카드를 1장 뽑았습니다!`,
+            description: `【각 턴 종료 시】 효과로 카드를 1장 뽑았습니다!`,
             sourceCardName: '방랑자(남) Lv.2 [SD02-001]',
             sourceCardArt: pl.slots.leader.artUrl,
             timestamp: Date.now(),
