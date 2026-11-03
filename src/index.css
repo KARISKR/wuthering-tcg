@@ -47,9 +47,9 @@
 }
 
 /* 덱 선택, 도감, 필드 등 축소 썸네일 박스 모서리 계단 현상 및 내부 이미지 떨림 방지 */
-.overflow-hidden,
-[class*="overflow-hidden"],
-[class*="rounded-"] {
+.card-img,
+.card-view,
+.card-texture {
   -webkit-mask-image: -webkit-radial-gradient(white, black);
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;

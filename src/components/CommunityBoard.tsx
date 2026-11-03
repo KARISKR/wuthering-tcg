@@ -69,7 +69,7 @@ import {
   presetToCustomDeck,
   customDeckToPreset,
 } from '../utils/deckCode';
-import { CURRENT_GAME_VERSION } from '../data/patchNotes';
+import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 import type { CustomDeckConfig } from '../types/tcg';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 

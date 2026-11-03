@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { BgmPlayer } from './BgmPlayer';
-import { CURRENT_GAME_VERSION } from '../data/patchNotes';
+import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 import type { CustomDeckConfig } from '../types/tcg';
-import { DeckSelectModal } from './DeckSelectModal';
 import { VisitorStatsWidget } from './VisitorStatsWidget';
 import { startIdleCardPreload } from '../utils/cardImagePreloader';
 
+const DeckSelectModal = lazy(() => import('./DeckSelectModal').then((m) => ({ default: m.DeckSelectModal })));
 const OfficialManualModal = lazy(() => import('./OfficialManualModal').then((m) => ({ default: m.OfficialManualModal })));
 const CardCatalogModal = lazy(() => import('./CardCatalogModal').then((m) => ({ default: m.CardCatalogModal })));
 const DeckPresetModal = lazy(() => import('./DeckPresetModal').then((m) => ({ default: m.DeckPresetModal })));
@@ -43,7 +43,8 @@ import {
 
 import { BattleReplayData } from '../utils/replayManager';
 import {
-  fetchGlobalFeedbackList,
+  fetchBoardSummaryForLobby,
+  getFeedbackList,
   getLatestNotice,
   hasNewPosts,
   FeedbackItem,
@@ -84,14 +85,23 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
   const [isMultiplayerModalOpen, setIsMultiplayerModalOpen] = useState(false);
-  const [boardPosts, setBoardPosts] = useState<FeedbackItem[]>([]);
+  const [boardPosts, setBoardPosts] = useState<FeedbackItem[]>(() => {
+    try {
+      return getFeedbackList();
+    } catch {
+      return [];
+    }
+  });
 
   useEffect(() => {
-    fetchGlobalFeedbackList().then((posts) => {
-      if (Array.isArray(posts)) {
-        setBoardPosts(posts);
-      }
-    });
+    const timer = window.setTimeout(() => {
+      fetchBoardSummaryForLobby().then((posts) => {
+        if (Array.isArray(posts)) {
+          setBoardPosts(posts);
+        }
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const latestNotice = useMemo(() => getLatestNotice(boardPosts), [boardPosts]);
@@ -251,7 +261,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           title="명조 배틀 (클릭)"
         >
           <img
-            src="/images/logo-battle-trans.png"
+            src="/images/logo-battle-trans.webp"
             alt="명조 배틀"
             className="h-8 sm:h-10 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] group-hover:scale-105 transition-transform"
           />
@@ -392,7 +402,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           {/* 공식 명조 배틀 로고 이미지 (요청에 따라 크기 확대) */}
           <div className="relative flex items-center justify-center">
             <img
-              src="/images/logo-battle-trans.png"
+              src="/images/logo-battle-trans.webp"
               alt="명조 배틀"
               className="h-28 sm:h-36 md:h-48 lg:h-52 xl:h-56 2xl:h-60 w-auto max-w-[85vw] object-contain drop-shadow-[0_0_36px_rgba(255,255,255,0.35)] hover:scale-[1.02] transition-transform duration-300"
             />
@@ -517,11 +527,6 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-fuchsia-400 z-20 pointer-events-none" />
               <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-cyan-300 z-20 pointer-events-none" />
 
-              <div
-                className="absolute inset-0 bg-cover bg-right transition-transform duration-700 ease-out group-hover:scale-105 pointer-events-none opacity-40 group-hover:opacity-60"
-                style={{ backgroundImage: `url('/images/bg-deck.png')` }}
-              />
-
               <div className="relative z-20 flex flex-col justify-center">
                 <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-cyan-200 transition-colors tracking-tight drop-shadow">
                   덱 빌더
@@ -549,11 +554,6 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="absolute inset-1.5 border border-emerald-400/25 pointer-events-none z-10" />
               <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-emerald-300 z-20 pointer-events-none" />
               <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-emerald-300 z-20 pointer-events-none" />
-
-              <div
-                className="absolute inset-0 bg-cover bg-right transition-transform duration-700 ease-out group-hover:scale-105 pointer-events-none opacity-40 group-hover:opacity-60"
-                style={{ backgroundImage: `url('/images/bg-gallery.png')` }}
-              />
 
               <div className="relative z-20 flex flex-col justify-center">
                 <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-emerald-200 transition-colors tracking-tight drop-shadow">
@@ -1006,23 +1006,25 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       )}
 
-      {/* 덱 선택 모달 (AI 봇 대전 / 1인 2역) */}
-      <DeckSelectModal
-        isOpen={deckSelectMode !== null}
-        mode={deckSelectMode ?? 'AI'}
-        onClose={() => {
-          clearHash();
-          setDeckSelectMode(null);
-        }}
-        onConfirm={(myDeck, oppDeck) => {
-          const m = deckSelectMode ?? 'AI';
-          setDeckSelectMode(null);
-          onStartGame(m, myDeck, oppDeck);
-        }}
-      />
-
       {/* 비동기 지연 로드 모달 컴포넌트 풀 (Suspense) */}
       <Suspense fallback={null}>
+        {/* 덱 선택 모달 (AI 봇 대전 / 1인 2역) */}
+        {deckSelectMode !== null && (
+          <DeckSelectModal
+            isOpen={deckSelectMode !== null}
+            mode={deckSelectMode ?? 'AI'}
+            onClose={() => {
+              clearHash();
+              setDeckSelectMode(null);
+            }}
+            onConfirm={(myDeck, oppDeck) => {
+              const m = deckSelectMode ?? 'AI';
+              setDeckSelectMode(null);
+              onStartGame(m, myDeck, oppDeck);
+            }}
+          />
+        )}
+
         {/* 온라인 1:1 멀티플레이 로비 모달 */}
         {isMultiplayerModalOpen && (
           <MultiplayerLobbyModal

@@ -1,4 +1,4 @@
-import { CURRENT_GAME_VERSION } from '../data/patchNotes';
+import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 
 export type FeedbackCategory = 'NOTICE' | 'GENERAL' | 'DECK' | 'TIP' | 'FEEDBACK' | 'BUG' | 'RULE' | 'FEATURE';
 
@@ -112,6 +112,18 @@ export const ACTIVE_CATEGORIES: FeedbackCategory[] = ['NOTICE', 'GENERAL', 'DECK
 // 가짜 시드 글을 완전히 비워 유저 실제 글만 표시되도록 함
 const SEED_POSTS: FeedbackItem[] = [];
 
+// 인메모리 캐시: 반복적인 localStorage 대용량 JSON.parse 동기 블로킹 방지
+let memoryPostsCache: FeedbackItem[] | null = null;
+
+function persistLocalPosts(posts: FeedbackItem[]): void {
+  memoryPostsCache = posts;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(posts));
+  } catch (err) {
+    console.warn('[feedbackManager] Failed to persist feedback list:', err);
+  }
+}
+
 export function getDeletedFeedbackIds(): string[] {
   try {
     const raw = localStorage.getItem(DELETED_KEY);
@@ -132,16 +144,41 @@ export function recordDeletedId(id: string): void {
 }
 
 export function getFeedbackList(): FeedbackItem[] {
+  if (memoryPostsCache) return memoryPostsCache;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
       return SEED_POSTS;
     }
     const list: FeedbackItem[] = JSON.parse(raw);
-    return Array.isArray(list) ? list : SEED_POSTS;
+    if (Array.isArray(list)) {
+      memoryPostsCache = list;
+      return list;
+    }
+    return SEED_POSTS;
   } catch {
     return SEED_POSTS;
   }
+}
+
+/**
+ * 로비 초기 진입용 초경량 요약 조회 (본문 및 Base64 첨부 이미지 제외)
+ * 초기 로딩 시 수 MB의 게시글 이미지 다운로드를 방지합니다.
+ */
+export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
+  const deletedIds = getDeletedFeedbackIds();
+  try {
+    const res = await fetch('/api/community?type=board&summary=1', {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.posts)) {
+        return (data.posts as FeedbackItem[]).filter((p) => p && p.id && !deletedIds.includes(p.id));
+      }
+    }
+  } catch {}
+  return getFeedbackList();
 }
 
 export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
@@ -150,7 +187,7 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
 
   // 1순위: Cloudflare Pages Function (/api/community?type=board)
   try {
-    const res = await fetch(`/api/community?type=board&t=${Date.now()}`, {
+    const res = await fetch('/api/community?type=board', {
       headers: { Accept: 'application/json' },
     });
     if (res.ok) {
@@ -221,9 +258,7 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
   }
 
   const merged = Array.from(mergedMap.values());
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-  } catch {}
+  persistLocalPosts(merged);
   return merged;
 }
 
@@ -287,19 +322,13 @@ export function saveFeedback(
     ...data,
   };
   const updated = [newItem, ...list];
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to persist feedback list:', err);
-  }
+  persistLocalPosts(updated);
 
   // 글로벌 클라우드 병합 및 동기화
   fetchGlobalFeedbackList().then((latest) => {
     const exists = latest.some((item) => item.id === newItem.id);
     const finalPosts = exists ? latest : [newItem, ...latest];
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(finalPosts));
-    } catch {}
+    persistLocalPosts(finalPosts);
     syncFeedbackListToCloud(finalPosts);
   });
 
@@ -314,11 +343,7 @@ export function incrementViewCount(id: string): void {
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to increment views:', err);
-  }
+  persistLocalPosts(updated);
 }
 
 export function toggleLikeFeedback(id: string): { likes: number; likedByMe: boolean } {
@@ -333,11 +358,7 @@ export function toggleLikeFeedback(id: string): { likes: number; likedByMe: bool
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to toggle like:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
   return result;
 }
@@ -354,11 +375,7 @@ export function toggleDislikeFeedback(id: string): { dislikes: number; dislikedB
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to toggle dislike:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
   return result;
 }
@@ -392,11 +409,7 @@ export function addCommentToFeedback(
     return item;
   });
 
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to add comment:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
   return newComment;
 }
@@ -415,11 +428,7 @@ export function updateFeedback(id: string, updates: Partial<Omit<FeedbackItem, '
       updatedAt: new Date().toISOString(),
     };
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to update feedback:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
 }
 
@@ -427,15 +436,12 @@ export function deleteFeedback(id: string): void {
   recordDeletedId(id);
   const list = getFeedbackList();
   const filtered = list.filter((item) => item.id !== id);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to delete feedback:', err);
-  }
+  persistLocalPosts(filtered);
   syncFeedbackListToCloud(filtered);
 }
 
 export function clearAllFeedback(): void {
+  memoryPostsCache = null;
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch (err) {
@@ -609,11 +615,7 @@ export function updateCommentInFeedback(
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to update comment:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
   return true;
 }
@@ -629,11 +631,7 @@ export function deleteCommentFromFeedback(postId: string, commentId: string): bo
     }
     return item;
   });
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch (err) {
-    console.warn('[feedbackManager] Failed to delete comment:', err);
-  }
+  persistLocalPosts(updated);
   syncFeedbackListToCloud(updated);
   return true;
 }

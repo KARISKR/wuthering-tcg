@@ -254,13 +254,9 @@ class BgmManager {
     }
 
     const audio = new Audio();
-    audio.preload = 'metadata';
+    audio.preload = 'none';
     this.audio = audio;
 
-    const currentTrack = tracks[this.currentTrackIdx] || tracks[0];
-    if (currentTrack) {
-      audio.src = currentTrack.src;
-    }
     audio.volume = this.getEffectiveVolume();
     audio.loop = this.isLooping;
 
@@ -275,7 +271,29 @@ class BgmManager {
       }
     };
 
-    this.attemptAutoplay();
+    const startDeferredAudio = () => {
+      if (!this.audio) return;
+      if (!this.audio.getAttribute('src')) {
+        const currentTracks = this.getCurrentTracks();
+        const currentTrack = currentTracks[this.currentTrackIdx] || currentTracks[0];
+        if (currentTrack) {
+          this.audio.src = currentTrack.src;
+        }
+      }
+      this.attemptAutoplay();
+    };
+
+    if (document.readyState === 'complete') {
+      window.setTimeout(startDeferredAudio, 1200);
+    } else {
+      window.addEventListener(
+        'load',
+        () => {
+          window.setTimeout(startDeferredAudio, 1200);
+        },
+        { once: true }
+      );
+    }
   }
 
   public getEffectiveVolume(): number {
@@ -471,6 +489,11 @@ class BgmManager {
       this.isPlaying = false;
       this.notify();
     } else {
+      if (!this.audio.getAttribute('src')) {
+        const tracks = this.getCurrentTracks();
+        const track = tracks[this.currentTrackIdx] || tracks[0];
+        if (track) this.audio.src = track.src;
+      }
       this.applyAudioVolume();
       this.audio
         .play()

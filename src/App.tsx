@@ -5,9 +5,26 @@ import type { BattleReplayData } from './utils/replayManager';
 import { bgmManager } from './utils/bgmManager';
 import { MAINTENANCE_CONFIG } from './config/maintenanceConfig';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
-import { multiplayerService } from './services/multiplayerService';
 import type { MultiplayerRole, MultiplayerSessionData } from './types/multiplayer';
 import { Wifi, RotateCcw, X } from 'lucide-react';
+
+const MULTIPLAYER_SESSION_STORAGE_KEY = 'wuthering_multiplayer_session_v1';
+
+function getSavedMultiplayerSession(): MultiplayerSessionData | null {
+  try {
+    const raw = localStorage.getItem(MULTIPLAYER_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as MultiplayerSessionData;
+  } catch {
+    return null;
+  }
+}
+
+function clearSavedMultiplayerSession(): void {
+  try {
+    localStorage.removeItem(MULTIPLAYER_SESSION_STORAGE_KEY);
+  } catch {}
+}
 
 const GameBoard = lazy(() => import('./components/GameBoard').then((m) => ({ default: m.GameBoard })));
 const DeckBuilder = lazy(() => import('./components/DeckBuilder').then((m) => ({ default: m.DeckBuilder })));
@@ -29,11 +46,11 @@ export function App() {
 
   // 멀티플레이 세션 복구 확인 (브라우저 종료 또는 새로고침 후 복구 지원)
   useEffect(() => {
-    const session = multiplayerService.getSavedSession();
+    const session = getSavedMultiplayerSession();
     if (session && Date.now() - session.timestamp < 10 * 60 * 1000 && session.lastGameState) {
       // 관전자는 새로고침 시 대결 복구 토스트 없이 세션 정리
       if (session.role === 'SPECTATOR') {
-        multiplayerService.clearSession();
+        clearSavedMultiplayerSession();
         return;
       }
 
@@ -46,8 +63,10 @@ export function App() {
         setCustomDeck(session.myProfile.customDeck || null);
         setOpponentDeck(session.opponentProfile?.customDeck || null);
         setCurrentView('BATTLE');
-        multiplayerService.attemptReconnect().catch((e) => {
-          console.warn('Auto-reconnect on reload failed:', e);
+        import('./services/multiplayerService').then(({ multiplayerService }) => {
+          multiplayerService.attemptReconnect().catch((e) => {
+            console.warn('Auto-reconnect on reload failed:', e);
+          });
         });
       } else {
         setSavedSessionToResume(session);
@@ -166,6 +185,7 @@ export function App() {
     setSavedSessionToResume(null);
     setCurrentView('BATTLE');
     try {
+      const { multiplayerService } = await import('./services/multiplayerService');
       await multiplayerService.attemptReconnect();
     } catch (e) {
       console.warn('Reconnect failed:', e);
@@ -173,7 +193,10 @@ export function App() {
   };
 
   const handleDismissResume = () => {
-    multiplayerService.clearSession();
+    clearSavedMultiplayerSession();
+    import('./services/multiplayerService').then(({ multiplayerService }) => {
+      multiplayerService.clearSession();
+    });
     setSavedSessionToResume(null);
   };
 
@@ -243,7 +266,9 @@ export function App() {
     setIsTutorialBattle(false);
     bgmManager.unlockTrack();
     if (battleMode === 'MULTIPLAYER') {
-      multiplayerService.leaveRoom();
+      import('./services/multiplayerService').then(({ multiplayerService }) => {
+        multiplayerService.leaveRoom();
+      });
     }
     setMultiplayerRole(null);
     if (window.location.hash.toLowerCase().includes('battle')) {
