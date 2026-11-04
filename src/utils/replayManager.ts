@@ -315,3 +315,78 @@ export async function importReplayFromFile(file: File): Promise<{ success: boole
   }
 }
 
+/**
+ * 서버에 저장된 공개 멀티배틀 리플레이 목록(요약본) 조회
+ */
+export async function fetchPublicReplayIndex(): Promise<BattleReplaySummary[]> {
+  try {
+    const res = await fetch(`/api/community?type=replays&summary=1&t=${Date.now()}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return [];
+    const json: any = await res.json();
+    return Array.isArray(json?.replays) ? json.replays : [];
+  } catch (err) {
+    console.warn('[Public Replay Index Fetch Error]:', err);
+    return [];
+  }
+}
+
+/**
+ * 특정 공개 멀티배틀 리플레이 상세 데이터 조회 (재생 클릭 시 호출)
+ */
+export async function fetchPublicReplayDetail(replayId: string): Promise<BattleReplayData | null> {
+  try {
+    const res = await fetch(`/api/community?type=replays&id=${encodeURIComponent(replayId)}&t=${Date.now()}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const json: any = await res.json();
+    if (json && Array.isArray(json.logs)) {
+      return json as BattleReplayData;
+    }
+    return null;
+  } catch (err) {
+    console.warn('[Public Replay Detail Fetch Error]:', err);
+    return null;
+  }
+}
+
+/**
+ * 멀티배틀 종료 시 방장(Host)이 서버에 리플레이 자동 업로드
+ * 덱 유출을 방지하기 위해 덱 원본 목록을 제거하고 순수 경기 스냅샷/로그만 전송
+ */
+export async function uploadPublicMultiplayerReplay(replay: BattleReplayData): Promise<boolean> {
+  try {
+    // 최소 2턴 이상 및 로그 8건 이상인 정상 경기만 등록
+    if (replay.totalTurns < 2 || replay.logs.length < 8) {
+      return false;
+    }
+
+    const payload = {
+      id: replay.id,
+      timestamp: replay.timestamp,
+      gameMode: 'MULTIPLAYER',
+      totalTurns: replay.totalTurns,
+      winner: replay.winner,
+      p0Leader: replay.p0Leader,
+      p1Leader: replay.p1Leader,
+      p0Hp: replay.p0Hp,
+      p1Hp: replay.p1Hp,
+      p0Name: replay.p0Name,
+      p1Name: replay.p1Name,
+      logs: replay.logs,
+    };
+
+    const res = await fetch('/api/community?type=replays', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Public Replay Upload Error]:', err);
+    return false;
+  }
+}
+

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   BattleReplayData,
+  BattleReplaySummary,
   getSavedReplays,
   deleteBattleReplay,
   clearAllBattleReplays,
@@ -10,6 +11,8 @@ import {
   importReplayFromCodeOrJson,
   encodeReplayToShareCode,
   restoreSampleReplays,
+  fetchPublicReplayIndex,
+  fetchPublicReplayDetail,
 } from '../utils/replayManager';
 import {
   X,
@@ -34,6 +37,9 @@ import {
   Shield,
   Layers,
   ScrollText,
+  Globe,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 
 interface BattleReplayModalProps {
@@ -51,7 +57,11 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
   initialSelectedReplayId,
   onPlayBattleReplay,
 }) => {
+  const [activeTab, setActiveTab] = useState<'PUBLIC' | 'LOCAL'>('PUBLIC');
   const [replays, setReplays] = useState<BattleReplayData[]>(() => getSavedReplays());
+  const [publicSummaries, setPublicSummaries] = useState<BattleReplaySummary[]>([]);
+  const [isLoadingPublic, setIsLoadingPublic] = useState(false);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const [inspectingReplay, setInspectingReplay] = useState<BattleReplayData | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [modeFilter, setModeFilter] = useState<'ALL' | 'AI' | 'SOLO_DUAL'>('ALL');
@@ -64,6 +74,16 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const loadPublicReplays = async () => {
+    setIsLoadingPublic(true);
+    try {
+      const list = await fetchPublicReplayIndex();
+      setPublicSummaries(list);
+    } finally {
+      setIsLoadingPublic(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen) {
       const list = getSavedReplays();
@@ -75,8 +95,13 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
 
       if (initialSelectedReplayId) {
         const found = list.find((r) => r.id === initialSelectedReplayId);
-        if (found) setInspectingReplay(found);
+        if (found) {
+          setInspectingReplay(found);
+          setActiveTab('LOCAL');
+        }
       }
+
+      loadPublicReplays();
     } else {
       setInspectingReplay(null);
     }
@@ -87,6 +112,60 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
     setReplays(list);
     if (inspectingReplay && !list.some((r) => r.id === inspectingReplay.id)) {
       setInspectingReplay(null);
+    }
+  };
+
+  const filteredPublicReplays = useMemo(() => {
+    return publicSummaries.filter((r) => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const p0 = (r.p0Name || '').toLowerCase();
+        const p1 = (r.p1Name || '').toLowerCase();
+        const l0 = (r.p0Leader?.nameKr || '').toLowerCase();
+        const l1 = (r.p1Leader?.nameKr || '').toLowerCase();
+        const id = (r.id || '').toLowerCase();
+        if (!p0.includes(q) && !p1.includes(q) && !l0.includes(q) && !l1.includes(q) && !id.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [publicSummaries, searchQuery]);
+
+  const handleInspectSummary = async (summary: BattleReplaySummary) => {
+    // 이미 캐싱되어 있거나 로컬에 있는 경우
+    const local = replays.find((r) => r.id === summary.id);
+    if (local) {
+      setInspectingReplay(local);
+      return;
+    }
+
+    setIsLoadingDetail(true);
+    try {
+      const full = await fetchPublicReplayDetail(summary.id);
+      if (full) {
+        setInspectingReplay(full);
+      } else {
+        alert('해당 공개 리플레이 데이터를 불러오지 못했습니다.');
+      }
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  };
+
+  const handlePlayDirect = async (summary: BattleReplaySummary, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setIsLoadingDetail(true);
+    try {
+      const full = await fetchPublicReplayDetail(summary.id);
+      if (full && onPlayBattleReplay) {
+        onPlayBattleReplay(full);
+        onClose();
+      } else {
+        alert('해당 공개 리플레이 데이터를 불러오지 못했습니다.');
+      }
+    } finally {
+      setIsLoadingDetail(false);
     }
   };
 
@@ -295,6 +374,45 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
           </div>
         </header>
 
+        {/* 상단 탭 네비게이션: [🌐 멀티배틀 공개 리플레이 광장] vs [📁 내 로컬 리플레이] */}
+        <div className="px-6 pt-3 pb-0 bg-[#0d1226] border-b border-purple-400/20 flex items-center gap-2 relative z-20">
+          <button
+            onClick={() => {
+              setActiveTab('PUBLIC');
+              setSearchQuery('');
+            }}
+            className={`flex items-center gap-2 px-5 py-2.5 font-black text-xs sm:text-sm border-b-2 transition cursor-pointer ${
+              activeTab === 'PUBLIC'
+                ? 'border-purple-400 text-purple-200 bg-purple-950/40'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Globe className="w-4 h-4 text-purple-400" />
+            <span>멀티배틀 공개 리플레이 광장</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">
+              {publicSummaries.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('LOCAL');
+              setSearchQuery('');
+            }}
+            className={`flex items-center gap-2 px-5 py-2.5 font-black text-xs sm:text-sm border-b-2 transition cursor-pointer ${
+              activeTab === 'LOCAL'
+                ? 'border-amber-400 text-amber-200 bg-amber-950/30'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <History className="w-4 h-4 text-amber-400" />
+            <span>내 로컬 리플레이 (개인 보관함)</span>
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
+              {replays.length}
+            </span>
+          </button>
+        </div>
+
         {/* 안내 알림 배너 */}
         {importNotice && (
           <div className="px-6 py-2 bg-emerald-500/20 border-b border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-bold flex items-center gap-2 relative z-20">
@@ -311,172 +429,320 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="플레이어명, 리더 캐릭터명, 덱 이름, 리플레이 코드 검색..."
+              placeholder="플레이어명, 리더 캐릭터명, 리플레이 코드 검색..."
               className="w-full pl-10 pr-4 py-2 bg-slate-950/80 border border-slate-700/70 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 transition"
             />
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/70">
-            {[
-              { id: 'ALL', label: `전체 (${replays.length})` },
-              { id: 'AI', label: `AI 대전 (${replays.filter((r) => r.gameMode === 'AI').length})` },
-              { id: 'SOLO_DUAL', label: `연습 듀얼 (${replays.filter((r) => r.gameMode === 'SOLO_DUAL').length})` },
-            ].map((m) => (
-              <button
-                key={m.id}
-                onClick={() => setModeFilter(m.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
-                  modeFilter === m.id
-                    ? 'bg-purple-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 타일 그리드 영역 (공유된 덱 리스트와 동일한 Master Duel 식 타일 뷰) */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-7 relative z-20 custom-scrollbar">
-          {filteredReplays.length === 0 ? (
-            <div className="h-72 flex flex-col items-center justify-center text-slate-500 gap-3 text-center">
-              <History className="w-12 h-12 opacity-30 text-purple-400" />
-              <p className="font-bold text-base text-slate-300">보관된 리플레이가 없습니다</p>
-              <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
-                전투가 끝나면 결과 화면에서 저장하거나,<br />
-                리플레이 파일(.json)을 가져와 감상할 수 있습니다.
-              </p>
+          {activeTab === 'LOCAL' ? (
+            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/70">
+              {[
+                { id: 'ALL', label: `전체 (${replays.length})` },
+                { id: 'AI', label: `AI 대전 (${replays.filter((r) => r.gameMode === 'AI').length})` },
+                { id: 'SOLO_DUAL', label: `연습 듀얼 (${replays.filter((r) => r.gameMode === 'SOLO_DUAL').length})` },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setModeFilter(m.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
+                    modeFilter === m.id
+                      ? 'bg-amber-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
             </div>
           ) : (
-            <div className="grid gap-5 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(265px,1fr))] max-w-[1600px] mx-auto">
-              {filteredReplays.map((rep) => {
-                const isP0Win = rep.winner === 0;
-                const winnerName = isP0Win ? rep.p0Name : rep.p1Name;
-                const dateStr = new Date(rep.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
-                const timeStr = new Date(rep.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                const isAi = rep.gameMode === 'AI';
-                const isCopied = copiedId === rep.id;
+            <button
+              onClick={loadPublicReplays}
+              disabled={isLoadingPublic}
+              className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/35 border border-purple-500/40 text-purple-200 text-xs font-black flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPublic ? 'animate-spin text-purple-400' : ''}`} />
+              <span>새로고침</span>
+            </button>
+          )}
+        </div>
 
-                return (
-                  <div
-                    key={rep.id}
-                    onClick={() => setInspectingReplay(rep)}
-                    className="group relative aspect-[1/1.26] border-2 border-slate-600/80 hover:border-purple-400 bg-[#080d1b]/95 hover:bg-[#150f28] flex flex-col justify-between cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(168,85,247,0.35)] p-4"
-                    style={{ clipPath: TILE_CLIP }}
-                  >
-                    {/* 리더 캐릭터 아트워크 배경 (우측 살짝 비네트) */}
-                    {rep.p0Leader?.artUrl && (
-                      <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                        <img
-                          src={rep.p0Leader.artUrl}
-                          alt=""
-                          className="w-full h-full object-cover object-top opacity-30 group-hover:opacity-45 group-hover:scale-105 transition-all duration-500"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#060814] via-[#060814]/85 to-transparent" />
-                      </div>
-                    )}
+        {/* 타일 그리드 영역 */}
+        <div className="flex-1 overflow-y-auto p-5 sm:p-7 relative z-20 custom-scrollbar">
+          {activeTab === 'PUBLIC' ? (
+            // [탭 1: 멀티배틀 공개 리플레이 광장]
+            isLoadingPublic ? (
+              <div className="h-72 flex flex-col items-center justify-center text-purple-400 gap-3">
+                <Loader2 className="w-10 h-10 animate-spin opacity-80" />
+                <p className="font-bold text-sm text-slate-300">공개 멀티배틀 리플레이 목록을 불러오는 중...</p>
+              </div>
+            ) : filteredPublicReplays.length === 0 ? (
+              <div className="h-72 flex flex-col items-center justify-center text-slate-500 gap-3 text-center">
+                <Globe className="w-12 h-12 opacity-30 text-purple-400" />
+                <p className="font-bold text-base text-slate-300">등록된 멀티배틀 공개 리플레이가 없습니다</p>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
+                  멀티배틀을 2턴 이상 완료하면 방장 측에서 자동으로 이곳에 등록됩니다.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-5 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(265px,1fr))] max-w-[1600px] mx-auto">
+                {filteredPublicReplays.map((rep) => {
+                  const isP0Win = rep.winner === 0;
+                  const dateStr = new Date(rep.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
+                  const timeStr = new Date(rep.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                    {/* 타일 상단 뱃지: 모드(좌) & 승리자(우) */}
-                    <div className="relative z-10 flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-900/90 text-slate-300 border border-slate-700/80 flex items-center gap-1 backdrop-blur-md">
-                        {isAi ? <Bot className="w-3.5 h-3.5 text-amber-400" /> : <User className="w-3.5 h-3.5 text-indigo-400" />}
-                        <span>{isAi ? 'AI 봇 대전' : '연습 듀얼'}</span>
-                      </span>
-
-                      <span
-                        className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm backdrop-blur-md flex items-center gap-1 ${
-                          isP0Win
-                            ? 'bg-amber-500/25 text-amber-300 border-amber-500/50'
-                            : 'bg-purple-500/25 text-purple-300 border-purple-500/50'
-                        }`}
-                      >
-                        <Trophy className="w-3.5 h-3.5" />
-                        <span>{isP0Win ? '1P 승리' : isAi ? 'AI 승리' : '2P 승리'}</span>
-                      </span>
-                    </div>
-
-                    {/* 타일 중앙: 1P vs 2P 대전 상대 정보 */}
-                    <div className="relative z-10 my-auto py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        {/* 1P 리더 */}
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          {rep.p0Leader?.artUrl ? (
-                            <img
-                              src={rep.p0Leader.artUrl}
-                              alt=""
-                              className="w-10 h-10 rounded-xl object-cover border border-amber-400/60 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-xl bg-slate-800 shrink-0" />
-                          )}
-                          <div className="min-w-0">
-                            <span className="text-[10px] text-amber-400 font-bold block truncate">
-                              {rep.p0Name || '플레이어 1'}
-                            </span>
-                            <span className="text-xs font-black text-white truncate block">
-                              {rep.p0Leader?.nameKr || '리더'}
-                            </span>
-                          </div>
+                  return (
+                    <div
+                      key={rep.id}
+                      onClick={() => handleInspectSummary(rep)}
+                      className="group relative aspect-[1/1.26] border-2 border-purple-500/50 hover:border-purple-300 bg-[#080d1b]/95 hover:bg-[#150f28] flex flex-col justify-between cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(168,85,247,0.4)] p-4"
+                      style={{ clipPath: TILE_CLIP }}
+                    >
+                      {/* 리더 캐릭터 아트워크 배경 */}
+                      {rep.p0Leader?.artUrl && (
+                        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                          <img
+                            src={rep.p0Leader.artUrl}
+                            alt=""
+                            className="w-full h-full object-cover object-top opacity-30 group-hover:opacity-45 group-hover:scale-105 transition-all duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#060814] via-[#060814]/85 to-transparent" />
                         </div>
+                      )}
 
-                        <span className="text-xs font-mono font-black text-slate-500 shrink-0">VS</span>
+                      {/* 타일 상단 뱃지: 공개 멀티배틀 & 승리자 */}
+                      <div className="relative z-10 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-purple-950/90 text-purple-200 border border-purple-500/50 flex items-center gap-1 backdrop-blur-md">
+                          <Globe className="w-3.5 h-3.5 text-purple-400" />
+                          <span>멀티배틀</span>
+                        </span>
 
-                        {/* 2P 리더 */}
-                        <div className="flex items-center gap-2 min-w-0 flex-1 justify-end text-right">
-                          <div className="min-w-0">
-                            <span className="text-[10px] text-indigo-400 font-bold block truncate">
-                              {rep.p1Name || (isAi ? '스마트 AI 봇' : '플레이어 2')}
-                            </span>
-                            <span className="text-xs font-black text-white truncate block">
-                              {rep.p1Leader?.nameKr || '상대 리더'}
-                            </span>
-                          </div>
-                          {rep.p1Leader?.artUrl ? (
-                            <img
-                              src={rep.p1Leader.artUrl}
-                              alt=""
-                              className="w-10 h-10 rounded-xl object-cover border border-indigo-400/60 shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-xl bg-slate-800 shrink-0" />
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                        <span>{dateStr} {timeStr}</span>
-                        <span className="text-purple-300 font-bold">총 {rep.totalTurns}턴</span>
-                      </div>
-                    </div>
-
-                    {/* 타일 하단: 리플레이 코드 노출 및 원클릭 복사 버튼 */}
-                    <div className="relative z-10 pt-2.5 border-t border-slate-700/80 flex items-center justify-between gap-2">
-                      <div className="min-w-0 flex items-center gap-1.5 text-xs font-mono">
-                        <FileCode className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                        <span className="text-purple-300 font-bold truncate max-w-[130px] sm:max-w-[150px]" title={rep.id}>
-                          {rep.id}
+                        <span
+                          className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm backdrop-blur-md flex items-center gap-1 ${
+                            isP0Win
+                              ? 'bg-amber-500/25 text-amber-300 border-amber-500/50'
+                              : 'bg-purple-500/25 text-purple-300 border-purple-500/50'
+                          }`}
+                        >
+                          <Trophy className="w-3.5 h-3.5" />
+                          <span>{isP0Win ? '1P 승리' : '2P 승리'}</span>
                         </span>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={(e) => handleCopyReplayCode(rep, e)}
-                        className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition border cursor-pointer shrink-0 ${
-                          isCopied
-                            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                            : 'bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 border-purple-500/40'
-                        }`}
-                        title="리플레이 코드 복사"
-                      >
-                        {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{isCopied ? '복사됨' : '코드 복사'}</span>
-                      </button>
+                      {/* 타일 중앙: 1P vs 2P 대전 상대 정보 */}
+                      <div className="relative z-10 my-auto py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          {/* 1P 리더 */}
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            {rep.p0Leader?.artUrl ? (
+                              <img
+                                src={rep.p0Leader.artUrl}
+                                alt=""
+                                className="w-10 h-10 rounded-xl object-cover border border-amber-400/60 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-slate-800 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[10px] text-amber-400 font-bold block truncate">
+                                {rep.p0Name || '플레이어 1'}
+                              </span>
+                              <span className="text-xs font-black text-white truncate block">
+                                {rep.p0Leader?.nameKr || '리더'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span className="text-xs font-mono font-black text-slate-500 shrink-0">VS</span>
+
+                          {/* 2P 리더 */}
+                          <div className="flex items-center gap-2 min-w-0 flex-1 justify-end text-right">
+                            <div className="min-w-0">
+                              <span className="text-[10px] text-indigo-400 font-bold block truncate">
+                                {rep.p1Name || '플레이어 2'}
+                              </span>
+                              <span className="text-xs font-black text-white truncate block">
+                                {rep.p1Leader?.nameKr || '상대 리더'}
+                              </span>
+                            </div>
+                            {rep.p1Leader?.artUrl ? (
+                              <img
+                                src={rep.p1Leader.artUrl}
+                                alt=""
+                                className="w-10 h-10 rounded-xl object-cover border border-indigo-400/60 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-slate-800 shrink-0" />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                          <span>{dateStr} {timeStr}</span>
+                          <span className="text-purple-300 font-bold">총 {rep.totalTurns}턴</span>
+                        </div>
+                      </div>
+
+                      {/* 타일 하단: 복기 재생 원클릭 버튼 */}
+                      <div className="relative z-10 pt-2.5 border-t border-slate-700/80 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-mono text-slate-400 truncate max-w-[120px]" title={rep.id}>
+                          {rep.id}
+                        </span>
+
+                        <button
+                          type="button"
+                          disabled={isLoadingDetail}
+                          onClick={(e) => handlePlayDirect(rep, e)}
+                          className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 text-xs font-black hover:brightness-110 transition shadow cursor-pointer"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-slate-950" />
+                          <span>복기 재생</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )
+          ) : (
+            // [탭 2: 내 로컬 리플레이 보관함]
+            filteredReplays.length === 0 ? (
+              <div className="h-72 flex flex-col items-center justify-center text-slate-500 gap-3 text-center">
+                <History className="w-12 h-12 opacity-30 text-amber-400" />
+                <p className="font-bold text-base text-slate-300">보관된 로컬 리플레이가 없습니다</p>
+                <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
+                  전투가 끝나면 결과 화면에서 저장하거나,<br />
+                  리플레이 파일(.json)을 가져와 감상할 수 있습니다.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-5 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(240px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(265px,1fr))] max-w-[1600px] mx-auto">
+                {filteredReplays.map((rep) => {
+                  const isP0Win = rep.winner === 0;
+                  const dateStr = new Date(rep.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
+                  const timeStr = new Date(rep.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                  const isAi = rep.gameMode === 'AI';
+                  const isCopied = copiedId === rep.id;
+
+                  return (
+                    <div
+                      key={rep.id}
+                      onClick={() => setInspectingReplay(rep)}
+                      className="group relative aspect-[1/1.26] border-2 border-slate-600/80 hover:border-purple-400 bg-[#080d1b]/95 hover:bg-[#150f28] flex flex-col justify-between cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(168,85,247,0.35)] p-4"
+                      style={{ clipPath: TILE_CLIP }}
+                    >
+                      {/* 리더 캐릭터 아트워크 배경 (우측 살짝 비네트) */}
+                      {rep.p0Leader?.artUrl && (
+                        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+                          <img
+                            src={rep.p0Leader.artUrl}
+                            alt=""
+                            className="w-full h-full object-cover object-top opacity-30 group-hover:opacity-45 group-hover:scale-105 transition-all duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#060814] via-[#060814]/85 to-transparent" />
+                        </div>
+                      )}
+
+                      {/* 타일 상단 뱃지: 모드(좌) & 승리자(우) */}
+                      <div className="relative z-10 flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-slate-900/90 text-slate-300 border border-slate-700/80 flex items-center gap-1 backdrop-blur-md">
+                          {isAi ? <Bot className="w-3.5 h-3.5 text-amber-400" /> : <User className="w-3.5 h-3.5 text-indigo-400" />}
+                          <span>{isAi ? 'AI 봇 대전' : rep.gameMode === 'MULTIPLAYER' ? '멀티배틀' : '연습 듀얼'}</span>
+                        </span>
+
+                        <span
+                          className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm backdrop-blur-md flex items-center gap-1 ${
+                            isP0Win
+                              ? 'bg-amber-500/25 text-amber-300 border-amber-500/50'
+                              : 'bg-purple-500/25 text-purple-300 border-purple-500/50'
+                          }`}
+                        >
+                          <Trophy className="w-3.5 h-3.5" />
+                          <span>{isP0Win ? '1P 승리' : isAi ? 'AI 승리' : '2P 승리'}</span>
+                        </span>
+                      </div>
+
+                      {/* 타일 중앙: 1P vs 2P 대전 상대 정보 */}
+                      <div className="relative z-10 my-auto py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          {/* 1P 리더 */}
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            {rep.p0Leader?.artUrl ? (
+                              <img
+                                src={rep.p0Leader.artUrl}
+                                alt=""
+                                className="w-10 h-10 rounded-xl object-cover border border-amber-400/60 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-slate-800 shrink-0" />
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-[10px] text-amber-400 font-bold block truncate">
+                                {rep.p0Name || '플레이어 1'}
+                              </span>
+                              <span className="text-xs font-black text-white truncate block">
+                                {rep.p0Leader?.nameKr || '리더'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <span className="text-xs font-mono font-black text-slate-500 shrink-0">VS</span>
+
+                          {/* 2P 리더 */}
+                          <div className="flex items-center gap-2 min-w-0 flex-1 justify-end text-right">
+                            <div className="min-w-0">
+                              <span className="text-[10px] text-indigo-400 font-bold block truncate">
+                                {rep.p1Name || (isAi ? '스마트 AI 봇' : '플레이어 2')}
+                              </span>
+                              <span className="text-xs font-black text-white truncate block">
+                                {rep.p1Leader?.nameKr || '상대 리더'}
+                              </span>
+                            </div>
+                            {rep.p1Leader?.artUrl ? (
+                              <img
+                                src={rep.p1Leader.artUrl}
+                                alt=""
+                                className="w-10 h-10 rounded-xl object-cover border border-indigo-400/60 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-xl bg-slate-800 shrink-0" />
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                          <span>{dateStr} {timeStr}</span>
+                          <span className="text-purple-300 font-bold">총 {rep.totalTurns}턴</span>
+                        </div>
+                      </div>
+
+                      {/* 타일 하단: 리플레이 코드 노출 및 원클릭 복사 버튼 */}
+                      <div className="relative z-10 pt-2.5 border-t border-slate-700/80 flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex items-center gap-1.5 text-xs font-mono">
+                          <FileCode className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                          <span className="text-purple-300 font-bold truncate max-w-[130px] sm:max-w-[150px]" title={rep.id}>
+                            {rep.id}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => handleCopyReplayCode(rep, e)}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition border cursor-pointer shrink-0 ${
+                            isCopied
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
+                              : 'bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 border-purple-500/40'
+                          }`}
+                          title="리플레이 코드 복사"
+                        >
+                          {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{isCopied ? '복사됨' : '코드 복사'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )
           )}
         </div>
 

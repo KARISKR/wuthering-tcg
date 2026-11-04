@@ -63,6 +63,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
     if (choice) {
       const isNonCardPrompt =
         choice.onResolveType === 'VIEW_ONLY' ||
+        choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ||
         choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' ||
         choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' ||
         choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT';
@@ -83,6 +84,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
   const toggleSelect = (cardId: string) => {
     if (
       choice.onResolveType === 'VIEW_ONLY' ||
+      choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT'
@@ -105,6 +107,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
   const selectAll = () => {
     if (
       choice.onResolveType === 'VIEW_ONLY' ||
+      choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT'
@@ -119,6 +122,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
 
   const requiredConfirmCount =
     choice.onResolveType === 'VIEW_ONLY' ||
+    choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ||
     choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' ||
     choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' ||
     choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' ||
@@ -132,11 +136,13 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
       choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' ||
       choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT';
-    if (choice.onResolveType !== 'VIEW_ONLY' && !isPrompt && selectedIds.length < requiredConfirmCount) return;
+    if (choice.onResolveType !== 'VIEW_ONLY' && choice.onResolveType !== 'ROVER_0_DRAW_PROMPT' && !isPrompt && selectedIds.length < requiredConfirmCount) return;
     isSubmittingRef.current = true;
     setIsSubmitting(true);
     if (choice.onResolveType === 'VIEW_ONLY') {
       onResolve([]);
+    } else if (choice.onResolveType === 'ROVER_0_DRAW_PROMPT') {
+      onResolve(['2']);
     } else if (isPrompt) {
       onResolve(['DRAW']);
     } else {
@@ -144,6 +150,17 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
       onResolve(unique);
     }
     // 더블 클릭 방지 및 자동 리셋 가드 (멈춤 방지)
+    setTimeout(() => {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+    }, 800);
+  };
+
+  const handleRoverSelect = (count: number) => {
+    if (isSubmittingRef.current || isSubmitting) return;
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    onResolve([String(count)]);
     setTimeout(() => {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -248,9 +265,42 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
         </div>
 
         {/* ============================================================
-            파수인 교체/배틀/상시 회복 드로우 효과 전용 레이아웃 (SHOREKEEPER_SWITCH_PROMPT / SHOREKEEPER_0_DRAW_PROMPT / SHOREKEEPER_LV2_HEAL_DRAW_PROMPT)
+            방랑자 Lv.0 녹색 배틀 효과 카드 장수 선택 프롬프트 (ROVER_0_DRAW_PROMPT)
            ============================================================ */}
-        {choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' || choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' || choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' ? (
+        {choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ? (
+          <div className="flex flex-col items-center gap-4 py-2 my-1">
+            {/* 1. 중앙: 캐릭터 카드 풀 프레임 */}
+            <div className="relative w-52 sm:w-60 aspect-[5/7] rounded-2xl overflow-hidden border-2 border-emerald-500 ring-4 ring-emerald-500/30 shadow-[0_0_35px_rgba(16,185,129,0.45)] select-none">
+              <img
+                src={choice.sourceCardArt || '/cards/card_images/BP01-018_방랑자(여)_1141.webp'}
+                alt={choice.sourceCardName}
+                className="w-full h-full object-cover object-top"
+              />
+              <div className="absolute top-2.5 left-2.5 bg-black/85 backdrop-blur-sm px-2.5 py-1 text-xs font-mono font-bold text-emerald-300 border border-emerald-500/40 rounded">
+                {choice.sourceCardName}
+              </div>
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-3 text-center">
+                <span className="text-sm font-black text-white drop-shadow block">
+                  {choice.sourceCardName}
+                </span>
+                <span className="text-xs font-bold text-emerald-400">
+                  【리더】【배틀】녹색 카드 배틀 효과
+                </span>
+              </div>
+            </div>
+
+            {/* 2. 하단: 설명 안내 박스 */}
+            <div className="w-full max-w-xl bg-[#111520]/95 border border-emerald-500/50 p-4 sm:p-5 rounded-xl shadow-inner text-center">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-xs sm:text-sm mb-2">
+                <Sparkles className="w-4 h-4 text-emerald-400" />
+                <span>【덱 위 카드 공개 장수 선택 (최대 2장)】</span>
+              </div>
+              <div className="text-sm sm:text-base text-slate-100 font-bold leading-relaxed whitespace-pre-line">
+                {formatEffectText(choice.description, 'md')}
+              </div>
+            </div>
+          </div>
+        ) : choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' || choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' || choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' ? (
           <div className="flex flex-col items-center gap-4 py-2 my-1">
             {/* 1. 중앙: 캐릭터 카드 풀 프레임 */}
             <div className="relative w-52 sm:w-60 aspect-[5/7] rounded-2xl overflow-hidden border-2 border-[#f97316] ring-4 ring-[#f97316]/30 shadow-[0_0_35px_rgba(249,115,22,0.45)] select-none">
@@ -560,6 +610,33 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                 <span>확인 완료 (계속 진행)</span>
                 <ChevronRight className="w-5 h-5" />
               </button>
+            </div>
+          ) : choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ? (
+            <div className="w-full flex items-center justify-between flex-wrap gap-2">
+              <button
+                disabled={isSubmitting}
+                onClick={handleSkip}
+                className="px-5 py-3 text-xs sm:text-sm font-bold text-slate-300 hover:text-white bg-[#111520] hover:bg-[#1a2234] border border-white/15 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+              >
+                발동하지 않음 (0장)
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={isSubmitting || choice.maxSelect < 1}
+                  onClick={() => handleRoverSelect(1)}
+                  className="px-5 py-3 text-xs sm:text-sm font-bold text-emerald-200 bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/60 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+                >
+                  1장 공개 후 패 추가
+                </button>
+                <button
+                  disabled={isSubmitting || choice.maxSelect < 2}
+                  onClick={() => handleRoverSelect(2)}
+                  className="flex items-center gap-2 px-6 py-3 text-sm sm:text-base font-black bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:brightness-110 shadow-lg shadow-emerald-600/30 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+                >
+                  <CheckCircle2 className="w-5 h-5" />
+                  <span>2장 공개 후 패 추가</span>
+                </button>
+              </div>
             </div>
           ) : (
             <>

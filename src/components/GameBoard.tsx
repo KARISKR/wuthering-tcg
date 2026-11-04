@@ -20,7 +20,7 @@ const CardCatalogModal = lazy(() => import('./CardCatalogModal').then((m) => ({ 
 import { GameOverModal } from './GameOverModal';
 import { CinematicFinisherOverlay } from './CinematicFinisherOverlay';
 const BattleReplayModal = lazy(() => import('./BattleReplayModal').then((m) => ({ default: m.BattleReplayModal })));
-import { createBattleReplayData, BattleReplayData } from '../utils/replayManager';
+import { createBattleReplayData, BattleReplayData, uploadPublicMultiplayerReplay } from '../utils/replayManager';
 import { telemetryService } from '../services/telemetryService';
 const CardListModal = lazy(() => import('./CardListModal').then((m) => ({ default: m.CardListModal })));
 import { ConcertoSelectModal } from './ConcertoSelectModal';
@@ -672,6 +672,13 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         customDeck,
         opponentDeck
       );
+
+      // 멀티플레이 공개 리플레이 광장에 자동 업로드 (방장 1회 등록, 2턴 이상 진행된 경기)
+      if (currentMatchReplay && currentMatchReplay.totalTurns >= 2) {
+        uploadPublicMultiplayerReplay(currentMatchReplay).catch((err) => {
+          console.warn('[Auto Upload Public Replay Error]:', err);
+        });
+      }
     }
   }, [
     gameState.phase,
@@ -3012,13 +3019,9 @@ export const GameBoard: React.FC<GameBoardProps> = ({
                   cards={otherPlayer.concertoZone}
                   zoneType="CONCERTO"
                   compact={true}
-                  isSecret={true}
-                  onOpenModal={() => {
-                    if (gameState.gameMode === 'SOLO_DUAL') openCardListModal('CONCERTO', oppPlayerIndex);
-                  }}
-                  onHoverCard={(c) => {
-                    if (gameState.gameMode === 'SOLO_DUAL') setPreviewCard(c);
-                  }}
+                  isSecret={false}
+                  onOpenModal={() => openCardListModal('CONCERTO', oppPlayerIndex)}
+                  onHoverCard={(c) => setPreviewCard(c)}
                 />
               </div>
 

@@ -26,11 +26,13 @@ interface Env {
 const POINTER_IDS = {
   decks: 'ff808181a09d98f701a173ca3379092e',
   board: 'ff808181a09d98f701a173ca355e092f',
+  replays: 'ff808181a09d98f701a173ca399e0930',
 } as const;
 
 const POINTER_NAMES = {
   decks: 'wuthering-tcg-shared-decks-v2',
   board: 'wuthering-tcg-community-board-v2',
+  replays: 'wuthering-tcg-public-replays-v1',
 } as const;
 
 function buildSummaryResponse(rawJsonText: string): string {
@@ -150,7 +152,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return new Response(null, { status: 204, headers });
   }
 
-  const type = (url.searchParams.get('type') === 'board' ? 'board' : 'decks') as 'decks' | 'board';
+  const rawType = url.searchParams.get('type');
+  const type = (rawType === 'board' ? 'board' : rawType === 'replays' ? 'replays' : 'decks') as 'decks' | 'board' | 'replays';
   const pointerId = POINTER_IDS[type];
   const pointerName = POINTER_NAMES[type];
 
@@ -158,19 +161,30 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // 1. GET: 데이터 조회
     if (request.method === 'GET') {
       const isLobby = url.searchParams.get('lobby') === '1' && type === 'board';
-      const isSummary = url.searchParams.get('summary') === '1' && type === 'board';
+      const isSummary = (url.searchParams.get('summary') === '1' && type === 'board') || (url.searchParams.get('summary') === '1' && type === 'replays');
       const postId = type === 'board' ? url.searchParams.get('postId') : null;
+      const replayId = type === 'replays' ? url.searchParams.get('id') : null;
 
       // (A) Cloudflare D1 최우선 조회
       if (env.DB) {
         try {
+          // 리플레이 단건 상세 조회
+          if (type === 'replays' && replayId) {
+            const row = await env.DB.prepare('SELECT data FROM community_data WHERE type = ?')
+              .bind(`replay_detail:${replayId}`)
+              .first<{ data: string }>();
+            if (row?.data) {
+              return new Response(row.data, { headers });
+            }
+          }
+
           const row = await env.DB.prepare('SELECT data, updated_at FROM community_data WHERE type = ?')
             .bind(type)
             .first<{ data: string; updated_at?: number }>();
 
           if (row?.data) {
             const updatedAt = row.updated_at || 0;
-            const modeTag = postId ? `post-${postId}-` : isLobby ? 'lobby-' : isSummary ? 'sum-' : '';
+            const modeTag = replayId ? `rep-${replayId}-` : postId ? `post-${postId}-` : isLobby ? 'lobby-' : isSummary ? 'sum-' : '';
             const etag = `W/"${type}-${modeTag}${updatedAt}"`;
             headers.set('ETag', etag);
 
@@ -186,7 +200,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
               return new Response(buildSinglePostResponse(row.data, postId), { headers });
             }
 
-            if (isSummary) {
+            if (isSummary && type === 'board') {
               return new Response(buildSummaryResponse(row.data), { headers });
             }
 
@@ -218,7 +232,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
                 if (postId) {
                   return new Response(buildSinglePostResponse(blobText, postId), { headers });
                 }
-                if (isSummary) {
+                if (isSummary && type === 'board') {
                   return new Response(buildSummaryResponse(blobText), { headers });
                 }
                 return new Response(blobText, { headers });
@@ -234,6 +248,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         JSON.stringify(
           type === 'decks'
             ? { decks: [] }
+            : type === 'replays'
+            ? (replayId ? { error: 'Replay not found' } : { replays: [] })
             : isLobby
             ? { latestNotice: null, hasNewBoardPosts: false }
             : postId
@@ -244,11 +260,76 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       );
     }
 
-    // 2. POST / PUT: 데이터 저장 (단일 게시글 원자적 upsert/delete 및 요약본 보호 지원)
+    // 2. POST / PUT: 데이터 저장 (단일 게시글 원자적 upsert/delete 및 공개 리플레이 저장 지원)
     if (request.method === 'POST' || request.method === 'PUT') {
       let bodyText = await request.text();
       const nowTs = Date.now();
       let saved = false;
+
+      // (A) 공개 멀티배틀 리플레이 저장 처리
+      if (type === 'replays' && env.DB) {
+        try {
+          const incoming = JSON.parse(bodyText);
+          const replayId = incoming?.id;
+          if (replayId && Array.isArray(incoming?.logs)) {
+            // 1) 개별 상세 경기 데이터(스냅샷+로그, 덱배열은 제외) 저장
+            const cleanDetail = {
+              id: incoming.id,
+              timestamp: incoming.timestamp || nowTs,
+              gameMode: 'MULTIPLAYER',
+              totalTurns: incoming.totalTurns || 1,
+              winner: incoming.winner,
+              p0Leader: incoming.p0Leader,
+              p1Leader: incoming.p1Leader,
+              p0Hp: incoming.p0Hp,
+              p1Hp: incoming.p1Hp,
+              p0Name: incoming.p0Name,
+              p1Name: incoming.p1Name,
+              totalLogCount: incoming.logs.length,
+              logs: incoming.logs,
+            };
+
+            await env.DB.prepare(
+              'INSERT INTO community_data (type, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(type) DO UPDATE SET data = ?, updated_at = ?'
+            ).bind(`replay_detail:${replayId}`, JSON.stringify(cleanDetail), nowTs, JSON.stringify(cleanDetail), nowTs).run();
+
+            // 2) 요약 인덱스 목록 갱신 (최근 최대 40경기만 유지)
+            const summaryItem = {
+              id: incoming.id,
+              timestamp: incoming.timestamp || nowTs,
+              gameMode: 'MULTIPLAYER',
+              totalTurns: incoming.totalTurns || 1,
+              winner: incoming.winner,
+              p0Leader: incoming.p0Leader,
+              p1Leader: incoming.p1Leader,
+              p0Hp: incoming.p0Hp,
+              p1Hp: incoming.p1Hp,
+              p0Name: incoming.p0Name,
+              p1Name: incoming.p1Name,
+              totalLogCount: incoming.logs.length,
+            };
+
+            const existingRow = await env.DB.prepare('SELECT data FROM community_data WHERE type = ?')
+              .bind('replays')
+              .first<{ data: string }>();
+            const existingParsed = existingRow?.data ? JSON.parse(existingRow.data) : { replays: [] };
+            const existingList: any[] = Array.isArray(existingParsed?.replays) ? existingParsed.replays : [];
+
+            // 중복 방지 및 최신 40개 슬라이스
+            const nextList = [summaryItem, ...existingList.filter((r) => r && r.id !== replayId)].slice(0, 40);
+            const indexJson = JSON.stringify({ replays: nextList, updatedAt: nowTs });
+
+            await env.DB.prepare(
+              'INSERT INTO community_data (type, data, updated_at) VALUES (?, ?, ?) ON CONFLICT(type) DO UPDATE SET data = ?, updated_at = ?'
+            ).bind('replays', indexJson, nowTs, indexJson, nowTs).run();
+
+            saved = true;
+            return new Response(JSON.stringify({ ok: true, id: replayId }), { headers });
+          }
+        } catch (repErr) {
+          console.warn('[Community Replay Save Error]:', repErr);
+        }
+      }
 
       if (type === 'board' && env.DB) {
         try {

@@ -3013,62 +3013,63 @@ export function applyBattleStepSkills(state: GameState): GameState {
     // 2. 녹색 배틀 시 스킬
     if (clashCard.color === 'GREEN') {
       // 2-A. 방랑자(여) [BP01-018] / 방랑자(남) [BP01-021] 배틀 효과 (리더 스킬 - 진화 계승 포함)
+      // 공식 룰: 덱 위의 카드를 미리 보는 것이 아니라, 공개할 장수(최대 2장: 2장/1장/0장)를 먼저 선언 후 공개하여 패에 추가
       const hasRover0 = leaderCards.some((c) =>
         c.code?.startsWith('BP01-018') ||
         c.code?.startsWith('BP01-021') ||
         (c.characterName?.includes('방랑자') || c.nameKr?.includes('방랑자'))
       );
-      if (hasRover0) {
-        const revealed = player.actionDeck.splice(0, Math.min(2, player.actionDeck.length));
-        if (revealed.length > 0) {
+      if (hasRover0 && player.actionDeck.length > 0) {
+        if (player.isAi) {
+          const drawCount = Math.min(2, player.actionDeck.length);
+          const revealed = player.actionDeck.splice(0, drawCount);
           revealed.forEach((c) => {
             c.isRevealed = true;
           });
-          if (player.isAi) {
-            addCardsToHand(player, revealed);
-            newState = addLog(
-              newState,
-              `[카드 공개 & 패 추가] [방랑자 배틀 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱 위의 [${revealed.map((c) => c.nameKr).join(', ')}] 카드를 공개하고 패에 추가했습니다.`,
-              'ACTION',
-              playerIndex,
-              { cardArt: revealed[0].artUrl, cardName: revealed[0].nameKr, effectTag: '카드 공개 & 패 추가' }
-            );
-            if (!newState.players[0].isAi) {
-              const aiRoverReveal: PendingChoice = {
-                id: `choice-${Date.now()}-ai-rover0-reveal`,
-                playerIndex: 0,
-                title: '상대 카드 공개 확인 — 방랑자 배틀 효과',
-                sourceCardName: `${player.slots.leader.nameKr}`,
-                sourceCardArt: player.slots.leader.artUrl,
-                description: `상대(${player.name})가 녹색 카드 배틀 효과로 덱 위의 카드 ${revealed.length}장(${revealed.map((c) => `[${c.nameKr}]`).join(', ')})을 공개하고 손패에 추가했습니다!`,
-                revealedCards: revealed,
-                minSelect: 0,
-                maxSelect: 0,
-                onResolveType: 'VIEW_ONLY',
-                isPublicReveal: true,
-                sourceZone: 'DECK',
-              };
-              newState = queueChoice(newState, aiRoverReveal, false);
-            }
-            players[playerIndex] = player;
-          } else {
-            const roverChoice: PendingChoice = {
-              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-              playerIndex,
-              title: '방랑자 배틀 효과 — 덱 위 카드 공개 및 패 추가',
-              sourceCardName: '방랑자',
+          addCardsToHand(player, revealed);
+          newState = addLog(
+            newState,
+            `[카드 공개 & 패 추가] [방랑자 배틀 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱 위의 ${revealed.length}장([${revealed.map((c) => c.nameKr).join(', ')}])을 공개하고 패에 추가했습니다.`,
+            'ACTION',
+            playerIndex,
+            { cardArt: revealed[0].artUrl, cardName: revealed[0].nameKr, effectTag: '카드 공개 & 패 추가' }
+          );
+          if (!newState.players[0].isAi) {
+            const aiRoverReveal: PendingChoice = {
+              id: `choice-${Date.now()}-ai-rover0-reveal`,
+              playerIndex: 0,
+              title: '상대 카드 공개 확인 — 방랑자 배틀 효과',
+              sourceCardName: `${player.slots.leader.nameKr}`,
               sourceCardArt: player.slots.leader.artUrl,
-              description: '【배틀 효과】 녹색 카드로 배틀하여 덱 위의 카드를 최대 2장 양측(상대 포함)에 공개했습니다! 공개된 카드 중 손패에 추가할 카드를 선택하세요 (0장~2장 선택).',
+              description: `상대(${player.name})가 녹색 카드 배틀 효과로 덱 위의 카드 ${revealed.length}장(${revealed.map((c) => `[${c.nameKr}]`).join(', ')})을 공개하고 손패에 추가했습니다!`,
               revealedCards: revealed,
               minSelect: 0,
-              maxSelect: revealed.length,
-              onResolveType: 'ADD_TO_HAND',
+              maxSelect: 0,
+              onResolveType: 'VIEW_ONLY',
               isPublicReveal: true,
               sourceZone: 'DECK',
             };
-            newState = queueChoice(newState, roverChoice, false);
-            players[playerIndex] = player;
+            newState = queueChoice(newState, aiRoverReveal, false);
           }
+          players[playerIndex] = player;
+        } else {
+          // Human 유저: 덱 카드를 미리 보여주지 않고, 몇 장을 공개하여 패에 추가할지 먼저 선택!
+          const roverChoice: PendingChoice = {
+            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            playerIndex,
+            title: '방랑자 배틀 효과 — 카드 공개 및 패 추가',
+            sourceCardName: player.slots.leader.nameKr || '방랑자',
+            sourceCardArt: player.slots.leader.artUrl,
+            description: `【배틀 효과】자신이 녹색 카드로 배틀 시, 자신의 덱 위의 카드를 최대 2장 공개하고 패에 추가합니다.\n덱에서 공개하여 패에 추가할 카드 장수를 선택하세요. (현재 덱 잔여: ${player.actionDeck.length}장)`,
+            revealedCards: [],
+            minSelect: 0,
+            maxSelect: Math.min(2, player.actionDeck.length),
+            onResolveType: 'ROVER_0_DRAW_PROMPT',
+            isPublicReveal: true,
+            sourceZone: 'DECK',
+          };
+          newState = queueChoice(newState, roverChoice, false);
+          players[playerIndex] = player;
         }
       }
 
@@ -5848,14 +5849,13 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
 
   // 2. 날개의 뜻·회피 [BP01-069] 배틀 페이즈 종료 효과:
   // 공식 텍스트: "【각 배틀 페이즈 종료 시】자신의 리더가 「양양」인 경우, 1 COST를 지불하여 이 카드를 패에 추가 가능."
+  // 중요: 공식 룰상 이번 턴 배틀 페이즈에 사용하여 '액션 에리어(actionArea)'에 전개된 카드만 회수 가능! (트래시에 미리 가 있던 카드는 대상 아님)
   for (let i = 0; i < 2; i++) {
     const pIdx = i as 0 | 1;
     const p = newState.players[pIdx];
     const hasYangyangLeader = slotHasCharacterSkill(p.slots.leader, '양양');
     p.actionArea = p.actionArea || [];
-    const wingCard =
-      p.actionArea.find((c) => c.code === 'BP01-069') ||
-      (p.dropZone.find((c) => c.code === 'BP01-069') as ActionCard | undefined);
+    const wingCard = p.actionArea.find((c) => c.code === 'BP01-069');
 
     if (hasYangyangLeader && wingCard && p.concertoZone.length >= 1) {
       if (p.isAi) {
@@ -5864,14 +5864,11 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
           const aIdx = p.actionArea.findIndex((c) => c.id === wingCard.id || c.code === 'BP01-069');
           if (aIdx !== -1) {
             p.actionArea.splice(aIdx, 1);
-          } else {
-            const dIdx = p.dropZone.findIndex((c) => c.id === wingCard.id || c.code === 'BP01-069');
-            if (dIdx !== -1) p.dropZone.splice(dIdx, 1);
           }
           addCardsToHand(p, [wingCard as ActionCard]);
           newState = addLog(
             newState,
-            `[날개의 뜻·회피 BP01-069 배틀 페이즈 종료 효과] 1 COST를 지불하고 [날개의 뜻·회피]를 패로 회수했습니다!`,
+            `[날개의 뜻·회피 BP01-069 배틀 페이즈 종료 효과] 1 COST를 지불하고 액션 에리어의 [날개의 뜻·회피]를 패로 회수했습니다!`,
             'ACTION',
             pIdx,
             { cardName: wingCard.nameKr, cardArt: wingCard.artUrl, effectTag: '패 회수' }
@@ -5885,7 +5882,7 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
           title: '날개의 뜻·회피 — 협주 코스트 지불 및 패 회수',
           sourceCardName: '날개의 뜻·회피 [BP01-069]',
           sourceCardArt: wingCard.artUrl,
-          description: '【배틀 페이즈 종료 효과】1 COST로 지불할 협주 에리어의 카드 1장을 선택하세요.\n선택한 협주 카드를 트래시로 보내고 [날개의 뜻·회피]를 패로 회수합니다.\n(회수를 원치 않으시면 0장 선택 상태로 넘어가기를 누르세요.)',
+          description: '【배틀 페이즈 종료 효과】1 COST로 지불할 협주 에리어의 카드 1장을 선택하세요.\n선택한 협주 카드를 트래시로 보내고 이번 배틀에 사용한 [날개의 뜻·회피]를 패로 회수합니다.\n(회수를 원치 않으시면 0장 선택 상태로 넘어가기를 누르세요.)',
           revealedCards: [...p.concertoZone],
           minSelect: 0,
           maxSelect: 1,
@@ -6597,11 +6594,6 @@ export function resolvePendingChoice(
       let recovered: ActionCard | undefined;
       if (aIdx !== -1) {
         [recovered] = player.actionArea.splice(aIdx, 1);
-      } else {
-        const dIdx = player.dropZone.findIndex((c) => c.code === 'BP01-069');
-        if (dIdx !== -1) {
-          [recovered] = player.dropZone.splice(dIdx, 1) as ActionCard[];
-        }
       }
 
       if (recovered) {
@@ -6751,6 +6743,87 @@ export function resolvePendingChoice(
       newState = addLog(
         newState,
         `[파수인 Lv.1 BP01-008 교체 효과] ${player.name}이(가) 교체 효과를 발동하지 않았습니다 (카드 뽑지 않음).`,
+        'ACTION',
+        playerIndex
+      );
+    }
+  } else if (onResolveType === 'ROVER_0_DRAW_PROMPT') {
+    // 방랑자 Lv.0 녹색 배틀 효과: 유저가 선택한 장수(2장, 1장, 0장)를 덱 맨 위에서 공개 후 패에 추가
+    const countStr = chosenCardIds?.[0] || '0';
+    let targetCount = 0;
+    if (countStr === '2' || countStr === 'DRAW_2') targetCount = 2;
+    else if (countStr === '1' || countStr === 'DRAW_1') targetCount = 1;
+    else if (countStr === 'DRAW' || chosenCardIds.length > 0) {
+      targetCount = Math.min(2, Math.max(1, chosenCardIds.length));
+    }
+
+    const actualCount = Math.min(targetCount, player.actionDeck.length);
+    if (actualCount > 0) {
+      const drawnCards = player.actionDeck.splice(0, actualCount);
+      drawnCards.forEach((c) => {
+        c.isRevealed = true;
+      });
+      addCardsToHand(player, drawnCards);
+
+      if (newState.phase === 'CLASH_REVEAL' && !newState.clashResult) {
+        newState.battleStepEffects = [
+          ...(newState.battleStepEffects || []),
+          {
+            id: `eff-${Date.now()}-rover0-battle-draw`,
+            sourceCardName: sourceCardName || '방랑자',
+            sourceCardArt: state.pendingChoice.sourceCardArt || drawnCards[0].artUrl,
+            effectType: 'DRAW',
+            title: '배틀 스킬 [카드 공개 & 패 추가]',
+            description: `녹색 카드를 내어 덱에서 카드 ${actualCount}장을 공개하고 패에 추가했습니다!`,
+            playerIndex,
+            timestamp: Date.now(),
+          },
+        ];
+      }
+
+      newState.lastEffectDraw = {
+        id: `eff-draw-${Date.now()}`,
+        playerIndex,
+        cards: drawnCards,
+        sourceCardName: `${sourceCardName || '방랑자'} 배틀 효과`,
+        sourceCardArt: drawnCards[0].artUrl,
+        nextPendingChoice: null,
+      };
+
+      newState = addLog(
+        newState,
+        `[효과 드로우] [방랑자 배틀 효과] 녹색 카드 배틀 효과로 덱 위의 ${actualCount}장([${drawnCards.map((c) => c.nameKr).join(', ')}])을 공개하고 패에 추가했습니다!`,
+        'ACTION',
+        playerIndex,
+        { cardArt: drawnCards[0].artUrl, cardName: drawnCards[0].nameKr, effectTag: '효과 드로우' }
+      );
+
+      // 상대방이 플레이어(비AI)인 경우 상대 공개 확인 모달 큐잉
+      const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
+      if (!newState.players[oppIdx].isAi) {
+        const oppRoverReveal: PendingChoice = {
+          id: `choice-${Date.now()}-opp-rover0-reveal`,
+          playerIndex: oppIdx,
+          title: '📢 [상대 카드 공개 확인] 방랑자 배틀 효과',
+          sourceCardName: sourceCardName || '방랑자',
+          sourceCardArt: state.pendingChoice.sourceCardArt || drawnCards[0].artUrl,
+          description: `상대(${player.name})가 녹색 카드 배틀 효과로 덱 위의 카드 ${actualCount}장([${drawnCards.map((c) => c.nameKr).join(', ')}])을 공개하고 손패에 추가했습니다!`,
+          revealedCards: drawnCards,
+          minSelect: 0,
+          maxSelect: 0,
+          onResolveType: 'VIEW_ONLY',
+          isPublicReveal: true,
+          sourceZone: 'DECK',
+        };
+        newState = queueChoice(newState, oppRoverReveal, false);
+      }
+
+      newState.pendingChoice = null;
+      return newState;
+    } else {
+      newState = addLog(
+        newState,
+        `[방랑자 배틀 효과] ${player.name}이(가) 카드 공개 및 패 추가 효과를 발동하지 않았습니다 (0장 선택).`,
         'ACTION',
         playerIndex
       );
