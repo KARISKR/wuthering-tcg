@@ -527,33 +527,14 @@ class SoundEffectsEngine {
     }
 
     if (typeof window !== 'undefined') {
-      // 첫 사용자 입력 시 오디오 컨텍스트 해제 + 핵심 효과음만 우선 로드
-      // (페이지 로드 직후 약 2MB 효과음을 내려받으면 배경/폰트/JS와 대역폭을 다투므로 지연)
+      // 첫 사용자 입력 시 AudioContext만 해제 (로비 첫 진입 시 시스템 사운드 일괄 다운로드 방지)
       const unlockAudio = () => {
         this.getAudioContext();
-        this.preloadAllCustomSounds();
         window.removeEventListener('pointerdown', unlockAudio, true);
         window.removeEventListener('keydown', unlockAudio, true);
       };
       window.addEventListener('pointerdown', unlockAudio, { once: true, capture: true });
       window.addEventListener('keydown', unlockAudio, { once: true, capture: true });
-
-      // 입력이 없더라도 페이지 로드 완료 + 유휴 시점에 조용히 백그라운드 프리로드
-      const scheduleIdlePreload = () => {
-        const run = () => this.preloadAllCustomSounds();
-        window.setTimeout(() => {
-          if ('requestIdleCallback' in window) {
-            (window as any).requestIdleCallback(run, { timeout: 5000 });
-          } else {
-            run();
-          }
-        }, 6000);
-      };
-      if (document.readyState === 'complete') {
-        scheduleIdlePreload();
-      } else {
-        window.addEventListener('load', scheduleIdlePreload, { once: true });
-      }
     }
   }
 
@@ -561,8 +542,8 @@ class SoundEffectsEngine {
   private fullPreloadPromise: Promise<void> | null = null;
 
   /**
-   * 게임 내 모든 필수 시스템 사운드 사전 비동기 로드
-   * 대결(카드 오픈/격돌/대미지/무기/페이즈/연격) 시 끊김이나 합성음 폴백 없이 고음질 오디오 즉시 재생
+   * 배틀 진입 시 핵심 대결 사운드 우선 비동기 로드
+   * (카드 오픈, 격돌, 드로우, 대미지, 무기 공격 등 핵심 사운드만 선별 로드하여 네트워크 대역폭 보호)
    */
   public preloadAllCustomSounds(): Promise<void> {
     if (this.hasStartedFullPreload && this.fullPreloadPromise) {
@@ -574,7 +555,7 @@ class SoundEffectsEngine {
   }
 
   private async runFullPreload(): Promise<void> {
-    // 1순위: 카드 오픈(clash_reveal), 격돌(clash), 무기 타격(직검/대검/권총/증폭기), 카드 세트(card), 딜링(card_deal) 등 핵심 대결 사운드 최우선 로드
+    // 1순위: 카드 오픈(clash_reveal), 격돌(clash), 무기 타격(직검/대검/권총/증폭기), 카드 세트(card), 딜링(card_deal) 등 핵심 대결 사운드 우선 로드
     const priorityCategories: string[] = [
       'clash_reveal',
       'clash',
@@ -597,15 +578,19 @@ class SoundEffectsEngine {
       // ignore
     }
 
-    // 2순위: 매니페스트에 등록된 나머지 시스템 효과음 로드
+    // 2순위: 기타 보조 효과음은 브라우저 유휴 시점에 여유롭게 로드 (대결 시작 블로킹 방지)
     const sysKeys = Object.keys(systemAudioManifest as Record<string, string[]>).filter(
       (k) => !priorityCategories.includes(k)
     );
 
-    try {
-      await Promise.allSettled(sysKeys.map((cat) => this.loadCustomServerFile(cat)));
-    } catch {
-      // ignore
+    const loadRest = () => {
+      Promise.allSettled(sysKeys.map((cat) => this.loadCustomServerFile(cat))).catch(() => {});
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(loadRest, { timeout: 8000 });
+    } else {
+      setTimeout(loadRest, 2000);
     }
   }
 

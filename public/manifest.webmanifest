@@ -1,0 +1,26 @@
+{
+  "name": "명조: 대결 (Wuthering Waves TCG)",
+  "short_name": "명조 배틀",
+  "description": "명조: 워더링 웨이브 2인 대전 카드 게임 (Wuthering Waves TCG)",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#080b13",
+  "theme_color": "#080b13",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/images/logo-battle-trans.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any"
+    }
+  ]
+}

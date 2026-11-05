@@ -17,10 +17,15 @@ interface LodImg extends HTMLImageElement {
   __lodRO?: ResizeObserver;
 }
 
-function toLod(orig: string, width: number): string {
+export function toLod(orig: string, width: number): string {
   const dot = orig.lastIndexOf('.');
   const base = dot > -1 ? orig.slice(0, dot) : orig;
   return base.replace(ORIG_PREFIX, `${LOD_PREFIX}${width}/`) + '.webp';
+}
+
+export function getLodUrl(orig: string | undefined, width = 256): string | undefined {
+  if (!orig || !orig.includes(ORIG_PREFIX)) return orig;
+  return toLod(orig, width);
 }
 
 function pickWidth(renderedCssPx: number): number | null {

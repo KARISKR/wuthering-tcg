@@ -610,7 +610,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
         actionType: 'COMBO',
         playerIndex,
       });
-    } else if (isIntroSkillCard(card)) {
+    } else if (isIntroSkillCard(card) && !player.actionFlags.leaderSwapLockedThisTurn) {
       setIntroSwapModalState({
         isOpen: true,
         targetCard: card,
@@ -4973,7 +4973,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
           } else if (concertoModalState.actionType === 'COMBO' && concertoModalState.targetCard) {
             const targetCard = concertoModalState.targetCard;
             const pIdx = concertoModalState.playerIndex;
-            if (isIntroSkillCard(targetCard)) {
+            const pState = gameState.players[pIdx];
+            if (isIntroSkillCard(targetCard) && !pState.actionFlags.leaderSwapLockedThisTurn) {
               setIntroSwapModalState({
                 isOpen: true,
                 targetCard,

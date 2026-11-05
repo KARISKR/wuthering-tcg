@@ -388,15 +388,29 @@ export function getConcertoSonataBonusDamage(player: PlayerState, card: ActionCa
   return bonus;
 }
 
+// 액션 덱이 0장이 된 경우 트래시 에리어의 모든 액션 카드를 뒷면으로 액션 덱으로 이동하고 셔플 (공식 Q&A Q4, Q5)
+export function refreshActionDeckIfEmpty(player: PlayerState): boolean {
+  if (player.actionDeck.length === 0 && player.dropZone.length > 0) {
+    const actionDrops = player.dropZone
+      .filter((c): c is ActionCard => c.kind === 'ACTION')
+      .map((c) => ({ ...c, isRevealed: false }));
+    if (actionDrops.length > 0) {
+      player.actionDeck = shuffleActionDeck(actionDrops);
+      player.dropZone = player.dropZone.filter((c) => c.kind === 'CHARACTER');
+      return true;
+    }
+  }
+  return false;
+}
+
 // 덱에서 카드 1장 추출 헬퍼 (덱 소진 시 드롭 존의 액션 카드를 분산 리셔플)
 export function drawSingleCardFromDeck(player: PlayerState): ActionCard | null {
-  if (player.actionDeck.length === 0 && player.dropZone.length > 0) {
-    const actionDrops = player.dropZone.filter((c): c is ActionCard => c.kind === 'ACTION');
-    player.actionDeck = shuffleActionDeck(actionDrops);
-    player.dropZone = player.dropZone.filter((c) => c.kind === 'CHARACTER');
-  }
+  refreshActionDeckIfEmpty(player);
   if (player.actionDeck.length > 0) {
-    return player.actionDeck.shift()!;
+    const drawn = player.actionDeck.shift()!;
+    // 마지막 1장을 뽑아 덱이 0장이 된 경우에도 공식 룰에 따라 즉시 트래시 카드를 뒷면으로 덱으로 이동 및 셔플
+    refreshActionDeckIfEmpty(player);
+    return drawn;
   }
   return null;
 }
@@ -3013,7 +3027,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
     // 2. 녹색 배틀 시 스킬
     if (clashCard.color === 'GREEN') {
       // 2-A. 방랑자(여) [BP01-018] / 방랑자(남) [BP01-021] 배틀 효과 (리더 스킬 - 진화 계승 포함)
-      // 공식 룰: 덱 위의 카드를 미리 보는 것이 아니라, 공개할 장수(최대 2장: 2장/1장/0장)를 먼저 선언 후 공개하여 패에 추가
+      // 공식 룰 & Q&A Q5: 공개할 장수(최대 2장: 2장/1장/0장)를 먼저 선언 후, 덱에 남은 만큼 공개하여 패에 추가하고 효과 종료 후 덱이 0장이면 트래시를 덱으로 리프레시
       const hasRover0 = leaderCards.some((c) =>
         c.code?.startsWith('BP01-018') ||
         c.code?.startsWith('BP01-021') ||
@@ -3027,9 +3041,10 @@ export function applyBattleStepSkills(state: GameState): GameState {
             c.isRevealed = true;
           });
           addCardsToHand(player, revealed);
+          const refreshed = refreshActionDeckIfEmpty(player);
           newState = addLog(
             newState,
-            `[카드 공개 & 패 추가] [방랑자 배틀 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱 위의 ${revealed.length}장([${revealed.map((c) => c.nameKr).join(', ')}])을 공개하고 패에 추가했습니다.`,
+            `[카드 공개 & 패 추가] [방랑자 배틀 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱 위의 ${revealed.length}장([${revealed.map((c) => c.nameKr).join(', ')}])을 공개하고 패에 추가했습니다.${refreshed ? ' (덱 소진으로 트래시 카드를 뒷면으로 액션 덱에 셔플)' : ''}`,
             'ACTION',
             playerIndex,
             { cardArt: revealed[0].artUrl, cardName: revealed[0].nameKr, effectTag: '카드 공개 & 패 추가' }
@@ -3053,7 +3068,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
           }
           players[playerIndex] = player;
         } else {
-          // Human 유저: 덱 카드를 미리 보여주지 않고, 몇 장을 공개하여 패에 추가할지 먼저 선택!
+          // Human 유저: 덱 카드를 미리 보여주지 않고, 몇 장을 공개하여 패에 추가할지 먼저 선택! (덱 잔여가 1장이어도 공식 Q&A Q5에 따라 최대 2장 선언 가능)
           const roverChoice: PendingChoice = {
             id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
             playerIndex,
@@ -3063,7 +3078,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
             description: `【배틀 효과】자신이 녹색 카드로 배틀 시, 자신의 덱 위의 카드를 최대 2장 공개하고 패에 추가합니다.\n덱에서 공개하여 패에 추가할 카드 장수를 선택하세요. (현재 덱 잔여: ${player.actionDeck.length}장)`,
             revealedCards: [],
             minSelect: 0,
-            maxSelect: Math.min(2, player.actionDeck.length),
+            maxSelect: 2,
             onResolveType: 'ROVER_0_DRAW_PROMPT',
             isPublicReveal: true,
             sourceZone: 'DECK',
@@ -3086,9 +3101,10 @@ export function applyBattleStepSkills(state: GameState): GameState {
           });
           if (player.isAi) {
             addCardsToHand(player, revealed);
+            const refreshed = refreshActionDeckIfEmpty(player);
             newState = addLog(
               newState,
-              `[카드 공개 & 패 추가] [파수인 Lv.0 BP01-010 배틀 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱 위의 [${revealed[0].nameKr}] 카드를 공개하고 패에 추가했습니다.`,
+              `[카드 공개 & 패 추가] [파수인 Lv.0 BP01-010 배틀 효과] ${player.name}이(가) 녹색 카드 배틀 효과로 덱 위의 [${revealed[0].nameKr}] 카드를 공개하고 패에 추가했습니다.${refreshed ? ' (덱 소진으로 트래시 카드를 뒷면으로 액션 덱에 셔플)' : ''}`,
               'ACTION',
               playerIndex,
               { cardArt: revealed[0].artUrl, cardName: revealed[0].nameKr, effectTag: '카드 공개 & 패 추가' }
@@ -3423,6 +3439,28 @@ export function applyBattleStepSkills(state: GameState): GameState {
         'ACTION',
         playerIndex,
         { cardArt: clashCard.artUrl, cardName: clashCard.nameKr, effectTag: '변주 드로우 부여' }
+      );
+    }
+
+    // 9. 용을 타고 하늘로 향해 [SD02-010] 배틀 효과: 이번 턴에 자신은 리더 교체 불가 (공식 Q&A Q9)
+    if (clashCard.code === 'SD02-010') {
+      player.actionFlags.leaderSwapLockedThisTurn = true;
+      battleStepEffects.push({
+        id: `eff-${Date.now()}-sd02-010-lock-${playerIndex}`,
+        sourceCardName: clashCard.nameKr,
+        sourceCardArt: clashCard.artUrl,
+        effectType: 'CANCEL',
+        title: '이번 턴 리더 교체 불가',
+        description: '【배틀】 효과로 이번 턴에는 자신의 리더를 교체할 수 없습니다.',
+        playerIndex,
+        timestamp: Date.now(),
+      });
+      newState = addLog(
+        newState,
+        `[용을 타고 하늘로 향해 SD02-010 배틀 효과] 이번 턴에 ${player.name}은(는) 리더를 교체할 수 없습니다.`,
+        'ACTION',
+        playerIndex,
+        { cardArt: clashCard.artUrl, cardName: clashCard.nameKr, effectTag: '리더 교체 불가' }
       );
     }
   }
@@ -3835,18 +3873,18 @@ export function finishClashJudgment(state: GameState): GameState {
       }
     }
 
-    // BP01-010 파수인 리더 승리: 녹색 카드로 승리 시 HP 1pt 회복 (현재 리더가 Lv.0일 때만 유효)
-    const hasShorekeeper0Leader = winnerPlayer.slots.leader.level === 0 && (
-      winnerPlayer.slots.leader.code?.startsWith('BP01-010') ||
-      winnerPlayer.slots.leader.characterName === '파수인' ||
-      winnerPlayer.slots.leader.nameKr.includes('파수인')
+    // BP01-010 파수인 리더 승리: 녹색 카드로 승리 시 HP 1pt 회복 (진화 시 하위 카드 스킬 계승 포함, 공식 Q&A Q7: 생명력에는 상한이 없음)
+    const hasShorekeeper0Leader = winnerLeaderCards.some(
+      (c) =>
+        c.code?.startsWith('BP01-010') ||
+        (c.level === 0 && (c.characterName === '파수인' || c.nameKr.includes('파수인')))
     );
     if (
       hasShorekeeper0Leader &&
       winCard.color === 'GREEN'
     ) {
       const prevHp = winnerPlayer.hp;
-      winnerPlayer.hp = Math.min(winnerPlayer.maxHp, winnerPlayer.hp + 1);
+      winnerPlayer.hp = winnerPlayer.hp + 1;
       const actualHealed = winnerPlayer.hp - prevHp;
       if (actualHealed > 0) {
         newState = recordHpChange(
@@ -4384,7 +4422,8 @@ export function finishClashJudgment(state: GameState): GameState {
 
     if (healAmount > 0) {
       const prevHp = winnerPlayer.hp;
-      winnerPlayer.hp = Math.min(winnerPlayer.maxHp, winnerPlayer.hp + healAmount);
+      // 공식 Q&A Q7: 플레이어의 생명력에는 상한이 없으므로 20을 초과하여 회복 가능
+      winnerPlayer.hp = winnerPlayer.hp + healAmount;
       const actualHealed = winnerPlayer.hp - prevHp;
       if (actualHealed > 0) {
         newState = recordHpChange(
@@ -4506,8 +4545,9 @@ export function finishClashJudgment(state: GameState): GameState {
     );
 
     const canSanhuaSwitchLeader =
-      (isSanhuaLv2Leader && winCard.color === 'BLUE') ||
-      (isIceShardWin && hasSanhuaInConcerto);
+      !winnerPlayer.actionFlags.leaderSwapLockedThisTurn &&
+      ((isSanhuaLv2Leader && winCard.color === 'BLUE') ||
+        (isIceShardWin && hasSanhuaInConcerto));
 
     if (canSanhuaSwitchLeader) {
       const availableSupports = [winnerPlayer.slots.leftSupport, winnerPlayer.slots.rightSupport].filter(
@@ -5109,28 +5149,40 @@ export function executeComboAttack(
   let comboEffectTitle: string | undefined = undefined;
   let comboEffectDesc: string | undefined = undefined;
 
+  // 공식 Q&A Q8, Q9: 콤보 카드 발동 시점(변주 스킬 리더 교체 전)의 리더 슬롯 스킬 상태 기록
+  // (SD02-005 Lv.2 금희가 리더일 때 사용한 적색 카드는 『【콤보】이 카드의 데미지 +1.』을 획득한 상태로 발동되며,
+  //  백 포지션에서 리더로 교체되어 들어오는 경우에는 발동 시점에 리더가 아니었으므로 +1 효과를 받지 않음)
+  const leaderCardsBeforeCombo = getAllCardsInSlot(player.slots.leader);
+
   // ==========================================
   // <변주 스킬> 9종 공통 리더 교체 & 고유 변주 효과 처리
   // 공식 텍스트: "【콤보】자신의 리더를 교체한다. 「캐릭터명」이(가) 교체될 경우, [효과]."
   // ★ 대상 캐릭터가 이미 리더(Leader) 자리에 있는 경우에도 후열(백) 캐릭터와 정상 교체되며,
   //   리더에서 후열로 교체된 것 역시 「캐릭터명」이 교체된 것이므로 변주 추가 효과가 정상 발동됩니다!
+  // ★ 단, SD02-010 「용을 타고 하늘로 향해」 【배틀】 효과로 이번 턴 리더 교체 불가 상태일 경우(공식 Q&A Q9),
+  //   리더는 교체하지 않고(추가 변주 효과 미발동) 콤보 공격을 진행합니다.
   // ==========================================
   if (isIntroSkillCard(card)) {
     const introTargetName = getIntroSkillTargetChar(card);
     let chosenSupportKey: 'leftSupport' | 'rightSupport' | null = null;
 
-    if (swapSupportSlot && player.slots[swapSupportSlot]) {
-      chosenSupportKey = swapSupportSlot;
-    } else {
-      const matchedSupport = (['leftSupport', 'rightSupport'] as const).find((k) =>
-        doesCharMatchIntroTarget(player.slots[k], introTargetName)
-      );
-      if (matchedSupport && player.slots[matchedSupport]) {
-        chosenSupportKey = matchedSupport;
+    if (!player.actionFlags.leaderSwapLockedThisTurn) {
+      if (swapSupportSlot && player.slots[swapSupportSlot]) {
+        chosenSupportKey = swapSupportSlot;
       } else {
-        // 대상 캐릭터가 이미 리더 자리에 있는 경우: 백(후열 서포터) 캐릭터와 교체!
-        chosenSupportKey = player.slots.leftSupport ? 'leftSupport' : player.slots.rightSupport ? 'rightSupport' : null;
+        const matchedSupport = (['leftSupport', 'rightSupport'] as const).find((k) =>
+          doesCharMatchIntroTarget(player.slots[k], introTargetName)
+        );
+        if (matchedSupport && player.slots[matchedSupport]) {
+          chosenSupportKey = matchedSupport;
+        } else {
+          // 대상 캐릭터가 이미 리더 자리에 있는 경우: 백(후열 서포터) 캐릭터와 교체!
+          chosenSupportKey = player.slots.leftSupport ? 'leftSupport' : player.slots.rightSupport ? 'rightSupport' : null;
+        }
       }
+    } else {
+      comboEffectTitle = `【콤보】 리더 교체 불가 (${card.nameKr})`;
+      comboEffectDesc = `이번 턴 [용을 타고 하늘로 향해]의 효과로 리더를 교체할 수 없어 리더를 유지한 채 공격합니다.`;
     }
 
     let wasTargetSwapped = false;
@@ -5170,10 +5222,12 @@ export function executeComboAttack(
       }
       newState = addLog(
         newState,
-        `[${card.nameKr} ${card.code} 변주 효과] 리더를 [${newLeaderName}](으)로 교체했습니다!${wasTargetSwapped ? ' (변주 효과: 데미지 +2)' : ''}`,
+        player.actionFlags.leaderSwapLockedThisTurn
+          ? `[${card.nameKr} ${card.code} 변주 효과] 이번 턴 리더 교체 불가 상태로 인해 리더를 교체하지 않습니다.`
+          : `[${card.nameKr} ${card.code} 변주 효과] 리더를 [${newLeaderName}](으)로 교체했습니다!${wasTargetSwapped ? ' (변주 효과: 데미지 +2)' : ''}`,
         'ACTION',
         playerIndex,
-        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '리더 교체' }
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: player.actionFlags.leaderSwapLockedThisTurn ? '리더 교체 불가' : '리더 교체' }
       );
     }
 
@@ -5241,11 +5295,11 @@ export function executeComboAttack(
       );
     }
 
-    // 4. 계발 [BP01-054] (파수인): 파수인이 교체될 경우 생명력 1pt 회복
+    // 4. 계발 [BP01-054] (파수인): 파수인이 교체될 경우 생명력 1pt 회복 (공식 Q&A Q7: 생명력 상한 없음)
     if (card.code === 'BP01-054') {
       if (wasTargetSwapped) {
         const prevHp = player.hp;
-        player.hp = Math.min(player.maxHp, player.hp + 1);
+        player.hp = player.hp + 1;
         const actualHealed = player.hp - prevHp;
         comboEffectDesc = `리더를 [${newLeaderName}](으)로 교체하고 생명력(HP)을 +1 회복했습니다! (현재 HP: ${player.hp}/${player.maxHp})`;
         if (actualHealed > 0) {
@@ -5577,7 +5631,9 @@ export function executeComboAttack(
   const leaderCards = getAllCardsInSlot(player.slots.leader);
 
   // 금희 Lv.2 [SD02-005] 리더: 적색 카드가 『【콤보】이 카드의 데미지 +1.』 획득
-  if (leaderCards.some((c) => c.code?.startsWith('SD02-005')) && card.color === 'RED') {
+  // 공식 Q&A Q8, Q9: 콤보 카드 사용 시점에 SD02-005가 리더였는지를 기준으로 판정!
+  // (SD02-005를 리더 -> 백으로 교체 시 +1 적용되어 총 3pt, 백 -> 리더로 교체 시 +1 미적용되어 총 2pt)
+  if (leaderCardsBeforeCombo.some((c) => c.code?.startsWith('SD02-005')) && card.color === 'RED') {
     dmg += 1;
   }
 
@@ -6089,8 +6145,8 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
         }
       }
 
-      // 양양 Lv.2 [BP01-022] 턴 종료: 패 1장 버리고 리더를 양양으로 교체 가능
-      if (i === newState.activePlayerIndex && pl.hand.length > 0) {
+      // 양양 Lv.2 [BP01-022] 턴 종료: 패 1장 버리고 리더를 양양으로 교체 가능 (단, 이번 턴 리더 교체 불가 시 미발동)
+      if (i === newState.activePlayerIndex && pl.hand.length > 0 && !pl.actionFlags.leaderSwapLockedThisTurn) {
         const yangyangSupportKey = (['leftSupport', 'rightSupport'] as const).find((k) =>
           getAllCardsInSlot(pl.slots[k]).some((c) => c.code?.startsWith('BP01-022'))
         );
@@ -6764,6 +6820,9 @@ export function resolvePendingChoice(
         c.isRevealed = true;
       });
       addCardsToHand(player, drawnCards);
+      // 공식 Q&A Q5: 덱에 남은 카드를 공개하여 패에 추가하고 스킬 효과 처리를 종료한 직후,
+      // 액션 덱이 0장이 된 경우 트래시 에리어의 모든 카드를 뒷면이 보이도록 액션 덱 에리어로 이동하고 셔플
+      const refreshed = refreshActionDeckIfEmpty(player);
 
       if (newState.phase === 'CLASH_REVEAL' && !newState.clashResult) {
         newState.battleStepEffects = [
@@ -6792,7 +6851,9 @@ export function resolvePendingChoice(
 
       newState = addLog(
         newState,
-        `[효과 드로우] [방랑자 배틀 효과] 녹색 카드 배틀 효과로 덱 위의 ${actualCount}장([${drawnCards.map((c) => c.nameKr).join(', ')}])을 공개하고 패에 추가했습니다!`,
+        `[효과 드로우] [방랑자 배틀 효과] 녹색 카드 배틀 효과로 덱 위의 ${actualCount}장([${drawnCards.map((c) => c.nameKr).join(', ')}])을 공개하고 패에 추가했습니다!${
+          refreshed ? ' (덱 소진으로 트래시 카드를 뒷면으로 액션 덱에 셔플)' : ''
+        }`,
         'ACTION',
         playerIndex,
         { cardArt: drawnCards[0].artUrl, cardName: drawnCards[0].nameKr, effectTag: '효과 드로우' }
@@ -7014,6 +7075,9 @@ export function resolvePendingChoice(
     } else {
       player.actionDeck = [...player.actionDeck, ...unchosenCards];
     }
+
+    // 효과 처리 종료 후 액션 덱이 0장이 된 경우 트래시 카드를 뒷면으로 액션 덱에 리프레시 (공식 Q&A Q5)
+    refreshActionDeckIfEmpty(player);
 
     // [상대방 실시간 공개 확인 팝업] 상대방이 인간 플레이어인 경우 공개된 카드 확인 모달 큐잉
     if (state.pendingChoice.isPublicReveal) {

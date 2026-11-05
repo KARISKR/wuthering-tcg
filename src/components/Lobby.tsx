@@ -3,7 +3,6 @@ import { BgmPlayer } from './BgmPlayer';
 import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 import type { CustomDeckConfig } from '../types/tcg';
 import { VisitorStatsWidget } from './VisitorStatsWidget';
-import { startIdleCardPreload } from '../utils/cardImagePreloader';
 
 const DeckSelectModal = lazy(() => import('./DeckSelectModal').then((m) => ({ default: m.DeckSelectModal })));
 const OfficialManualModal = lazy(() => import('./OfficialManualModal').then((m) => ({ default: m.OfficialManualModal })));
@@ -16,6 +15,7 @@ const CommunityDeckModal = lazy(() => import('./CommunityDeckModal').then((m) =>
 const BattleReplayModal = lazy(() => import('./BattleReplayModal').then((m) => ({ default: m.BattleReplayModal })));
 const InteractiveTutorialModal = lazy(() => import('./InteractiveTutorialModal').then((m) => ({ default: m.InteractiveTutorialModal })));
 const MultiplayerLobbyModal = lazy(() => import('./MultiplayerLobbyModal').then((m) => ({ default: m.MultiplayerLobbyModal })));
+const AppInstallModal = lazy(() => import('./AppInstallModal').then((m) => ({ default: m.AppInstallModal })));
 import type { MultiplayerRole } from '../types/multiplayer';
 import {
   Swords,
@@ -39,6 +39,7 @@ import {
   Bug,
   MessageSquare,
   Sliders,
+  Download,
 } from 'lucide-react';
 
 import { BattleReplayData } from '../utils/replayManager';
@@ -87,6 +88,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isPatchNotesOpen, setIsPatchNotesOpen] = useState(false);
   const [isInteractiveTutorialOpen, setIsInteractiveTutorialOpen] = useState(false);
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
+  const [isAppInstallOpen, setIsAppInstallOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
   const [isMultiplayerModalOpen, setIsMultiplayerModalOpen] = useState(false);
   const [latestNotice, setLatestNotice] = useState<LobbyNoticeSummary | null>(() => {
@@ -112,22 +114,37 @@ export const Lobby: React.FC<LobbyProps> = ({
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/community?type=board&lobby=1', {
-      headers: { Accept: 'application/json' },
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
-        setLatestNotice(data.latestNotice || null);
-        setHasNewBoardPosts(Boolean(data.hasNewBoardPosts));
-        try {
-          localStorage.setItem(LOBBY_NOTICE_CACHE_KEY, JSON.stringify(data));
-        } catch {}
+
+    // 초기 로딩 대역폭 경합 방지를 위해 브라우저 유휴 시점에 백그라운드로 공지사항 로드
+    const fetchNotice = () => {
+      fetch('/api/community?type=board&lobby=1', {
+        headers: { Accept: 'application/json' },
       })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (cancelled || !data) return;
+          setLatestNotice(data.latestNotice || null);
+          setHasNewBoardPosts(Boolean(data.hasNewBoardPosts));
+          try {
+            localStorage.setItem(LOBBY_NOTICE_CACHE_KEY, JSON.stringify(data));
+          } catch {}
+        })
+        .catch(() => {});
     };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      const handle = (window as any).requestIdleCallback(fetchNotice, { timeout: 3000 });
+      return () => {
+        cancelled = true;
+        if ('cancelIdleCallback' in window) (window as any).cancelIdleCallback(handle);
+      };
+    } else {
+      const timer = setTimeout(fetchNotice, 1200);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
+    }
   }, []);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
@@ -226,15 +243,13 @@ export const Lobby: React.FC<LobbyProps> = ({
       hash === '#interactive-tutorial' ||
       hash === '#patchnotes' ||
       hash === '#patch' ||
-      hash === '#sfx'
+      hash === '#sfx' ||
+      hash === '#install' ||
+      hash === '#app-install'
     ) {
       history.pushState('', document.title, window.location.pathname + window.location.search);
     }
   };
-
-  useEffect(() => {
-    startIdleCardPreload();
-  }, []);
 
   useEffect(() => {
     const syncHashToModals = () => {
@@ -250,6 +265,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       setIsInteractiveTutorialOpen(hash === '#tutorial' || hash === '#interactive-tutorial');
       setIsPatchNotesOpen(hash === '#patchnotes' || hash === '#patch');
       setIsSfxGuideOpen(hash === '#sfx');
+      setIsAppInstallOpen(hash === '#install' || hash === '#app-install');
     };
 
     syncHashToModals();
@@ -378,6 +394,19 @@ export const Lobby: React.FC<LobbyProps> = ({
             </>
           )}
 
+          {/* PWA 앱 설치 버튼 (모바일 홈 화면 또는 데스크톱 앱 바로가기) */}
+          <button
+            onClick={() => {
+              setHash('#install');
+              setIsAppInstallOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 border border-amber-400/40 text-xs font-bold transition cursor-pointer shadow-sm active:scale-95"
+            title="모바일/PC 홈 화면에 앱으로 설치하기"
+          >
+            <Download className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline font-sans">앱 설치</span>
+          </button>
+
           <BgmPlayer />
         </div>
       </header>
@@ -389,8 +418,8 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       )}
 
-      {/* 1.5 실시간 방문자 & 접속자 현황 위젯 (좌측 상단 고정 배치) */}
-      <div className="w-full px-4 sm:px-8 pt-2 sm:absolute sm:top-18 sm:left-8 sm:w-auto sm:pt-0 z-30 pointer-events-auto">
+      {/* 1.5 실시간 방문자 & 접속자 현황 위젯 (모바일에서는 화면 확보를 위해 숨김) */}
+      <div className="hidden md:block w-full px-4 sm:px-8 pt-2 sm:absolute sm:top-18 sm:left-8 sm:w-auto sm:pt-0 z-30 pointer-events-auto">
         <VisitorStatsWidget />
       </div>
 
@@ -440,9 +469,210 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
 
         {/* ========================================================= */}
-        {/* 비대칭 벤토 그리드 [우측 보조메뉴: 아이콘 및 폰트 꽉 차게 확장 (280px~320px)] */}
+        {/* 모바일 전용 타일형 레이아웃 (세로/모바일 최적화: 공지바 + 2대형타일 + 3x3타일) */}
         {/* ========================================================= */}
-        <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[1fr_270px_250px_310px] xl:grid-cols-[1fr_290px_270px_340px] 2xl:grid-cols-[1.05fr_310px_280px_360px] gap-3.5 sm:gap-4.5 lg:h-[500px] xl:h-[520px]">
+        <div className="w-full flex md:hidden flex-col gap-3 pb-8 select-none">
+          {/* 1. 상단 슬림 1줄 공지사항 배너 */}
+          <div
+            onClick={() => (latestNotice && onOpenBoard ? onOpenBoard(latestNotice.id) : onOpenBoard && onOpenBoard())}
+            className="w-full bg-[#0c111d]/90 border border-amber-400/60 p-2.5 rounded-xl shadow-md flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] transition backdrop-blur-md"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="shrink-0 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-black border border-amber-400/40">
+                📢 공지
+              </span>
+              <span className="text-xs font-bold text-slate-100 truncate">
+                {latestNotice?.title || '공식 공지사항 및 업데이트 안내'}
+              </span>
+            </div>
+            <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
+          </div>
+
+          {/* 2. 메인 대결 2열 대형 타일 (전투 시작 + 멀티배틀) */}
+          <div className="w-full grid grid-cols-2 gap-2.5">
+            {/* 좌: 싱글 전투 시작 */}
+            <div
+              onClick={() => setHash('#battle')}
+              className="relative h-28 rounded-2xl border-2 border-amber-400/80 bg-[#0d101a] p-3 flex flex-col justify-between overflow-hidden shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer"
+            >
+              <div
+                className="absolute inset-0 bg-cover bg-top opacity-50"
+                style={{ backgroundImage: `url('/images/bg-battle-rovers.webp')`, backgroundPosition: 'center 10%' }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+              <div className="relative z-10 flex items-center justify-between">
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 font-mono text-[9px] font-black border border-amber-400/40">
+                  SINGLE
+                </span>
+                <Swords className="w-4 h-4 text-amber-300" />
+              </div>
+              <div className="relative z-10">
+                <h4 className="text-base font-black text-white drop-shadow">전투 시작</h4>
+                <p className="text-[10px] font-mono font-bold text-amber-300">AI / 1인 2역 듀얼</p>
+              </div>
+            </div>
+
+            {/* 우: 멀티배틀 */}
+            <div
+              onClick={() => {
+                setHash('#multiplayer');
+                setIsMultiplayerModalOpen(true);
+              }}
+              className="relative h-28 rounded-2xl border-2 border-violet-400/80 bg-gradient-to-br from-[#120e24] to-[#1c1236] p-3 flex flex-col justify-between overflow-hidden shadow-lg shadow-violet-500/25 active:scale-95 transition cursor-pointer"
+            >
+              <div className="relative z-10 flex items-center justify-between">
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[9px] font-black border border-emerald-400/40 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  ONLINE
+                </span>
+                <Users className="w-4 h-4 text-violet-300" />
+              </div>
+              <div className="relative z-10">
+                <h4 className="text-base font-black text-white drop-shadow">멀티배틀</h4>
+                <p className="text-[10px] font-mono font-bold text-violet-300">1:1 실시간 친선전</p>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. 모바일 3x3 보조 메뉴 타일 */}
+          <div className="w-full grid grid-cols-3 gap-2">
+            {/* 1) 튜토리얼 */}
+            <button
+              onClick={() => {
+                setHash('#tutorial');
+                setIsInteractiveTutorialOpen(true);
+              }}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
+                <img src="/images/menu_icons/tutorial.webp" alt="튜토리얼" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xs font-black text-white">튜토리얼</span>
+            </button>
+
+            {/* 2) 덱 편집기 */}
+            <button
+              onClick={() => {
+                setHash('#deckbuilder');
+                if (onOpenDeckBuilder) onOpenDeckBuilder();
+              }}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
+                <img src="/images/menu_icons/deck-builder.webp" alt="덱 편집기" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xs font-black text-white">덱 편집기</span>
+            </button>
+
+            {/* 3) 카드 도감 */}
+            <button
+              onClick={() => setHash('#card-gallery')}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
+                <img src="/images/menu_icons/card-gallery.webp" alt="카드 도감" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xs font-black text-white">카드 도감</span>
+            </button>
+
+            {/* 4) 자유게시판 */}
+            <button
+              onClick={() => (onOpenBoard ? onOpenBoard() : setHash('#board'))}
+              className="relative flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              {hasNewBoardPosts && (
+                <span className="absolute top-1.5 right-1.5 px-1 py-0.2 rounded-full bg-rose-500 text-white font-black text-[8px] animate-pulse">
+                  NEW
+                </span>
+              )}
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
+                <img src="/images/menu_icons/board.webp" alt="자유게시판" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xs font-black text-white">자유게시판</span>
+            </button>
+
+            {/* 5) 공유된 덱 */}
+            <button
+              onClick={() => setHash('#shared-decks')}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
+                <img src="/images/menu_icons/shared-decks.webp" alt="공유된 덱" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xs font-black text-white">공유된 덱</span>
+            </button>
+
+            {/* 6) 대전 리플레이 */}
+            <button
+              onClick={() => setHash('#replay')}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
+                <img src="/images/menu_icons/replay.webp" alt="리플레이" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xs font-black text-white">리플레이</span>
+            </button>
+
+            {/* 7) 공식 룰북 */}
+            <button
+              onClick={() => setHash('#rulebook')}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
+                <img src="/images/menu_icons/rulebook.webp" alt="공식 룰북" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xs font-black text-white">공식 룰북</span>
+            </button>
+
+            {/* 8) 룰 영상 가이드 */}
+            <button
+              onClick={() => setHash('#guide')}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
+                <img src="/images/menu_icons/video-guide.webp" alt="영상 가이드" className="w-6 h-6 object-contain" />
+              </div>
+              <span className="text-xs font-black text-white">영상 가이드</span>
+            </button>
+
+            {/* 9) 앱 설치 (PWA) */}
+            <button
+              onClick={() => {
+                setHash('#install');
+                setIsAppInstallOpen(true);
+              }}
+              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
+            >
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center text-amber-300">
+                <Download className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-black text-white">앱 설치</span>
+            </button>
+          </div>
+
+          {/* 4. 모바일 하단 패치노트 바 */}
+          <div
+            onClick={() => {
+              setHash('#patchnotes');
+              setIsPatchNotesOpen(true);
+            }}
+            className="w-full bg-[#0c111d]/80 border border-slate-700/60 p-2.5 rounded-xl shadow-md flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] transition backdrop-blur-md"
+          >
+            <div className="flex items-center gap-2">
+              <ScrollText className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="text-xs font-bold text-slate-200">업데이트 패치노트</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] font-mono text-amber-300 font-bold">{CURRENT_GAME_VERSION}</span>
+              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+            </div>
+          </div>
+        </div>
+
+        {/* ========================================================= */}
+        {/* 데스크톱/태블릿 비대칭 벤토 그리드 [md 이상 화면 전용] */}
+        {/* ========================================================= */}
+        <div className="w-full hidden md:grid md:grid-cols-2 lg:grid-cols-[1fr_270px_250px_310px] xl:grid-cols-[1fr_290px_270px_340px] 2xl:grid-cols-[1.05fr_310px_280px_360px] gap-3.5 sm:gap-4.5 lg:h-[500px] xl:h-[520px]">
           {/* ========================================================= */}
           {/* [1열] 좌측: 전투 시작 (상단) + 인터랙티브 튜토리얼 (하단) */}
           {/* ========================================================= */}
@@ -1180,6 +1410,17 @@ export const Lobby: React.FC<LobbyProps> = ({
             onClose={() => {
               clearHash();
               setIsSfxGuideOpen(false);
+            }}
+          />
+        )}
+
+        {/* 앱(PWA) 설치 가이드 모달 */}
+        {isAppInstallOpen && (
+          <AppInstallModal
+            isOpen={isAppInstallOpen}
+            onClose={() => {
+              clearHash();
+              setIsAppInstallOpen(false);
             }}
           />
         )}

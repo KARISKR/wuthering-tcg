@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
+import { getLodUrl } from '../utils/cardImageLod';
 import { getElementKr } from '../types/tcg';
 import {
   X,
@@ -657,11 +658,12 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                     className="relative aspect-[5/7] w-full rounded-2xl overflow-hidden bg-slate-950/80 border border-slate-800/90 hover:border-amber-400 group shadow-lg hover:shadow-2xl hover:shadow-amber-500/25 transition-all duration-300 cursor-pointer hover:-translate-y-1.5 flex items-center justify-center p-0.5 select-none"
                     title={`${card.nameKr} [${card.code}] (${card.rarity || '★~★★'}) - 클릭 시 상세 보기`}
                   >
-                    {/* 100% 순수 카드 일러스트 (여백/찌그러짐 없이 완벽한 TCG 비율 렌더링) */}
+                    {/* 100% 순수 카드 일러스트 (LOD 256px 고효율 WebP로 초고속 렌더링) */}
                     <img
-                      src={card.artUrl}
+                      src={getLodUrl(card.artUrl, 256)}
                       alt={card.nameKr}
                       loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-contain rounded-xl drop-shadow-md group-hover:scale-105 transition-transform duration-300"
                     />
 
@@ -713,11 +715,13 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           onClick={() => setDetailCard(c)}
                           className="hover:bg-slate-800/50 transition-colors cursor-pointer group"
                         >
-                          {/* 1. 일러스트 썸네일 */}
+                          {/* 1. 일러스트 썸네일 (LOD 256 WebP) */}
                           <td className="py-2.5 px-3 text-center align-middle">
                             <img
-                              src={c.artUrl}
+                              src={getLodUrl(c.artUrl, 256)}
                               alt={c.nameKr}
+                              loading="lazy"
+                              decoding="async"
                               className="w-10 h-14 object-contain rounded-md border border-slate-700 mx-auto shadow group-hover:scale-110 transition-transform"
                             />
                           </td>

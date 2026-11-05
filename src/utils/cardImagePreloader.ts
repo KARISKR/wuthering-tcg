@@ -57,44 +57,43 @@ function getLodUrl(url: string | undefined, width = 512): string | undefined {
   return base.replace('/cards/card_images/', `/cards/card_images_lod/${width}/`) + '.webp';
 }
 
-/** 배틀 매치 시작 시 양측 덱/슬롯/진화 카드 전수 프리로드 (512px LOD 우선 캐싱) */
+/** 배틀 매치 시작 시 핵심 카드 우선 프리로드 (화면 표시 캐릭터/손패/카드뒷면, 512px LOD 1종만 캐싱) */
 export function preloadBattleCards(state: GameState) {
   if (!state || !state.players) return;
 
-  const rawUrls: (string | undefined)[] = [
+  const targetUrls: string[] = [
     '/cards/card_back_action.webp',
     '/cards/card_back_character.webp',
   ];
 
   state.players.forEach((p) => {
     if (!p) return;
-    // 1. 패 카드
-    p.hand?.forEach((c: ActionCard) => c?.artUrl && rawUrls.push(c.artUrl));
-    // 2. 덱 카드
-    p.actionDeck?.forEach((c: ActionCard) => c?.artUrl && rawUrls.push(c.artUrl));
-    // 3. 필드 캐릭터 슬롯 및 상속 카드
+    // 1. 현재 화면에 즉시 노출되는 필드 캐릭터 슬롯 및 상속 카드
     if (p.slots) {
       Object.values(p.slots).forEach((c: CharacterCard | null) => {
-        if (c?.artUrl) rawUrls.push(c.artUrl);
-        c?.underlyingCards?.forEach((u: CharacterCard) => u?.artUrl && rawUrls.push(u.artUrl));
+        if (c?.artUrl) {
+          const lod = getLodUrl(c.artUrl, 512) || c.artUrl;
+          targetUrls.push(lod);
+        }
+        c?.underlyingCards?.forEach((u: CharacterCard) => {
+          if (u?.artUrl) {
+            const lod = getLodUrl(u.artUrl, 512) || u.artUrl;
+            targetUrls.push(lod);
+          }
+        });
       });
     }
-    // 4. 캐릭터 덱 (진화용 카드)
-    p.characterDeck?.forEach((c: CharacterCard) => c?.artUrl && rawUrls.push(c.artUrl));
-    // 5. 협주 존 및 버린 카드 존
-    p.concertoZone?.forEach((c: ActionCard) => c?.artUrl && rawUrls.push(c.artUrl));
-    p.dropZone?.forEach((c) => (c as any)?.artUrl && rawUrls.push((c as any).artUrl));
+    // 2. 현재 손패 (첫 턴 멀리건 및 초반 플레이 즉각 표시)
+    p.hand?.forEach((c: ActionCard) => {
+      if (c?.artUrl) {
+        const lod = getLodUrl(c.artUrl, 512) || c.artUrl;
+        targetUrls.push(lod);
+      }
+    });
   });
 
-  const urlsToPreload: string[] = [];
-  rawUrls.forEach((u) => {
-    if (!u) return;
-    urlsToPreload.push(u);
-    const lod512 = getLodUrl(u, 512);
-    if (lod512 && lod512 !== u) urlsToPreload.push(lod512);
-  });
-
-  preloadImages(urlsToPreload);
+  // 중복 제거 후 병렬 프리로드 (LOD 단일 요청만 수행)
+  preloadImages(targetUrls);
 }
 
 /** 리플레이 시작 시 타임라인 상의 모든 카드 프리로드 */
@@ -133,65 +132,12 @@ export async function preloadReplayCards(replay: BattleReplayData) {
   preloadImages(urls);
 }
 
-/** 로비 유휴 시간에 카드 점진적 백그라운드 프리로드 */
-let idlePreloadStarted = false;
+/**
+ * 로비 유휴 시간 전체 카드 프리로드는 비활성화됨:
+ * 초기 로비 진입 시 192장의 카드 이미지(6.25MB) 및 OFFICIAL_CARDS 청크(105KB)의 불필요한 백그라운드 다운로드를 방지.
+ * 카드도감/덱편집기/배틀 진입 시 화면에 필요한 카드를 가상화/지연 로딩 방식으로 직접 로드함.
+ */
 export function startIdleCardPreload() {
-  if (idlePreloadStarted) return;
-  idlePreloadStarted = true;
-
-  // 데이터 절약 모드이거나 2G 환경일 경우 백그라운드 프리로드 건너뜀
-  if (typeof navigator !== 'undefined') {
-    const conn = (navigator as any)?.connection;
-    if (conn?.saveData || conn?.effectiveType === '2g' || conn?.effectiveType === 'slow-2g') {
-      return;
-    }
-  }
-
-  let batchIndex = 0;
-  const BATCH_SIZE = 4; // 한 번에 4장씩 초저부하 백그라운드 로드
-  let cardsToPreload: string[] = [];
-
-  const scheduleNext = (fn: () => void) => {
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(fn, { timeout: 5000 });
-    } else {
-      setTimeout(fn, 800);
-    }
-  };
-
-  const loadNextBatch = async () => {
-    if (cardsToPreload.length === 0) {
-      try {
-        const { OFFICIAL_CARDS } = await import('../data/officialCards');
-        cardsToPreload = OFFICIAL_CARDS.map((c) => {
-          if (!c.artUrl) return '';
-          const dot = c.artUrl.lastIndexOf('.');
-          const base = dot > -1 ? c.artUrl.slice(0, dot) : c.artUrl;
-          return base.replace('/cards/card_images/', '/cards/card_images_lod/256/') + '.webp';
-        }).filter(Boolean);
-      } catch {
-        return;
-      }
-    }
-
-    if (batchIndex >= cardsToPreload.length) return;
-    const batch = cardsToPreload.slice(batchIndex, batchIndex + BATCH_SIZE);
-    batchIndex += BATCH_SIZE;
-
-    // 이전 배치가 완전히 다운로드될 때까지 await 대기
-    await preloadImages(batch, 'low');
-
-    scheduleNext(loadNextBatch);
-  };
-
-  // 페이지 전체 리소스 및 첫 로비 렌더링이 완전히 안정화된 후 4초 뒤부터 조용히 시작
-  const begin = () => setTimeout(loadNextBatch, 4000);
-  if (typeof document !== 'undefined') {
-    if (document.readyState === 'complete') {
-      begin();
-    } else {
-      window.addEventListener('load', begin, { once: true });
-    }
-  }
+  // no-op: 불필요한 로비 백그라운드 프리로드 완전 차단
 }
 

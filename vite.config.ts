@@ -104,7 +104,10 @@ export default defineConfig({
             if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
               return 'vendor-react';
             }
-            if (id.includes('lucide-react') || id.includes('canvas-confetti')) {
+            if (id.includes('canvas-confetti')) {
+              return 'vendor-confetti';
+            }
+            if (id.includes('lucide-react')) {
               return 'vendor-ui';
             }
             if (

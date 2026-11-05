@@ -94,7 +94,7 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 lg:p-6 animate-in fade-in duration-200">
-      <div className="relative mobile-modal-scaled bg-[#0c101b]/95 border border-[#f97316]/60 max-w-5xl xl:max-w-7xl w-full p-2.5 sm:p-4 lg:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center gap-1.5 sm:gap-2.5 lg:gap-3.5 text-slate-100 text-center overflow-hidden">
+      <div className="relative mobile-modal-scaled bg-[#0c101b]/95 border border-[#f97316]/60 max-w-5xl xl:max-w-7xl w-full p-2.5 sm:p-4 lg:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center gap-1.5 sm:gap-2.5 lg:gap-3.5 text-slate-100 text-center max-h-[94dvh] overflow-y-auto custom-scrollbar">
         {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />

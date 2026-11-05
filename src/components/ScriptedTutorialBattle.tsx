@@ -52,12 +52,12 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     title: '기본 구성',
     phaseLabel: 'DECK RULES',
     dialogue: [
-      '『명조: 배틀』을 하려면\n캐릭터 카드 덱이랑 액션 카드 덱, 이렇게 딱 2종류의 덱이 필요해.',
-      '먼저 캐릭터 카드 덱은 3장에서 15장 사이로 구성해야 하는데,\n반드시 서로 다른 캐릭터 딱 3종류만 골라야 하고,\n그 3명은 각각의 Lv.0 카드가 무조건 1장씩 들어가야 해.',
-      '그리고 카드 번호가 똑같은 캐릭터 카드는\n덱에 단 1장만 넣을 수 있어.',
-      '액션 카드 덱은 부족하거나 넘치지 않게 정확히 40장으로 맞춰야 하고,\n같은 번호의 카드는 최대 3장까지만 넣을 수 있어.',
-      '또 일반 액션 카드는 자유롭게 넣을 수 있지만,\n캐릭터 전용 액션 카드는 내 캐릭터 덱에 그 캐릭터가 포함되어 있을 때만\n넣을 수 있으니까 이 점만 주의하면 돼.',
-      '이 카드들을 이용해서 상대방의 생명력(20)을\n모두 깎아서 0으로 만들면 승리하는 게임이야!',
+      '『명조: 배틀』을 하려면\n캐릭터 카드 덱과 액션 카드 덱, 2종류의 덱이 필요해.',
+      '캐릭터 카드 덱은 서로 다른 캐릭터 딱 3종류를 골라\n3장에서 15장 사이로 구성해야 해.',
+      '그 3명은 각각의 Lv.0 카드가 무조건 1장씩 들어가야 하고,\n번호가 똑같은 캐릭터 카드는 덱에 단 1장만 넣을 수 있어.',
+      '액션 카드 덱은 정확히 40장으로 맞춰야 하고,\n같은 번호의 카드는 최대 3장까지만 넣을 수 있어.',
+      '일반 액션 카드는 자유롭게 넣을 수 있지만,\n전용 액션 카드는 내 캐릭터 덱에 그 캐릭터가 있을 때만 넣을 수 있어.',
+      '이 카드들을 이용해 상대방의 생명력(20)을\n모두 깎아서 0으로 만들면 승리해!',
     ],
     hint: '캐릭터 카드 덱(3~15장)과 액션 카드 덱(40장)의 편성 규칙을 확인해 보세요!',
   },
@@ -67,10 +67,10 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     phaseLabel: 'COLOR TRIANGLE',
     dialogue: [
       '액션 카드에는 기본적으로\n빨간색(적색), 파란색(청색), 초록색(녹색) 3종류가 있어.',
-      '파란색 카드는 빨간색 카드를 이기고\n(🔵 청색 > 🔴 적색)',
-      '초록색 카드는 파란색 카드를 이기고\n(🟢 녹색 > 🔵 청색)',
-      '빨간색 카드는 초록색 카드를 이기는\n(🔴 적색 > 🟢 녹색)',
-      '쉽게 이야기하면 물고 물리는\n가위바위보 형태의 상성을 가지고 있어!',
+      '파란색 카드는 빨간색 카드를 이겨!\n(🔵 청색 > 🔴 적색)',
+      '초록색 카드는 파란색 카드를 이겨!\n(🟢 녹색 > 🔵 청색)',
+      '빨간색 카드는 초록색 카드를 이겨!\n(🔴 적색 > 🟢 녹색)',
+      '물고 물리는 가위바위보 형태의 상성을 가지고 있어!',
     ],
     hint: '대사에 따라 강조되는 3색 가위바위보 상성(빨강 > 초록 > 파랑 > 빨강)을 확인하세요!',
   },
@@ -79,12 +79,13 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     title: '액션 카드 살펴보기',
     phaseLabel: 'ACTION CARD',
     dialogue: [
-      '이번엔 카드를 자세히 살펴볼까?\n먼저 액션 카드에는 다양한 정보가 적혀 있어.',
-      '먼저 카드에 전용 캐릭터 이름이 적혀 있다면 그 캐릭터 전용 액션 카드고,\n안 적혀 있다면 누구나 쓸 수 있는 일반 액션 카드야.',
-      '그리고 COST는\n이 카드를 사용할 때 지불해야 하는 비용이야.',
-      '스피드는 아까 말한 가위바위보 상성에서\n서로 똑같은 빨간색이나 초록색 카드를 냈을 때 누가 이길지 비교하는 수치야.',
-      '스피드가 더 높은 카드가 이기고,\n만약 스피드까지 똑같다면 현재 턴을 진행 중인 플레이어가 승리해!\n참고로 파란색 카드끼리 부딪히면 스피드 상관없이 무조건 무승부가 돼.',
-      '다음으로 데미지는 배틀에서 이기거나 콤보를 넣을 때 상대방에게 입히는 피해량이고,\n아래쪽에는 고유한 스킬 텍스트와 카드의 특징을 나타내는 태그가 적혀 있어.',
+      '이번엔 액션 카드에 적힌 정보들을 자세히 살펴볼까?',
+      '전용 캐릭터 이름이 적혀 있다면 전용 카드고,\n안 적혀 있다면 누구나 쓸 수 있는 공용 카드야.',
+      'COST는 이 카드를 사용할 때 지불해야 하는 비용이야.',
+      '스피드는 가위바위보 상성이 비겼을 때(적색vs적색, 녹색vs녹색)\n누가 이길지 비교하는 수치야. 더 높은 쪽이 이겨!',
+      '만약 스피드까지 똑같다면 턴 플레이어가 승리해.\n(단, 청색vs청색은 스피드 무관 무조건 무승부야!)',
+      '데미지는 배틀에서 승리하거나 콤보 시 상대에게 입히는 피해량이야.',
+      '카드 아래쪽에는 고유한 스킬 텍스트와 태그가 적혀 있어.',
     ],
     hint: '액션 카드의 각 위치(전용 캐릭터, COST, 스피드, 데미지, 스킬 텍스트·태그) 하이라이트를 확인하세요!',
   },
@@ -93,10 +94,13 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     title: '캐릭터 카드 살펴보기',
     phaseLabel: 'CHARACTER CARD',
     dialogue: [
-      '다음은 내 덱의 중심이 되는 캐릭터 카드를 살펴보자!\n캐릭터 카드는 직접 배틀에 내는 카드가 아니라,\n필드에 배치해서 레벨업을 하며 스킬로 내 플레이를 든든하게 지원해 주는 역할을 해.',
-      '먼저 레벨(Lv.)은 캐릭터의 현재 성장 단계를 나타내.\n게임은 항상 Lv.0 캐릭터들로 시작해서 점점 높은 레벨의 카드를 위에 겹치며 강해지지!',
-      '그 옆의 태그 아이콘은 캐릭터의 속성과 무기 종류를 나타내.\n회절, 인멸, 기류, 전도, 용융, 응결 6가지 속성과\n대검, 직검, 권총, 권갑, 증폭기 5가지 무기 태그가 있어서,\n특정 태그를 참조하는 카드 효과에 사용돼.',
-      '아래쪽에는 캐릭터의 고유한 스킬 텍스트가 적혀 있어.\n여기서 아주 중요한 핵심 규칙 하나!\n캐릭터가 레벨업을 해서 카드가 여러 장 겹쳐지더라도,\n아래에 깔려 있는 캐릭터 카드들의 스킬도 사라지지 않고 그대로 계속 유지돼!\n즉, 레벨업을 할수록 스킬이 계속 누적되면서 캐릭터가 점점 더 강력해지는 거지!',
+      '다음은 덱의 중심이 되는 캐릭터 카드를 살펴보자!',
+      '캐릭터 카드는 직접 내는 것이 아니라,\n필드에 배치해 레벨업하며 스킬로 지원해 주는 역할을 해.',
+      '레벨(Lv.)은 캐릭터의 성장 단계를 나타내.\n항상 Lv.0으로 시작해서 높은 레벨을 위에 겹쳐 성장시켜!',
+      '태그 아이콘은 속성(6종)과 무기(5종)를 나타내며,\n특정 태그를 참조하는 카드 효과에 사용돼.',
+      '아래쪽에는 캐릭터의 고유 스킬 텍스트가 적혀 있어.',
+      '핵심 규칙! 캐릭터가 레벨업해서 카드가 여러 장 겹쳐도,\n아래에 깔린 캐릭터 카드들의 스킬은 사라지지 않고 계속 유지돼!',
+      '레벨업을 거듭할수록 스킬이 계속 누적되어 강력해져!',
     ],
     hint: '캐릭터 카드의 레벨(Lv.), 속성/무기 태그 아이콘, 그리고 스킬 누적 유지 규칙을 확인하세요!',
   },
@@ -105,22 +109,14 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     title: '카드 효과 키워드 알아보기',
     phaseLabel: 'KEYWORDS',
     dialogue: [
-      '카드의 스킬 텍스트를 보면 알록달록한 아이콘으로 된 키워드들이 적혀 있어.\n언제 어떻게 작동하는지 한눈에 알아볼 수 있는 표시니까 하나씩 짚어줄게!',
-      '먼저 조건을 나타내는 보라색 키워드야!',
-      '【리더】\n이 캐릭터 카드가 맨 앞줄인 리더 포지션에 나와 있을 때만 스킬이 유효해.',
-      '【리더 스킬】\n액션 카드에 붙어있는 키워드인데,\n현재 내 리더가 이 카드의 전용 캐릭터일 때만 이 카드를 사용할 수 있어.',
-      '【우세】\n내가 지난 턴 배틀에서 승리했거나 상대가 배틀 페이즈를 패스했을 때만 켜지는 강력한 효과야.\n단, 선공 첫 번째 턴에는 발동하지 않아!',
-      '다음은 특정 행동을 하거나 배틀 중에 발동하는 주황색 키워드야!',
-      '【등장】\n이 캐릭터 카드가 캐릭터 덱에서 캐릭터 에리어의 맨 위로 새로 올라올 때 발동해.\n(게임 시작할 때 처음 배치하는 Lv.0 카드는 등장으로 치지 않아!)',
-      '【레벨업】\n다른 캐릭터 카드가 등장해서,\n이 스킬을 가진 캐릭터 카드 위에 겹쳐 놓일 때 아래에 깔리면서 발동해.',
+      '스킬 텍스트의 알록달록한 키워드들을 하나씩 짚어줄게!',
+      '【리더】\n맨 앞줄인 리더 포지션에 나와 있을 때만 스킬이 유효해.',
+      '【리더 스킬】\n현재 내 리더가 이 카드의 전용 캐릭터일 때만 사용할 수 있어.',
+      '【우세】\n지난 턴 배틀에서 승리했거나 상대가 배틀을 패스했을 때 켜지는 강력한 효과야. (선공 1턴엔 미발동)',
+      '【등장】 · 【레벨업】\n새 카드가 올라올 때 발동하거나, 아래에 깔리면서 발동해.',
       '【교체】\n리더 캐릭터와 백 캐릭터가 서로 자리를 바꿀 때 발동해.',
-      '【배틀】\n배틀 페이즈의 \'배틀 스텝\'에서\n서로 카드를 공개하고 COST를 지불한 직후에 발동해.',
-      '【판정】\n배틀 페이즈의 \'판정 스텝\'에서\n배틀의 승패가 결정된 직후에 발동해.',
-      '【콤보】\n판정이 끝난 뒤 \'콤보 스텝\'에서\n이 액션 카드를 내며 콤보를 이어갈 때 발동해.',
-      '마지막으로 턴의 흐름에 따라 발동하는 타이밍 키워드와 파란색 키워드야!',
-      '【자신의 턴 시작 시】 · 【자신의 배틀 페이즈 시작 시】 · 【자신의 턴 종료 시】\n말 그대로 내 턴이나 내 배틀 페이즈가 시작될 때,\n그리고 내 턴이 끝날 때 발동해.',
-      '【각 배틀 페이즈 종료 시】 · 【각 턴 종료 시】\n내 턴이든 상대 턴이든 상관없이\n양쪽 플레이어의 배틀 페이즈나 턴이 끝날 때마다 매번 발동해.',
-      '【추격 X】\n파란색으로 표시된 이 키워드를 얻으면,\n이번 턴에 내가 콤보를 넣을 수 있는 가능 횟수가 X번만큼 늘어나!',
+      '【배틀】 · 【판정】 · 【콤보】\n배틀 페이즈의 각 단계별로 발동하는 스킬들이야.',
+      '【추격 X】\n이번 턴에 내가 콤보를 넣을 수 있는 가능 횟수가 X번 늘어나!',
     ],
     hint: '보라색(조건), 주황색(행동·배틀·타이밍), 파란색(추격 X) 키워드들을 하나씩 확인해 보세요!',
   },
@@ -130,11 +126,11 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     phaseLabel: 'FIELD ZONES',
     dialogue: [
       '이제 카드를 놓을 필드를 살펴보자.',
-      '가장 중심이 되는 곳은 캐릭터 에리어야.\n맨 앞줄에 있는 1칸은 현재 싸우고 있는 주인공인 리더 포지션이고,\n뒷줄의 2칸은 대기 중인 백 포지션이야.',
-      '그 옆의 액션 에리어는 배틀할 때 패에서 액션 카드를 내는 공간이야.\n카드를 여러 장 낼 때는 왼쪽부터 오른쪽 순서대로 차곡차곡 놓으면 돼.',
-      '그리고 여기는 협주 에리어야. 액션 카드의 COST를 지불할 때 쓸 에너지를 모아두는 곳이지.\n여기에 카드를 놓을 땐 알아보기 쉽게 앞면이 보이도록 가로 방향으로 눕혀서 배치하고,\n나중에 COST를 지불할 땐 필요한 수치만큼 이곳의 카드를 트래시 에리어(무덤)로 보내면 돼!',
-      '나머지는 각자의 덱을 놓는 캐릭터 덱 에리어와 액션 덱 에리어,\n그리고 사용한 카드나 버린 카드가 모이는 트래시 에리어로 구성되어 있어.\n참고로 내 캐릭터 덱은 게임 중 언제든지 내용을 확인해 볼 수 있어!',
-      '또 게임 도중에 액션 덱이 0장이 되면,\n트래시 에리어에 있는 카드를 전부 뒤집어서 섞은 뒤 다시 액션 덱으로 쓰는 덱 리프레시를 하게 돼.\n단, 액션 덱과 트래시 에리어 양쪽 모두에 카드가 1장도 없게 되면 그 즉시 패배하니까 조심해야 해!',
+      '캐릭터 에리어의 앞줄 1칸은 싸우고 있는 리더 포지션,\n뒷줄 2칸은 대기 중인 백 포지션이야.',
+      '액션 에리어는 배틀할 때 패에서 액션 카드를 내는 공간이야.\n여러 장을 낼 땐 왼쪽부터 오른쪽 순서로 놓으면 돼.',
+      '협주 에리어는 액션 카드의 COST를 낼 에너지를 모으는 곳이야.\n가로로 눕혀서 배치하고, COST만큼 트래시로 보내면 돼!',
+      '캐릭터 덱과 액션 덱, 사용한 카드가 모이는 트래시 에리어가 있어.\n내 캐릭터 덱은 언제든 내용을 확인해 볼 수 있어!',
+      '액션 덱이 0장이 되면 트래시 카드를 섞어 액션 덱으로 리프레시해.\n단, 둘 다 카드가 0장이 되면 즉시 패배하니까 주의해!',
     ],
     hint: '전체 게임 보드에서 순서대로 하이라이트되는 필드 구역들을 확인하세요!',
   },
@@ -143,11 +139,11 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     title: '게임 시작 준비',
     phaseLabel: 'GAME SETUP',
     dialogue: [
-      '자, 이제 실전 준비를 해볼까?\n먼저 서로 상대방의 액션 덱을 섞어준 다음,\n가위바위보나 주사위로 선공과 후공을 정해.',
-      '그리고 내 캐릭터 덱에서 Lv.0 캐릭터 카드 3장을 골라\n뒷면으로 리더 포지션과 백 포지션에 원하는 대로 배치해.',
-      '그다음 액션 덱에서 첫 패로 5장을 뽑아.\n이때 패가 마음에 안 들면 선공 플레이어부터 차례대로 딱 한 번 멀리건(패 교환)을 할 수 있어.',
-      '필요 없는 카드를 원하는 만큼 덱 맨 아래로 넣고,\n넣은 장수만큼 덱 맨 위에서 새로 뽑은 뒤 덱을 다시 섞어주면 돼!',
-      '멀리건이 끝나면 양쪽 모두 배치해 둔 캐릭터 카드를 동시에 앞면으로 공개하고,\n서로 생명력을 20으로 맞추면 배틀 시작이야!',
+      '실전 준비를 해볼까? 주사위로 선공과 후공을 정해.',
+      '캐릭터 덱에서 Lv.0 카드 3장을 골라\n뒷면으로 리더와 백 포지션에 원하는 대로 배치해.',
+      '액션 덱에서 첫 패로 5장을 뽑고,\n마음에 안 들면 선공부터 딱 한 번 멀리건(패 교환)을 할 수 있어.',
+      '필요 없는 카드를 덱 맨 아래로 넣고,\n그만큼 새로 뽑은 뒤 덱을 섞어줘.',
+      '양쪽 캐릭터 카드를 동시에 앞면으로 공개하고,\n생명력을 20으로 맞추면 배틀 시작이야!',
     ],
     hint: 'Lv.0 3장 뒷면 배치 ➔ 5장 드로우 후 멀리건 ➔ 캐릭터 3장 동시 오픈 & 생명력 20 세팅을 확인하세요!',
   },
@@ -156,12 +152,12 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     title: '턴의 시작과 액션 페이즈',
     phaseLabel: 'ACTION PHASE',
     dialogue: [
-      '내 턴이 오면 턴 시작 페이즈를 거쳐 드로우 페이즈로 넘어가서 덱에서 카드를 2장 뽑아.\n단, 선공 플레이어의 가장 첫 번째 턴에는 1장만 뽑아야 해!',
-      '카드를 뽑았다면 배틀을 준비하는 액션 페이즈야.\n여기서는 다음 3가지 행동을 내가 원하는 순서대로, 각각 1턴에 1번씩 할 수 있어.',
-      '캐릭터 교체\n내 리더 캐릭터와 백 캐릭터 1명의 자리를 서로 바꾸는 거야.\n자리를 바꾸면 캐릭터의 【교체】 스킬이 발동해.',
-      '레벨업\n필드에 있는 내 캐릭터 위에, 캐릭터 덱에 있는 같은 이름의 카드를 겹쳐서 성장시키는 거야.\n현재 레벨과 같거나 딱 1단계 높은 카드만 올릴 수 있고,\n올리려는 카드의 레벨 숫자만큼 내 패를 버려야 해. (예: Lv.1 카드를 올리려면 패 1장 버리기!)\n레벨업을 하면 새로 올라간 카드의 【등장】 스킬과 아래에 깔린 카드의 【레벨업】 스킬이 동시에 발동해.\n참고로 캐릭터는 한 자리에 최대 5장까지만 겹칠 수 있어!',
-      '충전\n내 패에서 카드 1장을 골라 협주 에리어에 배치해서,\n이따 쓸 COST를 미리 모아두는 행동이야.',
-      '정비가 끝났다면 배틀 페이즈로 들어갈 수도 있고,\n만약 싸우기 불리하다면 배틀페이즈를 건너뛰고 바로 턴을 종료할 수도 있어.',
+      '내 턴이 오면 드로우 페이즈에서 카드를 2장 뽑아.\n(단, 선공 첫 턴에는 1장만 뽑아!)',
+      '액션 페이즈에서는 다음 3가지 행동을\n원하는 순서대로 1턴에 1번씩 할 수 있어.',
+      '1. 캐릭터 교체: 리더와 백 캐릭터의 자리를 바꿔.\n자리를 바꾸면 【교체】 스킬이 발동해.',
+      '2. 레벨업: 필드의 캐릭터 위에 같은 이름의 카드를 겹쳐 성장시켜.\n올리는 카드의 레벨 수치만큼 패를 버려야 해!',
+      '3. 충전: 패에서 카드 1장을 골라 협주 에리어에 배치해\nCOST를 미리 모아두는 행동이야.',
+      '정비가 끝나면 배틀 페이즈로 들어가거나,\n불리하다면 배틀을 건너뛰고 바로 턴을 마칠 수도 있어.',
     ],
     hint: '드로우 페이즈 후 액션 페이즈의 [교체], [레벨업], [충전] 3가지 행동을 확인해 보세요!',
   },
@@ -171,11 +167,10 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     phaseLabel: 'BATTLE & JUDGMENT',
     dialogue: [
       '배틀 페이즈에 들어왔다면 먼저 배틀 스텝을 진행해.',
-      '현재 턴인 플레이어는 패에서 조건에 맞는 액션 카드 1장을 골라 뒷면으로 내야 해.\n턴 플레이어는 배틀 페이즈에 들어왔다면 무조건 카드를 내야 하지만,\n만약 패에 낼 수 있는 카드가 아예 없다면 상대에게 패 전체를 보여줘서 증명하고 안 낼 수 있어.',
-      '반대로 방어하는 상대방(비턴 플레이어)은\n카드를 낼지 말지 자유롭게 선택할 수 있어.',
-      '양쪽이 카드를 다 골랐다면 동시에 카드를 앞면으로 공개하고,\n각자 카드에 적힌 만큼 협주 에리어의 카드를 트래시로 보내서 COST를 지불해.\n이때 【배틀】 스킬들이 발동하지.',
-      '그다음 판정 스텝에서 아까 배운 가위바위보 상성과 스피드로 승패를 가려.\n만약 한쪽만 카드를 냈다면 카드를 낸 쪽이 무조건 승리하고,\n둘 다 안 냈거나 둘 다 파란색을 냈다면 무승부가 돼서 그대로 배틀 페이즈가 끝나.',
-      '승패가 갈렸다면 【판정】 스킬들이 발동하고,\n배틀에서 승리한 플레이어가 자기 배틀 카드의 데미지만큼 상대에게 피해를 입혀!\n(즉, 방어하는 턴이어도 배틀에서 이기면 상대에게 역으로 데미지를 줄 수 있어!)',
+      '턴 플레이어는 패에서 액션 카드 1장을 골라 뒷면으로 내야 해.\n상대방(수비측)은 카드를 낼지 말지 자유롭게 선택할 수 있어.',
+      '동시에 카드를 앞면으로 공개하고,\n협주 에리어의 카드를 트래시로 보내 COST를 지불해.',
+      '판정 스텝에서 상성과 스피드로 승패를 가려!\n한쪽만 카드를 냈다면 낸 쪽이 무조건 승리해.',
+      '배틀에서 이긴 플레이어가 데미지만큼 상대에게 피해를 입혀!\n(수비측이어도 배틀에서 이기면 역으로 데미지를 줘!)',
     ],
     hint: '양측 뒷면 배치 ➔ 동시 오픈 & COST 지불 & 【배틀】 스킬 ➔ 판정 & 데미지 타격 과정을 확인하세요!',
   },
@@ -184,12 +179,11 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     title: '콤보 스텝과 우세',
     phaseLabel: 'COMBO & DOMINANCE',
     dialogue: [
-      '판정이 끝났는데 내가 배틀에서 이겼다면?\n추가 타격을 넣는 콤보 스텝의 기회가 찾아와!\n배틀에서 승리한 플레이어가 아래 두 가지 조건 중 하나라도 만족하면 콤보를 이어갈 수 있어.',
-      '내가 빨간색(적색) 카드로 배틀에서 승리했을 때:\n이번 턴에는 횟수 제한 없이 무제한으로 콤보를 넣을 수 있어!',
-      '초록색이나 파란색으로 이겼더라도 【추격 X】 효과를 얻었을 때:\n적힌 X 숫자만큼 콤보를 넣을 수 있어!',
-      '콤보를 할 때는 콤보 가능 횟수를 1회 소모하고 COST를 지불한 뒤,\n내 패에서 빨간색 카드를 1장 액션 에리어에 내면 돼.',
-      '그러면 그 카드의 【콤보】 스킬이 발동하고\n카드에 적힌 데미지만큼 상대에게 추가 피해를 입히지!\nCOST와 패의 빨간색 카드, 그리고 콤보 횟수가 남아있는 한 계속해서 몰아칠 수 있어.',
-      '그리고 하나 더! 이번 턴 배틀에서 승리하거나 상대가 배틀을 포기하고 턴을 넘겼다면,\n다음 턴에 내 카드들의 【우세】 스킬이 켜지게 돼.\n배틀에서 한 번 흐름을 잡으면 다음 턴까지 강력한 보너스를 받을 수 있다는 점도 꼭 기억해 둬!',
+      '배틀에서 이겼다면 추가 타격을 넣는 콤보 스텝이 열려!',
+      '빨간색(적색) 카드로 이겼다면 횟수 제한 없이 콤보 가능!\n초록색/파란색으로 이겼어도 【추격 X】가 있다면 X회 콤보 가능해.',
+      '콤보 시 횟수 1회를 쓰고 COST를 지불한 뒤,\n패에서 빨간색 카드를 액션 에리어에 내면 돼.',
+      '카드의 【콤보】 스킬이 발동하고 데미지만큼 추가 피해를 입혀!\n조건이 되는 한 계속해서 몰아칠 수 있어.',
+      '배틀에서 승리하면 다음 턴에 내 카드들의 【우세】 스킬이 켜져!\n흐름을 잡으면 다음 턴까지 강력한 보너스를 받아.',
     ],
     hint: '콤보 스텝 연속 빨간색 카드 공격과 다음 턴 【우세】 아이콘 활성화 연출을 확인하세요!',
   },
@@ -198,9 +192,9 @@ export const TUTORIAL_SCRIPT: TutorialStepSpec[] = [
     title: '턴 종료와 마무리',
     phaseLabel: 'END PHASE & FINISH',
     dialogue: [
-      '콤보까지 모두 마쳤다면 턴 종료 페이즈로 넘어가.\n이때 【턴 종료 시】 스킬들을 처리하고,\n이번 턴에 액션 에리어에 냈던 모든 카드를 트래시 에리어로 치워.',
-      '마지막으로 내 패가 8장을 넘어가면\n8장이 될 때까지 카드를 골라 트래시 에리어로 버리고 상대에게 턴을 넘기면 끝이야!',
-      '자, 이렇게 턴을 주고받으면서 상대의 생명력 20을 먼저 0으로 만들면 승리를 거두게 돼.\n어때, 이제 직접 배틀해 볼 준비가 됐지, 방랑자?\n지금 바로 첫 매치를 시작해 보자!',
+      '콤보를 마치면 턴 종료 페이즈로 넘어가.\n【턴 종료 시】 스킬을 처리하고, 낸 카드들을 트래시로 치워.',
+      '내 패가 8장을 넘어가면 8장이 될 때까지 버려.\n그리고 상대에게 턴을 넘기면 끝이야!',
+      '이렇게 턴을 주고받으며 상대의 생명력 20을 0으로 만들면 승리해!\n방랑자, 첫 매치를 시작해 보자!',
     ],
     hint: '🎉 모든 튜토리얼을 마스터했습니다! 지금 바로 첫 매치를 시작해 보세요!',
   },
@@ -2345,20 +2339,20 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
       </div>
 
       {/* ========================================================= */}
-      {/* 3. 하단 아브 대사창 & 스텝 컨트롤러 (확대 & 고가독성 폰트) */}
+      {/* 3. 하단 아브 대사창 & 스텝 컨트롤러 (모바일 컴팩트 슬림 바 + 데스크톱 고가독성) */}
       {/* ========================================================= */}
       <div className="shrink-0 z-40 bg-[#080c16]/98 border-t border-white/15 flex flex-col items-center">
-        <div className="w-full max-w-6xl px-3 sm:px-6 py-3 sm:py-4">
-          <div className="relative bg-[#0d1222]/98 backdrop-blur-xl border-2 border-amber-500/90 rounded-3xl p-4 sm:p-5 shadow-[0_0_45px_rgba(245,158,11,0.45)] text-white flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
-            {/* 좌측 캐릭터 일러스트 프레임 (아브 - 크기 확대) */}
-            <div className="relative shrink-0 flex items-center justify-center">
-              <div className="relative w-20 h-20 sm:w-28 sm:h-28 rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.6)] bg-slate-900 group">
+        <div className="w-full max-w-6xl px-2 sm:px-6 py-1.5 sm:py-4">
+          <div className="relative bg-[#0d1222]/98 backdrop-blur-xl border-2 border-amber-500/90 rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 shadow-[0_0_45px_rgba(245,158,11,0.45)] text-white flex flex-row items-center gap-2.5 sm:gap-6">
+            {/* 좌측 캐릭터 일러스트 프레임 (아브 - 모바일에서는 슬림 12x12, 데스크톱에서는 28x28) */}
+            <div className="relative shrink-0 flex items-center justify-center self-start sm:self-center">
+              <div className="relative w-12 h-12 sm:w-28 sm:h-28 rounded-xl sm:rounded-3xl overflow-hidden border-2 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)] bg-slate-900 group">
                 <img
                   src="/images/tutorial/abby_guide.webp"
                   alt="아브 (Abby)"
-                  className="w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-300 drop-shadow-[0_4px_14px_rgba(0,0,0,0.9)]"
+                  className="w-full h-full object-contain p-0.5 sm:p-1.5 group-hover:scale-105 transition-transform duration-300 drop-shadow-[0_4px_14px_rgba(0,0,0,0.9)]"
                 />
-                <div className="absolute bottom-1 inset-x-1 text-center py-0.5 rounded bg-black/90 text-xs sm:text-sm font-black text-amber-300 border border-amber-500/50 shadow">
+                <div className="absolute bottom-0.5 inset-x-0.5 text-center py-0.2 sm:py-0.5 rounded bg-black/90 text-[9px] sm:text-sm font-black text-amber-300 border border-amber-500/50 shadow">
                   아브
                 </div>
               </div>
@@ -2369,59 +2363,59 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
             {/* 우측 말풍선 본문 & 컨트롤러 */}
             <div className="flex-1 flex flex-col justify-between w-full min-w-0">
               {/* 상단 화자 정보 및 진행도 */}
-              <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
-                <div className="flex items-center gap-2.5">
-                  <span className="px-3 py-1 rounded-full text-xs sm:text-sm font-black bg-amber-500/25 text-amber-300 border border-amber-500/50 flex items-center gap-1.5 shadow-sm">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <div className="flex items-center justify-between pb-1 sm:pb-2 border-b border-white/10 mb-1 sm:mb-2">
+                <div className="flex items-center gap-1.5 sm:gap-2.5">
+                  <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-sm font-black bg-amber-500/25 text-amber-300 border border-amber-500/50 flex items-center gap-1 shadow-sm">
+                    <Sparkles className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-amber-400" />
                     <span>STEP {step}</span>
                   </span>
-                  <span className="text-sm sm:text-base font-black text-white tracking-wide">
+                  <span className="text-xs sm:text-base font-black text-white tracking-wide truncate">
                     {currentStepData.title}
                   </span>
                 </div>
 
-                <span className="text-xs sm:text-sm font-mono text-amber-300 font-bold bg-black/50 px-2.5 py-0.5 rounded-lg border border-white/10">
+                <span className="text-[10px] sm:text-sm font-mono text-amber-300 font-bold bg-black/50 px-2 py-0.5 rounded-md sm:rounded-lg border border-white/10 shrink-0">
                   대화 {dialogueIdx + 1} / {currentStepData.dialogue.length}
                 </span>
               </div>
 
-              {/* 메인 대사 (글자 크기 확대 & 주요 키워드/룰/수치 컬러 하이라이팅 적용) */}
-              <div className="min-h-[68px] sm:min-h-[86px] flex items-center py-1.5">
-                <p className="text-base sm:text-lg lg:text-xl xl:text-[21px] text-slate-100 font-bold leading-relaxed sm:leading-loose tracking-wide break-keep drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+              {/* 메인 대사 (글자 크기 및 줄 간격 최적화) */}
+              <div className="min-h-[44px] sm:min-h-[86px] flex items-center py-1 sm:py-1.5">
+                <p className="text-xs sm:text-lg lg:text-xl xl:text-[21px] text-slate-100 font-bold leading-relaxed sm:leading-loose tracking-wide break-keep drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
                   {renderFormattedSentence(currentSentence)}
                 </p>
               </div>
 
               {/* 하단 행동 힌트 및 이전/다음 버튼 */}
-              <div className="mt-2.5 pt-2 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                <div className="text-xs sm:text-sm font-bold text-amber-300 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-amber-400 shrink-0" />
-                  <span className="leading-snug">{renderFormattedSentence(currentStepData.hint)}</span>
+              <div className="mt-1 sm:mt-2.5 pt-1 sm:pt-2 border-t border-white/10 flex flex-row items-center justify-between gap-2">
+                <div className="text-[10px] sm:text-sm font-bold text-amber-300 flex items-center gap-1.5 min-w-0 truncate">
+                  <Layers className="w-3.5 h-3.5 text-amber-400 shrink-0 hidden sm:inline" />
+                  <span className="leading-snug truncate">{renderFormattedSentence(currentStepData.hint)}</span>
                 </div>
 
-                <div className="flex items-center gap-2.5 ml-auto">
+                <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto shrink-0">
                   {(dialogueIdx > 0 || step > 1) && (
                     <button
                       onClick={handlePrevDialogue}
-                      className="px-3.5 py-2 rounded-xl border border-white/20 hover:bg-white/10 text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1.5 active:scale-95"
+                      className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border border-white/20 hover:bg-white/10 text-[11px] sm:text-sm font-bold text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1 active:scale-95"
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       <span>이전</span>
                     </button>
                   )}
 
                   <button
                     onClick={handleNextDialogue}
-                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:brightness-110 text-white text-xs sm:text-sm font-black transition shadow-lg shadow-orange-950/60 cursor-pointer flex items-center gap-1.5 hover:scale-105 active:scale-95"
+                    className="px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:brightness-110 text-white text-[11px] sm:text-sm font-black transition shadow-lg shadow-orange-950/60 cursor-pointer flex items-center gap-1 hover:scale-105 active:scale-95"
                   >
                     <span>
                       {dialogueIdx < currentStepData.dialogue.length - 1
                         ? '다음 대화 ▶'
                         : step < TUTORIAL_SCRIPT.length
-                        ? `STEP ${step + 1}로 이동 ▶`
-                        : '첫 매치 시작하기 ⚔️'}
+                        ? `STEP ${step + 1} ▶`
+                        : '첫 매치 시작 ⚔️'}
                     </span>
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                 </div>
               </div>
