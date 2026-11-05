@@ -292,19 +292,19 @@ export const Lobby: React.FC<LobbyProps> = ({
       <div className="fixed inset-0 z-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_-10%,rgba(34,211,238,0.06),transparent_70%)] pointer-events-none" />
 
       {/* 1. 상단 내비게이션 바 (명조 게임 클라이언트 스타일) */}
-      <header className="relative z-30 h-14 sm:h-15 border-b border-slate-800/80 bg-[#090d18]/85 backdrop-blur-xl px-4 sm:px-8 flex items-center justify-between">
+      <header className="relative z-30 h-14 sm:h-15 border-b border-slate-800/80 bg-[#090d18]/85 backdrop-blur-xl px-2.5 sm:px-8 flex items-center justify-between gap-2">
         {/* 좌측: 명조 배틀 공식 로고 + FAN-MADE ONLINE SIMULATOR (10회 클릭 시 개발자/화면편집 모드 활성화) */}
         <div
           onClick={handleLogoEasterEggClick}
-          className="flex items-center gap-3 shrink-0 cursor-pointer select-none group"
+          className="flex items-center gap-2 sm:gap-3 shrink-0 cursor-pointer select-none group"
           title="명조 배틀 (클릭)"
         >
           <img
             src="/images/logo-battle-trans.webp"
             alt="명조 배틀"
-            className="h-8 sm:h-10 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] group-hover:scale-105 transition-transform"
+            className="h-7 sm:h-10 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] group-hover:scale-105 transition-transform"
           />
-          <div className="flex flex-col justify-center">
+          <div className="hidden sm:flex flex-col justify-center">
             <span className="text-xs sm:text-sm font-black tracking-widest text-white uppercase font-sans drop-shadow-sm">
               FAN-MADE ONLINE SIMULATOR
             </span>
@@ -539,13 +539,24 @@ export const Lobby: React.FC<LobbyProps> = ({
             {/* 1) 튜토리얼 */}
             <button
               onClick={() => {
-                setHash('#tutorial');
-                setIsInteractiveTutorialOpen(true);
+                if (onStartTutorial) {
+                  onStartTutorial();
+                } else {
+                  setHash('#tutorial');
+                  setIsInteractiveTutorialOpen(true);
+                }
               }}
               className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
             >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/tutorial.webp" alt="튜토리얼" className="w-6 h-6 object-contain" />
+              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center overflow-hidden">
+                <img
+                  src="/images/menu_icons/tutorial.webp"
+                  alt="튜토리얼"
+                  className="w-7 h-7 object-contain"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/images/tutorial/abby_guide.webp';
+                  }}
+                />
               </div>
               <span className="text-xs font-black text-white">튜토리얼</span>
             </button>
@@ -570,7 +581,14 @@ export const Lobby: React.FC<LobbyProps> = ({
               className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
             >
               <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/card-gallery.webp" alt="카드 도감" className="w-6 h-6 object-contain" />
+                <img
+                  src="/images/menu_icons/card-gallery.webp"
+                  alt="카드 도감"
+                  className="w-6 h-6 object-contain"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src = '/images/menu_icons/deck-preset.webp';
+                  }}
+                />
               </div>
               <span className="text-xs font-black text-white">카드 도감</span>
             </button>

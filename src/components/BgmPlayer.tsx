@@ -93,10 +93,10 @@ export const BgmPlayer: React.FC = () => {
   const displayedTracks = activeTab === 'battle' ? battleTracks : lobbyTracks;
 
   return (
-    <div className="relative flex items-center gap-1.5 sm:gap-2 bg-slate-900/90 border border-slate-700/80 rounded-2xl px-2.5 sm:px-3 py-1 shadow-xl text-xs backdrop-blur-md select-none">
+    <div className="relative flex items-center gap-1 sm:gap-2 bg-slate-900/90 border border-slate-700/80 rounded-2xl px-2 sm:px-3 py-1 shadow-xl text-xs backdrop-blur-md select-none max-w-full">
       {/* 회전하는 LP 디스크 아이콘 */}
       <div
-        className={`p-1 rounded-full transition-colors ${
+        className={`p-0.5 sm:p-1 rounded-full transition-colors shrink-0 ${
           isPlaying
             ? isBattle
               ? 'text-rose-400 animate-spin'
@@ -113,7 +113,7 @@ export const BgmPlayer: React.FC = () => {
           setActiveTab(mode);
           setShowPlaylist(!showPlaylist);
         }}
-        className="flex flex-col text-left max-w-[105px] sm:max-w-[155px] truncate cursor-pointer group"
+        className="flex flex-col text-left max-w-[88px] xs:max-w-[105px] sm:max-w-[155px] truncate cursor-pointer group min-w-0"
         title="트랙 및 플레이리스트 목록 열기"
       >
         <div className="flex items-center gap-1">
@@ -294,7 +294,7 @@ export const BgmPlayer: React.FC = () => {
       {showPlaylist && (
         <div
           ref={playlistRef}
-          className="absolute left-1/2 -translate-x-1/2 md:left-auto md:right-0 md:translate-x-0 top-full mt-2 w-84 max-w-[92vw] bg-slate-900/98 border-2 border-amber-500/50 rounded-2xl p-3 shadow-2xl shadow-black/95 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute right-0 top-full mt-2 w-[calc(100vw-1.5rem)] max-w-[336px] sm:w-84 bg-slate-900/98 border-2 border-amber-500/50 rounded-2xl p-3 shadow-2xl shadow-black/95 backdrop-blur-md z-50 text-slate-100 animate-in fade-in zoom-in-95 duration-150"
         >
           {/* 상단 통합 사운드 마스터 볼륨 설정 카드 */}
           <div className="p-2.5 bg-slate-950/90 rounded-xl mb-2.5 border border-slate-800 space-y-2">

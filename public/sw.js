@@ -4,12 +4,13 @@
  * - HTML 및 JS 번들, API: Network-First (최신 업데이트 보장)
  */
 
-const CACHE_NAME = 'wuthering-tcg-v2.2.0';
+const CACHE_NAME = 'wuthering-tcg-v2.2.1';
 
 // 캐시 우선 서빙 대상 정적 자산 경로 패턴
 const STATIC_ASSET_PATTERNS = [
   /\/fonts\//,
   /\/images\//,
+  /\/icons\//,
   /\/cards\//,
   /\/audio\//,
   /favicon\.svg/,
