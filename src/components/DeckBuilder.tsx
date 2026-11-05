@@ -234,6 +234,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
   // 좌측 패널에 표시할 현재 활성/선택된 카드 (초대형 상세 뷰어)
   const [activeCard, setActiveCard] = useState<OfficialCardData | null>(null);
 
+  // 모바일 전용 3단 탭 전환 상태 ('DECK': 내 덱 구성 | 'POOL': 카드 라이브러리 추가 | 'DETAIL': 카드 상세)
+  const [mobileEditTab, setMobileEditTab] = useState<'DECK' | 'POOL' | 'DETAIL'>('DECK');
+
   // 드래그 앤 드롭 상태 관리 (덱에 카드 드래그로 넣기 & 빼기)
   interface DragCardData {
     source: 'ACTION_POOL' | 'ACTION_DECK' | 'CHAR_POOL' | 'CHAR_DECK';
@@ -941,54 +944,68 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       ) : (
       <>
       {/* 1. 상단 헤더 바 */}
-      <header className="h-16 border-b border-slate-800 bg-slate-950/95 px-5 flex items-center justify-between shrink-0 z-30">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={handleBackToDeckList}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4 text-amber-400" />
-            내 덱 목록
-          </button>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-black text-white flex items-center gap-2 tracking-wide">
-              <Sparkles className="w-5 h-5 text-amber-400" />
-              마스터 덱 에디터 <span className="text-xs text-amber-400 font-mono tracking-widest font-normal">MASTER DUEL EDITION</span>
-            </h2>
+      <header className="h-auto lg:h-16 py-2.5 lg:py-0 border-b border-slate-800 bg-slate-950/95 px-3 sm:px-5 flex flex-col lg:flex-row lg:items-center justify-between shrink-0 z-30 gap-2">
+        <div className="flex items-center justify-between lg:justify-start gap-2.5 sm:gap-4 w-full lg:w-auto">
+          <div className="flex items-center gap-2.5 sm:gap-4 min-w-0">
+            <button
+              onClick={handleBackToDeckList}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap"
+            >
+              <ArrowLeft className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>내 덱 목록</span>
+            </button>
+            <div className="flex items-center gap-2 min-w-0">
+              <h2 className="text-sm sm:text-base font-black text-white flex items-center gap-1.5 sm:gap-2 tracking-wide truncate">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
+                <span className="truncate">마스터 덱 에디터</span>
+                <span className="hidden xl:inline text-xs text-amber-400 font-mono tracking-widest font-normal whitespace-nowrap">
+                  MASTER DUEL EDITION
+                </span>
+              </h2>
+            </div>
           </div>
-        </div>
 
-        {/* 덱 선택 드롭다운, 이름 변경, 프리셋/코드 및 저장/완료 버튼 */}
-        <div className="flex items-center gap-2.5 flex-wrap">
+          {/* 모바일 상단 우측: 덱 이름 입력창 */}
           <input
             type="text"
             value={deckName}
             onChange={(e) => setDeckName(e.target.value)}
-            className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-400 font-bold w-36 sm:w-48"
+            className="lg:hidden bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-400 font-bold w-36 sm:w-48 shrink-0"
+            placeholder="덱 이름 입력"
+          />
+        </div>
+
+        {/* 덱 선택 드롭다운, 이름 변경, 프리셋/코드 및 저장/완료 버튼 */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar w-full lg:w-auto">
+          <input
+            type="text"
+            value={deckName}
+            onChange={(e) => setDeckName(e.target.value)}
+            className="hidden lg:block bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-400 font-bold w-48 shrink-0"
             placeholder="덱 이름 입력"
           />
           <button
             onClick={() => setIsPresetModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/50 text-sm font-bold transition cursor-pointer shadow"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-bold transition cursor-pointer shadow whitespace-nowrap shrink-0"
             title="덱 프리셋 보관함 열기 및 덱 코드 복사/가져오기"
           >
-            <BookmarkCheck className="w-4 h-4 text-purple-400" />
-            <span className="hidden sm:inline">프리셋 & 코드</span>
+            <BookmarkCheck className="w-4 h-4 text-purple-400 shrink-0" />
+            <span>프리셋 &amp; 코드</span>
           </button>
           <button
             onClick={() => setIsExportModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-sm font-bold transition cursor-pointer shadow"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-bold transition cursor-pointer shadow whitespace-nowrap shrink-0"
             title="덱 내보내기 (카드 이미지 시트 PNG / 텍스트 리스트)"
           >
-            <Share2 className="w-4 h-4 text-slate-400" />
-            <span className="hidden sm:inline">덱 내보내기</span>
+            <Share2 className="w-4 h-4 text-slate-400 shrink-0" />
+            <span>덱 내보내기</span>
           </button>
           <button
             onClick={saveDeck}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-sm font-bold transition cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap shrink-0"
           >
-            <Save className="w-4 h-4 text-amber-400" />
-            저장
+            <Save className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>저장</span>
           </button>
           <button
             onClick={() => {
@@ -1000,18 +1017,52 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
               }
               onStartBattleWithDeck(currentDeckConfig);
             }}
-            className={`flex items-center gap-2 px-5 py-2 rounded-xl font-black text-sm shadow-xl transition cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-1.5 sm:py-2 rounded-xl font-black text-xs sm:text-sm shadow-xl transition cursor-pointer whitespace-nowrap shrink-0 ml-auto lg:ml-0 ${
               isDeckValid
                 ? 'bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 shadow-amber-500/30'
                 : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
             }`}
             title="덱 생성 규칙 검사 및 출격"
           >
-            <CheckCircle2 className="w-4 h-4 text-amber-400" />
-            출격 준비 완료!
+            <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>출격 준비 완료!</span>
           </button>
         </div>
       </header>
+
+      {/* [모바일/태블릿 전용 3단 탭 스위처 바 (< lg)] — 각 패널이 모바일 화면 전체 높이를 쓰도록 보장 */}
+      <div className="lg:hidden flex border-b border-slate-800 bg-slate-950 shrink-0 z-20">
+        <button
+          onClick={() => setMobileEditTab('DECK')}
+          className={`flex-1 py-2.5 text-xs font-black transition cursor-pointer border-b-2 whitespace-nowrap ${
+            mobileEditTab === 'DECK'
+              ? 'border-amber-400 text-amber-300 bg-amber-500/10'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          🃏 내 덱 ({characterDeck.length}/15 · {actionDeck.length}/40)
+        </button>
+        <button
+          onClick={() => setMobileEditTab('POOL')}
+          className={`flex-1 py-2.5 text-xs font-black transition cursor-pointer border-b-2 whitespace-nowrap ${
+            mobileEditTab === 'POOL'
+              ? 'border-cyan-400 text-cyan-300 bg-cyan-500/10'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          📚 카드 추가 (라이브러리)
+        </button>
+        <button
+          onClick={() => setMobileEditTab('DETAIL')}
+          className={`flex-1 py-2.5 text-xs font-black transition cursor-pointer border-b-2 whitespace-nowrap ${
+            mobileEditTab === 'DETAIL'
+              ? 'border-purple-400 text-purple-300 bg-purple-500/10'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          🔍 카드 상세 {activeCard ? `(${activeCard.nameKr})` : ''}
+        </button>
+      </div>
 
       {/* 2. 유희왕 마스터 듀얼식 3단 패널 */}
       <div className="flex-1 flex flex-col lg:flex-row gap-0 overflow-hidden min-h-0">
@@ -1032,7 +1083,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
             }
           }}
           onDrop={handleDropOnRemovalZone}
-          className={`w-full lg:w-[380px] xl:w-[420px] 2xl:w-[460px] shrink-0 border-r border-slate-800/80 bg-slate-950 p-4 sm:p-5 flex flex-col justify-between overflow-y-auto min-h-0 transition-all ${
+          className={`${
+            mobileEditTab === 'DETAIL' ? 'flex flex-1' : 'hidden'
+          } lg:flex lg:flex-none w-full lg:w-[380px] xl:w-[420px] 2xl:w-[460px] shrink-0 border-r border-slate-800/80 bg-slate-950 p-4 sm:p-5 flex-col justify-between overflow-y-auto min-h-0 transition-all ${
             isOverRemovalZone && (dragItem?.source === 'ACTION_DECK' || dragItem?.source === 'CHAR_DECK')
               ? 'ring-2 ring-red-500 ring-dashed bg-red-950/20'
               : ''
@@ -1198,7 +1251,11 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
         {/* ========================================================= */}
         {/* [패널 2] 중앙: 캐릭터 덱 (3~15장 & 출전 3인 태그) & 메인 액션 덱 (40장) */}
         {/* ========================================================= */}
-        <div className="flex-1 border-r border-slate-800/80 bg-slate-900/30 p-3.5 sm:p-4 flex flex-col justify-between overflow-hidden min-h-0">
+        <div
+          className={`${
+            mobileEditTab === 'DECK' ? 'flex flex-1' : 'hidden'
+          } lg:flex flex-1 border-r border-slate-800/80 bg-slate-900/30 p-2.5 sm:p-4 flex-col justify-between overflow-y-auto lg:overflow-hidden min-h-0`}
+        >
           {/* 1. 캐릭터 덱 목록 (3~15장 편성 및 출전 캐릭터 3인 태그) */}
           <div className="bg-slate-950/95 border border-slate-800 rounded-2xl p-3 mb-2.5 shrink-0 shadow-lg">
             {/* 상단 헤더: 매수 배지 및 출전 3인 태그 */}
@@ -1655,12 +1712,32 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
             }
           }}
           onDrop={handleDropOnRemovalZone}
-          className={`w-full lg:w-[360px] xl:w-[400px] 2xl:w-[440px] shrink-0 bg-slate-950 p-4 flex flex-col justify-between overflow-hidden min-h-0 transition-all ${
+          className={`${
+            mobileEditTab === 'POOL' ? 'flex flex-1' : 'hidden'
+          } lg:flex lg:flex-none w-full lg:w-[360px] xl:w-[400px] 2xl:w-[440px] shrink-0 bg-slate-950 p-3 sm:p-4 flex-col justify-between overflow-hidden min-h-0 transition-all ${
             isOverRemovalZone && (dragItem?.source === 'ACTION_DECK' || dragItem?.source === 'CHAR_DECK')
               ? 'ring-2 ring-red-500 ring-dashed bg-red-950/20'
               : ''
           }`}
         >
+          {/* 모바일 라이브러리 전용 내 덱 실시간 카운터 배너 */}
+          <div className="lg:hidden mb-2 px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-2 shrink-0 text-xs">
+            <div className="flex items-center gap-2 font-mono font-black">
+              <span className={characterDeck.length >= 3 ? 'text-amber-300' : 'text-red-400'}>
+                캐릭터 {characterDeck.length}/15
+              </span>
+              <span className="text-slate-600">·</span>
+              <span className={actionDeck.length === 40 ? 'text-emerald-400' : 'text-cyan-300'}>
+                액션 {actionDeck.length}/40
+              </span>
+            </div>
+            <button
+              onClick={() => setMobileEditTab('DECK')}
+              className="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-[11px] whitespace-nowrap cursor-pointer"
+            >
+              내 덱 확인 ▶
+            </button>
+          </div>
           {/* 덱 카드 드래그 시 제거 드롭 가이드 배너 */}
           {(dragItem?.source === 'ACTION_DECK' || dragItem?.source === 'CHAR_DECK') && (
             <div className={`p-2.5 mb-2 rounded-xl border flex items-center justify-center gap-2 text-xs font-black transition-all shrink-0 ${

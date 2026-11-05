@@ -70,65 +70,76 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
         {/* ========================================================= */}
         {/* 1. 최상단 헤더 바 */}
         {/* ========================================================= */}
-        <header className="px-6 py-4.5 border-b border-cyan-400/20 bg-[#0c1224]/90 flex items-center justify-between shrink-0 z-20 gap-3">
-          <div className="flex items-center gap-3.5 min-w-0">
-            {/* 좌상단 나가기 버튼 */}
+        <header className="px-3.5 sm:px-6 py-3 sm:py-4 border-b border-cyan-400/20 bg-[#0c1224]/90 flex flex-col lg:flex-row lg:items-center justify-between shrink-0 z-20 gap-2.5 sm:gap-3">
+          <div className="flex items-center justify-between lg:justify-start gap-2.5 sm:gap-3.5 min-w-0 w-full lg:w-auto">
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              {/* 좌상단 나가기 버튼 */}
+              <button
+                onClick={onClose}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow whitespace-nowrap"
+                title="대기실로 나가기"
+              >
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
+                <span className="hidden sm:inline">대기실로 나가기</span>
+                <span className="sm:hidden">나가기</span>
+              </button>
+
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
+                <img src="/images/menu_icons/rulebook.webp" alt="공식 룰북" className="w-7 h-7 sm:w-9 sm:h-9 object-contain drop-shadow" />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-2xl font-black text-white tracking-wide truncate">
+                    공식 룰북 &amp; 규정 자료실
+                  </h2>
+                  <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-0.5 rounded-full shrink-0 hidden md:inline-block whitespace-nowrap">
+                    VER 1.0 OFFICIAL
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-400 truncate hidden lg:block mt-0.5">
+                  『명조: 대결』 공식 원문 종합 룰북, 간소화 가이드, 대회 플로어 룰, 질의응답 FAQ 열람
+                </p>
+              </div>
+            </div>
+
             <button
               onClick={onClose}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
-              title="대기실로 나가기"
+              className="lg:hidden w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer shrink-0"
+              title="닫기"
             >
-              <ArrowLeft className="w-5 h-5 text-amber-400 shrink-0" />
-              <span>대기실로 나가기</span>
+              <X className="w-5 h-5" />
             </button>
-
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
-              <img src="/images/menu_icons/rulebook.webp" alt="공식 룰북" className="w-9 h-9 object-contain drop-shadow" />
-            </div>
-
-            <div className="min-w-0">
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide truncate">
-                  공식 룰북 &amp; 규정 자료실
-                </h2>
-                <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-0.5 rounded-full shrink-0 hidden md:inline-block">
-                  VER 1.0 OFFICIAL
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 truncate hidden lg:block mt-0.5">
-                『명조: 대결』 공식 원문 종합 룰북, 간소화 가이드, 대회 플로어 룰, 질의응답 FAQ 열람
-              </p>
-            </div>
           </div>
 
           {/* 상단 탭 네비게이션 & 영상 가이드 이동 & 닫기 버튼 */}
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <div className="flex items-center justify-between lg:justify-end gap-2 sm:gap-3 shrink-0 w-full lg:w-auto">
             {onOpenVideoGuide && (
               <button
                 onClick={() => {
                   onClose();
                   onOpenVideoGuide();
                 }}
-                className="hidden xl:flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-black transition cursor-pointer shadow"
+                className="hidden xl:flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-black transition cursor-pointer shadow whitespace-nowrap"
               >
                 <Film className="w-4 h-4 text-amber-400" />
                 <span>동영상 룰 가이드</span>
               </button>
             )}
 
-            <div className="flex items-center gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/70 overflow-x-auto">
+            <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/70 overflow-x-auto no-scrollbar w-full lg:w-auto">
               <button
                 onClick={() => {
                   setActiveTab('DETAILED');
                   setSelectedSectionIdx(null);
                 }}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'DETAILED'
                     ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <BookOpen className="w-4 h-4" />
+                <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>[상세] 공식 룰북</span>
               </button>
 
@@ -137,44 +148,44 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                   setActiveTab('SIMPLIFIED');
                   setSelectedSectionIdx(null);
                 }}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'SIMPLIFIED'
                     ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <ScrollText className="w-4 h-4" />
+                <ScrollText className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>[간소화] 룰</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('FAQ')}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'FAQ'
                     ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <HelpCircle className="w-4 h-4" />
+                <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>공식 FAQ ({OFFICIAL_RULES_DATA.faq_list.length})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('FLOOR')}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'FLOOR'
                     ? 'bg-purple-600 text-white shadow-md font-black'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <FileText className="w-4 h-4" />
+                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>대회 플로어 룰</span>
               </button>
             </div>
 
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer ml-1"
+              className="hidden lg:flex w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white items-center justify-center transition border border-slate-700/60 cursor-pointer ml-1 shrink-0"
               title="닫기"
             >
               <X className="w-5 h-5" />
@@ -185,13 +196,13 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
         {/* ========================================================= */}
         {/* 2. 메인 본문 콘텐츠 */}
         {/* ========================================================= */}
-        <div className="flex-1 flex overflow-hidden min-h-0 bg-[#080d1a] relative z-20">
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0 bg-[#080d1a] relative z-20">
           {/* TAB 1 & 2: 상세 공식 룰북 or 간소화 룰 */}
           {(activeTab === 'DETAILED' || activeTab === 'SIMPLIFIED') && (
             <>
-              {/* 좌측 목차 사이드바 */}
-              <div className="w-72 sm:w-80 border-r border-slate-800 bg-[#0a0f20]/90 flex flex-col shrink-0">
-                <div className="p-4 border-b border-slate-800 flex items-center justify-between text-sm">
+              {/* 좌측 목차 사이드바 (모바일에서는 상단 가로 챕터 탭 바, 데스크톱에서는 좌측 사이드바) */}
+              <div className="w-full md:w-72 lg:w-80 border-b md:border-b-0 md:border-r border-slate-800 bg-[#0a0f20]/90 flex flex-col shrink-0">
+                <div className="hidden md:flex p-4 border-b border-slate-800 items-center justify-between text-sm">
                   <span className="font-black text-slate-200 flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-cyan-400" />
                     <span>룰북 챕터 목차</span>
@@ -200,24 +211,39 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                     총 {currentSections.length}개 챕터
                   </span>
                 </div>
-                <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                <div className="flex md:flex-col overflow-x-auto md:overflow-y-auto p-2.5 md:p-3 gap-2 md:gap-0 md:space-y-2 no-scrollbar md:custom-scrollbar">
+                  <button
+                    onClick={() => setSelectedSectionIdx(null)}
+                    className={`md:w-full px-3 py-2 md:p-3 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2 shrink-0 whitespace-nowrap ${
+                      selectedSectionIdx === null
+                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md font-black'
+                        : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700 font-bold'
+                    }`}
+                  >
+                    <span className="text-xs md:text-sm font-black">전체 챕터 한눈에 보기 ({currentSections.length})</span>
+                    <ChevronRight className="w-4 h-4 shrink-0 hidden md:inline text-cyan-300" />
+                  </button>
                   {currentSections.map((sec, idx) => {
                     const isSelected = selectedSectionIdx === idx;
                     return (
                       <button
                         key={idx}
                         onClick={() => setSelectedSectionIdx(idx)}
-                        className={`w-full p-3 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2.5 ${
+                        className={`md:w-full px-3 py-2 md:p-3 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2.5 shrink-0 ${
                           isSelected
                             ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md'
                             : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
                         }`}
                       >
-                        <div className="min-w-0">
-                          <span className="text-[11px] font-mono text-cyan-400/80 block">CHAPTER {idx + 1}</span>
-                          <span className="text-sm font-black truncate block mt-0.5">{sec.title}</span>
+                        <div className="min-w-0 flex md:block items-center gap-1.5">
+                          <span className="text-[10px] md:text-[11px] font-mono text-cyan-400/80 md:block whitespace-nowrap">
+                            CH.{idx + 1}
+                          </span>
+                          <span className="text-xs md:text-sm font-black truncate block md:mt-0.5 whitespace-nowrap md:whitespace-normal">
+                            {sec.title}
+                          </span>
                         </div>
-                        <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'text-cyan-300 translate-x-0.5' : 'text-slate-600'}`} />
+                        <ChevronRight className={`w-4 h-4 shrink-0 hidden md:inline transition-transform ${isSelected ? 'text-cyan-300 translate-x-0.5' : 'text-slate-600'}`} />
                       </button>
                     );
                   })}
@@ -225,20 +251,20 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
               </div>
 
               {/* 우측 본문 뷰어 */}
-              <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6 custom-scrollbar bg-[#080d1a]">
+              <div className="flex-1 overflow-y-auto p-3.5 sm:p-8 space-y-4 sm:space-y-6 custom-scrollbar bg-[#080d1a]">
                 {(selectedSectionIdx !== null ? [currentSections[selectedSectionIdx]] : currentSections).map((sec, idx) => (
                   <div
                     key={idx}
-                    className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 shadow-lg"
+                    className="p-4 sm:p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3.5 sm:space-y-4 shadow-lg break-keep"
                   >
-                    <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
-                      <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 font-black text-sm font-mono">
-                        {idx + 1}
+                    <div className="flex items-center gap-2.5 sm:gap-3 pb-3 border-b border-slate-800">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 font-black text-xs sm:text-sm font-mono shrink-0">
+                        {selectedSectionIdx !== null ? selectedSectionIdx + 1 : idx + 1}
                       </div>
                       <div className="min-w-0 flex items-center gap-2 flex-wrap">
-                        <h3 className="text-xl sm:text-2xl font-black text-cyan-100">{sec.title}</h3>
+                        <h3 className="text-base sm:text-2xl font-black text-cyan-100">{sec.title}</h3>
                         {sec.badge && (
-                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                          <span className="text-[11px] sm:text-xs font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 whitespace-nowrap">
                             {sec.badge}
                           </span>
                         )}
@@ -246,13 +272,13 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                     </div>
 
                     {sec.summary && (
-                      <div className="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs sm:text-sm text-cyan-200 flex items-center gap-2 font-bold">
-                        <Sparkles className="w-4 h-4 text-cyan-400 shrink-0" />
+                      <div className="p-3 sm:p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs sm:text-sm text-cyan-200 flex items-start sm:items-center gap-2 font-bold">
+                        <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5 sm:mt-0" />
                         <span>{sec.summary}</span>
                       </div>
                     )}
 
-                    <div className="text-sm sm:text-base text-slate-200 leading-relaxed space-y-2.5 font-medium">
+                    <div className="text-xs sm:text-base text-slate-200 leading-relaxed space-y-2.5 font-medium break-keep">
                       {Array.isArray(sec.content) ? (
                         sec.content.map((p, pIdx) => (
                           <p key={pIdx} className="leading-relaxed">{p}</p>
@@ -269,34 +295,34 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
 
           {/* TAB 3: 공식 FAQ */}
           {activeTab === 'FAQ' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-5 custom-scrollbar">
-              <div className="max-w-4xl mx-auto space-y-5">
+            <div className="flex-1 overflow-y-auto p-3.5 sm:p-8 space-y-4 sm:space-y-5 custom-scrollbar">
+              <div className="max-w-4xl mx-auto space-y-4 sm:space-y-5">
                 <div className="relative">
-                  <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Search className="w-4 h-4 sm:w-5 sm:h-5 absolute left-3.5 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="FAQ 질문 또는 답변 키워드 검색..."
-                    className="w-full pl-12 pr-4 py-3.5 bg-slate-900/90 border border-slate-700/80 rounded-2xl text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
+                    className="w-full pl-10 sm:pl-12 pr-4 py-3 sm:py-3.5 bg-slate-900/90 border border-slate-700/80 rounded-2xl text-xs sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
                   />
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {filteredFaq.map((item, idx) => (
                     <div
                       key={idx}
-                      className="p-5 sm:p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-3 shadow-md"
+                      className="p-4 sm:p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2.5 sm:space-y-3 shadow-md break-keep"
                     >
-                      <div className="flex items-start gap-3">
-                        <span className="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-black text-xs shrink-0 mt-0.5">
+                      <div className="flex items-start gap-2.5 sm:gap-3">
+                        <span className="px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg bg-amber-500 text-slate-950 font-black text-xs shrink-0 mt-0.5">
                           Q
                         </span>
-                        <h4 className="text-base sm:text-lg font-black text-amber-200 leading-snug">
+                        <h4 className="text-sm sm:text-lg font-black text-amber-200 leading-snug">
                           {item.q}
                         </h4>
                       </div>
-                      <div className="flex items-start gap-3 pl-8 text-sm sm:text-base text-slate-200 leading-relaxed font-medium">
+                      <div className="flex items-start gap-2.5 sm:gap-3 pl-1 sm:pl-8 text-xs sm:text-base text-slate-200 leading-relaxed font-medium">
                         <span className="text-cyan-400 font-bold shrink-0">A.</span>
                         <p>{item.a}</p>
                       </div>
@@ -309,19 +335,19 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
 
           {/* TAB 4: 대회 플로어 룰 */}
           {activeTab === 'FLOOR' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-5 custom-scrollbar">
-              <div className="max-w-4xl mx-auto space-y-5">
-                <div className="p-6 rounded-2xl bg-purple-950/30 border border-purple-500/40 space-y-2">
-                  <h3 className="text-xl sm:text-2xl font-black text-purple-200 flex items-center gap-2">
-                    <Trophy className="w-6 h-6 text-purple-400" />
+            <div className="flex-1 overflow-y-auto p-3.5 sm:p-8 space-y-4 sm:space-y-5 custom-scrollbar">
+              <div className="max-w-4xl mx-auto space-y-4 sm:space-y-5">
+                <div className="p-4 sm:p-6 rounded-2xl bg-purple-950/30 border border-purple-500/40 space-y-2 break-keep">
+                  <h3 className="text-base sm:text-2xl font-black text-purple-200 flex items-center gap-2">
+                    <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-purple-400 shrink-0" />
                     <span>공식 공인 대회 플로어 룰 가이드라인</span>
                   </h3>
-                  <p className="text-sm text-slate-300 leading-relaxed">
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
                     오프라인/온라인 토너먼트 및 이벤트 매치에서 적용되는 표준 경기 규정입니다.
                   </p>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3 sm:space-y-4">
                   {[
                     {
                       title: '1. 덱 구성 및 슬리브(프로텍터) 규정',
@@ -342,10 +368,10 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                   ].map((rule, idx) => (
                     <div
                       key={idx}
-                      className="p-5 sm:p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2 shadow-md"
+                      className="p-4 sm:p-6 rounded-2xl bg-slate-900/70 border border-slate-800 space-y-2 shadow-md break-keep"
                     >
-                      <h4 className="text-base sm:text-lg font-black text-white">{rule.title}</h4>
-                      <p className="text-sm sm:text-base text-slate-300 leading-relaxed font-medium">{rule.desc}</p>
+                      <h4 className="text-sm sm:text-lg font-black text-white">{rule.title}</h4>
+                      <p className="text-xs sm:text-base text-slate-300 leading-relaxed font-medium">{rule.desc}</p>
                     </div>
                   ))}
                 </div>

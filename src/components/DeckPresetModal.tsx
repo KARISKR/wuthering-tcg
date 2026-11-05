@@ -95,6 +95,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   // 카드 상세 인스펙터 (카드 클릭 시 고해상도 상세 뷰)
   const [inspectingCard, setInspectingCard] = useState<OfficialCardData | null>(null);
 
+  // 모바일 전용 화면 전환 탭 ('LIST': 프리셋 목록 | 'DETAIL': 선택한 덱 구성 보기)
+  const [mobilePresetView, setMobilePresetView] = useState<'LIST' | 'DETAIL'>('LIST');
+
   // 프리셋 로드
   const reloadPresets = () => {
     const list = getStoredPresets();
@@ -350,37 +353,48 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       {/* ========================================================= */}
       {/* 1. 최상단 전체화면 글로벌 헤더 바 */}
       {/* ========================================================= */}
-      <header className="h-16 px-6 border-b border-slate-800 bg-slate-950/95 flex items-center justify-between shrink-0 z-20">
-        <div className="flex items-center gap-3.5">
-          {/* 좌상단 대기실로 나가기 버튼 통일 */}
+      <header className="h-auto lg:h-16 py-2.5 lg:py-0 px-3.5 sm:px-6 border-b border-slate-800 bg-slate-950/95 flex flex-col lg:flex-row lg:items-center justify-between shrink-0 z-20 gap-2">
+        <div className="flex items-center justify-between lg:justify-start gap-2.5 sm:gap-3.5 min-w-0 w-full lg:w-auto">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            {/* 좌상단 대기실로 나가기 버튼 통일 */}
+            <button
+              onClick={onClose}
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow whitespace-nowrap"
+              title="대기실로 나가기"
+            >
+              <ArrowLeft className="w-4 h-4 text-amber-400 shrink-0" />
+              <span className="hidden sm:inline">대기실로 나가기</span>
+              <span className="sm:hidden">나가기</span>
+            </button>
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400/20 to-yellow-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
+              <img src="/images/menu_icons/deck-preset.webp" alt="덱 프리셋" className="w-7 h-7 sm:w-9 sm:h-9 object-contain drop-shadow" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm sm:text-lg font-black text-white tracking-wide truncate">
+                  덱 프리셋 &amp; 코드 보관함
+                </h2>
+                <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full hidden md:inline whitespace-nowrap">
+                  FULLSCREEN MASTER DECK ARCHIVE
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 hidden lg:block truncate">
+                저장된 레시피를 일괄 불러오고, 덱 코드를 공유하거나 덱 빌더에서 즉시 수정하여 출격할 수 있습니다.
+              </p>
+            </div>
+          </div>
+
           <button
             onClick={onClose}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
-            title="대기실로 나가기"
+            className="lg:hidden w-8 h-8 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center justify-center transition cursor-pointer shrink-0"
+            title="닫기"
           >
-            <ArrowLeft className="w-4 h-4 text-amber-400" />
-            <span>대기실로 나가기</span>
+            <X className="w-4 h-4" />
           </button>
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400/20 to-yellow-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
-            <img src="/images/menu_icons/deck-preset.webp" alt="덱 프리셋" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h2 className="text-base sm:text-lg font-black text-white tracking-wide">
-                덱 프리셋 & 코드 보관함
-              </h2>
-              <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full hidden md:inline">
-                FULLSCREEN MASTER DECK ARCHIVE
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 hidden lg:block">
-              저장된 레시피를 일괄 불러오고, 덱 코드를 공유하거나 덱 빌더에서 즉시 수정하여 출격할 수 있습니다.
-            </p>
-          </div>
         </div>
 
         {/* 우측 상단 글로벌 액션 버튼 */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar w-full lg:w-auto">
           {/* 새 프리셋 편성하기 (덱 빌더 진입) */}
           {onSelectAndEdit && (
             <button
@@ -391,10 +405,10 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                   onClose();
                 }
               }}
-              className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black transition cursor-pointer shadow-md shadow-indigo-600/20"
+              className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black transition cursor-pointer shadow-md shadow-indigo-600/20 whitespace-nowrap shrink-0"
               title="이 프리셋을 바탕으로 덱 빌더에서 새롭게 수정합니다"
             >
-              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
               <span>덱 빌더에서 편집</span>
             </button>
           )}
@@ -402,23 +416,23 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
           {/* 공유된 덱 리스트 열기 버튼 */}
           <button
             onClick={() => setIsCommunityOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-xs font-black transition cursor-pointer shadow-md"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-xs font-black transition cursor-pointer shadow-md whitespace-nowrap shrink-0"
             title="다른 유저들의 공유 덱 둘러보기 및 내 덱 공유"
           >
-            <Share2 className="w-3.5 h-3.5 text-indigo-400" />
+            <Share2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
             <span>공유된 덱 리스트</span>
           </button>
 
           {/* 덱 코드 가져오기 드로어 토글 */}
           <button
             onClick={() => setIsImportOpen(!isImportOpen)}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition cursor-pointer border ${
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl text-xs font-black transition cursor-pointer border whitespace-nowrap shrink-0 ${
               isImportOpen
                 ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20'
                 : 'bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700'
             }`}
           >
-            <Download className="w-3.5 h-3.5 text-amber-400" />
+            <Download className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>덱 코드 입력 / 가져오기</span>
           </button>
 
@@ -429,16 +443,16 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               setNewPresetName(targetDeck.name || '나만의 덱 1');
               setIsSavingCurrent(true);
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer shadow-md shadow-amber-500/20"
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer shadow-md shadow-amber-500/20 whitespace-nowrap shrink-0"
           >
-            <Bookmark className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">현재 덱 저장</span>
+            <Bookmark className="w-3.5 h-3.5 shrink-0" />
+            <span>현재 덱 저장</span>
           </button>
 
           {/* 닫기 버튼 */}
           <button
             onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition cursor-pointer text-xs font-bold"
+            className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition cursor-pointer text-xs font-bold whitespace-nowrap shrink-0"
             title="닫기"
           >
             <X className="w-4 h-4" />
@@ -596,13 +610,43 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       )}
 
       {/* ========================================================= */}
+      {/* [모바일 전용 2단 탭 전환 바 (< md)] — 목록과 40장 덱 구성 화면 전환 */}
+      {/* ========================================================= */}
+      <div className="md:hidden flex border-b border-slate-800 bg-slate-950 shrink-0 z-20">
+        <button
+          onClick={() => setMobilePresetView('LIST')}
+          className={`flex-1 py-2.5 text-xs font-black transition cursor-pointer border-b-2 whitespace-nowrap ${
+            mobilePresetView === 'LIST'
+              ? 'border-amber-400 text-amber-300 bg-amber-500/10'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          📂 프리셋 목록 ({filteredPresets.length})
+        </button>
+        <button
+          onClick={() => setMobilePresetView('DETAIL')}
+          className={`flex-1 py-2.5 text-xs font-black transition cursor-pointer border-b-2 truncate px-2 ${
+            mobilePresetView === 'DETAIL'
+              ? 'border-amber-400 text-amber-300 bg-amber-500/10'
+              : 'border-transparent text-slate-400 hover:text-white'
+          }`}
+        >
+          🃏 선택 덱 구성 보기 ({currentPreviewDeck?.name || '40장'})
+        </button>
+      </div>
+
+      {/* ========================================================= */}
       {/* 2. 전체화면 메인 본문: [좌측 프리셋 브라우저] + [우측 40장 전체 확장 뷰어] */}
       {/* ========================================================= */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
         {/* ------------------------------------------------------- */}
         {/* [좌측 사이드바] 프리셋 목록 브라우저 & 검색 & 필터 */}
         {/* ------------------------------------------------------- */}
-        <aside className="w-full md:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[480px] border-r border-slate-800 flex flex-col shrink-0 overflow-hidden bg-slate-950/80 backdrop-blur-sm">
+        <aside
+          className={`${
+            mobilePresetView === 'LIST' ? 'flex flex-1' : 'hidden'
+          } md:flex md:flex-none w-full md:w-[380px] lg:w-[420px] xl:w-[460px] 2xl:w-[480px] border-r border-slate-800 flex-col shrink-0 overflow-hidden bg-slate-950/80 backdrop-blur-sm min-h-0`}
+        >
           {/* 상단 탭 필터 */}
           <div className="p-3 border-b border-slate-800 flex items-center gap-1 shrink-0 bg-slate-950 flex-wrap">
             <button
@@ -687,7 +731,10 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 return (
                   <div
                     key={preset.id}
-                    onClick={() => setSelectedPresetId(preset.id)}
+                    onClick={() => {
+                      setSelectedPresetId(preset.id);
+                      setMobilePresetView('DETAIL');
+                    }}
                     className={`p-3.5 rounded-2xl border transition-all cursor-pointer relative group ${
                       isSelected
                         ? 'bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/20 border-amber-400 ring-2 ring-amber-400/40 shadow-xl'
@@ -823,13 +870,17 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
         {/* ------------------------------------------------------- */}
         {/* [우측 메인 영역] 선택된 프리셋 40장 전체 카드 상세 뷰어 & 액션 센터 */}
         {/* ------------------------------------------------------- */}
-        <main className="flex-1 flex flex-col overflow-y-auto bg-gradient-to-b from-[#080d1a] via-[#050811] to-[#04060c] min-h-0 custom-scrollbar">
+        <main
+          className={`${
+            mobilePresetView === 'DETAIL' ? 'flex flex-1' : 'hidden'
+          } md:flex flex-1 flex-col overflow-y-auto bg-gradient-to-b from-[#080d1a] via-[#050811] to-[#04060c] min-h-0 custom-scrollbar`}
+        >
           {currentPreviewDeck ? (
-            <div className="p-5 sm:p-6 lg:p-8 space-y-6">
+            <div className="p-3.5 sm:p-6 lg:p-8 space-y-5 sm:space-y-6">
               {/* --------------------------------------------------- */}
               {/* A. 프리셋 상단 디테일 정보 & 최우선 액션 바 */}
               {/* --------------------------------------------------- */}
-              <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5 backdrop-blur-md">
+              <div className="p-4 sm:p-6 rounded-2xl sm:rounded-3xl bg-slate-900/80 border border-slate-800 shadow-2xl flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-5 backdrop-blur-md">
                 <div className="space-y-1.5 min-w-0 max-w-2xl">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2.5 py-0.5 rounded-full">

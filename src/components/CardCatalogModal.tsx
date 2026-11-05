@@ -198,6 +198,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
   const [sortBy, setSortBy] = useState<SortOptionType>('CODE_ASC');
   const [searchTerm, setSearchTerm] = useState('');
   const [detailCard, setDetailCard] = useState<OfficialCardData | null>(null);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
   // 캐릭터 목록 추출 (방랑자 남/여 완벽 분리 지원)
   const characterFilterOptions = [
@@ -334,33 +335,33 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
       {/* ========================================================= */}
       {/* 1. 모달 헤더 & 통계 */}
       {/* ========================================================= */}
-      <div className="h-16 px-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/95 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center font-black shadow-lg">
-              <Layers className="w-5 h-5" />
+      <div className="h-auto sm:h-16 py-2.5 sm:py-0 px-3.5 sm:px-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/95 shrink-0 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center font-black shadow-lg shrink-0">
+              <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-lg text-white tracking-wide">
-                  공식 카드 도감 (CARD CATALOG)
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <h3 className="font-black text-base sm:text-lg text-white tracking-wide truncate">
+                  공식 카드 도감 <span className="hidden md:inline">(CARD CATALOG)</span>
                 </h3>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/40">
-                  {filteredCards.length} / {OFFICIAL_CARDS.length}종 수록
+                <span className="text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/40 whitespace-nowrap shrink-0">
+                  {filteredCards.length} / {OFFICIAL_CARDS.length}종
                 </span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-400 hidden lg:block truncate">
                 『명조: 대결』 공식 데이터베이스 192종 전체 카드 및 성급별(★ ~ ★★★★★, PR) / 팩별 일러스트 열람
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             {/* 카드 크기 토글 (대형 3~4열 vs 보통 5~6열) */}
             {viewMode === 'GRID' && (
-              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+              <div className="hidden md:flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
                 <button
                   onClick={() => setCardSize('LARGE')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                     cardSize === 'LARGE'
                       ? 'bg-amber-500 text-slate-950 font-black shadow'
                       : 'text-slate-400 hover:text-white'
@@ -371,7 +372,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                 </button>
                 <button
                   onClick={() => setCardSize('MEDIUM')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                     cardSize === 'MEDIUM'
                       ? 'bg-amber-500 text-slate-950 font-black shadow'
                       : 'text-slate-400 hover:text-white'
@@ -387,33 +388,33 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
             <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
               <button
                 onClick={() => setViewMode('GRID')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                   viewMode === 'GRID'
                     ? 'bg-amber-500 text-slate-950 font-black shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
                 title="카드 일러스트 갤러리 뷰"
               >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                갤러리
+                <LayoutGrid className="w-3.5 h-3.5 shrink-0" />
+                <span>갤러리</span>
               </button>
               <button
                 onClick={() => setViewMode('LIST')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
                   viewMode === 'LIST'
                     ? 'bg-amber-500 text-slate-950 font-black shadow'
                     : 'text-slate-400 hover:text-white'
                 }`}
                 title="마스터듀얼식 데이터 테이블 리스트 뷰"
               >
-                <List className="w-3.5 h-3.5" />
-                리스트
+                <List className="w-3.5 h-3.5 shrink-0" />
+                <span>리스트</span>
               </button>
             </div>
 
             <button
               onClick={onClose}
-              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-700"
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition border border-transparent hover:border-slate-700 shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -423,14 +424,14 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
         {/* ========================================================= */}
         {/* 2. 탭 & 다층 필터 툴바 */}
         {/* ========================================================= */}
-        <div className="px-5 py-3 border-b border-slate-800 bg-slate-950/60 flex flex-col gap-2.5 shrink-0">
-          {/* 상단: 대분류 탭 & 성급 필터 & 수록 팩 & 검색창 */}
-          <div className="flex items-center justify-between flex-wrap gap-2.5">
+        <div className="px-3.5 sm:px-5 py-2.5 sm:py-3 border-b border-slate-800 bg-slate-950/60 flex flex-col gap-2 sm:gap-2.5 shrink-0">
+          {/* 상단: 대분류 탭 & 검색창 & 모바일 필터 토글 */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
             {/* 분류 탭 */}
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 overflow-x-auto no-scrollbar max-w-full">
               <button
                 onClick={() => setTab('ALL')}
-                className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer whitespace-nowrap shrink-0 ${
                   tab === 'ALL' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -438,116 +439,134 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
               </button>
               <button
                 onClick={() => setTab('CHARACTER')}
-                className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer whitespace-nowrap shrink-0 ${
                   tab === 'CHARACTER' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                캐릭터 카드 ({CATALOG_CARDS.filter((c) => c.kind === 'CHARACTER').length})
+                캐릭터 ({CATALOG_CARDS.filter((c) => c.kind === 'CHARACTER').length})
               </button>
               <button
                 onClick={() => setTab('ACTION')}
-                className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer whitespace-nowrap shrink-0 ${
                   tab === 'ACTION' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                액션 카드 ({CATALOG_CARDS.filter((c) => c.kind === 'ACTION' && (!c.feature || !c.feature.includes('에코'))).length})
+                액션 ({CATALOG_CARDS.filter((c) => c.kind === 'ACTION' && (!c.feature || !c.feature.includes('에코'))).length})
               </button>
               <button
                 onClick={() => setTab('ECHO')}
-                className={`px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1 ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg font-bold text-xs transition cursor-pointer flex items-center gap-1 whitespace-nowrap shrink-0 ${
                   tab === 'ECHO' ? 'bg-amber-500 text-slate-950 font-black shadow' : 'text-slate-400 hover:text-white'
                 }`}
               >
-                <Sparkles className="w-3 h-3 text-amber-300" />
-                에코 ({CATALOG_CARDS.filter((c) => c.feature && c.feature.includes('에코')).length})
+                <Sparkles className="w-3 h-3 text-amber-300 shrink-0" />
+                <span>에코 ({CATALOG_CARDS.filter((c) => c.feature && c.feature.includes('에코')).length})</span>
               </button>
             </div>
 
-            {/* 성급(Rarity) 필터 (5성, 4성, 3성, 1~2성 통합, PR) */}
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 flex-wrap">
-              <span className="text-[11px] text-slate-400 font-bold px-1.5 flex items-center gap-1">
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> 성급:
-              </span>
-              {(
-                [
-                  { key: 'ALL', label: '전체' },
-                  { key: '★★★★★', label: '★★★★★', special: 'gold' },
-                  { key: '★★★★', label: '★★★★', special: 'purple' },
-                  { key: '★★★', label: '★★★' },
-                  { key: '★~★★', label: '★~★★ (1~2성)' },
-                  { key: 'PR', label: 'PR (프로모)' },
-                ] as const
-              ).map((r) => {
-                const isSelected = selectedRarity === r.key;
-                let activeStyle = 'bg-amber-400 text-slate-950 font-black shadow';
-                if (r.key === '★★★★★') {
-                  activeStyle = 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black shadow-lg shadow-amber-500/40 ring-1 ring-yellow-200';
-                } else if (r.key === '★★★★') {
-                  activeStyle = 'bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black shadow-lg shadow-purple-500/40 ring-1 ring-purple-300';
-                } else if (r.key === '★~★★') {
-                  activeStyle = 'bg-slate-700 text-amber-300 border border-amber-400/50 font-black shadow';
-                } else if (r.key === 'PR') {
-                  activeStyle = 'bg-rose-500 text-white font-black shadow';
-                }
-
-                return (
+            {/* 모바일용 검색창 + 상세 필터 펼치기 버튼 */}
+            <div className="flex items-center gap-1.5 w-full md:w-auto">
+              <div className="relative flex-1 md:min-w-[220px]">
+                <Search className="w-4 h-4 absolute left-3 top-2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="카드명, 코드, 효과, 특징 검색..."
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-7 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition"
+                />
+                {searchTerm && (
                   <button
-                    key={r.key}
-                    onClick={() => setSelectedRarity(r.key as RarityFilterType)}
-                    className={`px-2 py-0.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      isSelected
-                        ? activeStyle
-                        : r.key === '★★★★★'
-                        ? 'text-yellow-400 hover:text-yellow-200 border border-yellow-500/30'
-                        : r.key === '★★★★'
-                        ? 'text-purple-300 hover:text-purple-100 border border-purple-500/30'
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <button
+                onClick={() => setIsMobileFilterOpen(!isMobileFilterOpen)}
+                className={`md:hidden px-3 py-1.5 rounded-xl border text-xs font-black transition cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1 ${
+                  isMobileFilterOpen || selectedRarity !== 'ALL' || selectedPack !== 'ALL' || selectedChar !== 'ALL' || selectedColor !== 'ALL'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-400'
+                    : 'bg-slate-900 text-slate-300 border-slate-700'
+                }`}
+              >
+                <span>상세 필터</span>
+                <span>{isMobileFilterOpen ? '▴' : '▾'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* 상세 필터 그룹 (모바일에서는 토글 시 표시, 데스크톱 md 이상에서는 상시 표시) */}
+          <div className={`${isMobileFilterOpen ? 'flex' : 'hidden'} md:flex flex-col gap-2`}>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              {/* 성급(Rarity) 필터 (5성, 4성, 3성, 1~2성 통합, PR) */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 flex-wrap">
+                <span className="text-[11px] text-slate-400 font-bold px-1.5 flex items-center gap-1 whitespace-nowrap">
+                  <Star className="w-3 h-3 text-amber-400 fill-amber-400" /> 성급:
+                </span>
+                {(
+                  [
+                    { key: 'ALL', label: '전체' },
+                    { key: '★★★★★', label: '★★★★★', special: 'gold' },
+                    { key: '★★★★', label: '★★★★', special: 'purple' },
+                    { key: '★★★', label: '★★★' },
+                    { key: '★~★★', label: '★~★★ (1~2성)' },
+                    { key: 'PR', label: 'PR (프로모)' },
+                  ] as const
+                ).map((r) => {
+                  const isSelected = selectedRarity === r.key;
+                  let activeStyle = 'bg-amber-400 text-slate-950 font-black shadow';
+                  if (r.key === '★★★★★') {
+                    activeStyle = 'bg-gradient-to-r from-amber-400 to-yellow-300 text-slate-950 font-black shadow-lg shadow-amber-500/40 ring-1 ring-yellow-200';
+                  } else if (r.key === '★★★★') {
+                    activeStyle = 'bg-gradient-to-r from-purple-500 to-pink-500 text-white font-black shadow-lg shadow-purple-500/40 ring-1 ring-purple-300';
+                  } else if (r.key === '★~★★') {
+                    activeStyle = 'bg-slate-700 text-amber-300 border border-amber-400/50 font-black shadow';
+                  } else if (r.key === 'PR') {
+                    activeStyle = 'bg-rose-500 text-white font-black shadow';
+                  }
+
+                  return (
+                    <button
+                      key={r.key}
+                      onClick={() => setSelectedRarity(r.key as RarityFilterType)}
+                      className={`px-2 py-0.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                        isSelected
+                          ? activeStyle
+                          : r.key === '★★★★★'
+                          ? 'text-yellow-400 hover:text-yellow-200 border border-yellow-500/30'
+                          : r.key === '★★★★'
+                          ? 'text-purple-300 hover:text-purple-100 border border-purple-500/30'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      {r.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* 수록 팩 필터 */}
+              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                <span className="text-[11px] text-slate-400 font-bold px-1.5 whitespace-nowrap">팩:</span>
+                {(['ALL', 'SD01', 'SD02', 'BP01'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setSelectedPack(p)}
+                    className={`px-2 py-0.5 rounded-lg text-xs font-bold transition cursor-pointer whitespace-nowrap ${
+                      selectedPack === p
+                        ? 'bg-slate-700 text-amber-300 border border-amber-500/40 font-bold'
                         : 'text-slate-400 hover:text-white'
                     }`}
                   >
-                    {r.label}
+                    {p === 'ALL' ? '전체' : p}
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-
-            {/* 수록 팩 필터 */}
-            <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-              <span className="text-[11px] text-slate-400 font-bold px-1.5">팩:</span>
-              {(['ALL', 'SD01', 'SD02', 'BP01'] as const).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setSelectedPack(p)}
-                  className={`px-2 py-0.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                    selectedPack === p
-                      ? 'bg-slate-700 text-amber-300 border border-amber-500/40 font-bold'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {p === 'ALL' ? '전체' : p}
-                </button>
-              ))}
-            </div>
-
-            {/* 실시간 통합 검색창 */}
-            <div className="relative min-w-[220px]">
-              <Search className="w-4 h-4 absolute left-3 top-2 text-slate-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="카드명, 코드, 효과, 특징 검색..."
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3 py-1.5 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-400 transition"
-              />
-              {searchTerm && (
-                <button
-                  onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-2 text-slate-400 hover:text-white"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
 
           {/* 하단 세부 필터 (캐릭터 빠른 선택 & 액션 카드 속성 색상) */}
           <div className="flex items-center justify-between flex-wrap gap-2 text-xs">
@@ -558,7 +577,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                 <button
                   key={ch}
                   onClick={() => setSelectedChar(ch)}
-                  className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                  className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold transition cursor-pointer whitespace-nowrap ${
                     selectedChar === ch
                       ? 'bg-amber-500/20 text-amber-300 border border-amber-400/60 shadow'
                       : 'bg-slate-900/80 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -573,12 +592,12 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
             <div className="flex items-center gap-2.5 flex-wrap">
               {/* 속성 색상 필터 */}
               <div className="flex items-center gap-1">
-                <span className="text-slate-500 text-[11px] mr-1 font-bold">액션 색상:</span>
+                <span className="text-slate-500 text-[11px] mr-1 font-bold whitespace-nowrap">액션 색상:</span>
                 {(['ALL', 'RED', 'GREEN', 'BLUE'] as const).map((col) => (
                   <button
                     key={col}
                     onClick={() => setSelectedColor(col)}
-                    className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-lg text-[11px] font-bold transition cursor-pointer whitespace-nowrap ${
                       selectedColor === col
                         ? col === 'RED'
                           ? 'bg-red-500 text-white font-black'
@@ -615,6 +634,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                 </select>
               </div>
             </div>
+          </div>
           </div>
         </div>
 
@@ -866,12 +886,12 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="bg-slate-900 border-2 border-amber-500 rounded-3xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] w-full max-h-[94vh] p-6 sm:p-8 shadow-2xl flex flex-col lg:flex-row gap-8 text-slate-100 relative overflow-y-auto"
+            className="bg-slate-900 border-2 border-amber-500 rounded-2xl sm:rounded-3xl max-w-6xl xl:max-w-7xl 2xl:max-w-[1550px] w-full max-h-[94vh] p-4 sm:p-8 shadow-2xl flex flex-col lg:flex-row gap-4 sm:gap-8 text-slate-100 relative overflow-y-auto"
           >
             {/* 닫기 버튼 */}
             <button
               onClick={() => setDetailCard(null)}
-              className="absolute top-5 right-5 p-2.5 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 cursor-pointer transition border border-slate-700 z-10 shadow"
+              className="absolute top-3.5 right-3.5 sm:top-5 sm:right-5 p-2 sm:p-2.5 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 cursor-pointer transition border border-slate-700 z-10 shadow"
             >
               <X className="w-5 h-5" />
             </button>
@@ -880,7 +900,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
             <div className="flex flex-col items-center lg:w-[480px] xl:w-[560px] 2xl:w-[640px] shrink-0">
               <div
                 onClick={() => setIsCinemaZoomOpen(true)}
-                className="w-full aspect-[5/7] max-h-[640px] 2xl:max-h-[720px] rounded-2xl overflow-hidden bg-slate-950 border-2 border-amber-400/80 shadow-2xl p-2 relative group cursor-zoom-in"
+                className="w-full aspect-[5/7] max-h-[300px] sm:max-h-[540px] lg:max-h-[640px] 2xl:max-h-[720px] rounded-2xl overflow-hidden bg-slate-950 border-2 border-amber-400/80 shadow-2xl p-2 relative group cursor-zoom-in"
                 title="클릭하여 전체화면 극장 뷰로 확대"
               >
                 <img

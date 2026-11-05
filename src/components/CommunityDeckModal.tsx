@@ -291,49 +291,60 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
         <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-fuchsia-300 z-30 pointer-events-none" />
 
         {/* 상단 헤더 */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-fuchsia-400/20 bg-[#0d1226]/90 shrink-0 relative z-20">
-          <div className="flex items-center gap-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4.5 border-b border-fuchsia-400/20 bg-[#0d1226]/90 shrink-0 relative z-20 gap-2.5">
+          <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3.5 min-w-0 w-full sm:w-auto">
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              <button
+                onClick={onClose}
+                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow whitespace-nowrap"
+                title="대기실로 나가기"
+              >
+                <ArrowLeft className="w-4 h-4 text-fuchsia-400 shrink-0" />
+                <span className="hidden sm:inline">대기실로 나가기</span>
+                <span className="sm:hidden">나가기</span>
+              </button>
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-indigo-600/20 border border-fuchsia-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-fuchsia-500/20 shrink-0">
+                <img src="/images/menu_icons/shared-decks.webp" alt="공유된 덱 리스트" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 min-w-0">
+                  <h2 className="text-base sm:text-xl font-black text-white tracking-wide truncate">
+                    공유된 덱 리스트
+                  </h2>
+                  <span className="hidden md:inline text-xs px-2.5 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 font-bold whitespace-nowrap">
+                    COMMUNITY DECKS
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-400 mt-0.5 hidden lg:block truncate">
+                  덱을 클릭하면 전체 40장 구성 및 상세 레시피를 확인하고 즉시 내 덱으로 가져올 수 있습니다.
+                </p>
+              </div>
+            </div>
+
             <button
               onClick={onClose}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
-              title="대기실로 나가기"
+              className="sm:hidden w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition border border-slate-700/60 shrink-0"
+              title="닫기"
             >
-              <ArrowLeft className="w-4 h-4 text-fuchsia-400" />
-              <span>대기실로 나가기</span>
+              <X className="w-5 h-5" />
             </button>
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-fuchsia-500/20 to-indigo-600/20 border border-fuchsia-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-fuchsia-500/20 shrink-0">
-              <img src="/images/menu_icons/shared-decks.webp" alt="공유된 덱 리스트" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-lg sm:text-xl font-black text-white tracking-wide">
-                  공유된 덱 리스트
-                </h2>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-fuchsia-500/20 text-fuchsia-300 border border-fuchsia-500/40 font-bold">
-                  COMMUNITY DECKS
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5 hidden sm:block">
-                덱을 클릭하면 전체 40장 구성 및 상세 레시피를 확인하고 즉시 내 덱으로 가져올 수 있습니다.
-              </p>
-            </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto">
             {/* 탭 전환 버튼 */}
-            <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/60">
+            <div className="flex items-center bg-slate-900/90 p-1 rounded-xl border border-slate-700/60 w-full sm:w-auto">
               <button
                 onClick={() => {
                   setActiveTab('BROWSE');
                   setInspectingDeck(null);
                 }}
-                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`flex-1 sm:flex-initial justify-center px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                   activeTab === 'BROWSE'
                     ? 'bg-fuchsia-600 text-white shadow-md font-black'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Layers className="w-4 h-4" />
+                <Layers className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>공유된 덱 목록 ({sharedDecks.length})</span>
               </button>
               <button
@@ -341,20 +352,20 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                   setActiveTab('SHARE');
                   setInspectingDeck(null);
                 }}
-                className={`px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                className={`flex-1 sm:flex-initial justify-center px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                   activeTab === 'SHARE'
                     ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>내 덱 공유하기</span>
               </button>
             </div>
 
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center cursor-pointer transition border border-slate-700/60"
+              className="hidden sm:flex w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white items-center justify-center cursor-pointer transition border border-slate-700/60 shrink-0"
               title="닫기"
             >
               <X className="w-5 h-5" />
@@ -438,7 +449,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-5 sm:gap-6 grid-cols-[repeat(auto-fill,minmax(220px,1fr))] sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] max-w-[1600px] mx-auto">
+                <div className="grid gap-3 sm:gap-6 grid-cols-2 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] max-w-[1600px] mx-auto">
                   {filteredDecks.map((deck) => {
                     const leader = getCharInfo(deck.deckPreset.leaderCode);
                     const leftSup = getCharInfo(deck.deckPreset.leftSupportCode);
@@ -771,7 +782,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                         <Crown className="w-4 h-4 text-amber-400" />
                         <span>출전 라인업 (리더 1 + 서포터 2)</span>
                       </div>
-                      <div className="grid grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
                         {[
                           { char: l, role: '리더 (LEADER)', border: 'border-amber-400' },
                           { char: s1, role: '좌측 서포터', border: 'border-slate-700' },
@@ -864,34 +875,34 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
               </div>
 
               {/* 상세 하단 버튼 액션 바 */}
-              <div className="px-6 py-4 border-t border-fuchsia-400/20 bg-[#12162e]/90 flex items-center justify-between gap-3 shrink-0 relative z-20">
-                <div className="flex items-center gap-2">
+              <div className="px-3.5 sm:px-6 py-3 sm:py-4 border-t border-fuchsia-400/20 bg-[#12162e]/90 flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0 relative z-20">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={(e) => handleLike(inspectingDeck.id, e)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer ${
+                    className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-black border transition cursor-pointer whitespace-nowrap ${
                       inspectingDeck.likedByMe
                         ? 'bg-rose-500/20 text-rose-300 border-rose-500/60 shadow-rose-500/20'
                         : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
                     }`}
                   >
-                    <Heart className={`w-4 h-4 ${inspectingDeck.likedByMe ? 'fill-rose-500 text-rose-500' : 'text-slate-400'}`} />
+                    <Heart className={`w-4 h-4 shrink-0 ${inspectingDeck.likedByMe ? 'fill-rose-500 text-rose-500' : 'text-slate-400'}`} />
                     <span>추천 {inspectingDeck.likes}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={(e) => handleCopyCode(inspectingDeck, e)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer whitespace-nowrap"
                   >
                     {copiedDeckId === inspectingDeck.id ? (
                       <>
-                        <Check className="w-4 h-4 text-emerald-400" />
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                         <span className="text-emerald-300">복사완료!</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="w-4 h-4 text-slate-400" />
+                        <Copy className="w-4 h-4 text-slate-400 shrink-0" />
                         <span>덱 코드 복사</span>
                       </>
                     )}
@@ -900,27 +911,27 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                   <button
                     type="button"
                     onClick={(e) => handleImport(inspectingDeck, e)}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 transition cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 transition cursor-pointer whitespace-nowrap"
                   >
                     {importedDeckId === inspectingDeck.id ? (
                       <>
-                        <Check className="w-4 h-4 text-purple-400" />
-                        <span className="text-purple-300">내 덱 보관함 저장완료!</span>
+                        <Check className="w-4 h-4 text-purple-400 shrink-0" />
+                        <span className="text-purple-300">보관함 저장완료!</span>
                       </>
                     ) : (
                       <>
-                        <BookmarkPlus className="w-4 h-4 text-purple-400" />
+                        <BookmarkPlus className="w-4 h-4 text-purple-400 shrink-0" />
                         <span>내 덱으로 가져오기</span>
                       </>
                     )}
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                   <button
                     type="button"
                     onClick={() => setInspectingDeck(null)}
-                    className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-bold transition border border-slate-700 cursor-pointer"
+                    className="px-3.5 sm:px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs sm:text-sm font-bold transition border border-slate-700 cursor-pointer whitespace-nowrap"
                   >
                     목록으로
                   </button>
@@ -929,9 +940,9 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                     <button
                       type="button"
                       onClick={() => handleBattleWithDeck(inspectingDeck)}
-                      className="flex items-center gap-2 px-6 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-sm shadow-xl shadow-amber-500/25 transition cursor-pointer transform hover:scale-[1.02]"
+                      className="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 sm:px-6 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs sm:text-sm shadow-xl shadow-amber-500/25 transition cursor-pointer transform hover:scale-[1.02] whitespace-nowrap"
                     >
-                      <Swords className="w-4 h-4 fill-slate-950" />
+                      <Swords className="w-4 h-4 fill-slate-950 shrink-0" />
                       <span>이 덱으로 배틀 시작</span>
                     </button>
                   )}

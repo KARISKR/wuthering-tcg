@@ -501,6 +501,38 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
   const [dialogueIdx, setDialogueIdx] = useState<number>(0);
   const [isSoundMuted, setIsSoundMuted] = useState<boolean>(false);
   const [arenaScale, setArenaScale] = useState<number>(1.0);
+  const [viewport, setViewport] = useState<{ w: number; h: number }>(() => ({
+    w: typeof window !== 'undefined' ? window.innerWidth : 1920,
+    h: typeof window !== 'undefined' ? window.innerHeight : 1080,
+  }));
+
+  useEffect(() => {
+    const updateViewport = () => {
+      setViewport({ w: window.innerWidth, h: window.innerHeight });
+    };
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+
+    // 모바일/PWA 환경에서 가로 모드 자동 전환 시도
+    try {
+      const orientation = (window.screen as unknown as { orientation?: { lock?: (mode: string) => Promise<void> } })?.orientation;
+      orientation?.lock?.('landscape')?.catch(() => {});
+    } catch {
+      // 브라우저 정책상 지원하지 않으면 CSS 자동 가로 회전 래퍼가 동작함
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+      try {
+        const orientation = (window.screen as unknown as { orientation?: { unlock?: () => void } })?.orientation;
+        orientation?.unlock?.();
+      } catch {
+        // ignore
+      }
+    };
+  }, []);
 
   // 인터랙티브 멀리건 선택 상태 (Step 8)
   const [mulliganSelected, setMulliganSelected] = useState<number[]>([3]);
@@ -1487,7 +1519,7 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8 w-full max-w-4xl">
+              <div className="grid grid-cols-2 gap-5 sm:gap-8 w-full max-w-4xl">
                 {/* 1. 캐릭터 카드 예시 (대형) */}
                 <div className="bg-slate-900/95 border-2 border-amber-400 rounded-3xl p-5 sm:p-6 flex flex-col items-center shadow-[0_0_35px_rgba(245,158,11,0.3)]">
                   <span className="px-3.5 py-1 rounded-full bg-amber-500 text-slate-950 font-black text-xs sm:text-sm mb-3">
@@ -1599,7 +1631,7 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
                 </h3>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-8 w-full max-w-4xl">
+              <div className="grid grid-cols-2 gap-5 sm:gap-8 w-full max-w-4xl">
                 {/* 1. 일반 액션 카드 예시 (지옥불 기사 - 전용 캐릭터 표기 없음!) */}
                 <div className="bg-slate-900/95 border-2 border-emerald-400 rounded-3xl p-5 sm:p-6 flex flex-col items-center shadow-[0_0_35px_rgba(16,185,129,0.35)] relative">
                   <div className="px-3.5 py-1 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-black text-xs sm:text-sm mb-3">
@@ -1780,7 +1812,7 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
     if (step === 4) {
       return (
         <div className="flex-1 flex flex-col items-center justify-center p-3 sm:p-5 overflow-y-auto">
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-6 sm:gap-8 max-w-5xl w-full">
+          <div className="flex flex-row items-center justify-center gap-6 sm:gap-8 max-w-5xl w-full">
             {/* 좌측: 확대 액션 카드 (SD01-016 북풍의 소용돌이) 및 실제 좌표 하이라이트 */}
             <div className="relative w-68 sm:w-80 md:w-92 xl:w-[380px] aspect-[1055/1473] rounded-3xl overflow-hidden border-2 border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.45)] bg-slate-900 shrink-0">
               <img
@@ -1925,7 +1957,7 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
     // --------------------------------------------------------------------------
     if (step === 5) {
       return (
-        <div className="flex-1 flex flex-col lg:flex-row items-center justify-center gap-6 sm:gap-10 p-3 sm:p-5 overflow-y-auto">
+        <div className="flex-1 flex flex-row items-center justify-center gap-6 sm:gap-10 p-3 sm:p-5 overflow-y-auto">
           {/* 중앙 확대 캐릭터 카드 (SD01-004 양양 Lv.1) */}
           <div className="relative w-68 sm:w-80 md:w-92 xl:w-[380px] aspect-[1055/1473] rounded-3xl overflow-hidden border-2 border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.45)] bg-slate-900 shrink-0">
             <img
@@ -2029,7 +2061,7 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.7fr_1.35fr] gap-4 sm:gap-5 w-full">
+        <div className="grid grid-cols-[1fr_1.7fr_1.35fr] gap-4 sm:gap-5 w-full">
           {/* 1. 보라색 조건 키워드 */}
           <div
             className={`rounded-3xl p-5 sm:p-6 border-2 transition-all duration-300 flex flex-col justify-between ${
@@ -2096,7 +2128,7 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
                   🟠 주황색 키워드 (행동 · 배틀)
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 {[
                   {
                     idx: 6,
@@ -2232,28 +2264,52 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
     );
   };
 
+  // 모바일/태블릿 환경(또는 세로 화면) 감지: PC 튜토리얼 화면(1480px 가로 규격)을 그대로 자동 가로 회전 및 비율 스케일링하여 제공
+  const isPortraitViewport = viewport.w < viewport.h;
+  const availW = isPortraitViewport ? viewport.h : viewport.w;
+  const availH = isPortraitViewport ? viewport.w : viewport.h;
+  const useVirtualPcLandscape = isPortraitViewport || viewport.w < 1180 || viewport.h < 720;
+  const virtualBaseW = 1480;
+  const virtualBaseH = Math.max(820, Math.min(980, Math.round(virtualBaseW * (availH / Math.max(1, availW)))));
+  const virtualScale = useVirtualPcLandscape ? availW / virtualBaseW : 1;
+
   return (
-    <div className="relative w-screen h-screen bg-[#07090e] text-slate-100 flex flex-col overflow-hidden select-none font-sans">
+    <div className="fixed inset-0 w-screen h-screen bg-[#07090e] overflow-hidden select-none font-sans flex items-center justify-center">
+      <div
+        className="relative bg-[#07090e] text-slate-100 flex flex-col overflow-hidden shrink-0 origin-center"
+        style={
+          useVirtualPcLandscape
+            ? {
+                width: `${virtualBaseW}px`,
+                height: `${virtualBaseH}px`,
+                transform: `${isPortraitViewport ? 'rotate(90deg) ' : ''}scale(${virtualScale})`,
+              }
+            : {
+                width: '100vw',
+                height: '100vh',
+              }
+        }
+      >
       {/* ========================================================= */}
       {/* 1. 상단 택티컬 헤더 & STEP 1~12 퀵 네비게이터 */}
       {/* ========================================================= */}
-      <header className="border-b border-white/10 bg-[#090d16]/95 backdrop-blur-md px-3 sm:px-4 py-2 flex flex-col gap-1.5 z-30 shrink-0">
+      <header className="border-b border-white/10 bg-[#090d16]/95 backdrop-blur-md px-4 py-2 flex flex-col gap-1.5 z-30 shrink-0">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <button
               onClick={onExitToLobby}
-              className="flex items-center gap-1.5 px-3 py-1 bg-[#111520] hover:bg-[#1c2334] text-[#f97316] border border-[#f97316]/50 text-xs font-black transition cursor-pointer rounded"
+              className="flex items-center gap-1.5 px-3 py-1 bg-[#111520] hover:bg-[#1c2334] text-[#f97316] border border-[#f97316]/50 text-xs font-black transition cursor-pointer rounded whitespace-nowrap"
               title="대기실(메인 메뉴)로 나가기"
             >
               <Home className="w-3.5 h-3.5 text-[#f97316]" />
               <span>대기실</span>
             </button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 whitespace-nowrap">
               <span className="text-[#f97316] text-base leading-none drop-shadow-[0_0_8px_rgba(249,115,22,0.8)]">
                 ✦
               </span>
-              <h1 className="text-xs sm:text-sm font-black tracking-wider text-white flex items-center gap-2">
+              <h1 className="text-sm font-black tracking-wider text-white flex items-center gap-2">
                 <span>『명조: 배틀』</span>
                 <span className="text-amber-400">공식 튜토리얼</span>
               </h1>
@@ -2261,7 +2317,7 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
           </div>
 
           {/* 중앙: 현재 스텝 배지 */}
-          <div className="hidden sm:flex items-center gap-2 px-4 py-1 bg-[#0c101b] border border-amber-500/70 rounded-full text-xs shadow-[0_0_15px_rgba(245,158,11,0.25)]">
+          <div className="flex items-center gap-2 px-4 py-1 bg-[#0c101b] border border-amber-500/70 rounded-full text-xs shadow-[0_0_15px_rgba(245,158,11,0.25)] whitespace-nowrap">
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span className="font-mono font-black text-amber-400">
               STEP {step}/{TUTORIAL_SCRIPT.length}
@@ -2339,74 +2395,74 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
       </div>
 
       {/* ========================================================= */}
-      {/* 3. 하단 아브 대사창 & 스텝 컨트롤러 (모바일 컴팩트 슬림 바 + 데스크톱 고가독성) */}
+      {/* 3. 하단 아브 대사창 & 스텝 컨트롤러 (PC 동일 고가독성 규격) */}
       {/* ========================================================= */}
       <div className="shrink-0 z-40 bg-[#080c16]/98 border-t border-white/15 flex flex-col items-center">
-        <div className="w-full max-w-6xl px-2 sm:px-6 py-1.5 sm:py-4">
-          <div className="relative bg-[#0d1222]/98 backdrop-blur-xl border-2 border-amber-500/90 rounded-2xl sm:rounded-3xl p-2.5 sm:p-5 shadow-[0_0_45px_rgba(245,158,11,0.45)] text-white flex flex-row items-center gap-2.5 sm:gap-6">
-            {/* 좌측 캐릭터 일러스트 프레임 (아브 - 모바일에서는 슬림 12x12, 데스크톱에서는 28x28) */}
-            <div className="relative shrink-0 flex items-center justify-center self-start sm:self-center">
-              <div className="relative w-12 h-12 sm:w-28 sm:h-28 rounded-xl sm:rounded-3xl overflow-hidden border-2 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)] bg-slate-900 group">
+        <div className="w-full max-w-6xl px-6 py-3.5">
+          <div className="relative bg-[#0d1222]/98 backdrop-blur-xl border-2 border-amber-500/90 rounded-3xl p-4 sm:p-5 shadow-[0_0_45px_rgba(245,158,11,0.45)] text-white flex flex-row items-center gap-5 sm:gap-6">
+            {/* 좌측 캐릭터 일러스트 프레임 (아브) */}
+            <div className="relative shrink-0 flex items-center justify-center self-center">
+              <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-3xl overflow-hidden border-2 border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)] bg-slate-900 group">
                 <img
                   src="/images/tutorial/abby_guide.webp"
                   alt="아브 (Abby)"
-                  className="w-full h-full object-contain p-0.5 sm:p-1.5 group-hover:scale-105 transition-transform duration-300 drop-shadow-[0_4px_14px_rgba(0,0,0,0.9)]"
+                  className="w-full h-full object-contain p-1.5 group-hover:scale-105 transition-transform duration-300 drop-shadow-[0_4px_14px_rgba(0,0,0,0.9)]"
                 />
-                <div className="absolute bottom-0.5 inset-x-0.5 text-center py-0.2 sm:py-0.5 rounded bg-black/90 text-[9px] sm:text-sm font-black text-amber-300 border border-amber-500/50 shadow">
+                <div className="absolute bottom-0.5 inset-x-0.5 text-center py-0.5 rounded bg-black/90 text-xs sm:text-sm font-black text-amber-300 border border-amber-500/50 shadow">
                   아브
                 </div>
               </div>
               {/* 말풍선 꼬리 */}
-              <div className="hidden sm:block absolute -right-3.5 top-10 w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-r-[14px] border-r-amber-500" />
+              <div className="block absolute -right-3.5 top-10 w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-r-[14px] border-r-amber-500" />
             </div>
 
             {/* 우측 말풍선 본문 & 컨트롤러 */}
             <div className="flex-1 flex flex-col justify-between w-full min-w-0">
               {/* 상단 화자 정보 및 진행도 */}
-              <div className="flex items-center justify-between pb-1 sm:pb-2 border-b border-white/10 mb-1 sm:mb-2">
-                <div className="flex items-center gap-1.5 sm:gap-2.5">
-                  <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-sm font-black bg-amber-500/25 text-amber-300 border border-amber-500/50 flex items-center gap-1 shadow-sm">
-                    <Sparkles className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-amber-400" />
+              <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2">
+                <div className="flex items-center gap-2.5">
+                  <span className="px-3 py-1 rounded-full text-xs sm:text-sm font-black bg-amber-500/25 text-amber-300 border border-amber-500/50 flex items-center gap-1 shadow-sm whitespace-nowrap">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                     <span>STEP {step}</span>
                   </span>
-                  <span className="text-xs sm:text-base font-black text-white tracking-wide truncate">
+                  <span className="text-sm sm:text-base font-black text-white tracking-wide truncate">
                     {currentStepData.title}
                   </span>
                 </div>
 
-                <span className="text-[10px] sm:text-sm font-mono text-amber-300 font-bold bg-black/50 px-2 py-0.5 rounded-md sm:rounded-lg border border-white/10 shrink-0">
+                <span className="text-xs sm:text-sm font-mono text-amber-300 font-bold bg-black/50 px-2.5 py-0.5 rounded-lg border border-white/10 shrink-0 whitespace-nowrap">
                   대화 {dialogueIdx + 1} / {currentStepData.dialogue.length}
                 </span>
               </div>
 
-              {/* 메인 대사 (글자 크기 및 줄 간격 최적화) */}
-              <div className="min-h-[44px] sm:min-h-[86px] flex items-center py-1 sm:py-1.5">
-                <p className="text-xs sm:text-lg lg:text-xl xl:text-[21px] text-slate-100 font-bold leading-relaxed sm:leading-loose tracking-wide break-keep drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
+              {/* 메인 대사 */}
+              <div className="min-h-[76px] flex items-center py-1.5">
+                <p className="text-lg lg:text-xl xl:text-[21px] text-slate-100 font-bold leading-loose tracking-wide break-keep drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]">
                   {renderFormattedSentence(currentSentence)}
                 </p>
               </div>
 
               {/* 하단 행동 힌트 및 이전/다음 버튼 */}
-              <div className="mt-1 sm:mt-2.5 pt-1 sm:pt-2 border-t border-white/10 flex flex-row items-center justify-between gap-2">
-                <div className="text-[10px] sm:text-sm font-bold text-amber-300 flex items-center gap-1.5 min-w-0 truncate">
-                  <Layers className="w-3.5 h-3.5 text-amber-400 shrink-0 hidden sm:inline" />
+              <div className="mt-2 pt-2 border-t border-white/10 flex flex-row items-center justify-between gap-2">
+                <div className="text-xs sm:text-sm font-bold text-amber-300 flex items-center gap-1.5 min-w-0 truncate">
+                  <Layers className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   <span className="leading-snug truncate">{renderFormattedSentence(currentStepData.hint)}</span>
                 </div>
 
-                <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto shrink-0">
+                <div className="flex items-center gap-2.5 ml-auto shrink-0">
                   {(dialogueIdx > 0 || step > 1) && (
                     <button
                       onClick={handlePrevDialogue}
-                      className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl border border-white/20 hover:bg-white/10 text-[11px] sm:text-sm font-bold text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1 active:scale-95"
+                      className="px-3.5 py-2 rounded-xl border border-white/20 hover:bg-white/10 text-xs sm:text-sm font-bold text-slate-300 hover:text-white transition cursor-pointer flex items-center gap-1 active:scale-95 whitespace-nowrap"
                     >
-                      <ChevronLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      <ChevronLeft className="w-4 h-4" />
                       <span>이전</span>
                     </button>
                   )}
 
                   <button
                     onClick={handleNextDialogue}
-                    className="px-3 sm:px-5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:brightness-110 text-white text-[11px] sm:text-sm font-black transition shadow-lg shadow-orange-950/60 cursor-pointer flex items-center gap-1 hover:scale-105 active:scale-95"
+                    className="px-5 py-2 rounded-xl bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 hover:brightness-110 text-white text-xs sm:text-sm font-black transition shadow-lg shadow-orange-950/60 cursor-pointer flex items-center gap-1 hover:scale-105 active:scale-95 whitespace-nowrap"
                   >
                     <span>
                       {dialogueIdx < currentStepData.dialogue.length - 1
@@ -2415,13 +2471,14 @@ export const ScriptedTutorialBattle: React.FC<ScriptedTutorialBattleProps> = ({
                         ? `STEP ${step + 1} ▶`
                         : '첫 매치 시작 ⚔️'}
                     </span>
-                    <ChevronRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
               </div>
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

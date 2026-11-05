@@ -156,12 +156,12 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
         </header>
 
         {/* ========================================================= */}
-        {/* 2. 본문 영역: CSS Grid를 통해 우측 패널 잘림 원천 차단 */}
+        {/* 2. 본문 영역: 모바일은 상단 16:9 영상 + 하단 챕터 스크롤, 데스크톱은 2열 그리드 */}
         {/* ========================================================= */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_380px] overflow-hidden min-h-0 bg-[#080d1a]">
-          {/* 좌측: 반응형 유튜브 비디오 플레이어 */}
-          <div className="flex flex-col justify-center items-center p-3 sm:p-5 lg:p-6 bg-black min-h-0 min-w-0 overflow-hidden">
-            <div className="w-full h-full max-h-[640px] aspect-video bg-slate-950 rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-800 relative">
+        <div className="flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_340px] xl:grid-cols-[1fr_380px] overflow-hidden min-h-0 bg-[#080d1a]">
+          {/* 좌측(모바일 상단): 반응형 유튜브 비디오 플레이어 */}
+          <div className="shrink-0 lg:h-full flex flex-col justify-center items-center p-2.5 sm:p-5 lg:p-6 bg-black min-h-0 min-w-0 overflow-hidden">
+            <div className="w-full lg:h-full max-h-[38vh] sm:max-h-[48vh] lg:max-h-[640px] aspect-video bg-slate-950 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-800 relative">
               <iframe
                 ref={iframeRef}
                 key={currentSeekTime}
@@ -174,11 +174,12 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
             </div>
 
             {/* 비디오 하단 알림 바 */}
-            <div className="w-full mt-2.5 px-3 py-2 rounded-xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-between text-xs text-slate-300">
+            <div className="w-full mt-2 sm:mt-2.5 px-3 py-1.5 sm:py-2 rounded-xl bg-slate-900/80 border border-slate-800/80 flex items-center justify-between text-[11px] sm:text-xs text-slate-300">
               <div className="flex items-center gap-2 truncate">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                 <span className="truncate">
-                  우측 챕터를 클릭하면 해당 구간으로 즉시 이동합니다.
+                  <span className="lg:hidden">아래 챕터를 터치하면 해당 구간으로 즉시 이동합니다.</span>
+                  <span className="hidden lg:inline">우측 챕터를 클릭하면 해당 구간으로 즉시 이동합니다.</span>
                 </span>
               </div>
               <span className="text-[11px] font-mono text-amber-400 font-bold shrink-0 hidden sm:inline">
@@ -187,8 +188,8 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
             </div>
           </div>
 
-          {/* 우측: 챕터별 타임스탬프 목차 패널 (모달 내부에 안전하게 격리) */}
-          <div className="border-t lg:border-t-0 lg:border-l border-slate-800 bg-[#0a0f20]/95 flex flex-col min-h-0 min-w-0">
+          {/* 우측(모바일 하단): 챕터별 타임스탬프 목차 패널 */}
+          <div className="flex-1 border-t lg:border-t-0 lg:border-l border-slate-800 bg-[#0a0f20]/95 flex flex-col min-h-0 min-w-0 overflow-hidden">
             <div className="p-3 sm:p-4 border-b border-slate-800 flex items-center justify-between text-sm shrink-0">
               <span className="font-black text-slate-200 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-400" />

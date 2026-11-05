@@ -300,44 +300,45 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
         <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-purple-300 z-30 pointer-events-none" />
 
         {/* 헤더 바 */}
-        <header className="px-6 py-4.5 border-b border-purple-400/20 bg-[#0d1226]/90 flex items-center justify-between shrink-0 relative z-20">
-          <div className="flex items-center gap-3.5">
+        <header className="px-3.5 sm:px-6 py-3 sm:py-4.5 border-b border-purple-400/20 bg-[#0d1226]/90 flex items-center justify-between shrink-0 relative z-20 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
             <button
               onClick={onClose}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
+              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow whitespace-nowrap"
               title="대기실로 나가기"
             >
-              <ArrowLeft className="w-5 h-5 text-amber-400" />
-              <span>대기실로 나가기</span>
+              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
+              <span className="hidden sm:inline">대기실로 나가기</span>
+              <span className="sm:hidden">나가기</span>
             </button>
 
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-tr from-purple-500/20 to-indigo-600/20 border border-purple-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
-              <img src="/images/menu_icons/replay.webp" alt="대전 리플레이" className="w-9 h-9 object-contain drop-shadow" />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-purple-500/20 to-indigo-600/20 border border-purple-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
+              <img src="/images/menu_icons/replay.webp" alt="대전 리플레이" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
             </div>
 
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-wide">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 className="text-base sm:text-2xl font-black text-white tracking-wide truncate">
                   대전 리플레이 &amp; 복기
                 </h2>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono font-bold">
+                <span className="hidden md:inline text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono font-bold whitespace-nowrap">
                   REPLAY ARCHIVE
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5 hidden sm:block">
+              <p className="text-xs sm:text-sm text-slate-400 mt-0.5 hidden lg:block truncate">
                 과거의 명경기 듀얼을 타일 형태로 탐색하고, 클릭하여 대전 상대 정보 확인 및 리플레이를 감상하세요.
               </p>
             </div>
           </div>
 
           {/* 상단 툴 액션 버튼들 */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-2 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-black transition cursor-pointer flex items-center gap-1.5 shadow"
+              className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-black transition cursor-pointer flex items-center gap-1.5 shadow whitespace-nowrap"
               title="외부 리플레이 JSON 파일 불러오기"
             >
-              <Upload className="w-4 h-4 text-purple-300" />
+              <Upload className="w-4 h-4 text-purple-300 shrink-0" />
               <span className="hidden md:inline">파일 불러오기</span>
             </button>
 
@@ -347,10 +348,10 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                 setPasteError(null);
                 setPasteText('');
               }}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-black transition cursor-pointer flex items-center gap-1.5"
+              className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-black transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
               title="리플레이 JSON 코드 직접 붙여넣기"
             >
-              <FileCode className="w-4 h-4 text-cyan-400" />
+              <FileCode className="w-4 h-4 text-cyan-400 shrink-0" />
               <span className="hidden md:inline">코드 붙여넣기</span>
             </button>
 
@@ -366,7 +367,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
 
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer ml-1"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition border border-slate-700/60 cursor-pointer ml-0.5 sm:ml-1 shrink-0"
               title="닫기"
             >
               <X className="w-5 h-5" />
@@ -375,20 +376,20 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
         </header>
 
         {/* 상단 탭 네비게이션: [🌐 멀티배틀 공개 리플레이 광장] vs [📁 내 로컬 리플레이] */}
-        <div className="px-6 pt-3 pb-0 bg-[#0d1226] border-b border-purple-400/20 flex items-center gap-2 relative z-20">
+        <div className="px-3 sm:px-6 pt-2.5 sm:pt-3 pb-0 bg-[#0d1226] border-b border-purple-400/20 flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar relative z-20 shrink-0">
           <button
             onClick={() => {
               setActiveTab('PUBLIC');
               setSearchQuery('');
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 font-black text-xs sm:text-sm border-b-2 transition cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 font-black text-xs sm:text-sm border-b-2 transition cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'PUBLIC'
                 ? 'border-purple-400 text-purple-200 bg-purple-950/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Globe className="w-4 h-4 text-purple-400" />
-            <span>멀티배틀 공개 리플레이 광장</span>
+            <Globe className="w-4 h-4 text-purple-400 shrink-0" />
+            <span>공개 리플레이 광장</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">
               {publicSummaries.length}
             </span>
@@ -399,14 +400,14 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
               setActiveTab('LOCAL');
               setSearchQuery('');
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 font-black text-xs sm:text-sm border-b-2 transition cursor-pointer ${
+            className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 font-black text-xs sm:text-sm border-b-2 transition cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'LOCAL'
                 ? 'border-amber-400 text-amber-200 bg-amber-950/30'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <History className="w-4 h-4 text-amber-400" />
-            <span>내 로컬 리플레이 (개인 보관함)</span>
+            <History className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>내 로컬 리플레이</span>
             <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
               {replays.length}
             </span>
@@ -821,7 +822,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                 </div>
 
                 {/* 2. 배틀한 상대 정보 카드 비교 */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {/* 1P 카드 */}
                   <div className="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-800">
@@ -914,25 +915,25 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
               </div>
 
               {/* 하단 3대 주요 액션 버튼 바 */}
-              <div className="px-6 py-4.5 border-t border-purple-400/20 bg-[#12162e]/90 flex items-center justify-between gap-3 shrink-0 relative z-20">
+              <div className="px-3.5 sm:px-6 py-3.5 sm:py-4.5 border-t border-purple-400/20 bg-[#12162e]/90 flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0 relative z-20">
                 <button
                   type="button"
                   onClick={(e) => handleDelete(inspectingReplay.id, e)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-red-950/60 text-slate-400 hover:text-red-300 border border-slate-700 hover:border-red-500/40 text-xs sm:text-sm font-bold transition cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 sm:px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-red-950/60 text-slate-400 hover:text-red-300 border border-slate-700 hover:border-red-500/40 text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap"
                   title="이 리플레이 삭제"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-4 h-4 shrink-0" />
                   <span>기록 삭제</span>
                 </button>
 
-                <div className="flex items-center gap-2.5">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2.5 ml-auto">
                   {/* 1. 코드 복사 */}
                   <button
                     type="button"
                     onClick={(e) => handleCopyReplayCode(inspectingReplay, e)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-bold transition cursor-pointer"
+                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap"
                   >
-                    <Copy className="w-4 h-4 text-purple-400" />
+                    <Copy className="w-4 h-4 text-purple-400 shrink-0" />
                     <span>코드 복사</span>
                   </button>
 
@@ -940,9 +941,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                   <button
                     type="button"
                     onClick={(e) => handleExportReplay(inspectingReplay, e)}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-black transition cursor-pointer shadow"
+                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-black transition cursor-pointer shadow whitespace-nowrap"
                   >
-                    <Download className="w-4 h-4 text-purple-300" />
+                    <Download className="w-4 h-4 text-purple-300 shrink-0" />
                     <span>리플레이 내보내기</span>
                   </button>
 
@@ -950,9 +951,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                   <button
                     type="button"
                     onClick={() => handlePlayReplay(inspectingReplay)}
-                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-sm sm:text-base shadow-xl shadow-amber-500/30 transition cursor-pointer transform hover:scale-[1.02] active:scale-[0.98]"
+                    className="flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-base shadow-xl shadow-amber-500/30 transition cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] whitespace-nowrap"
                   >
-                    <Play className="w-5 h-5 fill-slate-950" />
+                    <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-slate-950 shrink-0" />
                     <span>리플레이 재생</span>
                   </button>
                 </div>

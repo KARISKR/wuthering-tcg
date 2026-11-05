@@ -1556,53 +1556,53 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       )}
 
       {/* 1. 최상단 아카라이브 내비게이션 바 */}
-      <header className="h-14 border-b border-[#252b3b] bg-[#161a25] px-4 sm:px-8 flex items-center justify-between text-sm text-slate-300 select-none">
-        <div className="flex items-center gap-3.5">
+      <header className="h-14 border-b border-[#252b3b] bg-[#161a25] px-3 sm:px-8 flex items-center justify-between text-sm text-slate-300 select-none gap-2">
+        <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
           <button
             onClick={onBackToLobby}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-[#202636] hover:bg-[#2b3347] text-slate-100 border border-[#2d354a] transition cursor-pointer font-bold text-xs sm:text-sm shadow"
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-1.5 rounded-lg bg-[#202636] hover:bg-[#2b3347] text-slate-100 border border-[#2d354a] transition cursor-pointer font-bold text-xs sm:text-sm shadow shrink-0 whitespace-nowrap"
             title="메인 로비 화면으로 나가기"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 shrink-0" />
             <span>로비</span>
           </button>
 
-          <span className="text-[#32394d]">|</span>
+          <span className="text-[#32394d] shrink-0">|</span>
 
           {/* 아카라이브 빵부스러기(Breadcrumb) */}
-          <div className="flex items-center gap-2 text-xs sm:text-sm">
-            <span className="hover:text-white transition cursor-pointer">채널</span>
-            <span className="text-slate-600">&gt;</span>
-            <span className="hover:text-white transition cursor-pointer">게임</span>
-            <span className="text-slate-600">&gt;</span>
-            <div className="flex items-center gap-1.5">
-              <img src="/images/menu_icons/board.webp" alt="" className="w-4 h-4 object-contain" />
-              <span className="text-amber-300 font-black">명조 배틀 채널 (자유게시판)</span>
+          <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm min-w-0 truncate">
+            <span className="hidden sm:inline hover:text-white transition cursor-pointer shrink-0">채널</span>
+            <span className="hidden sm:inline text-slate-600 shrink-0">&gt;</span>
+            <span className="hidden sm:inline hover:text-white transition cursor-pointer shrink-0">게임</span>
+            <span className="hidden sm:inline text-slate-600 shrink-0">&gt;</span>
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
+              <img src="/images/menu_icons/board.webp" alt="" className="w-4 h-4 object-contain shrink-0" />
+              <span className="text-amber-300 font-black truncate">명조 배틀 채널 (자유게시판)</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <button
             onClick={() => exportFeedbackAsJson(items)}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202636] hover:bg-[#2b3347] text-slate-200 border border-[#2d354a] transition cursor-pointer text-xs font-bold"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#202636] hover:bg-[#2b3347] text-slate-200 border border-[#2d354a] transition cursor-pointer text-xs font-bold whitespace-nowrap"
             title="게시글 JSON 백업 다운로드"
           >
             <Download className="w-3.5 h-3.5" />
             <span>백업</span>
           </button>
-          <span className="text-xs text-slate-400 font-bold bg-[#121520] px-2.5 py-1 rounded border border-[#2d354a]">{CURRENT_GAME_VERSION}</span>
+          <span className="text-[11px] sm:text-xs text-slate-400 font-bold bg-[#121520] px-2 sm:px-2.5 py-1 rounded border border-[#2d354a] whitespace-nowrap">{CURRENT_GAME_VERSION}</span>
         </div>
       </header>
 
       {/* 2. 메인 컨테이너 (와이드 스크린 채널 뷰 폭 ~1560px~1720px로 확장) */}
-      <div className="max-w-[1560px] 2xl:max-w-[1720px] w-full mx-auto px-4 sm:px-8 py-5 sm:py-8 flex flex-col gap-5">
+      <div className="max-w-[1560px] 2xl:max-w-[1720px] w-full mx-auto px-3 sm:px-8 py-4 sm:py-8 flex flex-col gap-4 sm:gap-5">
         
         {/* 2.1 아카라이브 채널 헤더 프로필 박스 */}
-        <section className="bg-[#181d2a] border border-[#262c3d] rounded-2xl p-5 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-5 shadow-xl">
-          <div className="flex items-start sm:items-center gap-4 sm:gap-5">
+        <section className="bg-[#181d2a] border border-[#262c3d] rounded-2xl p-4 sm:p-7 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-5 shadow-xl">
+          <div className="flex items-start sm:items-center gap-3.5 sm:gap-5">
             {/* 채널 아바타 (자유게시판 공식 커스텀 아이콘) */}
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 p-0.5 shrink-0 shadow-lg shadow-amber-500/20">
+            <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-tr from-amber-600 via-amber-500 to-yellow-400 p-0.5 shrink-0 shadow-lg shadow-amber-500/20">
               <div className="w-full h-full bg-[#121622] rounded-[14px] flex items-center justify-center overflow-hidden p-2">
                 <img
                   src="/images/menu_icons/board.webp"
@@ -1613,22 +1613,22 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             </div>
 
             {/* 채널 명 및 설명 */}
-            <div className="flex flex-col gap-1.5">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
+            <div className="flex flex-col gap-1 sm:gap-1.5 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight whitespace-nowrap">
                   명조 배틀 채널
                 </h1>
-                <span className="px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
                   TCG SIMULATOR
                 </span>
-                <span className="px-2.5 py-0.5 rounded-md bg-blue-500/20 border border-blue-500/40 text-blue-300 text-xs font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-500/40 text-blue-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
                   공식 채널
                 </span>
               </div>
-              <p className="text-xs sm:text-sm md:text-base text-slate-300 leading-relaxed max-w-4xl">
+              <p className="text-xs sm:text-sm md:text-base text-slate-300 leading-relaxed max-w-4xl break-keep">
                 명조: 워더링 웨이브 배틀 TCG 시뮬레이터 커뮤니티입니다. 덱 편성 공략, 콤보 연구, 대전 피드백 및 버그 제보를 자유롭게 나누세요.
               </p>
-              <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-400 mt-1">
+              <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-400 mt-0.5">
                 <span>게시글 <b className="text-slate-200">{items.length}</b></span>
                 <span>•</span>
                 <span className="text-emerald-400 font-bold">온라인 접속 중</span>
@@ -1637,7 +1637,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
           </div>
 
           {/* 우측 상단 글쓰기 및 덱 공유 버튼 */}
-          <div className="flex items-center gap-2.5 shrink-0 self-end md:self-center">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 w-full md:w-auto justify-end">
             {/* 덱 공유 전용 버튼 (내 보유 덱 바로 불러오기) */}
             <button
               onClick={() => {
@@ -1648,10 +1648,10 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 }
                 setIsWriteModalOpen(true);
               }}
-              className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 hover:brightness-110 text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-purple-500/25 active:scale-95"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 hover:brightness-110 text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-purple-500/25 active:scale-95 whitespace-nowrap"
               title="내 보유 덱을 자동으로 불러와 게시글에 첨부합니다"
             >
-              <Layers className="w-4 h-4" />
+              <Layers className="w-4 h-4 shrink-0" />
               <span>내 덱 공유하기</span>
             </button>
 
@@ -1669,16 +1669,16 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 setShowColorPicker(false);
                 setIsWriteModalOpen(true);
               }}
-              className="flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-blue-500/25 active:scale-95"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-blue-500/25 active:scale-95 whitespace-nowrap"
             >
-              <Plus className="w-4 h-4 stroke-[3]" />
+              <Plus className="w-4 h-4 stroke-[3] shrink-0" />
               <span>글쓰기</span>
             </button>
           </div>
         </section>
 
         {/* 2.2 아카라이브 말머리(카테고리) 탭 바 */}
-        <nav className="flex items-center justify-between border-b border-[#262c3d] pb-2.5 overflow-x-auto scrollbar-none gap-2">
+        <nav className="flex items-center justify-between border-b border-[#262c3d] pb-2.5 overflow-x-auto no-scrollbar gap-2">
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {BOARD_TABS.map((tab) => {
               const isSelected = activeTab === tab.id;
@@ -1689,7 +1689,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     setActiveTab(tab.id);
                     setCurrentPage(1);
                   }}
-                  className={`flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-lg text-xs sm:text-sm md:text-base font-bold transition cursor-pointer ${
+                  className={`flex items-center gap-1 sm:gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm md:text-base font-bold transition cursor-pointer shrink-0 whitespace-nowrap ${
                     isSelected
                       ? tab.id === 'BEST'
                         ? 'bg-amber-500 text-slate-950 font-black shadow-md'
@@ -1719,13 +1719,13 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         {selectedPost && (
           <article className="bg-[#181d2a] border border-[#2b3245] rounded-2xl overflow-hidden shadow-2xl animate-in fade-in duration-200">
             {/* 아카라이브 본문 헤더 */}
-            <header className="p-6 sm:p-8 border-b border-[#252b3b] bg-[#1a202e] flex flex-col gap-3.5">
-              <div className="flex items-center gap-2.5">
-                <span className={`px-2.5 py-1 rounded-md text-xs sm:text-sm font-bold border ${CATEGORY_INFO[selectedPost.category]?.badgeClass || 'bg-slate-800 text-slate-300'}`}>
+            <header className="p-4 sm:p-8 border-b border-[#252b3b] bg-[#1a202e] flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`px-2.5 py-1 rounded-md text-xs sm:text-sm font-bold border whitespace-nowrap ${CATEGORY_INFO[selectedPost.category]?.badgeClass || 'bg-slate-800 text-slate-300'}`}>
                   {selectedPost.isNotice ? '공지' : CATEGORY_INFO[selectedPost.category]?.label}
                 </span>
                 {selectedPost.isSecret && (
-                  <span className="px-2.5 py-1 rounded-md text-xs sm:text-sm font-bold border bg-amber-500/20 text-amber-300 border-amber-500/40 flex items-center gap-1.5 shadow-sm">
+                  <span className="px-2.5 py-1 rounded-md text-xs sm:text-sm font-bold border bg-amber-500/20 text-amber-300 border-amber-500/40 flex items-center gap-1.5 shadow-sm whitespace-nowrap">
                     {unlockedPostIds.has(selectedPost.id) ? (
                       <>
                         <Unlock className="w-3.5 h-3.5 text-emerald-400" />
@@ -1742,7 +1742,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 <span className="text-xs sm:text-sm font-mono text-slate-400">// {selectedPost.appVersion}</span>
               </div>
 
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-snug">
+              <h2 className="text-lg sm:text-3xl lg:text-4xl font-black text-white tracking-tight leading-snug break-keep">
                 {selectedPost.title}
               </h2>
 
@@ -2284,12 +2284,148 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* 4. 아카라이브 게시판 테이블 (ArcaLive Signature Board Table) */}
+        {/* 4. 아카라이브 게시판 리스트 (모바일 전용 2줄 카드 리스트 & 데스크톱 7열 테이블) */}
         {/* ========================================================================= */}
         <section className="bg-[#181d2a] border border-[#262c3d] rounded-xl overflow-hidden shadow-lg">
           
-          {/* 테이블 컨테이너 */}
-          <div className="overflow-x-auto">
+          {/* [모바일 전용 게시판 리스트 (< md)] — 글자 세로 쏠림 현상 완벽 차단 */}
+          <div className="md:hidden divide-y divide-[#222838] select-none">
+            {/* 공지사항 고정글 (모바일) */}
+            {noticeItems.map((notice) => (
+              <div
+                key={`m-${notice.id}`}
+                onClick={() => handleSelectPost(notice.id)}
+                className="p-3.5 bg-[#20202e]/85 active:bg-[#28273d] transition cursor-pointer flex flex-col gap-1.5"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-black text-[11px] shrink-0 whitespace-nowrap">
+                    📢 공지
+                  </span>
+                  <span className="font-bold text-white text-sm truncate flex-1">{notice.title}</span>
+                  {isPostNew(notice) && (
+                    <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] shrink-0">
+                      NEW
+                    </span>
+                  )}
+                  {notice.comments && notice.comments.length > 0 && (
+                    <span className="text-cyan-400 font-mono font-bold text-xs shrink-0">
+                      [{notice.comments.length}]
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="font-bold text-slate-300">{notice.contact || '관리자'}</span>
+                    <span>·</span>
+                    <span className="font-mono">{formatArcaDate(notice.createdAt)}</span>
+                  </div>
+                  <div className="flex items-center gap-2.5 font-mono shrink-0">
+                    <span>조회 {notice.views || 0}</span>
+                    <span className="text-amber-400 font-bold">추천 +{notice.likes || 0}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* 일반 게시글 목록 (모바일) */}
+            {paginatedNormalItems.length === 0 ? (
+              <div className="py-12 px-4 text-center text-slate-500">
+                <FileText className="w-9 h-9 mx-auto mb-2 opacity-50" />
+                <p className="text-sm font-bold">게시글이 존재하지 않습니다.</p>
+                <button
+                  onClick={() => setIsWriteModalOpen(true)}
+                  className="mt-3 px-4 py-2 rounded-lg bg-[#3b82f6] text-white text-xs font-bold transition cursor-pointer"
+                >
+                  첫 글 작성하기
+                </button>
+              </div>
+            ) : (
+              paginatedNormalItems.map((item) => {
+                const cat = CATEGORY_INFO[item.category] || CATEGORY_INFO.GENERAL;
+                const isCurrentActive = selectedPostId === item.id;
+                return (
+                  <div
+                    key={`m-${item.id}`}
+                    onClick={() => handleSelectPost(item.id)}
+                    className={`p-3.5 transition cursor-pointer flex flex-col gap-1.5 ${
+                      isCurrentActive
+                        ? 'bg-[#222b40] border-l-3 border-l-blue-400'
+                        : 'hover:bg-[#1f2536] active:bg-[#242b3d]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span
+                        className="px-1.5 py-0.5 rounded bg-slate-900/90 border border-slate-700/80 text-[11px] font-black shrink-0 whitespace-nowrap"
+                        style={{ color: cat.color }}
+                      >
+                        {cat.label}
+                      </span>
+                      {item.isSecret && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 flex items-center gap-0.5 border whitespace-nowrap ${
+                            unlockedPostIds.has(item.id)
+                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                              : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                          }`}
+                        >
+                          {unlockedPostIds.has(item.id) ? (
+                            <Unlock className="w-2.5 h-2.5 text-emerald-400" />
+                          ) : (
+                            <Lock className="w-2.5 h-2.5 text-amber-400" />
+                          )}
+                          <span>비밀</span>
+                        </span>
+                      )}
+                      {item.category === 'DECK' && item.deckCode && (
+                        <span className="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono shrink-0 whitespace-nowrap">
+                          🃏덱
+                        </span>
+                      )}
+                      <span
+                        className={`truncate text-sm flex-1 ${
+                          isCurrentActive ? 'font-black text-amber-200' : 'font-bold text-slate-100'
+                        }`}
+                      >
+                        {item.title}
+                      </span>
+                      {(item.hasImage || item.imageUrl || (item.images && item.images.length > 0)) && (
+                        <ImageIcon className="w-3.5 h-3.5 text-emerald-400/90 shrink-0" />
+                      )}
+                      {isPostNew(item) && (
+                        <span className="px-1.5 py-0.5 rounded bg-red-600 text-white font-black text-[9px] shrink-0">
+                          NEW
+                        </span>
+                      )}
+                      {item.comments && item.comments.length > 0 && (
+                        <span className="text-cyan-400 font-mono font-bold text-xs shrink-0">
+                          [{item.comments.length}]
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-[11px] text-slate-400">
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="font-medium text-slate-300 truncate max-w-[120px]">
+                          {item.contact || '방랑자'}
+                        </span>
+                        <span>·</span>
+                        <span className="font-mono">{formatArcaDate(item.createdAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-2.5 font-mono shrink-0">
+                        <span>조회 {item.views || 1}</span>
+                        <span className={(item.likes || 0) > 0 ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
+                          추천 + {item.likes || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* [데스크톱/태블릿 전용 7열 테이블 (md 이상)] */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left border-collapse select-none">
               
               {/* 테이블 헤더 */}

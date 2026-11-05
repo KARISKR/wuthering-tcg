@@ -111,7 +111,7 @@ export function App() {
         setIsTutorialBattle(false);
         bgmManager.unlockTrack();
         setCurrentView('DECK_BUILDER');
-      } else if (hash === '#tutorial-battle') {
+      } else if (hash === '#tutorial-battle' || hash === '#tutorial' || hash === '#interactive-tutorial') {
         setIsTutorialBattle(true);
         setCurrentView('BATTLE');
       } else if (hash === '#battle-stage' || hash === '#m-battle-stage' || hash === '#m-battle') {
@@ -303,7 +303,7 @@ export function App() {
 
   return (
     <div className="w-full min-h-screen bg-[#070a13]">
-      {(currentView === 'BATTLE' || currentView === 'REPLAY_STAGE') && <MobileOrientationGuard />}
+      {((currentView === 'BATTLE' && !isTutorialBattle) || currentView === 'REPLAY_STAGE') && <MobileOrientationGuard />}
       {/* 이전 멀티플레이 세션 재접속 알림 토스트 배너 */}
       {savedSessionToResume && currentView === 'LOBBY' && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[100] max-w-md w-full px-4 animate-in fade-in slide-in-from-top-4 duration-300">
