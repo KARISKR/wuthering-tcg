@@ -260,10 +260,10 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
 
               {/* [WP5] 공격자 캐릭터 공격 스프라이트 (로드 실패 시 기존 십자 참격만 표시) */}
               <AttackFx
+                scene="combo"
                 characterKey={fxKey}
                 tier={fxTier}
                 attackerOnRight={false}
-                size={420}
                 failed={fxFailed}
                 onFail={() => setFxFailed(true)}
                 fallback={null}

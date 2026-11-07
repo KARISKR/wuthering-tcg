@@ -383,6 +383,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                   {/* [WP5] 승자 캐릭터 공격 스프라이트 (실패·스킵 시 기존 검기) */}
                   {fxActive ? (
                     <AttackFx
+                      scene="clash"
                       characterKey={fxKey}
                       tier={fxTier}
                       attackerOnRight={true}
@@ -572,6 +573,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                   {/* [WP5] 승자 캐릭터 공격 스프라이트 (실패·스킵 시 기존 검기) */}
                   {fxActive ? (
                     <AttackFx
+                      scene="clash"
                       characterKey={fxKey}
                       tier={fxTier}
                       attackerOnRight={false}

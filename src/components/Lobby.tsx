@@ -16,6 +16,7 @@ const BattleReplayModal = lazy(() => import('./BattleReplayModal').then((m) => (
 const InteractiveTutorialModal = lazy(() => import('./InteractiveTutorialModal').then((m) => ({ default: m.InteractiveTutorialModal })));
 const MultiplayerLobbyModal = lazy(() => import('./MultiplayerLobbyModal').then((m) => ({ default: m.MultiplayerLobbyModal })));
 const AppInstallModal = lazy(() => import('./AppInstallModal').then((m) => ({ default: m.AppInstallModal })));
+const AttackFxStudioModal = lazy(() => import('./attackMotions/AttackFxStudioModal').then((m) => ({ default: m.AttackFxStudioModal })));
 import type { MultiplayerRole } from '../types/multiplayer';
 import {
   Bot,
@@ -23,6 +24,7 @@ import {
   ChevronRight,
   Volume2,
   Sliders,
+  Sparkles,
   Download,
   X,
 } from 'lucide-react';
@@ -146,6 +148,7 @@ export const Lobby: React.FC<LobbyProps> = ({
     }
   }, []);
   const [isReplayOpen, setIsReplayOpen] = useState(false);
+  const [isFxStudioOpen, setIsFxStudioOpen] = useState(false);
   const [showModeModal, setShowModeModal] = useState(false);
   const [deckSelectMode, setDeckSelectMode] = useState<'AI' | 'SOLO_DUAL' | null>(null);
   const [isEditingLayout, setIsEditingLayout] = useState(false);
@@ -243,6 +246,8 @@ export const Lobby: React.FC<LobbyProps> = ({
       hash === '#patchnotes' ||
       hash === '#patch' ||
       hash === '#sfx' ||
+      hash === '#fx' ||
+      hash === '#fx-studio' ||
       hash === '#install' ||
       hash === '#app-install'
     ) {
@@ -264,6 +269,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       setIsInteractiveTutorialOpen(hash === '#tutorial' || hash === '#interactive-tutorial');
       setIsPatchNotesOpen(hash === '#patchnotes' || hash === '#patch');
       setIsSfxGuideOpen(hash === '#sfx');
+      setIsFxStudioOpen(hash === '#fx' || hash === '#fx-studio');
       setIsAppInstallOpen(hash === '#install' || hash === '#app-install');
     };
 
@@ -460,6 +466,14 @@ export const Lobby: React.FC<LobbyProps> = ({
               >
                 <Volume2 className="w-3.5 h-3.5" />
                 <span>SFX</span>
+              </button>
+              <button
+                onClick={() => setHash('#fx-studio')}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 text-xs font-black transition cursor-pointer"
+                title="공격 이펙트 스프라이트(격돌/연격) 크기 및 위치 실시간 튜닝"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>FX 스튜디오</span>
               </button>
             </>
           )}
@@ -998,6 +1012,16 @@ export const Lobby: React.FC<LobbyProps> = ({
               if (onPlayBattleReplay) {
                 onPlayBattleReplay(record);
               }
+            }}
+          />
+        )}
+
+        {/* [WP5] 독립형 공격 이펙트 스프라이트 스튜디오 */}
+        {isFxStudioOpen && (
+          <AttackFxStudioModal
+            onClose={() => {
+              clearHash();
+              setIsFxStudioOpen(false);
             }}
           />
         )}

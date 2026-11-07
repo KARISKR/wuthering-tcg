@@ -5,8 +5,9 @@
  * - 프레임 안의 대상(맞는 카드) 중심은 (276, 176) / 384. 공격 방향은 왼쪽 → 오른쪽이므로 오른쪽 승자는 flip.
  * - 로드 실패 시 onError → 호출부가 기존 검기 연출로 대체.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { loadAttackFxConfig, type AttackFxGlobalConfig } from './attackFxConfig';
 
 export type SheetMeta = {
   frameWidth: number;
@@ -144,14 +145,63 @@ export function AttackFx(props: {
   fallback: ReactNode;
   failed: boolean;
   onFail: () => void;
+  scene?: 'clash' | 'combo';
+  offsetX?: number;
+  offsetY?: number;
+  scale?: number;
+  customConfig?: AttackFxGlobalConfig;
 }) {
-  const { characterKey, tier, attackerOnRight, size = 360, fallback, failed, onFail } = props;
+  const {
+    characterKey,
+    tier,
+    attackerOnRight,
+    fallback,
+    failed,
+    onFail,
+    scene,
+    customConfig,
+  } = props;
+
+  const [activeConfig, setActiveConfig] = useState<AttackFxGlobalConfig>(() => customConfig || loadAttackFxConfig());
+
+  useEffect(() => {
+    if (customConfig) {
+      setActiveConfig(customConfig);
+      return;
+    }
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<AttackFxGlobalConfig>).detail;
+      if (detail) setActiveConfig(detail);
+    };
+    window.addEventListener('wuthering_attack_fx_config_changed', handler);
+    return () => window.removeEventListener('wuthering_attack_fx_config_changed', handler);
+  }, [customConfig]);
+
   if (!characterKey || tier <= 0 || failed) return <>{fallback}</>;
-  const ix = attackerOnRight ? 1 - FX_IMPACT.x : FX_IMPACT.x;
+
+  const sceneConfig = scene ? activeConfig[scene] : undefined;
+  const baseSize = props.size ?? sceneConfig?.size ?? (scene === 'combo' ? 420 : 360);
+  const scale = props.scale ?? sceneConfig?.scale ?? 1.0;
+  const size = Math.round(baseSize * scale);
+
+  const impactX = activeConfig.impactX ?? FX_IMPACT.x;
+  const impactY = activeConfig.impactY ?? FX_IMPACT.y;
+
+  const baseOffsetX = props.offsetX ?? sceneConfig?.offsetX ?? 0;
+  const baseOffsetY = props.offsetY ?? sceneConfig?.offsetY ?? 0;
+  const directionalOffsetX = attackerOnRight ? -baseOffsetX : baseOffsetX;
+
+  const ix = attackerOnRight ? 1 - impactX : impactX;
+
   return (
     <div
       className="absolute pointer-events-none z-30"
-      style={{ left: `calc(50% - ${size * ix}px)`, top: `calc(50% - ${size * FX_IMPACT.y}px)`, width: size, height: size }}
+      style={{
+        left: `calc(50% - ${size * ix}px + ${directionalOffsetX}px)`,
+        top: `calc(50% - ${size * impactY}px + ${baseOffsetY}px)`,
+        width: size,
+        height: size,
+      }}
     >
       <SpriteEffect name={`${characterKey}_t${tier}`} size={size} flip={attackerOnRight} onError={onFail} />
     </div>
