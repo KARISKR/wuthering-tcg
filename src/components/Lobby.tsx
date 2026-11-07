@@ -20,7 +20,6 @@ import type { MultiplayerRole } from '../types/multiplayer';
 import {
   Bot,
   User,
-  Users,
   ChevronRight,
   Volume2,
   Sliders,
@@ -353,7 +352,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           SINGLE · AI
         </span>
         <span className="relative flex flex-col gap-1.5">
-          <span className={`font-black text-white leading-none ${s.title}`}>전투 시작</span>
+          <span className={`font-black text-white leading-none ${s.title}`}>싱글배틀</span>
           <span className={`text-slate-200 ${s.sub}`}>{variant === 'desktop' ? 'AI 대전 또는 1인 2역 연습. 덱을 고르고 바로 시작합니다.' : 'AI 대전 · 1인 2역'}</span>
           {variant === 'desktop' && (
             <span className="mt-2.5 self-start h-11 px-5 rounded-xl bg-amber-400 group-hover:bg-amber-300 text-slate-950 text-[15px] font-black flex items-center gap-1.5 transition">
@@ -777,31 +776,6 @@ export const Lobby: React.FC<LobbyProps> = ({
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-indigo-400/60 group-hover:text-indigo-300 group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowModeModal(false);
-                  setHash('#multiplayer');
-                  setIsMultiplayerModalOpen(true);
-                }}
-                className="w-full p-4.5 rounded-2xl bg-[#121626]/90 hover:bg-[#1a142e] border-2 border-violet-400/60 hover:border-violet-400 transition-all duration-200 flex items-center gap-4 text-left group cursor-pointer shadow-[0_0_20px_rgba(139,92,246,0.15)] hover:shadow-[0_0_30px_rgba(139,92,246,0.35)] transform hover:-translate-y-0.5"
-              >
-                <div className="w-13 h-13 rounded-xl bg-violet-500/20 text-violet-300 border border-violet-400/40 flex items-center justify-center font-bold text-xl group-hover:scale-105 transition shadow">
-                  <Users className="w-7 h-7" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-black text-white group-hover:text-violet-300 transition text-base flex items-center gap-2">
-                    <span>온라인 1:1 대전 (P2P)</span>
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 border border-violet-500/40">
-                      MULTIPLAYER
-                    </span>
-                  </div>
-                  <div className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    초대 코드 또는 공유 링크로 친구와 실시간 대결을 진행합니다. (재접속 지원)
-                  </div>
-                </div>
-                <ChevronRight className="w-5 h-5 text-violet-400/60 group-hover:text-violet-300 group-hover:translate-x-1 transition-transform" />
               </button>
             </div>
 
