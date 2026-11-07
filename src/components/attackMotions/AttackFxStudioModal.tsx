@@ -240,23 +240,26 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
               {/* ================= 격돌(Clash) 모의 무대 ================= */}
               {scene === 'clash' && (
                 <div className="relative flex items-center justify-center gap-6 sm:gap-14 scale-90 sm:scale-100">
-                  {/* 왼쪽 플레이어 카드 (P0) */}
-                  <div
-                    className={`relative w-48 h-68 sm:w-56 sm:h-80 rounded-2xl overflow-hidden border-2 transition-all duration-300 ${
-                      attackerOnRight
-                        ? 'border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.35)] ring-2 ring-rose-500/30'
-                        : 'border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.35)]'
-                    }`}
-                  >
-                    <img
-                      src={attackerOnRight ? '/images/cards/rover_female.webp' : currentCharData.artUrl}
-                      alt="P0"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                    <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-xs font-black">
-                      <span className="text-white">{attackerOnRight ? '방랑자 (맞는 쪽)' : `${currentCharData.name} (공격)`}</span>
-                      <span className="text-amber-300">P0</span>
+                  {/* 왼쪽 플레이어 카드 (P0) - 바깥 컨테이너는 overflow-visible로 이펙트가 카드 밖으로 자유롭게 튀어나옴 */}
+                  <div className="relative w-48 h-68 sm:w-56 sm:h-80 select-none">
+                    {/* 카드 본체 (테두리 및 내부 일러스트만 클리핑) */}
+                    <div
+                      className={`w-full h-full rounded-2xl overflow-hidden border-2 relative transition-all duration-300 ${
+                        attackerOnRight
+                          ? 'border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.35)] ring-2 ring-rose-500/30'
+                          : 'border-amber-400 shadow-[0_0_30px_rgba(245,158,11,0.35)]'
+                      }`}
+                    >
+                      <img
+                        src={attackerOnRight ? '/images/cards/rover_female.webp' : currentCharData.artUrl}
+                        alt="P0"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                      <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-xs font-black">
+                        <span className="text-white">{attackerOnRight ? '방랑자 (맞는 쪽)' : `${currentCharData.name} (공격)`}</span>
+                        <span className="text-amber-300">P0</span>
+                      </div>
                     </div>
 
                     {/* 타격 중심점 십자선 (오른쪽에서 공격해 왼쪽이 맞을 때) */}
@@ -271,7 +274,7 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
                       </div>
                     )}
 
-                    {/* 이펙트 스프라이트 마운트: 오른쪽에서 공격했을 때 P0 카드 위에 발생 */}
+                    {/* 이펙트 스프라이트: 카드 네모 밖으로 시원하게 튀어나옴 */}
                     {attackerOnRight && (
                       <AttackFx
                         key={`studio-clash-p0-${playTrigger}`}
@@ -288,7 +291,7 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
                   </div>
 
                   {/* 중앙 충돌 뱃지 */}
-                  <div className="flex flex-col items-center gap-1 text-slate-400 z-10">
+                  <div className="flex flex-col items-center gap-1 text-slate-400 z-10 shrink-0">
                     <div className="w-10 h-10 rounded-full bg-slate-800/90 border border-white/20 flex items-center justify-center font-black text-amber-300 shadow-lg">
                       VS
                     </div>
@@ -297,23 +300,26 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
                     </span>
                   </div>
 
-                  {/* 오른쪽 플레이어 카드 (P1) */}
-                  <div
-                    className={`relative w-48 h-68 sm:w-56 sm:h-80 rounded-2xl overflow-hidden border-2 transition-all duration-300 ${
-                      !attackerOnRight
-                        ? 'border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.35)] ring-2 ring-rose-500/30'
-                        : 'border-violet-400 shadow-[0_0_30px_rgba(139,92,246,0.35)]'
-                    }`}
-                  >
-                    <img
-                      src={!attackerOnRight ? '/images/cards/rover_female.webp' : currentCharData.artUrl}
-                      alt="P1"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                    <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-xs font-black">
-                      <span className="text-white">{!attackerOnRight ? '방랑자 (맞는 쪽)' : `${currentCharData.name} (공격)`}</span>
-                      <span className="text-violet-300">P1</span>
+                  {/* 오른쪽 플레이어 카드 (P1) - 바깥 컨테이너는 overflow-visible */}
+                  <div className="relative w-48 h-68 sm:w-56 sm:h-80 select-none">
+                    {/* 카드 본체 */}
+                    <div
+                      className={`w-full h-full rounded-2xl overflow-hidden border-2 relative transition-all duration-300 ${
+                        !attackerOnRight
+                          ? 'border-rose-500 shadow-[0_0_30px_rgba(244,63,94,0.35)] ring-2 ring-rose-500/30'
+                          : 'border-violet-400 shadow-[0_0_30px_rgba(139,92,246,0.35)]'
+                      }`}
+                    >
+                      <img
+                        src={!attackerOnRight ? '/images/cards/rover_female.webp' : currentCharData.artUrl}
+                        alt="P1"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                      <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between text-xs font-black">
+                        <span className="text-white">{!attackerOnRight ? '방랑자 (맞는 쪽)' : `${currentCharData.name} (공격)`}</span>
+                        <span className="text-violet-300">P1</span>
+                      </div>
                     </div>
 
                     {/* 타격 중심점 십자선 (왼쪽에서 공격해 오른쪽이 맞을 때) */}
@@ -328,7 +334,7 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
                       </div>
                     )}
 
-                    {/* 이펙트 스프라이트 마운트: 왼쪽에서 공격했을 때 P1 카드 위에 발생 */}
+                    {/* 이펙트 스프라이트: 카드 네모 밖으로 시원하게 튀어나옴 */}
                     {!attackerOnRight && (
                       <AttackFx
                         key={`studio-clash-p1-${playTrigger}`}
@@ -349,14 +355,27 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
               {/* ================= 연격(Combo Strike) 모의 무대 ================= */}
               {scene === 'combo' && (
                 <div className="relative flex items-center justify-center scale-90 sm:scale-100">
-                  {/* 중앙 연격 대형 프레임 */}
-                  <div className="relative w-52 h-72 sm:w-60 sm:h-84 rounded-2xl overflow-hidden border-2 border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.6)]">
-                    <img
-                      src={currentCharData.artUrl}
-                      alt="Combo Card"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                  {/* 실제 연격과 동일한 배경 십자 참격 광선 */}
+                  <div className="absolute w-[520px] md:w-[620px] h-3.5 rounded-full bg-gradient-to-r from-transparent via-red-500 via-amber-200 to-transparent shadow-[0_0_40px_rgba(239,68,68,0.8)] transform -rotate-[35deg] pointer-events-none opacity-70" />
+                  <div className="absolute w-[520px] md:w-[620px] h-3.5 rounded-full bg-gradient-to-r from-transparent via-rose-500 via-yellow-100 to-transparent shadow-[0_0_40px_rgba(244,63,94,0.8)] transform rotate-[35deg] pointer-events-none opacity-70" />
+                  <div className="absolute w-44 h-44 rounded-full bg-radial from-white/60 via-amber-400/30 to-transparent pointer-events-none" />
+
+                  {/* 중앙 연격 대형 프레임 래퍼 (overflow-visible로 이펙트가 카드 밖으로 자유롭게 튀어나옴) */}
+                  <div className="relative w-52 h-72 sm:w-60 sm:h-84 select-none">
+                    {/* 카드 본체 */}
+                    <div className="w-full h-full rounded-2xl overflow-hidden border-2 border-amber-400 shadow-[0_0_40px_rgba(245,158,11,0.6)] relative z-10">
+                      <img
+                        src={currentCharData.artUrl}
+                        alt="Combo Card"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                      <div className="absolute bottom-3 left-3 right-3 text-center">
+                        <span className="text-sm font-black text-amber-300 drop-shadow">
+                          {currentCharData.name} 연격 발동
+                        </span>
+                      </div>
+                    </div>
 
                     {/* 타격 중심점 십자선 */}
                     {showCrosshair && (
@@ -370,7 +389,7 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
                       </div>
                     )}
 
-                    {/* 연격 이펙트 스프라이트 */}
+                    {/* 연격 이펙트 스프라이트: z-30으로 카드 위 및 카드 바깥 화면 전체로 튀어나옴 */}
                     <AttackFx
                       key={`studio-combo-${playTrigger}`}
                       scene="combo"
