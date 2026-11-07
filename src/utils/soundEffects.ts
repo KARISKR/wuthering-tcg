@@ -538,6 +538,74 @@ class SoundEffectsEngine {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // [WP2] 다운로드 큐: 미리 받기(low)는 동시 2개까지만, 낮은 네트워크 우선순위로 받는다.
+  // 재생 요청으로 생긴 로드(high)는 큐를 거치지 않고 즉시 받으며, 이미 큐에 있던 같은 키는 앞당긴다.
+  // 이렇게 해야 전투 진입 직후 BGM(<audio>)과 화면에 보이는 카드 이미지가 대역폭을 먼저 쓴다.
+  // ─────────────────────────────────────────────────────────────────────────
+  private static readonly LOW_CONCURRENCY = 2;
+  private lowQueue: Array<{ key: string; start: () => void }> = [];
+  private activeLowFetches = 0;
+
+  private queuedFetch(url: string, key: string, priority: 'high' | 'low'): Promise<Response> {
+    const doFetch = () =>
+      fetch(url, { method: 'GET', priority } as RequestInit & { priority?: 'high' | 'low' | 'auto' });
+    if (priority === 'high') return doFetch();
+    return new Promise<Response>((resolve, reject) => {
+      const start = () => {
+        this.activeLowFetches++;
+        doFetch()
+          .then(resolve, reject)
+          .finally(() => {
+            this.activeLowFetches--;
+            this.pumpLowQueue();
+          });
+      };
+      this.lowQueue.push({ key, start });
+      this.pumpLowQueue();
+    });
+  }
+
+  private pumpLowQueue() {
+    while (this.activeLowFetches < SoundEffectsEngine.LOW_CONCURRENCY && this.lowQueue.length > 0) {
+      this.lowQueue.shift()!.start();
+    }
+  }
+
+  /** 큐에서 대기 중인 특정 키의 다운로드를 즉시 시작 (재생 요청이 들어왔을 때) */
+  private promoteQueued(key: string) {
+    const mine = this.lowQueue.filter((e) => e.key === key);
+    if (mine.length === 0) return;
+    this.lowQueue = this.lowQueue.filter((e) => e.key !== key);
+    mine.forEach((e) => e.start());
+  }
+
+  // [WP2] 캐릭터 보이스 메모리 상한: 디코딩된 보이스가 캐릭터 6명분을 넘으면 가장 오래 안 쓴 캐릭터부터 해제
+  private static readonly MAX_VOICE_CHARACTERS = 6;
+  private voiceLastUsed: Map<string, number> = new Map();
+
+  private touchVoice(key: string) {
+    const charId = this.extractCharId(key);
+    if (!charId) return;
+    this.voiceLastUsed.set(charId, Date.now());
+    if (this.voiceLastUsed.size <= SoundEffectsEngine.MAX_VOICE_CHARACTERS) return;
+    const oldest = [...this.voiceLastUsed.entries()].sort((a, b) => a[1] - b[1])[0][0];
+    this.voiceLastUsed.delete(oldest);
+    for (const k of [...this.customAudioBuffers.keys()]) {
+      if (k.startsWith('char_') && this.extractCharId(k) === oldest) {
+        this.customAudioBuffers.delete(k);
+        this.checkedCustomFiles.delete(k);
+      }
+    }
+  }
+
+  private extractCharId(key: string): string | null {
+    // char_<category>_<charId>[_costN]  예: char_attack_jinhsi_cost1, char_low_hp_rover_male
+    const known = ['jinhsi', 'camellya', 'sanhua', 'yangyang', 'chixia', 'encore', 'shorekeeper', 'rover_male', 'rover_female'];
+    const body = key.replace(/_cost\d$/, '');
+    return known.find((c) => body.endsWith(`_${c}`)) ?? null;
+  }
+
   private hasStartedFullPreload = false;
   private fullPreloadPromise: Promise<void> | null = null;
 
@@ -555,42 +623,26 @@ class SoundEffectsEngine {
   }
 
   private async runFullPreload(): Promise<void> {
-    // 1순위: 카드 오픈(clash_reveal), 격돌(clash), 무기 타격(직검/대검/권총/증폭기), 카드 세트(card), 딜링(card_deal) 등 핵심 대결 사운드 우선 로드
-    const priorityCategories: string[] = [
-      'clash_reveal',
-      'clash',
-      'weapon_sword',
-      'weapon_broadblade',
-      'weapon_pistol',
-      'weapon_rectifier',
-      'combo_broadblade',
-      'card',
-      'card_deal',
-      'draw',
-      'upgrade',
-      'victory',
-      'card_shatter',
+    // [WP2] 1단계(즉시, high): 전투 첫 장면에서 바로 들리는 소리만
+    const immediate: string[] = ['clash_reveal', 'clash', 'card', 'card_deal', 'draw'];
+    // 2단계(큐, low): 첫 격돌 결과 무렵 필요한 소리 → 나머지 시스템 효과음 순서로 동시 2개씩
+    const early: string[] = [
+      'weapon_sword', 'weapon_broadblade', 'weapon_pistol', 'weapon_rectifier',
+      'combo_broadblade', 'upgrade', 'card_shatter', 'victory',
     ];
-
-    try {
-      await Promise.allSettled(priorityCategories.map((cat) => this.loadCustomServerFile(cat)));
-    } catch {
-      // ignore
-    }
-
-    // 2순위: 기타 보조 효과음은 브라우저 유휴 시점에 여유롭게 로드 (대결 시작 블로킹 방지)
-    const sysKeys = Object.keys(systemAudioManifest as Record<string, string[]>).filter(
-      (k) => !priorityCategories.includes(k)
+    const rest = Object.keys(systemAudioManifest as Record<string, string[]>).filter(
+      (k) => !immediate.includes(k) && !early.includes(k)
     );
 
-    const loadRest = () => {
-      Promise.allSettled(sysKeys.map((cat) => this.loadCustomServerFile(cat))).catch(() => {});
-    };
+    // 큐에는 즉시 넣어두되, 실제 다운로드는 동시 2개씩 low 우선순위로 진행된다.
+    [...early, ...rest].forEach((cat) => {
+      this.loadCustomServerFile(cat, 'low').catch(() => {});
+    });
 
-    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(loadRest, { timeout: 8000 });
-    } else {
-      setTimeout(loadRest, 2000);
+    try {
+      await Promise.allSettled(immediate.map((cat) => this.loadCustomServerFile(cat, 'high')));
+    } catch {
+      // ignore
     }
   }
 
@@ -598,6 +650,7 @@ class SoundEffectsEngine {
    * 현재 매치에 참여 중인 캐릭터들의 보이스 음원만 선별 사전 로드
    */
   public async preloadCharacters(characterNames: (string | undefined)[]) {
+    // [WP2] 필드에 나온 캐릭터(리더·서포터)만 넘겨받는다. 캐릭터 덱은 등장할 때 GameBoard가 다시 호출.
     const charKeys = Array.from(
       new Set(
         characterNames
@@ -608,25 +661,32 @@ class SoundEffectsEngine {
 
     if (charKeys.length === 0) return;
 
-    const categories: string[] = [];
+    const high: string[] = [];
+    const low: string[] = [];
+    const tail: string[] = [];
     for (const charId of charKeys) {
-      categories.push(
-        `char_opening_${charId}`,
+      high.push(`char_opening_${charId}`);
+      low.push(
         `char_attack_${charId}_cost0`,
         `char_attack_${charId}_cost1`,
         `char_attack_${charId}_cost2`,
-        `char_hurt_${charId}`,
+        `char_hurt_${charId}`
+      );
+      // 드물게 쓰이는 보이스는 큐 맨 뒤 (재생 요청이 먼저 오면 그때 즉시 로드됨). idle은 재생 시 로드.
+      tail.push(
         `char_levelup_${charId}`,
         `char_switch_${charId}`,
         `char_victory_${charId}`,
         `char_defeat_${charId}`,
-        `char_low_hp_${charId}`,
-        `char_idle_${charId}`
+        `char_low_hp_${charId}`
       );
     }
 
+    [...low, ...tail].forEach((cat) => {
+      this.loadCustomServerFile(cat, 'low').catch(() => {});
+    });
     try {
-      await Promise.allSettled(categories.map((cat) => this.loadCustomServerFile(cat)));
+      await Promise.allSettled(high.map((cat) => this.loadCustomServerFile(cat, 'high')));
     } catch {
       // ignore
     }
@@ -752,12 +812,14 @@ class SoundEffectsEngine {
   /**
    * 서버 정적 폴더 파일 다중 경로 및 다중 음원(_1, _2, _3 넘버링) 탐색 및 로드 시도
    */
-  private async loadCustomServerFile(key: string): Promise<AudioBuffer[] | null> {
+  private async loadCustomServerFile(key: string, priority: 'high' | 'low' = 'high'): Promise<AudioBuffer[] | null> {
     const existing = this.customAudioBuffers.get(key);
     if (existing && existing.length > 0) {
       return existing;
     }
     if (this.loadingPromises.has(key)) {
+      // [WP2] 큐에서 대기 중인데 high 요청(재생)이 오면 즉시 시작
+      if (priority === 'high') this.promoteQueued(key);
       return this.loadingPromises.get(key)!;
     }
     if (this.checkedCustomFiles.has(key)) {
@@ -976,7 +1038,8 @@ class SoundEffectsEngine {
           try {
             // 캐시 무효화 파라미터를 추가하여 브라우저/CDN 디스크 캐시로 인한 구버전/무음 음원 잔류 방지
             const cacheBustUrl = `${url}?v=20261029`;
-            const resp = await fetch(encodeURI(cacheBustUrl), { method: 'GET' });
+            // [WP2] 미리 받기(low)는 다운로드 큐를 거쳐 동시 2개·낮은 우선순위로
+            const resp = await this.queuedFetch(encodeURI(cacheBustUrl), key, priority);
             if (resp.ok) {
               const contentType = resp.headers.get('content-type') || '';
               if (contentType.includes('text/html')) return;
@@ -996,6 +1059,7 @@ class SoundEffectsEngine {
       if (loadedBuffers.length > 0) {
         this.customAudioBuffers.set(key, loadedBuffers);
         this.checkedCustomFiles.add(key);
+        if (key.startsWith('char_')) this.touchVoice(key);
         return loadedBuffers;
       }
 
@@ -1192,6 +1256,7 @@ class SoundEffectsEngine {
     if (this.isMuted) return false;
     const buffers = this.customAudioBuffers.get(key);
     if (buffers && buffers.length > 0) {
+      if (key.startsWith('char_')) this.touchVoice(key);
       const randomIndex = Math.floor(Math.random() * buffers.length);
       return this.playDecodedBuffer(buffers[randomIndex], key, volumeMultiplier);
     }

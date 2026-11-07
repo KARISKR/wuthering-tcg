@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
 import {
   BattleReplayData,
   BattleReplaySummary,
@@ -29,7 +30,6 @@ import {
   Copy,
   Check,
   FileCode,
-  ArrowLeft,
   ChevronRight,
   Eye,
   Bot,
@@ -287,41 +287,32 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
 
       {/* 모달 컨테이너 (명조 택티컬 챔퍼 테두리 스타일) */}
       <div
-        className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-[#090c19]/98 border-2 border-purple-400/80 shadow-[0_0_50px_rgba(168,85,247,0.3)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
+        className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-[#090c19]/98 border-2 border-amber-400/80 shadow-[0_0_50px_rgba(245,158,11,0.3)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
         style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
       >
         {/* 내부 얇은 인셋 라인 */}
-        <div className="absolute inset-1.5 border border-purple-400/25 pointer-events-none z-30" />
+        <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-30" />
 
         {/* 네 모서리 코너 브라켓 장식 */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-purple-300 z-30 pointer-events-none" />
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-purple-300 z-30 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-purple-300 z-30 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-purple-300 z-30 pointer-events-none" />
+        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
 
         {/* 헤더 바 */}
-        <header className="px-3.5 sm:px-6 py-3 sm:py-4.5 border-b border-purple-400/20 bg-[#0d1226]/90 flex items-center justify-between shrink-0 relative z-20 gap-2">
+        <header className="px-3.5 sm:px-6 py-3 sm:py-4.5 border-b border-amber-400/20 bg-[#0d1226]/90 flex items-center justify-between shrink-0 relative z-20 gap-2">
           <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-            <button
-              onClick={onClose}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow whitespace-nowrap"
-              title="대기실로 나가기"
-            >
-              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
-              <span className="hidden sm:inline">대기실로 나가기</span>
-              <span className="sm:hidden">나가기</span>
-            </button>
 
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-purple-500/20 to-indigo-600/20 border border-purple-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-500/20 to-indigo-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
               <img src="/images/menu_icons/replay.webp" alt="대전 리플레이" className="w-8 h-8 sm:w-9 sm:h-9 object-contain drop-shadow" />
             </div>
 
             <div className="min-w-0">
               <div className="flex items-center gap-2 min-w-0">
                 <h2 className="text-base sm:text-2xl font-black text-white tracking-wide truncate">
-                  대전 리플레이 &amp; 복기
+                  리플레이
                 </h2>
-                <span className="hidden md:inline text-xs px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono font-bold whitespace-nowrap">
+                <span className="hidden md:inline text-xs px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono font-bold whitespace-nowrap">
                   REPLAY ARCHIVE
                 </span>
               </div>
@@ -335,10 +326,10 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
           <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-black transition cursor-pointer flex items-center gap-1.5 shadow whitespace-nowrap"
+              className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-amber-600/25 hover:bg-amber-600/40 text-amber-200 border border-amber-500/50 text-xs sm:text-sm font-black transition cursor-pointer flex items-center gap-1.5 shadow whitespace-nowrap"
               title="외부 리플레이 JSON 파일 불러오기"
             >
-              <Upload className="w-4 h-4 text-purple-300 shrink-0" />
+              <Upload className="w-4 h-4 text-amber-300 shrink-0" />
               <span className="hidden md:inline">파일 불러오기</span>
             </button>
 
@@ -376,7 +367,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
         </header>
 
         {/* 상단 탭 네비게이션: [🌐 멀티배틀 공개 리플레이 광장] vs [📁 내 로컬 리플레이] */}
-        <div className="px-3 sm:px-6 pt-2.5 sm:pt-3 pb-0 bg-[#0d1226] border-b border-purple-400/20 flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar relative z-20 shrink-0">
+        <div className="px-3 sm:px-6 pt-2.5 sm:pt-3 pb-0 bg-[#0d1226] border-b border-amber-400/20 flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar relative z-20 shrink-0">
           <button
             onClick={() => {
               setActiveTab('PUBLIC');
@@ -384,13 +375,13 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
             }}
             className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2.5 font-black text-xs sm:text-sm border-b-2 transition cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'PUBLIC'
-                ? 'border-purple-400 text-purple-200 bg-purple-950/40'
+                ? 'border-amber-400 text-amber-200 bg-amber-950/40'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
-            <Globe className="w-4 h-4 text-purple-400 shrink-0" />
+            <Globe className="w-4 h-4 text-amber-400 shrink-0" />
             <span>공개 리플레이 광장</span>
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono">
               {publicSummaries.length}
             </span>
           </button>
@@ -431,7 +422,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="플레이어명, 리더 캐릭터명, 리플레이 코드 검색..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-950/80 border border-slate-700/70 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-purple-400 transition"
+              className="w-full pl-10 pr-4 py-2 bg-slate-950/80 border border-slate-700/70 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 transition"
             />
           </div>
 
@@ -447,7 +438,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                   onClick={() => setModeFilter(m.id as any)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-black transition cursor-pointer ${
                     modeFilter === m.id
-                      ? 'bg-amber-600 text-white shadow-md'
+                      ? 'bg-amber-600 text-slate-950 shadow-md'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -459,9 +450,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
             <button
               onClick={loadPublicReplays}
               disabled={isLoadingPublic}
-              className="px-3.5 py-2 rounded-xl bg-purple-600/20 hover:bg-purple-600/35 border border-purple-500/40 text-purple-200 text-xs font-black flex items-center gap-1.5 transition cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-amber-600/20 hover:bg-amber-600/35 border border-amber-500/40 text-amber-200 text-xs font-black flex items-center gap-1.5 transition cursor-pointer"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPublic ? 'animate-spin text-purple-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingPublic ? 'animate-spin text-amber-400' : ''}`} />
               <span>새로고침</span>
             </button>
           )}
@@ -472,13 +463,13 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
           {activeTab === 'PUBLIC' ? (
             // [탭 1: 멀티배틀 공개 리플레이 광장]
             isLoadingPublic ? (
-              <div className="h-72 flex flex-col items-center justify-center text-purple-400 gap-3">
+              <div className="h-72 flex flex-col items-center justify-center text-amber-400 gap-3">
                 <Loader2 className="w-10 h-10 animate-spin opacity-80" />
                 <p className="font-bold text-sm text-slate-300">공개 멀티배틀 리플레이 목록을 불러오는 중...</p>
               </div>
             ) : filteredPublicReplays.length === 0 ? (
               <div className="h-72 flex flex-col items-center justify-center text-slate-500 gap-3 text-center">
-                <Globe className="w-12 h-12 opacity-30 text-purple-400" />
+                <Globe className="w-12 h-12 opacity-30 text-amber-400" />
                 <p className="font-bold text-base text-slate-300">등록된 멀티배틀 공개 리플레이가 없습니다</p>
                 <p className="text-xs text-slate-500 leading-relaxed max-w-sm">
                   멀티배틀을 2턴 이상 완료하면 방장 측에서 자동으로 이곳에 등록됩니다.
@@ -495,14 +486,15 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                     <div
                       key={rep.id}
                       onClick={() => handleInspectSummary(rep)}
-                      className="group relative aspect-[1/1.26] border-2 border-purple-500/50 hover:border-purple-300 bg-[#080d1b]/95 hover:bg-[#150f28] flex flex-col justify-between cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(168,85,247,0.4)] p-4"
+                      className="group relative aspect-[1/1.26] border-2 border-amber-500/50 hover:border-amber-300 bg-[#080d1b]/95 hover:bg-[#150f28] flex flex-col justify-between cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(245,158,11,0.4)] p-4"
                       style={{ clipPath: TILE_CLIP }}
                     >
                       {/* 리더 캐릭터 아트워크 배경 */}
                       {rep.p0Leader?.artUrl && (
                         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                          <img
-                            src={rep.p0Leader.artUrl}
+                          <CardArt
+                            sizes="320px"
+                            artUrl={rep.p0Leader.artUrl}
                             alt=""
                             className="w-full h-full object-cover object-top opacity-30 group-hover:opacity-45 group-hover:scale-105 transition-all duration-500"
                           />
@@ -512,8 +504,8 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
 
                       {/* 타일 상단 뱃지: 공개 멀티배틀 & 승리자 */}
                       <div className="relative z-10 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-purple-950/90 text-purple-200 border border-purple-500/50 flex items-center gap-1 backdrop-blur-md">
-                          <Globe className="w-3.5 h-3.5 text-purple-400" />
+                        <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-amber-950/90 text-amber-200 border border-amber-500/50 flex items-center gap-1 backdrop-blur-md">
+                          <Globe className="w-3.5 h-3.5 text-amber-400" />
                           <span>멀티배틀</span>
                         </span>
 
@@ -521,7 +513,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                           className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm backdrop-blur-md flex items-center gap-1 ${
                             isP0Win
                               ? 'bg-amber-500/25 text-amber-300 border-amber-500/50'
-                              : 'bg-purple-500/25 text-purple-300 border-purple-500/50'
+                              : 'bg-amber-500/25 text-amber-300 border-amber-500/50'
                           }`}
                         >
                           <Trophy className="w-3.5 h-3.5" />
@@ -535,8 +527,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                           {/* 1P 리더 */}
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             {rep.p0Leader?.artUrl ? (
-                              <img
-                                src={rep.p0Leader.artUrl}
+                              <CardArt
+                                sizes="40px"
+                                artUrl={rep.p0Leader.artUrl}
                                 alt=""
                                 className="w-10 h-10 rounded-xl object-cover border border-amber-400/60 shrink-0"
                               />
@@ -566,8 +559,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                               </span>
                             </div>
                             {rep.p1Leader?.artUrl ? (
-                              <img
-                                src={rep.p1Leader.artUrl}
+                              <CardArt
+                                sizes="40px"
+                                artUrl={rep.p1Leader.artUrl}
                                 alt=""
                                 className="w-10 h-10 rounded-xl object-cover border border-indigo-400/60 shrink-0"
                               />
@@ -579,7 +573,14 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
 
                         <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 font-mono">
                           <span>{dateStr} {timeStr}</span>
-                          <span className="text-purple-300 font-bold">총 {rep.totalTurns}턴</span>
+                          <div className="flex items-center gap-1.5">
+                            {rep.v2 && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] font-black">
+                                정밀 재생
+                              </span>
+                            )}
+                            <span className="text-amber-300 font-bold">총 {rep.totalTurns}턴</span>
+                          </div>
                         </div>
                       </div>
 
@@ -628,14 +629,15 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                     <div
                       key={rep.id}
                       onClick={() => setInspectingReplay(rep)}
-                      className="group relative aspect-[1/1.26] border-2 border-slate-600/80 hover:border-purple-400 bg-[#080d1b]/95 hover:bg-[#150f28] flex flex-col justify-between cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(168,85,247,0.35)] p-4"
+                      className="group relative aspect-[1/1.26] border-2 border-slate-600/80 hover:border-amber-400 bg-[#080d1b]/95 hover:bg-[#150f28] flex flex-col justify-between cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(245,158,11,0.35)] p-4"
                       style={{ clipPath: TILE_CLIP }}
                     >
                       {/* 리더 캐릭터 아트워크 배경 (우측 살짝 비네트) */}
                       {rep.p0Leader?.artUrl && (
                         <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                          <img
-                            src={rep.p0Leader.artUrl}
+                          <CardArt
+                            sizes="320px"
+                            artUrl={rep.p0Leader.artUrl}
                             alt=""
                             className="w-full h-full object-cover object-top opacity-30 group-hover:opacity-45 group-hover:scale-105 transition-all duration-500"
                           />
@@ -654,7 +656,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                           className={`text-[11px] font-black px-2.5 py-0.5 rounded-full border shadow-sm backdrop-blur-md flex items-center gap-1 ${
                             isP0Win
                               ? 'bg-amber-500/25 text-amber-300 border-amber-500/50'
-                              : 'bg-purple-500/25 text-purple-300 border-purple-500/50'
+                              : 'bg-amber-500/25 text-amber-300 border-amber-500/50'
                           }`}
                         >
                           <Trophy className="w-3.5 h-3.5" />
@@ -668,8 +670,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                           {/* 1P 리더 */}
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             {rep.p0Leader?.artUrl ? (
-                              <img
-                                src={rep.p0Leader.artUrl}
+                              <CardArt
+                                sizes="40px"
+                                artUrl={rep.p0Leader.artUrl}
                                 alt=""
                                 className="w-10 h-10 rounded-xl object-cover border border-amber-400/60 shrink-0"
                               />
@@ -699,8 +702,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                               </span>
                             </div>
                             {rep.p1Leader?.artUrl ? (
-                              <img
-                                src={rep.p1Leader.artUrl}
+                              <CardArt
+                                sizes="40px"
+                                artUrl={rep.p1Leader.artUrl}
                                 alt=""
                                 className="w-10 h-10 rounded-xl object-cover border border-indigo-400/60 shrink-0"
                               />
@@ -712,15 +716,22 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
 
                         <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 font-mono">
                           <span>{dateStr} {timeStr}</span>
-                          <span className="text-purple-300 font-bold">총 {rep.totalTurns}턴</span>
+                          <div className="flex items-center gap-1.5">
+                            {rep.v2 && (
+                              <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] font-black">
+                                정밀 재생
+                              </span>
+                            )}
+                            <span className="text-amber-300 font-bold">총 {rep.totalTurns}턴</span>
+                          </div>
                         </div>
                       </div>
 
                       {/* 타일 하단: 리플레이 코드 노출 및 원클릭 복사 버튼 */}
                       <div className="relative z-10 pt-2.5 border-t border-slate-700/80 flex items-center justify-between gap-2">
                         <div className="min-w-0 flex items-center gap-1.5 text-xs font-mono">
-                          <FileCode className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-                          <span className="text-purple-300 font-bold truncate max-w-[130px] sm:max-w-[150px]" title={rep.id}>
+                          <FileCode className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                          <span className="text-amber-300 font-bold truncate max-w-[130px] sm:max-w-[150px]" title={rep.id}>
                             {rep.id}
                           </span>
                         </div>
@@ -731,7 +742,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                           className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition border cursor-pointer shrink-0 ${
                             isCopied
                               ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/50'
-                              : 'bg-purple-950/60 hover:bg-purple-900/80 text-purple-200 border-purple-500/40'
+                              : 'bg-amber-950/60 hover:bg-amber-900/80 text-amber-200 border-amber-500/40'
                           }`}
                           title="리플레이 코드 복사"
                         >
@@ -754,21 +765,21 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
             onClick={() => setInspectingReplay(null)}
           >
             <div
-              className="relative w-full max-w-2xl bg-[#0c1020]/98 border-2 border-purple-400/90 rounded-2xl shadow-[0_0_50px_rgba(168,85,247,0.35)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
+              className="relative w-full max-w-2xl bg-[#0c1020]/98 border-2 border-amber-400/90 rounded-2xl shadow-[0_0_50px_rgba(245,158,11,0.35)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
               style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
               onClick={(e) => e.stopPropagation()}
             >
               {/* 내부 인셋 라인 */}
-              <div className="absolute inset-1.5 border border-purple-400/25 pointer-events-none z-30" />
-              <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-purple-300 z-30 pointer-events-none" />
-              <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-purple-300 z-30 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-purple-300 z-30 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-purple-300 z-30 pointer-events-none" />
+              <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-30" />
+              <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+              <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+              <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
 
               {/* 상세 헤더 */}
-              <div className="px-6 py-4 border-b border-purple-400/20 bg-[#12162e]/90 flex items-center justify-between shrink-0 relative z-20">
+              <div className="px-6 py-4 border-b border-amber-400/20 bg-[#12162e]/90 flex items-center justify-between shrink-0 relative z-20">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-300">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
                     <History className="w-6 h-6" />
                   </div>
                   <div>
@@ -778,7 +789,12 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                     <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 font-mono">
                       <span>{new Date(inspectingReplay.timestamp).toLocaleString()}</span>
                       <span>·</span>
-                      <span className="text-purple-300 font-bold">총 {inspectingReplay.totalTurns}턴 종료</span>
+                      <span className="text-amber-300 font-bold">총 {inspectingReplay.totalTurns}턴 종료</span>
+                      {inspectingReplay.v2 && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[10px] font-black">
+                          정밀 재생 (v2)
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -799,7 +815,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                   className={`p-4 rounded-xl border flex items-center justify-between shadow-lg ${
                     inspectingReplay.winner === 0
                       ? 'bg-amber-500/20 border-amber-400/60 text-amber-200'
-                      : 'bg-purple-500/20 border-purple-400/60 text-purple-200'
+                      : 'bg-amber-500/20 border-amber-400/60 text-amber-200'
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -831,8 +847,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                     </div>
                     <div className="flex items-center gap-3">
                       {inspectingReplay.p0Leader?.artUrl && (
-                        <img
-                          src={inspectingReplay.p0Leader.artUrl}
+                        <CardArt
+                          sizes="56px"
+                          artUrl={inspectingReplay.p0Leader.artUrl}
                           alt=""
                           className="w-14 h-18 rounded-lg object-cover border border-amber-400/60 shadow"
                         />
@@ -864,8 +881,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                     </div>
                     <div className="flex items-center gap-3">
                       {inspectingReplay.p1Leader?.artUrl && (
-                        <img
-                          src={inspectingReplay.p1Leader.artUrl}
+                        <CardArt
+                          sizes="56px"
+                          artUrl={inspectingReplay.p1Leader.artUrl}
                           alt=""
                           className="w-14 h-18 rounded-lg object-cover border border-indigo-400/60 shadow"
                         />
@@ -892,7 +910,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                 <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between text-xs font-mono">
                   <div className="truncate mr-2">
                     <span className="text-slate-500 mr-2">리플레이 코드:</span>
-                    <span className="text-purple-300 font-bold">{inspectingReplay.id}</span>
+                    <span className="text-amber-300 font-bold">{inspectingReplay.id}</span>
                   </div>
                   <button
                     type="button"
@@ -915,7 +933,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
               </div>
 
               {/* 하단 3대 주요 액션 버튼 바 */}
-              <div className="px-3.5 sm:px-6 py-3.5 sm:py-4.5 border-t border-purple-400/20 bg-[#12162e]/90 flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0 relative z-20">
+              <div className="px-3.5 sm:px-6 py-3.5 sm:py-4.5 border-t border-amber-400/20 bg-[#12162e]/90 flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0 relative z-20">
                 <button
                   type="button"
                   onClick={(e) => handleDelete(inspectingReplay.id, e)}
@@ -933,7 +951,7 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                     onClick={(e) => handleCopyReplayCode(inspectingReplay, e)}
                     className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs sm:text-sm font-bold transition cursor-pointer whitespace-nowrap"
                   >
-                    <Copy className="w-4 h-4 text-purple-400 shrink-0" />
+                    <Copy className="w-4 h-4 text-amber-400 shrink-0" />
                     <span>코드 복사</span>
                   </button>
 
@@ -941,9 +959,9 @@ export const BattleReplayModal: React.FC<BattleReplayModalProps> = ({
                   <button
                     type="button"
                     onClick={(e) => handleExportReplay(inspectingReplay, e)}
-                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-purple-600/25 hover:bg-purple-600/40 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-black transition cursor-pointer shadow whitespace-nowrap"
+                    className="flex items-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-amber-600/25 hover:bg-amber-600/40 text-amber-200 border border-amber-500/50 text-xs sm:text-sm font-black transition cursor-pointer shadow whitespace-nowrap"
                   >
-                    <Download className="w-4 h-4 text-purple-300 shrink-0" />
+                    <Download className="w-4 h-4 text-amber-300 shrink-0" />
                     <span>리플레이 내보내기</span>
                   </button>
 

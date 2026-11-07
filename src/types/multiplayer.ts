@@ -1,4 +1,5 @@
 import { GameState, CustomDeckConfig } from './tcg';
+import type { GameEvent } from '../engine/events';
 
 export type MultiplayerRole = 'HOST' | 'GUEST' | 'SPECTATOR';
 
@@ -107,6 +108,8 @@ export type MultiplayerMessage =
       type: 'SYNC_GAME_STATE';
       gameState: GameState;
       actionDesc?: string;
+      /** [WP8 버그 수정] 호스트 엔진이 낸 연출 이벤트(레벨업·효과 알림). 상태 비교로는 알 수 없어 함께 보냄. 구버전은 무시 */
+      fxEvents?: GameEvent[];
     }
   | {
       type: 'TIME_SYNC';

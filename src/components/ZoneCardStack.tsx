@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CardArt } from './CardArt';
 import { AnyCard } from '../types/tcg';
 import { Sparkles, Layers } from 'lucide-react';
 
@@ -140,9 +141,11 @@ export const ZoneCardStack: React.FC<ZoneCardStackProps> = ({
                     isTopCard ? 'shadow-[0_4px_14px_rgba(0,0,0,0.85)]' : 'shadow'
                   }`}
                 >
-                  <img
-                    src={(card as any).artUrl}
+                  <CardArt
+                    artUrl={(card as any).artUrl}
+                    sizes="96px"
                     alt={card.nameKr}
+                    fallbackName={card.nameKr}
                     className="w-full h-full object-cover object-top hover:object-center transition-all duration-200"
                   />
 

@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { ComboStrikeEffect } from '../types/tcg';
 import { Flame, Swords, Zap, Sparkles, ArrowRight, RefreshCw } from 'lucide-react';
 
-import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
+import { soundEffects, getWeaponByCharacter, getCharacterKey } from '../utils/soundEffects';
+import { AttackFx, loadSheet, tierForCombo } from './attackMotions/SpriteEffect';
 
 interface ComboStrikeOverlayProps {
   strike: ComboStrikeEffect;
@@ -15,6 +16,15 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
   const hasComboEffect = hasLeaderSwap || Boolean(strike.comboEffectTitle || strike.comboEffectDesc);
 
   const [step, setStep] = useState<'COMBO_EFFECT' | 'DAMAGE_STEP'>('COMBO_EFFECT');
+
+  // [WP5] 연격 단계(1·2·3 이상)에 맞춰 공격자 캐릭터 스프라이트 t1·t2·t3 재생 (격돌과 같은 파일 재사용)
+  const fxKey = getCharacterKey(strike.attackerName);
+  const fxTier = strike.damage > 0 ? tierForCombo(strike.comboCount || 1) : 0;
+  const [fxFailed, setFxFailed] = useState(false);
+  useEffect(() => {
+    setFxFailed(false);
+    if (fxKey && fxTier > 0) loadSheet(`${fxKey}_t${fxTier}`).catch(() => setFxFailed(true));
+  }, [strike.id, fxKey, fxTier]);
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
 
@@ -247,6 +257,17 @@ export const ComboStrikeOverlay: React.FC<ComboStrikeOverlayProps> = ({ strike, 
 
               {/* 참격 광선 2 (대각선 +35deg 십자 참격) */}
               <div className="absolute w-[560px] md:w-[680px] h-3.5 md:h-4 rounded-full bg-gradient-to-r from-transparent via-rose-500 via-yellow-100 to-transparent shadow-[0_0_40px_rgba(244,63,94,1)] transform rotate-[35deg] animate-combo-slash" />
+
+              {/* [WP5] 공격자 캐릭터 공격 스프라이트 (로드 실패 시 기존 십자 참격만 표시) */}
+              <AttackFx
+                characterKey={fxKey}
+                tier={fxTier}
+                attackerOnRight={false}
+                size={420}
+                failed={fxFailed}
+                onFail={() => setFxFailed(true)}
+                fallback={null}
+              />
 
               {/* 중심 충돌 스파크 파티클 버스트 */}
               <div className="absolute w-44 h-44 md:w-56 md:h-56 rounded-full bg-radial from-white via-amber-400 to-transparent opacity-80 animate-hit-spark" />

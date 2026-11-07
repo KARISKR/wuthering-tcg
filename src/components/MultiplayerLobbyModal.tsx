@@ -47,6 +47,8 @@ import {
 import { ALL_CHARACTERS } from '../data/cards';
 import { soundEffects } from '../utils/soundEffects';
 
+import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
+import { preloadDeckCards } from '../utils/cardImagePreloader';
 interface MultiplayerLobbyModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -177,6 +179,13 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     return myDecks[0] || recDecks[0] || null;
   }, [myDecks, recDecks, selectedDeckId]);
 
+  // [WP3 잔여] 멀티 대기실에서 고른 내 덱 카드를 미리 받는다 (0.5초 디바운스)
+  useEffect(() => {
+    if (!isOpen || !selectedDeckConfig) return;
+    const t = window.setTimeout(() => preloadDeckCards([selectedDeckConfig, guestDeckRef.current]), 500);
+    return () => window.clearTimeout(t);
+  }, [isOpen, selectedDeckConfig]);
+
   // 현재 탭에 따른 덱 목록 및 페이지네이션
   const currentDeckList = useMemo(() => {
     return deckTab === 'MY_DECKS' ? myDecks : recDecks;
@@ -241,14 +250,16 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     }
   }, []);
 
-  // 모달 오픈 시 자동 새로고침 (로비 화면일 때만 4.5초 간격 폴링, 대기방 입장 시 불필요한 백그라운드 폴링 중단)
+  // 모달 오픈 시 자동 새로고침 (로비 화면일 때만 12초 간격 폴링, 대기방 입장 시·탭 비활성 시 폴링 중단)
+  // [WP1] 4.5초 → 12초: Pages Functions 무료 요청 한도 절감. 수동 새로고침 버튼은 그대로 사용 가능
   useEffect(() => {
     if (!isOpen || activeOverlay !== 'NONE') return;
     setIsLoadingRooms(true);
     fetchRoomList();
     const timer = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return; // [WP1] 탭이 숨겨져 있으면 건너뜀
       fetchRoomList(false);
-    }, 4500);
+    }, 12000);
     return () => clearInterval(timer);
   }, [isOpen, activeOverlay, fetchRoomList]);
 
@@ -386,6 +397,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
         }
         if (msg.profile?.customDeck) {
           guestDeckRef.current = msg.profile.customDeck;
+          // [WP3 잔여] 방장: 상대(게스트) 덱이 도착하면 바로 미리 받기
+          preloadDeckCards([selectedDeckConfig, msg.profile.customDeck]);
         }
         soundEffects.playCardPlace();
       } else if (msg.type === 'GAME_START') {
@@ -1168,8 +1181,9 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                     <div className="flex items-center justify-between gap-3 bg-slate-950/85 border border-amber-500/35 rounded-2xl p-4">
                       <div className="flex items-center gap-3.5 min-w-0">
                         {myLeaderArt ? (
-                          <img
-                            src={myLeaderArt}
+                          <CardArt
+                            sizes="64px"
+                            artUrl={myLeaderArt}
                             alt=""
                             className="w-16 h-16 rounded-2xl object-cover border-2 border-amber-400/70 shrink-0 shadow-md"
                           />
@@ -1330,8 +1344,9 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                         <div className="flex items-center justify-between gap-3 bg-slate-950/85 border border-cyan-500/35 rounded-2xl p-4">
                           <div className="flex items-center gap-3.5 min-w-0">
                             {myLeaderArt ? (
-                              <img
-                                src={myLeaderArt}
+                              <CardArt
+                                sizes="64px"
+                                artUrl={myLeaderArt}
                                 alt=""
                                 className="w-16 h-16 rounded-2xl object-cover border-2 border-cyan-400/70 shrink-0 shadow-md"
                               />
@@ -1517,8 +1532,9 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3.5 min-w-0">
                               {leaderArt ? (
-                                <img
-                                  src={leaderArt}
+                                <CardArt
+                                  sizes="60px"
+                                  artUrl={leaderArt}
                                   alt={leaderName}
                                   className={`w-14 h-14 sm:w-15 sm:h-15 rounded-xl object-cover border-2 shrink-0 ${
                                     isSelected
@@ -1659,8 +1675,9 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
             {/* 좌측: 현재 선택된 덱 요약 */}
             <div className="flex items-center gap-3.5 min-w-0">
               {myLeaderArt && (
-                <img
-                  src={myLeaderArt}
+                <CardArt
+                  sizes="52px"
+                  artUrl={myLeaderArt}
                   alt=""
                   className="w-13 h-13 rounded-2xl object-cover border border-amber-400/60 hidden sm:block shrink-0 shadow-md"
                 />

@@ -100,7 +100,19 @@ export function getCurrentSlot(): number {
   return Math.floor(Date.now() / 90000);
 }
 
-const COUNTAPI_BASE = 'https://countapi.mileshilliard.com/api/v1';
+/** 생존 핑 간격 (서버 SESSION_TTL_MS 10분보다 짧아야 함) */
+const PING_INTERVAL_MS = 5 * 60 * 1000;
+/** 탭 복귀 시 재동기화 최소 간격 */
+const VISIBILITY_SYNC_MIN_GAP_MS = 2 * 60 * 1000;
+
+/** 전투 화면(#battle-stage, #m-battle-stage, #m-battle) 여부: 전투 중에는 핑을 보내지 않음 */
+function isInBattleView(): boolean {
+  if (typeof window === 'undefined') return false;
+  const h = window.location.hash;
+  return h === '#battle-stage' || h === '#m-battle-stage' || h === '#m-battle';
+}
+
+const COUNTAPI_BASE ='https://countapi.mileshilliard.com/api/v1';
 const TOTAL_KEY = 'wuthering_tcg_v1_total_visitors';
 
 /**
@@ -272,11 +284,16 @@ export function useVisitorStats(): VisitorStatsData {
     };
 
     // 1. 초기 방문 동기화
+    let lastSyncAt = Date.now();
     runVisitSync();
 
-    // 2. 60초 간격 실시간 생존 핑(Heartbeat) 및 통계 최신화
+    // 2. 5분 간격 생존 핑(Heartbeat) 및 통계 최신화
+    //    - 탭 비활성 / 전투 중에는 건너뜀 (서버 요청·D1 쓰기 절감)
+    //    - 서버의 접속 판정 시간(SESSION_TTL_MS, 10분)보다 짧게 유지해야 접속자 수가 끊기지 않음
     const heartbeatInterval = setInterval(() => {
       if (typeof document !== 'undefined' && document.hidden) return; // 탭 비활성 시 대기
+      if (isInBattleView()) return; // 전투 중 대기
+      lastSyncAt = Date.now();
       const activeSlot = getCurrentSlot();
       fetchStatsApi('ping', {
         incDaily: false,
@@ -297,11 +314,12 @@ export function useVisitorStats(): VisitorStatsData {
           }));
         }
       });
-    }, 60000);
+    }, PING_INTERVAL_MS);
 
-    // 3. 브라우저 탭 활성화 복귀 시 즉시 동기화
+    // 3. 브라우저 탭 활성화 복귀 시 동기화 (마지막 동기화 후 2분 이상 지났고 전투 중이 아닐 때만)
     const handleVisibilityChange = () => {
-      if (!document.hidden) {
+      if (!document.hidden && !isInBattleView() && Date.now() - lastSyncAt > VISIBILITY_SYNC_MIN_GAP_MS) {
+        lastSyncAt = Date.now();
         const activeSlot = getCurrentSlot();
         fetchStatsApi('get', {
           incDaily: false,

@@ -1,38 +1,27 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { GameState, EffectDrawAnimation } from '../types/tcg';
+import { GameState } from '../types/tcg';
 import {
   createInitialGameState,
-  executeMulligan,
-  executeDrawPhase,
-  selectStartingLeader,
-  upgradeCharacter,
-  switchLeader,
-  chargeConcerto,
-  decideClash,
-  setClashCard,
-  proceedAfterClashReveal,
-  executeComboAttack,
-  finishComboStep,
-  discardOverflowCards,
-  executeEndPhase,
-  forceResolveClash,
-  resolveClash,
-  finishClashJudgment,
-  continuePostClashOrBattlePhase,
-  resolvePendingChoice,
-  canPlayerExecuteCombo,
-  checkGameOver,
-  addLog,
   cloneGameState,
+  canPlayerExecuteCombo,
   CustomDeckConfig,
 } from '../engine/gameEngine';
 import {
-  decideAiMulligan,
-  runAiActionPhase,
   selectAiClashCard,
-  runAiComboStep,
-  runAiDiscardOverflow,
 } from '../engine/aiPlayer';
+import { GameAction, GameEvent } from '../engine/events';
+import { LocalSource } from '../battle/LocalSource';
+
+export interface GameStartArgs {
+  p0PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA';
+  p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA';
+  gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER';
+  p0Deck: CustomDeckConfig | null;
+  p1Deck: CustomDeckConfig | null;
+  p0Name?: string;
+  p1Name?: string;
+  seed: number;
+}
 
 export function useGame(
   p0PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA' = 'STARTER_ROVER',
@@ -44,9 +33,9 @@ export function useGame(
   p1CustomName?: string,
   initialSavedGameState?: GameState | null
 ) {
-  const [gameState, rawSetGameState] = useState<GameState>(() =>
-    initialSavedGameState ||
-    createInitialGameState(
+  // [Step B] BattleSource: LocalSource 인스턴스 보유
+  const [localSource] = useState<LocalSource>(() => {
+    const initial = initialSavedGameState || createInitialGameState(
       p0PresetKey,
       p1PresetKey,
       initialGameMode,
@@ -54,55 +43,100 @@ export function useGame(
       p1CustomDeck,
       p0CustomName,
       p1CustomName
-    )
+    );
+    return new LocalSource(initial);
+  });
+
+  // [WP6/WP8] 시작 인자 보관 (리플레이 v2 기록용, initialSavedGameState 시작 시 null)
+  const startArgsRef = useRef<GameStartArgs | null>(
+    initialSavedGameState
+      ? null
+      : {
+          p0PresetKey,
+          p1PresetKey,
+          gameMode: initialGameMode,
+          p0Deck: customDeck || null,
+          p1Deck: p1CustomDeck || null,
+          p0Name: p0CustomName,
+          p1Name: p1CustomName,
+          seed: localSource.getState().seed ?? localSource.getState().rngSeed ?? 0,
+        }
   );
 
-  // React 19 <StrictMode>는 setState(updater)의 updater(prev)를 2회(EagerState + Render Double Invoke) 호출하므로,
-  // 동일 prev 참조에 대해 1회만 엔진 상태 전이를 실행하고 캐시된 결과(cachedNext)를 반환하여
-  // 인플레이스 변이로 인한 연격 2회 동시 실행(2·3연격 스킵), 배틀 로그 누락, 덱 중복 셔플 버그를 원천 차단합니다.
+  const [gameState, rawSetGameState] = useState<GameState>(() => localSource.getState());
+  const [lastEvents, setLastEvents] = useState<GameEvent[]>([]);
+
+  // [WP7-2] 실행된 모든 액션 로그 및 최근 발생한 이벤트
+  const actionLogRef = useRef<GameAction[]>([]);
+  const lastEventsRef = useRef<GameEvent[]>([]);
+
+  // [Step B] LocalSource 구독을 통해 상태 및 이벤트 발행 (액션당 정확히 1회)
+  useEffect(() => {
+    const unsub = localSource.subscribe((nextState, events) => {
+      rawSetGameState(nextState);
+      setLastEvents(events);
+      lastEventsRef.current = events;
+      actionLogRef.current = [...localSource.getActionLog()];
+    });
+    return unsub;
+  }, [localSource]);
+
   const setGameState = useCallback(
     (updater: GameState | ((prev: GameState) => GameState)) => {
       if (typeof updater === 'function') {
-        let cachedPrev: GameState | null = null;
-        let cachedNext: GameState | null = null;
-        rawSetGameState((prev) => {
-          if (cachedPrev === prev && cachedNext !== null) {
-            return cachedNext;
-          }
-          cachedPrev = prev;
-          cachedNext = updater(cloneGameState(prev));
-          return cachedNext;
-        });
+        const next = updater(cloneGameState(localSource.getState()));
+        localSource.reset(next);
       } else {
-        rawSetGameState(updater);
+        localSource.reset(updater);
       }
     },
-    []
+    [localSource]
+  );
+
+  // [WP7-2 / Step B] 액션 디스패치 일원화 함수
+  const dispatch = useCallback(
+    (action: GameAction) => {
+      localSource.dispatch(action);
+    },
+    [localSource]
   );
 
   const [isAiThinking, setIsAiThinking] = useState(false);
   const [isDrawFlightActive, setIsDrawFlightActive] = useState(false);
+  const [isFxBlocking, setIsFxBlocking] = useState(false);
   const isDrawingInProgress = useRef(false);
 
   // 새 게임 시작
   const restartGame = useCallback(
     (newP0Preset = p0PresetKey, newP1Preset = p1PresetKey, newMode = gameState.gameMode) => {
-      setGameState(
-        createInitialGameState(
-          newP0Preset,
-          newP1Preset,
-          newMode,
-          customDeck,
-          p1CustomDeck,
-          p0CustomName,
-          p1CustomName
-        )
+      const fresh = createInitialGameState(
+        newP0Preset,
+        newP1Preset,
+        newMode,
+        customDeck,
+        p1CustomDeck,
+        p0CustomName,
+        p1CustomName
       );
+      localSource.reset(fresh);
+      startArgsRef.current = {
+        p0PresetKey: newP0Preset,
+        p1PresetKey: newP1Preset,
+        gameMode: newMode,
+        p0Deck: customDeck || null,
+        p1Deck: p1CustomDeck || null,
+        p0Name: p0CustomName,
+        p1Name: p1CustomName,
+        seed: fresh.seed ?? fresh.rngSeed ?? 0,
+      };
+      actionLogRef.current = [];
+      lastEventsRef.current = [];
+      setLastEvents([]);
       setIsAiThinking(false);
       setIsDrawFlightActive(false);
       isDrawingInProgress.current = false;
     },
-    [p0PresetKey, p1PresetKey, gameState.gameMode, customDeck, p1CustomDeck, p0CustomName, p1CustomName]
+    [p0PresetKey, p1PresetKey, gameState.gameMode, customDeck, p1CustomDeck, p0CustomName, p1CustomName, localSource]
   );
 
   // 게임 모드 변경 (AI 대전 <-> 1인 2역 <-> 온라인 P2P)
@@ -119,7 +153,7 @@ export function useGame(
         },
       ],
     }));
-  }, []);
+  }, [setGameState]);
 
   // 0. 선공 주사위 결정 (LEADER_SELECT 또는 MULLIGAN 단계에서 적용)
   const handleSetInitiative = useCallback(
@@ -129,127 +163,118 @@ export function useGame(
       roll1: number,
       choiceDetail?: { winnerIndex: 0 | 1; chosenOrder: 'FIRST' | 'SECOND' }
     ) => {
-      setGameState((prev) => {
-        if (prev.phase !== 'LEADER_SELECT' && prev.phase !== 'MULLIGAN') return prev;
-        if (prev.logs.some((l) => l.id.startsWith('log-dice-'))) return prev;
-
-        const firstPlayerName = prev.players[firstPlayerIndex].name;
-        const diceWinnerIndex = choiceDetail?.winnerIndex ?? (roll0 > roll1 ? 0 : 1);
-        const diceWinnerName = prev.players[diceWinnerIndex].name;
-        const orderText = choiceDetail?.chosenOrder === 'SECOND' ? '후공' : '선공';
-
-        const rollLog: import('../types/tcg').LogItem = {
-          id: `log-dice-${Date.now()}`,
-          turn: prev.turn,
-          playerIndex: firstPlayerIndex,
-          type: 'SYSTEM',
-          text: `🎲 [선/후공 결정] ${prev.players[0].name}: ${roll0} vs ${prev.players[1].name}: ${roll1} ➔ [${diceWinnerName}] 주사위 승리! [${orderText}]을(를) 선택하여 [${firstPlayerName}] 1턴 선공 확정!`,
-          timestamp: Date.now(),
-        };
-        return {
-          ...prev,
-          activePlayerIndex: firstPlayerIndex,
-          firstPlayerIndex,
-          firstTurnDrawCompleted: false,
-          logs: [rollLog, ...prev.logs],
-        };
+      dispatch({
+        type: 'SET_INITIATIVE',
+        firstPlayerIndex,
+        roll0,
+        roll1,
+        choiceDetail,
       });
     },
-    []
+    [dispatch]
   );
 
   // 0.5. 시작 리더 카드 선택 (LEADER_SELECT)
   const handleSelectStartingLeader = useCallback(
     (p0LeaderIdOrName: string, p1LeaderIdOrName?: string) => {
-      setGameState((prev) => selectStartingLeader(prev, p0LeaderIdOrName, p1LeaderIdOrName));
+      dispatch({
+        type: 'SELECT_STARTING_LEADER',
+        p0LeaderIdOrName,
+        p1LeaderIdOrName,
+      });
     },
-    []
+    [dispatch]
   );
 
   // 1. 멀리건 확인 (p1DiscardIds 지원)
   const handleMulligan = useCallback(
     (p0DiscardIds: string[], p1DiscardIds?: string[]) => {
-      setGameState((prev) => {
-        let finalP1DiscardIds: string[] = [];
-        if (p1DiscardIds !== undefined) {
-          finalP1DiscardIds = p1DiscardIds;
-        } else if (prev.players[1].isAi) {
-          finalP1DiscardIds = decideAiMulligan(prev.players[1]);
-        }
-        return executeMulligan(prev, p0DiscardIds, finalP1DiscardIds);
+      dispatch({
+        type: 'MULLIGAN',
+        p0DiscardIds,
+        p1DiscardIds,
       });
     },
-    []
+    [dispatch]
   );
 
   // 1.5. 카드 드로우 실행 (수동 클릭 및 AI 자동 드로우 공용)
   const handleDrawCards = useCallback(
     (playerIndex?: 0 | 1) => {
-      setGameState((prev) => {
-        if (prev.phase !== 'DRAW_PHASE') return prev;
-        const targetIdx = playerIndex ?? (prev.activePlayerIndex as 0 | 1);
-        if (prev.activePlayerIndex !== targetIdx) return prev;
-
-        const afterDraw = executeDrawPhase(prev);
-        return {
-          ...afterDraw,
-          phase: 'ACTION_PHASE',
-        };
+      dispatch({
+        type: 'DRAW_CARDS',
+        playerIndex,
       });
     },
-    []
+    [dispatch]
   );
 
   // 2. 캐릭터 레벨업
   const handleUpgrade = useCallback(
     (playerIndex: 0 | 1, targetSlot: 'leader' | 'leftSupport' | 'rightSupport', upgradeCardId: string, discardIds: string[]) => {
-      setGameState((prev) => {
-        const res = upgradeCharacter(prev, playerIndex, targetSlot, upgradeCardId, discardIds);
-        return res.success ? res.newState : prev;
+      dispatch({
+        type: 'UPGRADE',
+        playerIndex,
+        targetSlot,
+        upgradeCardId,
+        discardIds,
       });
     },
-    []
+    [dispatch]
   );
 
   // 3. 리더 교대
   const handleSwitchLeader = useCallback(
     (playerIndex: 0 | 1, targetSlot: 'leftSupport' | 'rightSupport') => {
-      setGameState((prev) => {
-        const res = switchLeader(prev, playerIndex, targetSlot);
-        return res.success ? res.newState : prev;
+      dispatch({
+        type: 'SWITCH_LEADER',
+        playerIndex,
+        targetSlot,
       });
     },
-    []
+    [dispatch]
   );
 
   // 4. 협주 충전
   const handleChargeConcerto = useCallback(
     (playerIndex: 0 | 1, cardId: string) => {
-      setGameState((prev) => {
-        const res = chargeConcerto(prev, playerIndex, cardId);
-        return res.success ? res.newState : prev;
+      dispatch({
+        type: 'CHARGE_CONCERTO',
+        playerIndex,
+        cardId,
       });
     },
-    []
+    [dispatch]
   );
 
   // 5. 대결 여부 선택 (Clash or Pass)
-  const handleDecideClash = useCallback((startClash: boolean) => {
-    setGameState((prev) => decideClash(prev, startClash));
-  }, []);
+  const handleDecideClash = useCallback(
+    (startClash: boolean) => {
+      dispatch({
+        type: 'DECIDE_CLASH',
+        startClash,
+      });
+    },
+    [dispatch]
+  );
 
   // 6. 대결 카드 세트
-  const handleSetClashCard = useCallback((playerIndex: 0 | 1, cardId: string | null, spentConcertoIds?: string[]) => {
-    setGameState((prev) => {
-      const res = setClashCard(prev, playerIndex, cardId, spentConcertoIds);
-      return res.success ? res.newState : prev;
-    });
-  }, []);
+  const handleSetClashCard = useCallback(
+    (playerIndex: 0 | 1, cardId: string | null, spentConcertoIds?: string[]) => {
+      dispatch({
+        type: 'SET_CLASH_CARD',
+        playerIndex,
+        cardId,
+        spentConcertoIds,
+      });
+    },
+    [dispatch]
+  );
 
   // 7. 대결 결과 확인 후 다음으로
   const handleProceedAfterClash = useCallback(() => {
-    setGameState((prev) => proceedAfterClashReveal(prev));
-  }, []);
+    dispatch({ type: 'PROCEED_AFTER_CLASH' });
+  }, [dispatch]);
 
   // 8. 연격(Combo) 공격
   const handleComboAttack = useCallback(
@@ -260,154 +285,111 @@ export function useGame(
       discardForBonusDmgId?: string,
       swapSupportSlot?: 'leftSupport' | 'rightSupport'
     ) => {
-      setGameState((prev) => {
-        const res = executeComboAttack(
-          prev,
-          playerIndex,
-          cardId,
-          spentConcertoIds,
-          discardForBonusDmgId,
-          swapSupportSlot
-        );
-        return res.success ? res.newState : prev;
+      dispatch({
+        type: 'COMBO_ATTACK',
+        playerIndex,
+        cardId,
+        spentConcertoIds,
+        discardForBonusDmgId,
+        swapSupportSlot,
       });
     },
-    []
+    [dispatch]
   );
 
   // 8-1. 선택 발동 효과 해결
-  const handleResolvePendingChoice = useCallback((chosenCardIds: string[]) => {
-    setGameState((prev) => resolvePendingChoice(prev, chosenCardIds));
-  }, []);
+  const handleResolvePendingChoice = useCallback(
+    (chosenCardIds: string[]) => {
+      dispatch({
+        type: 'RESOLVE_PENDING_CHOICE',
+        chosenCardIds,
+      });
+    },
+    [dispatch]
+  );
 
   // 9. 연격 종료
-  const handleFinishCombo = useCallback((playerIndex: 0 | 1) => {
-    setGameState((prev) => finishComboStep(prev, playerIndex));
-  }, []);
+  const handleFinishCombo = useCallback(
+    (playerIndex: 0 | 1) => {
+      dispatch({
+        type: 'FINISH_COMBO',
+        playerIndex,
+      });
+    },
+    [dispatch]
+  );
 
   // 10. 패 초과 버리기
-  const handleDiscardOverflow = useCallback((playerIndex: 0 | 1, discardIds: string[]) => {
-    setGameState((prev) => {
-      const res = discardOverflowCards(prev, playerIndex, discardIds);
-      return res.success ? res.newState : prev;
-    });
-  }, []);
+  const handleDiscardOverflow = useCallback(
+    (playerIndex: 0 | 1, discardIds: string[]) => {
+      dispatch({
+        type: 'DISCARD_OVERFLOW',
+        playerIndex,
+        discardIds,
+      });
+    },
+    [dispatch]
+  );
 
   // 11. 수동 턴 종료 (대결 패스 시 등)
   const handleEndTurn = useCallback(() => {
-    setGameState((prev) => executeEndPhase(prev));
-  }, []);
+    dispatch({ type: 'END_TURN' });
+  }, [dispatch]);
+
+  // 11-B. 엔드 페이즈 마무리 및 다음 턴 전환 (END_PHASE 배너 종료 후 호출)
+  const handleFinalizeEndPhase = useCallback(() => {
+    dispatch({ type: 'FINALIZE_END_PHASE' });
+  }, [dispatch]);
+
+  // 11-C. 항복 선언
+  const handleSurrender = useCallback(
+    (playerIndex: 0 | 1) => {
+      dispatch({ type: 'SURRENDER', playerIndex });
+    },
+    [dispatch]
+  );
+
+  // 11-D. 제한 시간 초과 패배 처리
+  const handleTimeOut = useCallback(
+    (loserIndex: 0 | 1, reason?: string) => {
+      dispatch({ type: 'TIME_OUT', loserIndex, reason });
+    },
+    [dispatch]
+  );
 
   // 대결 즉시 판정 (마스터듀얼식 수동 진행 및 대기 해제)
   const handleForceResolveClash = useCallback(() => {
-    setGameState((prev) => forceResolveClash(prev));
-  }, []);
+    dispatch({ type: 'FORCE_RESOLVE_CLASH' });
+  }, [dispatch]);
 
-  // 레벨업 연출 완료 후 lastUpgrade 초기화
+  // 레벨업 연출 완료 액션 디스패치
   const clearLastUpgrade = useCallback(() => {
-    setGameState((prev) => (prev.lastUpgrade ? { ...prev, lastUpgrade: null } : prev));
-  }, []);
+    dispatch({ type: 'CLEAR_LAST_UPGRADE' });
+  }, [dispatch]);
 
-  // 연격 연출 완료 후 lastComboStrike 초기화 및 치명타 피니시(GAME_OVER) 전환
+  // 연격 연출 완료 액션 디스패치
   const clearLastComboStrike = useCallback(() => {
-    setGameState((prev) => {
-      if (!prev.lastComboStrike) return prev;
-      let nextState = { ...prev, lastComboStrike: null };
-      // 만약 어느 한 쪽의 체력이 0 이하인 결정타 상태라면, 연격 연출 확인이 끝났으므로 여기서 GAME_OVER 및 피니시로 진입!
-      if (nextState.players[0].hp <= 0 || nextState.players[1].hp <= 0) {
-        return checkGameOver(nextState);
-      }
-      return nextState;
-    });
-  }, []);
+    dispatch({ type: 'CLEAR_LAST_COMBO_STRIKE' });
+  }, [dispatch]);
 
-  // 효과 발동 팝업 닫힘 시 lastEffectEvent 초기화
+  // 효과 발동 팝업 닫힘 시 액션 디스패치
   const clearLastEffectEvent = useCallback(() => {
-    setGameState((prev) => (prev.lastEffectEvent ? { ...prev, lastEffectEvent: null } : prev));
-  }, []);
+    dispatch({ type: 'CLEAR_LAST_EFFECT_EVENT' });
+  }, [dispatch]);
 
-  // 효과 드로우 및 패 비행 연출 완료 후 정리 및 후속 선택 모달 활성화 (completedDrawId 전달 시 해당 ID와 일치할 때만 닫기)
-  const handleFinishEffectDraw = useCallback((completedDrawId?: string) => {
-    setGameState((prev) => {
-      if (!prev.lastEffectDraw) return prev;
-      if (completedDrawId && prev.lastEffectDraw.id !== completedDrawId) {
-        return prev;
-      }
-      if (
-        !prev.clashResult &&
-        !prev.lastComboStrike &&
-        (prev.phase === 'GAME_OVER' || prev.players[0].hp <= 0 || prev.players[1].hp <= 0)
-      ) {
-        return checkGameOver({ ...prev, lastEffectDraw: null });
-      }
-      const chainedChoice = prev.lastEffectDraw.nextPendingChoice || null;
-
-      // 체인된 선택(예: 파수인 Lv.1 드로우 직후 패 1장 버리기)과 기존 대기 중인 선택들을 무손실 병합
-      const mergedChoices: import('../types/tcg').PendingChoice[] = [];
-      const pushUniqueChoice = (ch: import('../types/tcg').PendingChoice | null | undefined) => {
-        if (!ch) return;
-        if (!mergedChoices.some((existing) => existing.id === ch.id)) {
-          mergedChoices.push(ch);
-        }
-      };
-
-      pushUniqueChoice(chainedChoice);
-      pushUniqueChoice(prev.pendingChoice);
-      for (const qItem of prev.pendingChoiceQueue || []) {
-        pushUniqueChoice(qItem);
-      }
-
-      let remainingDraws = prev.deferredEffectDraws ? [...prev.deferredEffectDraws] : [];
-      let nextDraw: EffectDrawAnimation | null = null;
-
-      // 방금 끝난 드로우에 직결된 후속 선택(chainedChoice, 예: 버릴 카드 선택)이 없는 경우에만 다음 보류 드로우를 즉시 재생
-      if (!chainedChoice && remainingDraws.length > 0) {
-        nextDraw = remainingDraws.shift() || null;
-      }
-
-      const nextChoice = mergedChoices.length > 0 ? mergedChoices[0] : null;
-      const nextQueue = mergedChoices.length > 1 ? mergedChoices.slice(1) : [];
-
-      const newState: GameState = {
-        ...prev,
-        lastEffectDraw: nextDraw,
-        deferredEffectDraws: remainingDraws,
-        deferredEffectDraw: remainingDraws.length > 0 ? remainingDraws[0] : null,
-        pendingChoice: nextChoice,
-        pendingChoiceQueue: nextQueue,
-      };
-
-      if (
-        !nextDraw &&
-        !newState.pendingChoice &&
-        newState.phase === 'CLASH_REVEAL' &&
-        !newState.clashResult &&
-        Boolean(newState.players[0].clashCard || newState.players[1].clashCard)
-      ) {
-        return finishClashJudgment(newState);
-      }
-
-      // 대결 판정(CLASH_REVEAL) 중 보류되었던 효과 드로우가 완료된 경우에만
-      // 게임이 멈추지 않고 계속해서 연격 단계(COMBO_STEP) 또는 배틀 종료 단계로 안전하게 진행!
-      // (이미 연격 단계(COMBO_STEP) 등 후속 페이즈에서 발생한 효과 드로우는 현재 페이즈를 정상 유지)
-      if (!nextDraw && !newState.pendingChoice) {
-        // 턴 시작(START_PHASE)에서 발동한 효과 드로우(예: 방랑자(여) Lv.2 1장 드로우) 확인 완료 시 -> 정규 드로우 단계(DRAW_PHASE)로 진입!
-        if (newState.phase === 'START_PHASE') {
-          return { ...newState, phase: 'DRAW_PHASE' };
-        }
-        if (newState.phase === 'CLASH_REVEAL' || (newState.phase as any) === 'CLASH_JUDGING') {
-          return continuePostClashOrBattlePhase(newState);
-        }
-      }
-
-      return newState;
-    });
-  }, []);
+  // 효과 드로우 및 패 비행 연출 완료 후 정리 및 후속 선택 모달 활성화
+  const handleFinishEffectDraw = useCallback(
+    (completedDrawId?: string) => {
+      dispatch({
+        type: 'FINISH_EFFECT_DRAW',
+        completedDrawId,
+      });
+    },
+    [dispatch]
+  );
 
   // ==========================================
   // 드로우 단계 (DRAW_PHASE) 관리
-  // - 플레이어 턴: 사용자가 덱을 직접 클릭할 때까지 DRAW_PHASE 유지
-  // - AI 턴: 750ms 후 자동으로 AI 드로우 트리거
   // ==========================================
   useEffect(() => {
     if (gameState.phase !== 'DRAW_PHASE') {
@@ -423,16 +405,14 @@ export function useGame(
       gameState.players[1].isAi &&
       !isDrawingInProgress.current &&
       !gameState.pendingChoice &&
-      !gameState.lastEffectDraw
+      !isFxBlocking
     ) {
-      // CenterDrawOverlay가 800ms에 자동 연출을 트리거하고 카드를 패로 보낸 뒤 드로우를 완료합니다.
-      // 본 타이머는 혹시 모를 오버레이 미작동 시의 안전 폴백(Watchdog)으로 4000ms로 설정합니다.
       const timer = setTimeout(() => {
         handleDrawCards(1);
       }, 4000);
       return () => clearTimeout(timer);
     }
-  }, [gameState.phase, gameState.activePlayerIndex, gameState.players, gameState.pendingChoice, handleDrawCards]);
+  }, [gameState.phase, gameState.activePlayerIndex, gameState.players, gameState.pendingChoice, isFxBlocking, handleDrawCards]);
 
   // ==========================================
   // AI 봇 비동기 턴 처리 (레이스 컨디션 및 멈춤 방지)
@@ -441,13 +421,10 @@ export function useGame(
     const isAiTurn = gameState.activePlayerIndex === 1 && gameState.players[1].isAi;
     const isGameOver = gameState.phase === 'GAME_OVER' || gameState.phase === 'MULLIGAN';
 
-    // 플레이어가 효과 선택 발동 팝업(스캔, 드로우, 버리기 등), 효과 드로우 애니메이션, 연격 오버레이, 레벨업 연출을 진행 중일 때는 모든 AI 행동과 턴 진행을 일시 정지!
     if (
       isGameOver ||
       Boolean(gameState.pendingChoice) ||
-      Boolean(gameState.lastEffectDraw) ||
-      Boolean(gameState.lastComboStrike) ||
-      Boolean(gameState.lastUpgrade)
+      isFxBlocking
     ) {
       setIsAiThinking(false);
       return;
@@ -457,12 +434,7 @@ export function useGame(
     if (isAiTurn && gameState.phase === 'ACTION_PHASE') {
       setIsAiThinking(true);
       const timer = setTimeout(() => {
-        setGameState((prev) => {
-          if (prev.activePlayerIndex === 1 && prev.phase === 'ACTION_PHASE') {
-            return runAiActionPhase(prev);
-          }
-          return prev;
-        });
+        dispatch({ type: 'AI_ACTION_PHASE' });
         setIsAiThinking(false);
       }, 2000);
       return () => {
@@ -484,17 +456,14 @@ export function useGame(
     ) {
       setIsAiThinking(true);
       const timer = setTimeout(() => {
-        setGameState((prev) => {
-          if (prev.phase === 'CLASH_SET' && !prev.players[1].clashCardReady) {
-            const aiCardId = selectAiClashCard(prev);
-            let res = setClashCard(prev, 1, aiCardId);
-            if (!res.success) {
-              res = setClashCard(prev, 1, null);
-            }
-            return res.success ? res.newState : prev;
-          }
-          return prev;
-        });
+        if (!gameState.players[1].clashCardReady) {
+          const aiCardId = selectAiClashCard(gameState);
+          dispatch({
+            type: 'SET_CLASH_CARD',
+            playerIndex: 1,
+            cardId: aiCardId,
+          });
+        }
         setIsAiThinking(false);
       }, isAiTurnPlayer ? 1500 : 900);
       return () => {
@@ -504,7 +473,6 @@ export function useGame(
     }
 
     // 2-B) 양 플레이어 카드 세트 완료 후 전장 대치 연출 (900ms 대치 후 자동 오픈 및 판정)
-    // 플레이어가 효과 선택 팝업 중이면 대결 판정을 백그라운드에서 절대 진행하지 않음!
     if (
       gameState.phase === 'CLASH_SET' &&
       gameState.players[0].clashCardReady &&
@@ -512,17 +480,7 @@ export function useGame(
       !gameState.pendingChoice
     ) {
       const timer = setTimeout(() => {
-        setGameState((prev) => {
-          if (
-            prev.phase === 'CLASH_SET' &&
-            prev.players[0].clashCardReady &&
-            prev.players[1].clashCardReady &&
-            !prev.pendingChoice
-          ) {
-            return resolveClash(prev);
-          }
-          return prev;
-        });
+        dispatch({ type: 'RESOLVE_CLASH' });
       }, 900);
       return () => {
         clearTimeout(timer);
@@ -533,7 +491,6 @@ export function useGame(
     const isAiComboTurn =
       gameState.players[1].isAi &&
       (gameState.clashResult?.winnerIndex === 1 ||
-        gameState.lastComboStrike?.attackerIndex === 1 ||
         Boolean(gameState.players[1].comboUnlimited) ||
         (gameState.players[1].comboCount ?? 0) > 0);
 
@@ -542,11 +499,6 @@ export function useGame(
       (Boolean(gameState.players[0].comboUnlimited) || (gameState.players[0].comboCount ?? 0) > 0);
 
     if (gameState.phase === 'COMBO_STEP' && isAiComboTurn && !isUserComboTurn) {
-      // 화면에 이전 연격 참격 연출(lastComboStrike)이 재생 중이면 연출이 완전히 닫힐 때까지 다음 연격 대기!
-      if (Boolean(gameState.lastComboStrike)) {
-        return;
-      }
-
       const p1HasCombo =
         Boolean(gameState.players[1].comboUnlimited) || (gameState.players[1].comboCount ?? 0) > 0;
       const p1CanCombo = p1HasCombo && canPlayerExecuteCombo(gameState.players[1]);
@@ -554,21 +506,7 @@ export function useGame(
       if (p1CanCombo) {
         setIsAiThinking(true);
         const timer = setTimeout(() => {
-          setGameState((prev) => {
-            // 실행 직전에도 연격 오버레이가 아직 떠있으면 보류
-            if (Boolean(prev.lastComboStrike)) return prev;
-
-            const stillHasCombo =
-              Boolean(prev.players[1].comboUnlimited) || (prev.players[1].comboCount ?? 0) > 0;
-            if (prev.phase === 'COMBO_STEP' && prev.players[1].isAi && stillHasCombo) {
-              if (canPlayerExecuteCombo(prev.players[1])) {
-                return runAiComboStep(prev, 1);
-              } else {
-                return finishComboStep(prev, 1);
-              }
-            }
-            return prev;
-          });
+          dispatch({ type: 'AI_COMBO_STEP', playerIndex: 1 });
           setIsAiThinking(false);
         }, 950);
         return () => {
@@ -576,16 +514,9 @@ export function useGame(
           setIsAiThinking(false);
         };
       } else {
-        // AI에게 남은 연격이 없거나 낼 수 있는 적색 카드가 없을 때 -> 연격 정상 종료!
-        // (연격 오버레이가 완전히 닫힌 뒤 850ms의 여유를 두고 종료 페이즈 진입)
         setIsAiThinking(true);
         const timer = setTimeout(() => {
-          setGameState((prev) => {
-            if (prev.phase === 'COMBO_STEP' && prev.players[1].isAi) {
-              return finishComboStep(prev, 1);
-            }
-            return prev;
-          });
+          dispatch({ type: 'FINISH_COMBO', playerIndex: 1 });
           setIsAiThinking(false);
         }, 850);
         return () => {
@@ -599,12 +530,7 @@ export function useGame(
     if (gameState.phase === 'DISCARD_OVERFLOW' && isAiTurn) {
       setIsAiThinking(true);
       const timer = setTimeout(() => {
-        setGameState((prev) => {
-          if (prev.phase === 'DISCARD_OVERFLOW') {
-            return runAiDiscardOverflow(prev);
-          }
-          return prev;
-        });
+        dispatch({ type: 'AI_DISCARD_OVERFLOW' });
         setIsAiThinking(false);
       }, 1400);
       return () => {
@@ -613,28 +539,22 @@ export function useGame(
       };
     }
   }, [
-    gameState.phase,
-    gameState.activePlayerIndex,
-    gameState.players[0].clashCardReady,
-    gameState.players[1].clashCardReady,
-    gameState.players[1].isAi,
-    gameState.players[1].comboCount,
-    gameState.players[0].comboCount,
-    gameState.players[1].comboUnlimited,
-    gameState.players[0].comboUnlimited,
-    gameState.players[1].hand.length,
-    gameState.players[0].hand.length,
-    gameState.players[1].actionArea?.length,
-    gameState.lastComboStrike?.id,
-    gameState.lastUpgrade?.id,
-    gameState.pendingChoice?.id,
-    gameState.lastEffectDraw?.id,
+    gameState,
+    isFxBlocking,
+    dispatch,
   ]);
 
   return {
     gameState,
     setGameState,
+    dispatch,
+    battleSource: localSource,
+    lastEvents,
+    actionLogRef,
+    lastEventsRef,
+    startArgsRef,
     isAiThinking,
+    setIsFxBlocking,
     restartGame,
     setGameMode,
     handleSetInitiative,
@@ -653,6 +573,9 @@ export function useGame(
     handleFinishCombo,
     handleDiscardOverflow,
     handleEndTurn,
+    handleFinalizeEndPhase,
+    handleSurrender,
+    handleTimeOut,
     handleForceResolveClash,
     clearLastUpgrade,
     clearLastComboStrike,
@@ -660,4 +583,3 @@ export function useGame(
     handleFinishEffectDraw,
   };
 }
-

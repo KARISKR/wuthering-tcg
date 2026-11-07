@@ -310,6 +310,10 @@ export interface HpHistoryEntry {
 }
 
 export interface GameState {
+  /** [WP6] 엔진 시드 난수의 시드. 같은 시드 + 같은 엔진 호출 순서 → 같은 게임 */
+  rngSeed?: number;
+  /** [WP6/WP8] 시작 시드 보존 (리플레이 v2 및 동일 경기 재현용) */
+  seed?: number;
   turn: number;
   activePlayerIndex: 0 | 1; // 턴 플레이어 (0: 플레이어1, 1: 플레이어2/AI)
   firstPlayerIndex?: 0 | 1; // 게임 시작 시 주사위로 결정된 1턴 선공 플레이어 (0: 플레이어1, 1: 플레이어2/AI)
@@ -320,17 +324,13 @@ export interface GameState {
   lastClashWinnerIndex?: 0 | 1 | -1 | null; // 최근 대결 승자 (우세 판정 보존용)
   battleStepEffects?: TriggeredEffectEvent[]; // 배틀 스텝(604.1.1)에서 발생한 효과 목록 (치샤/금희 배틀 데미지 등)
   lastComboStrike?: ComboStrikeEffect | null;
-  lastUpgrade?: UpgradeEffect | null;
   lastEffectDraw?: EffectDrawAnimation | null; // 효과 드로우 및 손패 비행 연출
   deferredEffectDraw?: EffectDrawAnimation | null; // 전투 판정 결과창 종료 후 발동할 보류 드로우 연출
   deferredEffectDraws?: EffectDrawAnimation[]; // 전투 중 발생한 보류 드로우 연출 큐
-  lastEffectEvent?: TriggeredEffectEvent | null; // 최근 발동된 효과 이벤트 (화면 토스트 연출용)
   pendingChoice?: PendingChoice | null;
   pendingChoiceQueue?: PendingChoice[]; // 여러 효과 동시 발동 시 순차 처리 큐
   deferredChoice?: PendingChoice | null; // 전투 데미지 결과 후 발동할 보류 선택 효과
   deferredChoices?: PendingChoice[]; // 전투 중 발생한 보류 선택 효과 큐
-  deferredUpgrade?: UpgradeEffect | null; // 전투 데미지 결과 후 발동할 보류 레벨업 연출
-  deferredEffectEvent?: TriggeredEffectEvent | null; // 전투 데미지 결과 후 발동할 보류 알림 이벤트
   winner: 0 | 1 | null;
   logs: LogItem[];
   hpHistory?: HpHistoryEntry[]; // 체력 변동 상세 기록 (대미지/회복 원인 및 카드 정보)

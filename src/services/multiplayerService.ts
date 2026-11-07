@@ -9,6 +9,7 @@ import {
   TimeLimitConfig,
 } from '../types/multiplayer';
 import { GameState } from '../types/tcg';
+import type { GameEvent } from '../engine/events';
 
 const SESSION_STORAGE_KEY = 'wuthering_multiplayer_session';
 const PEER_ID_PREFIX = 'wuthering-tcg-room';
@@ -915,13 +916,14 @@ class MultiplayerService {
     });
   }
 
-  public sendGameState(gameState: GameState, actionDesc?: string) {
+  public sendGameState(gameState: GameState, actionDesc?: string, fxEvents?: GameEvent[]) {
     this.latestGameState = gameState;
     this.saveSession(gameState);
     const msg: MultiplayerMessage = {
       type: 'SYNC_GAME_STATE',
       gameState,
       actionDesc,
+      ...(fxEvents && fxEvents.length > 0 ? { fxEvents } : {}),
     };
     this.send(msg);
     this.broadcastToSpectators(msg);

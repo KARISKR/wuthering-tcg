@@ -4,7 +4,6 @@ import {
   Plus,
   Trash2,
   BookmarkCheck,
-  Share2,
   Layers,
   AlertTriangle,
   Download,
@@ -17,6 +16,8 @@ import {
 import type { CustomDeckConfig } from '../types/tcg';
 import { decodeDeckCode, fetchSldarkDeck } from '../utils/deckCode';
 
+import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
+import { DeckHubTabs } from './DeckHubTabs';
 export const MAX_USER_DECKS = 20;
 
 interface DeckListScreenProps {
@@ -118,7 +119,7 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
             <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 stroke-[3]" />
           </button>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide whitespace-nowrap">마이 덱</h2>
+            <h2 className="text-lg sm:text-2xl font-black text-white tracking-wide whitespace-nowrap">내 덱</h2>
             <span className="text-[10px] sm:text-[11px] font-mono text-amber-400/80 px-2 py-0.5 rounded bg-amber-400/10 border border-amber-400/30 whitespace-nowrap">
               MY DECKS
             </span>
@@ -132,6 +133,9 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
           </span>
         </div>
       </header>
+
+      {/* [메뉴 최적화 2026-11] 덱 화면 공통 탭 (기존 하단 '덱 프리셋 & 코드' / '공유된 덱 리스트' 버튼 대체) */}
+      <DeckHubTabs active="mine" onSwitch={(t) => (t === 'preset' ? onOpenPreset() : onOpenShared())} />
 
       {/* 덱 타일 그리드 (모바일 2열 · 데스크톱 minmax 250px) */}
       <main className="relative z-10 flex-1 overflow-y-auto px-3 sm:px-8 py-4 sm:py-7 custom-scrollbar">
@@ -155,6 +159,21 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
             <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 whitespace-nowrap">신규 제작 · 코드 불러오기</div>
           </button>
 
+          {/* [메뉴 최적화 2026-11] 덱이 적을 때: 추천 덱으로 바로 시작 */}
+          {decks.length < 3 && (
+            <button
+              onClick={onOpenPreset}
+              className="group relative aspect-[1/1.22] border-2 border-dashed border-amber-400/50 hover:border-amber-400 bg-[#080d1b]/70 hover:bg-[#0e1428] flex flex-col items-center justify-center text-center transition-all duration-300 cursor-pointer p-3"
+              style={{ clipPath: TILE_CLIP }}
+            >
+              <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-2 border-amber-400/70 flex items-center justify-center bg-amber-400/10 group-hover:scale-110 transition-transform">
+                <BookmarkCheck className="w-7 h-7 sm:w-10 sm:h-10 text-amber-300" />
+              </div>
+              <div className="mt-2.5 sm:mt-4 text-sm sm:text-base font-black text-amber-300">추천 덱으로 시작</div>
+              <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 leading-snug">AI 추천·공식 스타터 덱을<br />골라 바로 쓰기</div>
+            </button>
+          )}
+
           {decks.map((deck) => {
             const actionCount = deck.actionCards?.length ?? 0;
             const charCount = deck.characterDeck?.length ?? 3;
@@ -175,8 +194,9 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
               >
                 {/* 리더 카드 아트 (덱 케이스 대용) */}
                 {art && (
-                  <img
-                    src={art}
+                  <CardArt
+                    sizes="(max-width: 640px) 90vw, 260px"
+                    artUrl={art}
                     alt=""
                     draggable={false}
                     className="absolute inset-x-0 top-0 w-full h-[76%] object-cover object-top opacity-85 group-hover:opacity-100 group-hover:scale-105 transition duration-300"
@@ -232,25 +252,6 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
         </div>
       </main>
 
-      {/* 하단 메뉴 (프리셋 & 코드 / 공유된 덱) */}
-      <footer className="relative z-10 shrink-0 px-3 sm:px-8 py-3 sm:py-4 flex items-center justify-between sm:justify-end gap-2 sm:gap-3 border-t border-slate-700/60 bg-black/40 backdrop-blur-md">
-        <button
-          onClick={onOpenPreset}
-          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 border border-amber-400/70 hover:border-amber-300 hover:bg-amber-400/10 text-amber-300 font-black text-xs sm:text-sm transition cursor-pointer whitespace-nowrap"
-          style={{ clipPath: 'polygon(12px 0, 100% 0, 100% 100%, 0 100%, 0 12px)' }}
-        >
-          <BookmarkCheck className="w-4 h-4 shrink-0" />
-          <span>덱 프리셋 &amp; 코드</span>
-        </button>
-        <button
-          onClick={onOpenShared}
-          className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 py-2.5 border border-amber-400/70 hover:border-amber-300 hover:bg-amber-400/10 text-amber-300 font-black text-xs sm:text-sm transition cursor-pointer whitespace-nowrap"
-          style={{ clipPath: 'polygon(12px 0, 100% 0, 100% 100%, 0 100%, 0 12px)' }}
-        >
-          <Share2 className="w-4 h-4 shrink-0" />
-          <span>공유된 덱 리스트</span>
-        </button>
-      </footer>
 
       {/* 새 덱 추가 메뉴 팝업 (+ 버튼 클릭 시 팝업) */}
       {showAddMenu && (

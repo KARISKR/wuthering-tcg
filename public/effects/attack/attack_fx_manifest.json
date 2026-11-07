@@ -1,0 +1,342 @@
+{
+  "jinhsi": {
+    "label": "금희",
+    "weapon": "broadblade",
+    "element": "spectro",
+    "tiers": {
+      "1": {
+        "file": "jinhsi_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 14,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 5
+      },
+      "2": {
+        "file": "jinhsi_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 18,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 10
+      },
+      "3": {
+        "file": "jinhsi_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 11
+      }
+    }
+  },
+  "camellya": {
+    "label": "카멜리아",
+    "weapon": "sword",
+    "element": "havoc",
+    "tiers": {
+      "1": {
+        "file": "camellya_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 3
+      },
+      "2": {
+        "file": "camellya_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "camellya_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 22,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "sanhua": {
+    "label": "산화",
+    "weapon": "sword",
+    "element": "glacio",
+    "tiers": {
+      "1": {
+        "file": "sanhua_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 3
+      },
+      "2": {
+        "file": "sanhua_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "sanhua_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 22,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "yangyang": {
+    "label": "양양",
+    "weapon": "sword",
+    "element": "aero",
+    "tiers": {
+      "1": {
+        "file": "yangyang_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 3
+      },
+      "2": {
+        "file": "yangyang_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "yangyang_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 22,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "rover": {
+    "label": "방랑자",
+    "weapon": "sword",
+    "element": "spectro",
+    "tiers": {
+      "1": {
+        "file": "rover_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 3
+      },
+      "2": {
+        "file": "rover_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "rover_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 22,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "rover_male": {
+    "label": "방랑자",
+    "weapon": "sword",
+    "element": "spectro",
+    "tiers": {
+      "1": {
+        "file": "rover_male_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 3
+      },
+      "2": {
+        "file": "rover_male_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "rover_male_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 22,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "rover_female": {
+    "label": "방랑자",
+    "weapon": "sword",
+    "element": "spectro",
+    "tiers": {
+      "1": {
+        "file": "rover_female_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 3
+      },
+      "2": {
+        "file": "rover_female_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "rover_female_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 22,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "chixia": {
+    "label": "치샤",
+    "weapon": "pistol",
+    "element": "fusion",
+    "tiers": {
+      "1": {
+        "file": "chixia_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 5
+      },
+      "2": {
+        "file": "chixia_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 9
+      },
+      "3": {
+        "file": "chixia_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 15
+      }
+    }
+  },
+  "encore": {
+    "label": "앙코",
+    "weapon": "rectifier",
+    "element": "fusion",
+    "tiers": {
+      "1": {
+        "file": "encore_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 14,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 6
+      },
+      "2": {
+        "file": "encore_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 18,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 11
+      },
+      "3": {
+        "file": "encore_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "shorekeeper": {
+    "label": "파수인",
+    "weapon": "rectifier",
+    "element": "starry",
+    "tiers": {
+      "1": {
+        "file": "shorekeeper_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 14,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 6
+      },
+      "2": {
+        "file": "shorekeeper_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 18,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 11
+      },
+      "3": {
+        "file": "shorekeeper_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  }
+}

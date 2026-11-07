@@ -15,7 +15,6 @@ import {
   Trophy,
   CheckCircle2,
   Film,
-  ArrowLeft,
   ScrollText,
 } from 'lucide-react';
 
@@ -55,45 +54,36 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
       {/* 명조 택티컬 챔퍼 테두리 모달 컨테이너 */}
       <div
-        className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-[#080d1a]/98 border-2 border-cyan-400/80 shadow-[0_0_50px_rgba(34,211,238,0.28)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
+        className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-[#080d1a]/98 border-2 border-amber-400/80 shadow-[0_0_50px_rgba(245,158,11,0.28)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
         style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
       >
         {/* 내부 인셋 라인 */}
-        <div className="absolute inset-1.5 border border-cyan-400/25 pointer-events-none z-30" />
+        <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-30" />
 
         {/* 네 모서리 코너 브라켓 장식 */}
-        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-cyan-300 z-30 pointer-events-none" />
-        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-cyan-300 z-30 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-cyan-300 z-30 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-cyan-300 z-30 pointer-events-none" />
+        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-amber-300 z-30 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
 
         {/* ========================================================= */}
         {/* 1. 최상단 헤더 바 */}
         {/* ========================================================= */}
-        <header className="px-3.5 sm:px-6 py-3 sm:py-4 border-b border-cyan-400/20 bg-[#0c1224]/90 flex flex-col lg:flex-row lg:items-center justify-between shrink-0 z-20 gap-2.5 sm:gap-3">
+        <header className="px-3.5 sm:px-6 py-3 sm:py-4 border-b border-amber-400/20 bg-[#0c1224]/90 flex flex-col lg:flex-row lg:items-center justify-between shrink-0 z-20 gap-2.5 sm:gap-3">
           <div className="flex items-center justify-between lg:justify-start gap-2.5 sm:gap-3.5 min-w-0 w-full lg:w-auto">
             <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
               {/* 좌상단 나가기 버튼 */}
-              <button
-                onClick={onClose}
-                className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-black text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow whitespace-nowrap"
-                title="대기실로 나가기"
-              >
-                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400 shrink-0" />
-                <span className="hidden sm:inline">대기실로 나가기</span>
-                <span className="sm:hidden">나가기</span>
-              </button>
 
-              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
+              <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-blue-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
                 <img src="/images/menu_icons/rulebook.webp" alt="공식 룰북" className="w-7 h-7 sm:w-9 sm:h-9 object-contain drop-shadow" />
               </div>
 
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h2 className="text-base sm:text-2xl font-black text-white tracking-wide truncate">
-                    공식 룰북 &amp; 규정 자료실
+                    룰북 &amp; FAQ
                   </h2>
-                  <span className="text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-2.5 py-0.5 rounded-full shrink-0 hidden md:inline-block whitespace-nowrap">
+                  <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 rounded-full shrink-0 hidden md:inline-block whitespace-nowrap">
                     VER 1.0 OFFICIAL
                   </span>
                 </div>
@@ -114,18 +104,6 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
 
           {/* 상단 탭 네비게이션 & 영상 가이드 이동 & 닫기 버튼 */}
           <div className="flex items-center justify-between lg:justify-end gap-2 sm:gap-3 shrink-0 w-full lg:w-auto">
-            {onOpenVideoGuide && (
-              <button
-                onClick={() => {
-                  onClose();
-                  onOpenVideoGuide();
-                }}
-                className="hidden xl:flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/40 text-xs sm:text-sm font-black transition cursor-pointer shadow whitespace-nowrap"
-              >
-                <Film className="w-4 h-4 text-amber-400" />
-                <span>동영상 룰 가이드</span>
-              </button>
-            )}
 
             <div className="flex items-center gap-1 sm:gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-700/70 overflow-x-auto no-scrollbar w-full lg:w-auto">
               <button
@@ -135,7 +113,7 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                 }}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'DETAILED'
-                    ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -150,7 +128,7 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                 }}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'SIMPLIFIED'
-                    ? 'bg-cyan-500 text-slate-950 shadow-md font-black'
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
@@ -174,13 +152,27 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                 onClick={() => setActiveTab('FLOOR')}
                 className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap ${
                   activeTab === 'FLOOR'
-                    ? 'bg-purple-600 text-white shadow-md font-black'
+                    ? 'bg-amber-500 text-slate-950 shadow-md font-black'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
                 <span>대회 플로어 룰</span>
               </button>
+
+              {/* [메뉴 최적화 2026-11] 영상 가이드를 탭 줄 안으로 (넓은 화면에서 제목이 잘리던 문제) */}
+              {onOpenVideoGuide && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenVideoGuide();
+                  }}
+                  className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-black text-xs sm:text-sm transition cursor-pointer shrink-0 whitespace-nowrap text-amber-300 hover:text-amber-200 border-l border-slate-700/70 ml-0.5"
+                >
+                  <Film className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+                  <span>영상 가이드</span>
+                </button>
+              )}
             </div>
 
             <button
@@ -204,10 +196,10 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
               <div className="w-full md:w-72 lg:w-80 border-b md:border-b-0 md:border-r border-slate-800 bg-[#0a0f20]/90 flex flex-col shrink-0">
                 <div className="hidden md:flex p-4 border-b border-slate-800 items-center justify-between text-sm">
                   <span className="font-black text-slate-200 flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-cyan-400" />
+                    <BookOpen className="w-4 h-4 text-amber-400" />
                     <span>룰북 챕터 목차</span>
                   </span>
-                  <span className="text-xs font-mono text-cyan-400 font-bold">
+                  <span className="text-xs font-mono text-amber-400 font-bold">
                     총 {currentSections.length}개 챕터
                   </span>
                 </div>
@@ -216,12 +208,12 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                     onClick={() => setSelectedSectionIdx(null)}
                     className={`md:w-full px-3 py-2 md:p-3 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2 shrink-0 whitespace-nowrap ${
                       selectedSectionIdx === null
-                        ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md font-black'
+                        ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-md font-black'
                         : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700 font-bold'
                     }`}
                   >
                     <span className="text-xs md:text-sm font-black">전체 챕터 한눈에 보기 ({currentSections.length})</span>
-                    <ChevronRight className="w-4 h-4 shrink-0 hidden md:inline text-cyan-300" />
+                    <ChevronRight className="w-4 h-4 shrink-0 hidden md:inline text-amber-300" />
                   </button>
                   {currentSections.map((sec, idx) => {
                     const isSelected = selectedSectionIdx === idx;
@@ -231,19 +223,19 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                         onClick={() => setSelectedSectionIdx(idx)}
                         className={`md:w-full px-3 py-2 md:p-3 rounded-xl border text-left transition cursor-pointer flex items-center justify-between gap-2.5 shrink-0 ${
                           isSelected
-                            ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-md'
+                            ? 'bg-amber-500/20 border-amber-400 text-amber-200 shadow-md'
                             : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-900 hover:border-slate-700'
                         }`}
                       >
                         <div className="min-w-0 flex md:block items-center gap-1.5">
-                          <span className="text-[10px] md:text-[11px] font-mono text-cyan-400/80 md:block whitespace-nowrap">
+                          <span className="text-[10px] md:text-[11px] font-mono text-amber-400/80 md:block whitespace-nowrap">
                             CH.{idx + 1}
                           </span>
                           <span className="text-xs md:text-sm font-black truncate block md:mt-0.5 whitespace-nowrap md:whitespace-normal">
                             {sec.title}
                           </span>
                         </div>
-                        <ChevronRight className={`w-4 h-4 shrink-0 hidden md:inline transition-transform ${isSelected ? 'text-cyan-300 translate-x-0.5' : 'text-slate-600'}`} />
+                        <ChevronRight className={`w-4 h-4 shrink-0 hidden md:inline transition-transform ${isSelected ? 'text-amber-300 translate-x-0.5' : 'text-slate-600'}`} />
                       </button>
                     );
                   })}
@@ -258,13 +250,13 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                     className="p-4 sm:p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3.5 sm:space-y-4 shadow-lg break-keep"
                   >
                     <div className="flex items-center gap-2.5 sm:gap-3 pb-3 border-b border-slate-800">
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 font-black text-xs sm:text-sm font-mono shrink-0">
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-300 font-black text-xs sm:text-sm font-mono shrink-0">
                         {selectedSectionIdx !== null ? selectedSectionIdx + 1 : idx + 1}
                       </div>
                       <div className="min-w-0 flex items-center gap-2 flex-wrap">
-                        <h3 className="text-base sm:text-2xl font-black text-cyan-100">{sec.title}</h3>
+                        <h3 className="text-base sm:text-2xl font-black text-amber-100">{sec.title}</h3>
                         {sec.badge && (
-                          <span className="text-[11px] sm:text-xs font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 whitespace-nowrap">
+                          <span className="text-[11px] sm:text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap">
                             {sec.badge}
                           </span>
                         )}
@@ -272,8 +264,8 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                     </div>
 
                     {sec.summary && (
-                      <div className="p-3 sm:p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-xs sm:text-sm text-cyan-200 flex items-start sm:items-center gap-2 font-bold">
-                        <Sparkles className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5 sm:mt-0" />
+                      <div className="p-3 sm:p-3.5 rounded-xl bg-amber-950/30 border border-amber-500/30 text-xs sm:text-sm text-amber-200 flex items-start sm:items-center gap-2 font-bold">
+                        <Sparkles className="w-4 h-4 text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
                         <span>{sec.summary}</span>
                       </div>
                     )}
@@ -323,7 +315,7 @@ export const OfficialManualModal: React.FC<OfficialManualModalProps> = ({
                         </h4>
                       </div>
                       <div className="flex items-start gap-2.5 sm:gap-3 pl-1 sm:pl-8 text-xs sm:text-base text-slate-200 leading-relaxed font-medium">
-                        <span className="text-cyan-400 font-bold shrink-0">A.</span>
+                        <span className="text-amber-400 font-bold shrink-0">A.</span>
                         <p>{item.a}</p>
                       </div>
                     </div>

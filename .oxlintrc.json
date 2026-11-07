@@ -1,8 +1,52 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
+  "plugins": [
+    "react",
+    "typescript",
+    "oxc"
+  ],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+    "react/only-export-components": [
+      "warn",
+      {
+        "allowConstantExport": true
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "src/engine/**/*.ts"
+      ],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "Math",
+            "property": "random",
+            "message": "엔진에서는 engineRandom()/aiRandom()을 쓰세요 (src/engine/rng.ts)"
+          },
+          {
+            "object": "Date",
+            "property": "now",
+            "message": "id는 engineTick()/engineTag(), 로그 시각은 logTimestamp()를 쓰세요"
+          },
+          {
+            "object": "performance",
+            "property": "now",
+            "message": "엔진은 실제 시간에 의존하면 안 됩니다"
+          }
+        ]
+      }
+    },
+    {
+      "files": [
+        "src/engine/rng.ts"
+      ],
+      "rules": {
+        "no-restricted-properties": "off"
+      }
+    }
+  ]
 }

@@ -5,6 +5,8 @@
   src: url('/fonts/SUITE-Variable.woff2') format('woff2-variations');
 }
 @import "tailwindcss" source("../src");
+/* [로비 개편 2026-11] 가로로 눕힌 휴대폰 (높이 500px 이하) */
+@custom-variant short (@media (orientation: landscape) and (max-height: 500px));
 
 @theme {
   --font-sans: 'SUITE', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;

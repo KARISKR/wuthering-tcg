@@ -44,6 +44,7 @@ import {
   savePreset,
 } from '../utils/deckCode';
 import { soundEffects } from '../utils/soundEffects';
+import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
 export type { CustomDeckConfig };
 
 interface DeckBuilderProps {
@@ -1364,8 +1365,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                     }`}
                     title={`${charCard.nameKr} (Lv.${charCard.level}) - 드래그하여 덱 밖으로 빼기 (제거) / 클릭: 상세 보기`}
                   >
-                    <img
-                      src={charCard.artUrl}
+                    <CardArt
+                      sizes="(max-width: 640px) 18vw, 80px"
+                      artUrl={charCard.artUrl}
                       alt={charCard.nameKr}
                       className="w-full h-full object-cover object-top"
                     />
@@ -1526,8 +1528,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                       title={`${card.nameKr} (#${index + 1}) - 드래그하여 덱 밖으로 빼기 (제거) / 더블클릭·우클릭: 제거`}
                     >
                       {/* 카드 일러스트 (최고 성급 100% 매칭) */}
-                      <img
-                        src={card.artUrl}
+                      <CardArt
+                        sizes="(max-width: 640px) 46vw, 170px"
+                        artUrl={card.artUrl}
                         alt={card.nameKr}
                         className="w-full h-full object-cover object-top"
                       />
@@ -1944,8 +1947,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                         title={`${card.nameKr} (덱에 ${countInDeck}장) - 드래그하여 덱에 추가 / 클릭: 상세 보기 / 더블클릭: 추가`}
                       >
                         {/* 카드 일러스트 */}
-                        <img
-                          src={card.artUrl}
+                        <CardArt
+                          sizes="(max-width: 640px) 46vw, 190px"
+                          artUrl={card.artUrl}
                           alt={card.nameKr}
                           className="w-full h-full object-cover object-top"
                         />
@@ -2097,8 +2101,9 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
                         }`}
                         title={`${charCard.nameKr} (Lv.${charCard.level} · ${charCard.rarity || '1~2성'}) - 드래그하여 캐릭터 덱에 추가 / 클릭: 상세 보기 / 더블클릭: 1장 추가`}
                       >
-                        <img
-                          src={charCard.artUrl}
+                        <CardArt
+                          sizes="(max-width: 640px) 46vw, 190px"
+                          artUrl={charCard.artUrl}
                           alt={charCard.nameKr}
                           className="w-full h-full object-cover object-top"
                         />
@@ -2254,6 +2259,10 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       <DeckPresetModal
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
+        onSwitchHub={(t) => {
+          setIsPresetModalOpen(false);
+          if (t === 'shared') setIsCommunityModalOpen(true);
+        }}
         currentEditingDeck={currentDeckConfig}
         onApplyActiveDeck={(deck) => {
           saveUserDeck(deck);
@@ -2287,6 +2296,10 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       <CommunityDeckModal
         isOpen={isCommunityModalOpen}
         onClose={() => setIsCommunityModalOpen(false)}
+        onSwitchHub={(t) => {
+          setIsCommunityModalOpen(false);
+          if (t === 'preset') setIsPresetModalOpen(true);
+        }}
         currentEditingDeck={currentDeckConfig}
         onSelectAndBattle={(deck) => {
           setIsCommunityModalOpen(false);

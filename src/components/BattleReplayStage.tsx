@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { BattleReplayData } from '../utils/replayManager';
 import { buildReplayTimeline } from '../utils/replayTimelineBuilder';
 import { ReplaySnapshot, ReplaySlotSnapshot, ReplayActionCardVisual } from '../types/replayTimeline';
-import { soundEffects, getWeaponByCharacter, WeaponType } from '../utils/soundEffects';
+import { soundEffects, getWeaponByCharacter, getCharacterKey, WeaponType } from '../utils/soundEffects';
+import { AttackFx, tierForDamage, tierForCombo } from './attackMotions/SpriteEffect';
 import { bgmManager } from '../utils/bgmManager';
 import { preloadReplayCards } from '../utils/cardImagePreloader';
 import { CharacterSlot } from './CharacterSlot';
@@ -315,6 +316,30 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
 
   const p0 = activeSnapshot.p0;
   const p1 = activeSnapshot.p1;
+
+  // [WP5] 대미지가 발생한 스텝에서 맞는 리더 위에 공격자 캐릭터 스프라이트 재생 (실전 격돌·연격과 같은 파일)
+  const [fxFailedStep, setFxFailedStep] = useState<number | null>(null);
+  const dmg = activeSnapshot.damageEvent;
+  const replayFx = dmg && dmg.amount > 0
+    ? {
+        target: dmg.targetIndex,
+        key: getCharacterKey(dmg.attackerName),
+        tier: activeSnapshot.combo ? tierForCombo(activeSnapshot.combo.comboCount) : tierForDamage(dmg.amount),
+      }
+    : null;
+  const renderReplayFx = (targetIndex: 0 | 1) =>
+    replayFx && replayFx.target === targetIndex ? (
+      <AttackFx
+        key={`fx-${currentStep}`}
+        characterKey={replayFx.key}
+        tier={replayFx.tier}
+        attackerOnRight={targetIndex === 0}
+        size={300}
+        failed={fxFailedStep === currentStep}
+        onFail={() => setFxFailedStep(currentStep)}
+        fallback={null}
+      />
+    ) : null;
   const isP0Turn = activeSnapshot.activePlayerIndex === 0;
 
   // 플레이어 캐릭터 카드 객체 변환
@@ -1017,18 +1042,21 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                   isOpponent={true}
                 />
 
-                <CharacterSlot
-                  card={p1LeaderChar}
-                  role="leader"
-                  isOwnerActive={!isP0Turn}
-                  canUpgrade={false}
-                  canSwitch={false}
-                  onMouseEnter={() => p1LeaderChar && setPreviewCard(p1LeaderChar)}
-                  onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
-                  onHoverUnderlyingCard={(c) => setPreviewCard(c)}
-                  isAi={replay.gameMode === 'AI'}
-                  isOpponent={true}
-                />
+                <div className="relative">
+                  <CharacterSlot
+                    card={p1LeaderChar}
+                    role="leader"
+                    isOwnerActive={!isP0Turn}
+                    canUpgrade={false}
+                    canSwitch={false}
+                    onMouseEnter={() => p1LeaderChar && setPreviewCard(p1LeaderChar)}
+                    onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                    onHoverUnderlyingCard={(c) => setPreviewCard(c)}
+                    isAi={replay.gameMode === 'AI'}
+                    isOpponent={true}
+                  />
+                  {renderReplayFx(1)}
+                </div>
 
                 <CharacterSlot
                   card={p1RightChar}
@@ -1277,17 +1305,20 @@ export const BattleReplayStage: React.FC<BattleReplayStageProps> = ({ replay, on
                   isAi={false}
                 />
 
-                <CharacterSlot
-                  card={p0LeaderChar}
-                  role="leader"
-                  isOwnerActive={isP0Turn}
-                  canUpgrade={false}
-                  canSwitch={false}
-                  onMouseEnter={() => p0LeaderChar && setPreviewCard(p0LeaderChar)}
-                  onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
-                  onHoverUnderlyingCard={(c) => setPreviewCard(c)}
-                  isAi={false}
-                />
+                <div className="relative">
+                  <CharacterSlot
+                    card={p0LeaderChar}
+                    role="leader"
+                    isOwnerActive={isP0Turn}
+                    canUpgrade={false}
+                    canSwitch={false}
+                    onMouseEnter={() => p0LeaderChar && setPreviewCard(p0LeaderChar)}
+                    onOpenEvolutionModal={(char) => setEvolutionModalChar(char)}
+                    onHoverUnderlyingCard={(c) => setPreviewCard(c)}
+                    isAi={false}
+                  />
+                  {renderReplayFx(0)}
+                </div>
 
                 <CharacterSlot
                   card={p0RightChar}

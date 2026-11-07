@@ -46,6 +46,49 @@ const DELETED_KEY = 'wuthering_deleted_feedback_ids_v1';
 const BOARD_POINTER_ID = 'ff808181a09d98f701a173ca355e092f';
 const BOARD_POINTER_NAME = 'wuthering-tcg-community-board-v2';
 
+// [WP9 잔여] 서버가 작성 빈도 제한(429)으로 거절하면 화면에 알린다. CommunityBoard·FeedbackModal이 구독.
+export const RATE_LIMITED_EVENT = 'wtcg:community-rate-limited';
+/** 로컬 댓글 목록이 비동기로 바뀌었을 때(빈도 제한 되돌리기) 화면 갱신용 */
+export const COMMENTS_CHANGED_EVENT = 'wtcg:community-comments-changed';
+export interface RateLimitedDetail {
+  bucket: 'post' | 'comment' | 'replay' | 'write';
+  retryAfter: number; // 초
+}
+async function notifyIfRateLimited(res: Response): Promise<boolean> {
+  if (res.status !== 429) return false;
+  let detail: RateLimitedDetail = { bucket: 'write', retryAfter: Number(res.headers.get('Retry-After')) || 60 };
+  try {
+    const body = await res.json();
+    if (body?.bucket) detail = { bucket: body.bucket, retryAfter: Number(body.retryAfter) || detail.retryAfter };
+  } catch {}
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent<RateLimitedDetail>(RATE_LIMITED_EVENT, { detail }));
+  return true;
+}
+export function rateLimitMessage(d: RateLimitedDetail): string {
+  const what = d.bucket === 'post' ? '새 글' : d.bucket === 'comment' ? '댓글' : '작성';
+  const min = Math.max(1, Math.ceil(d.retryAfter / 60));
+  return `⏳ ${what}을 너무 자주 올렸어요. 약 ${min}분 뒤에 다시 시도해주세요.`;
+}
+
+/** 댓글 1건 추가·수정·삭제만 서버에 보낸다 (글 전체를 다시 저장하지 않음) */
+async function syncCommentAction(body: Record<string, unknown>): Promise<'ok' | 'limited' | 'error'> {
+  try {
+    try {
+      localStorage.removeItem('wuthering_lobby_notice_cache_v1');
+    } catch {}
+    const res = await fetch('/api/community?type=board', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, updatedAt: Date.now() }),
+    });
+    if (await notifyIfRateLimited(res)) return 'limited';
+    return res.ok ? 'ok' : 'error';
+  } catch (err) {
+    console.warn('[feedbackManager] 댓글 동기화 실패:', err);
+    return 'error';
+  }
+}
+
 export const CATEGORY_INFO: Record<
   FeedbackCategory,
   { label: string; icon: string; color: string; badgeClass: string; desc: string }
@@ -330,6 +373,7 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
 
   const localPosts = getFeedbackList();
   const allPosts = remotePosts ? [...remotePosts, ...localPosts] : localPosts;
+  const remoteIds = new Set((remotePosts || []).map((p) => p?.id).filter(Boolean) as string[]);
 
   // 원격 게시글과 로컬 게시글을 ID 기준으로 병합 (삭제된 글 제외)
   const mergedMap = new Map<string, FeedbackItem>();
@@ -341,10 +385,19 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
     if (!existing) {
       mergedMap.set(p.id, p);
     } else {
-      // 댓글 병합 (중복 제거)
+      // 댓글 병합: 서버에 있는 글이면 서버 댓글을 기준으로 하고(다른 사람이 지운 댓글이 되살아나지 않게),
+      // 아직 서버에 반영되지 않았을 수 있는 내 최근 댓글(2분 이내)만 덧붙인다.
       const commentMap = new Map<string, CommentItem>();
-      for (const c of [...(existing.comments || []), ...(p.comments || [])]) {
-        if (c && c.id) commentMap.set(c.id, c);
+      if (remoteIds.has(p.id)) {
+        const pendingSince = Date.now() - 120_000;
+        for (const c of existing.comments || []) if (c && c.id) commentMap.set(c.id, c);
+        for (const c of p.comments || []) {
+          if (c && c.id && !commentMap.has(c.id) && new Date(c.createdAt).getTime() > pendingSince) commentMap.set(c.id, c);
+        }
+      } else {
+        for (const c of [...(existing.comments || []), ...(p.comments || [])]) {
+          if (c && c.id) commentMap.set(c.id, c);
+        }
       }
       // updatedAt 비교: 더 최신에 수정된 버전(또는 로컬 최신본 p)을 우선 채택하여 삭제된 이미지가 부활하는 현상 방지
       const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
@@ -377,15 +430,18 @@ export async function syncSinglePostToCloud(post: FeedbackItem): Promise<void> {
     try {
       localStorage.removeItem('wuthering_lobby_notice_cache_v1');
     } catch {}
-    await fetch('/api/community?type=board', {
+    // 댓글은 addComment/updateComment/deleteComment로 따로 보내므로 글 저장에는 싣지 않는다
+    const { comments: _comments, ...postWithoutComments } = post;
+    const res = await fetch('/api/community?type=board', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'upsertPost',
-        post,
+        post: postWithoutComments,
         updatedAt: Date.now(),
       }),
     });
+    await notifyIfRateLimited(res);
   } catch (err) {
     console.warn('[feedbackManager] 단일 게시글 동기화 실패:', err);
   }
@@ -552,7 +608,20 @@ export function addCommentToFeedback(
   });
 
   persistLocalPosts(updated);
-  if (targetPost) syncSinglePostToCloud(targetPost);
+  if (targetPost) {
+    void syncCommentAction({ action: 'addComment', postId: id, comment: newComment }).then((r) => {
+      if (r !== 'limited') return;
+      // 빈도 제한으로 거절된 댓글은 로컬에서도 되돌린다 (저장된 것처럼 보이지 않게)
+      persistLocalPosts(
+        getFeedbackList().map((item) =>
+          item.id === id ? { ...item, comments: (item.comments || []).filter((c) => c.id !== newComment.id) } : item
+        )
+      );
+      const cached = postDetailCache.get(id);
+      if (cached) postDetailCache.set(id, { ...cached, comments: (cached.comments || []).filter((c) => c.id !== newComment.id) });
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(COMMENTS_CHANGED_EVENT, { detail: { postId: id } }));
+    });
+  }
   return newComment;
 }
 
@@ -769,7 +838,7 @@ export function updateCommentInFeedback(
   });
   persistLocalPosts(updated);
   if (targetPost) {
-    syncSinglePostToCloud(targetPost);
+    void syncCommentAction({ action: 'updateComment', postId, commentId, text: newText.trim() });
   }
   return true;
 }
@@ -790,7 +859,7 @@ export function deleteCommentFromFeedback(postId: string, commentId: string): bo
   });
   persistLocalPosts(updated);
   if (targetPost) {
-    syncSinglePostToCloud(targetPost);
+    void syncCommentAction({ action: 'deleteComment', postId, commentId });
   }
   return true;
 }

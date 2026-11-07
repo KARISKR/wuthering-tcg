@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { CardArt } from './CardArt';
 import { ActionCard } from '../types/tcg';
 import { RefreshCw, CheckCircle2, Sparkles } from 'lucide-react';
 import { soundEffects } from '../utils/soundEffects';
@@ -175,9 +176,11 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
 
                 {/* 1. 실물 카드 일러스트 */}
                 <div className="relative w-full aspect-[5/7] rounded-md sm:rounded-lg lg:rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner group-hover:scale-[1.02] transition-transform duration-200">
-                  <img
-                    src={card.artUrl}
+                  <CardArt
+                    artUrl={card.artUrl}
+                    sizes="(max-width: 640px) 30vw, 200px"
                     alt={card.nameKr}
+                    fallbackName={card.nameKr}
                     className="w-full h-full object-contain drop-shadow-md pointer-events-none"
                   />
 

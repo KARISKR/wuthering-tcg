@@ -4,7 +4,8 @@ import { CardView } from './CardView';
 import { Flame, Wind, Shield, Swords, Sparkles, XCircle, Zap, Crown, Heart, BatteryCharging, ShieldAlert } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-import { soundEffects, getWeaponByCharacter } from '../utils/soundEffects';
+import { soundEffects, getWeaponByCharacter, getCharacterKey } from '../utils/soundEffects';
+import { AttackFx, loadSheet, peekSheetMeta, tierForDamage } from './attackMotions/SpriteEffect';
 
 interface ClashAnimationOverlayProps {
   clashResult: ClashResult;
@@ -103,7 +104,22 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
   const winnerLeader = clashResult.winnerIndex !== -1 ? players[clashResult.winnerIndex]?.slots.leader : null;
   const winnerWeapon = winnerLeader ? getWeaponByCharacter(winnerLeader.characterName || winnerLeader.nameKr) : undefined;
 
+  // [WP5] 승자 캐릭터별 공격 이펙트 스프라이트 (대미지 1~2 → t1, 3~4 → t2, 5+ → t3)
+  const fxKey = winnerLeader ? getCharacterKey(winnerLeader.characterName || winnerLeader.nameKr) : null;
+  const fxTier = tierForDamage(clashResult.damageDealt);
+  const fxName = fxKey && fxTier > 0 ? `${fxKey}_t${fxTier}` : null;
+  const [fxActive, setFxActive] = useState(false); // SLASH 단계에 진입했을 때만 재생 (스킵 시에는 기존 검기)
+  const [fxFailed, setFxFailed] = useState(false);
+
+  // 카드가 뒤집히는 동안(약 3.4초) 미리 불러둔다. SLASH 시점에 로드가 끝났으면 타이밍을 스프라이트에 맞춘다.
+  useEffect(() => {
+    setFxActive(false);
+    setFxFailed(false);
+    if (fxName) loadSheet(fxName).catch(() => setFxFailed(true));
+  }, [fxName, clashResult]);
+
   const latestRef = useRef({
+    fxName,
     clashResult,
     p0,
     p1,
@@ -113,6 +129,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
     p1HealTotal,
   });
   latestRef.current = {
+    fxName,
     clashResult,
     p0,
     p1,
@@ -138,34 +155,8 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
       soundEffects.playClash();
     }, 2400);
 
-    // 3단계: 3400ms 후 승리자의 참격 및 대미지 슬램 (공격 음성/모션 -> 180ms 후 피격 대미지 크런치 순차 발동)
-    const tSlash = window.setTimeout(() => {
-      setStage('SLASH');
-      hasPlayedSlashRef.current = true;
-      const cur = latestRef.current;
-      if (cur.clashResult.damageDealt > 0) {
-        const winnerCard = cur.clashResult.winnerIndex === 0 ? cur.p0.clashCard : cur.p1.clashCard;
-        const winnerCost = winnerCard ? winnerCard.cost : 0;
-        const winnerLeaderName = cur.winnerLeader?.characterName || cur.winnerLeader?.nameKr;
-
-        // 1. 공격자 기합 보이스 우선 재생 (무기음은 180ms 후 피격 시점에 단일 재생)
-        soundEffects.playCharacterAttack(winnerLeaderName, winnerCost);
-
-        // 2. 180ms 후 피격자 타격 및 무기 고유 타격음, 피격 보이스 순차 재생 (음성 뭉개짐/상쇄 방지)
-        const tImpact = window.setTimeout(() => {
-          const latest = latestRef.current;
-          const loserLeader = latest.clashResult.winnerIndex === 0 ? latest.p1.slots.leader : latest.p0.slots.leader;
-          const loserLeaderName = loserLeader?.characterName || loserLeader?.nameKr;
-          soundEffects.playDamage(latest.clashResult.damageDealt, latest.winnerWeapon, loserLeaderName);
-        }, 180);
-        timersRef.current.push(tImpact);
-      } else {
-        soundEffects.playClashDraw();
-      }
-    }, 3400);
-
-    // 4단계: 4400ms 후 공격 직후 체력 회복 효과음 & 승리 배너 & 연격권 해금 & 콘페티
-    const tResult = window.setTimeout(() => {
+    // 4단계 처리: 회복 효과음 & 승리 배너 & 연격권 해금 & 콘페티
+    const goResult = () => {
       setStage('RESULT');
       const cur = latestRef.current;
       if (!hasPlayedHealRef.current && (cur.p0HealTotal > 0 || cur.p1HealTotal > 0)) {
@@ -179,9 +170,42 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
           origin: { y: 0.65 },
         });
       }
-    }, 4400);
+    };
 
-    timersRef.current = [tReveal, tCollide, tSlash, tResult];
+    // 3단계: 3400ms 후 승리자의 참격 및 대미지 슬램 (공격 음성/모션 -> 타격 시점에 피격 대미지 크런치 순차 발동)
+    const tSlash = window.setTimeout(() => {
+      setStage('SLASH');
+      hasPlayedSlashRef.current = true;
+      const cur = latestRef.current;
+      // [WP5] 스프라이트가 준비됐으면 타격음은 스프라이트의 타격 프레임에, 결과 화면은 스프라이트가 끝난 뒤에
+      const meta = cur.fxName ? peekSheetMeta(cur.fxName) : undefined;
+      const impactMs = meta ? Math.round((meta.impactFrame / meta.fps) * 1000) : 180;
+      const slashMs = meta ? Math.max(1000, Math.round((meta.frames / meta.fps) * 1000) + 100) : 1000;
+      if (cur.clashResult.damageDealt > 0) {
+        if (meta) setFxActive(true);
+        const winnerCard = cur.clashResult.winnerIndex === 0 ? cur.p0.clashCard : cur.p1.clashCard;
+        const winnerCost = winnerCard ? winnerCard.cost : 0;
+        const winnerLeaderName = cur.winnerLeader?.characterName || cur.winnerLeader?.nameKr;
+
+        // 1. 공격자 기합 보이스 우선 재생 (무기음은 타격 시점에 단일 재생)
+        soundEffects.playCharacterAttack(winnerLeaderName, winnerCost);
+
+        // 2. 타격 시점에 피격자 타격 및 무기 고유 타격음, 피격 보이스 순차 재생 (음성 뭉개짐/상쇄 방지)
+        const tImpact = window.setTimeout(() => {
+          const latest = latestRef.current;
+          const loserLeader = latest.clashResult.winnerIndex === 0 ? latest.p1.slots.leader : latest.p0.slots.leader;
+          const loserLeaderName = loserLeader?.characterName || loserLeader?.nameKr;
+          soundEffects.playDamage(latest.clashResult.damageDealt, latest.winnerWeapon, loserLeaderName);
+        }, impactMs);
+        timersRef.current.push(tImpact);
+      } else {
+        soundEffects.playClashDraw();
+      }
+      const tResult = window.setTimeout(goResult, slashMs);
+      timersRef.current.push(tResult);
+    }, 3400);
+
+    timersRef.current = [tReveal, tCollide, tSlash];
 
     return () => {
       timersRef.current.forEach(clearTimeout);
@@ -356,9 +380,25 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
               {(stage === 'SLASH' || stage === 'RESULT') && isP1Winner && (
                 <>
                   {/* 참격 검기 궤적 (오른쪽에서 날아와 베어버림) */}
+                  {/* [WP5] 승자 캐릭터 공격 스프라이트 (실패·스킵 시 기존 검기) */}
+                  {fxActive ? (
+                    <AttackFx
+                      characterKey={fxKey}
+                      tier={fxTier}
+                      attackerOnRight={true}
+                      failed={fxFailed}
+                      onFail={() => setFxFailed(true)}
+                      fallback={
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-30">
+                          <div className="w-[360px] h-3.5 bg-gradient-to-r from-transparent via-rose-500 via-white to-transparent shadow-[0_0_35px_rgba(244,63,94,1)] animate-blade-slash-right" />
+                        </div>
+                      }
+                    />
+                  ) : (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-30">
                     <div className="w-[360px] h-3.5 bg-gradient-to-r from-transparent via-rose-500 via-white to-transparent shadow-[0_0_35px_rgba(244,63,94,1)] animate-blade-slash-right" />
                   </div>
+                  )}
 
                   {/* 거대 플로팅 대미지 슬램 */}
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 pointer-events-none z-40">
@@ -529,9 +569,25 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
               {(stage === 'SLASH' || stage === 'RESULT') && isP0Winner && (
                 <>
                   {/* 참격 검기 궤적 (왼쪽에서 날아와 베어버림) */}
+                  {/* [WP5] 승자 캐릭터 공격 스프라이트 (실패·스킵 시 기존 검기) */}
+                  {fxActive ? (
+                    <AttackFx
+                      characterKey={fxKey}
+                      tier={fxTier}
+                      attackerOnRight={false}
+                      failed={fxFailed}
+                      onFail={() => setFxFailed(true)}
+                      fallback={
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-30">
+                          <div className="w-[360px] h-3.5 bg-gradient-to-r from-transparent via-cyan-400 via-white to-transparent shadow-[0_0_35px_rgba(34,211,238,1)] animate-blade-slash-left" />
+                        </div>
+                      }
+                    />
+                  ) : (
                   <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-30">
                     <div className="w-[360px] h-3.5 bg-gradient-to-r from-transparent via-cyan-400 via-white to-transparent shadow-[0_0_35px_rgba(34,211,238,1)] animate-blade-slash-left" />
                   </div>
+                  )}
 
                   {/* 거대 플로팅 대미지 슬램 */}
                   <div className="absolute -top-12 left-1/2 -translate-x-1/2 pointer-events-none z-40">

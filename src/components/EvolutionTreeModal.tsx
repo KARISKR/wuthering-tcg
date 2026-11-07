@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { formatEffectText } from '../utils/formatEffectText';
 
+import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
 interface EvolutionTreeModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -214,8 +215,9 @@ export const EvolutionTreeModal: React.FC<EvolutionTreeModalProps> = ({
 
                     {/* 카드 일러스트 */}
                     <div className="relative w-full aspect-[5/7] rounded-lg overflow-hidden bg-slate-950 border border-slate-800">
-                      <img
-                        src={card.artUrl}
+                      <CardArt
+                        sizes="170px"
+                        artUrl={card.artUrl}
                         alt={card.nameKr}
                         className="w-full h-full object-cover object-top"
                       />

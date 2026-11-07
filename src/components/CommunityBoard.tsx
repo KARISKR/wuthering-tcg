@@ -51,6 +51,10 @@ import {
   incrementViewCount,
   addCommentToFeedback,
   formatForClipboard,
+  RATE_LIMITED_EVENT,
+  COMMENTS_CHANGED_EVENT,
+  rateLimitMessage,
+  type RateLimitedDetail,
   exportFeedbackAsJson,
   updateFeedback,
   compressImageFile,
@@ -357,7 +361,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
         const w = sizeOpt ? sizeOpt.trim() : '';
         const sizeAttr = w ? `data-width="${w}" style="width: ${w}; max-width: 100%;"` : '';
         const defaultCls = w ? '' : 'max-w-full sm:max-w-[300px] max-h-[320px]';
-        return `<img src="${url}" data-shortcode="[사진${numStr}]" ${sizeAttr} alt="사진 ${numStr}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border border-[#3b4254] shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-blue-400 transition" />`;
+        return `<img src="${url}" data-shortcode="[사진${numStr}]" ${sizeAttr} alt="사진 ${numStr}" class="my-1.5 mr-2 ${defaultCls} rounded-xl border border-[#3b4254] shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />`;
       }
       return '';
     });
@@ -548,12 +552,12 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     const target = e.target as HTMLElement;
     if (wysiwygRef.current) {
       wysiwygRef.current.querySelectorAll('img').forEach((img) => {
-        img.classList.remove('ring-4', 'ring-blue-500');
+        img.classList.remove('ring-4', 'ring-amber-500');
       });
     }
     if (target.tagName === 'IMG') {
       const imgEl = target as HTMLImageElement;
-      imgEl.classList.add('ring-4', 'ring-blue-500');
+      imgEl.classList.add('ring-4', 'ring-amber-500');
       selectedEditorImgRef.current = imgEl;
       setSelectedImgMeta({
         shortcode: imgEl.getAttribute('data-shortcode') || '이미지',
@@ -691,7 +695,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       else if (cmd === 'fontSizePx' && value) applyFormat(`<span style="font-size: ${value};">`, '</span>', '텍스트');
       else if (cmd === 'foreColor' && value) applyFormat(`<span style="color: ${value};">`, '</span>', '색상 텍스트');
       else if (cmd === 'hiliteColor' && value) applyFormat(`<mark style="background: ${value}; color: #fff; padding: 0 4px; border-radius: 3px;">`, '</mark>', '강조 텍스트');
-      else if (cmd === 'blockquote') applyFormat('<blockquote style="border-left: 3px solid #60a5fa; padding-left: 10px; margin: 6px 0; color: #cbd5e1;">', '</blockquote>', '인용 문구');
+      else if (cmd === 'blockquote') applyFormat('<blockquote style="border-left: 3px solid #fbbf24; padding-left: 10px; margin: 6px 0; color: #cbd5e1;">', '</blockquote>', '인용 문구');
       else if (cmd === 'insertHorizontalRule') applyFormat('\n<hr style="border-color: #2d354a; margin: 12px 0;" />\n', '', '');
       else if (cmd === 'justifyLeft') applyFormat('<div style="text-align: left;">', '</div>', '텍스트');
       else if (cmd === 'justifyCenter') applyFormat('<div style="text-align: center;">', '</div>', '텍스트');
@@ -711,7 +715,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       document.execCommand(
         'insertHTML',
         false,
-        `<blockquote style="border-left: 3px solid #60a5fa; padding-left: 12px; margin: 8px 0; color: #cbd5e1;">${selectedText}</blockquote><div><br></div>`
+        `<blockquote style="border-left: 3px solid #fbbf24; padding-left: 12px; margin: 8px 0; color: #cbd5e1;">${selectedText}</blockquote><div><br></div>`
       );
     } else {
       document.execCommand(cmd, false, value);
@@ -744,7 +748,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       // 강제 <br> 없이 inline-block으로 삽입하여 연속 삽입 시 가로로 나란히 배치되고, Enter를 치면 아래 줄로 내려가도록 설계
       const imgHtml = isCard
         ? `<img src="${url}" data-shortcode="${shortTag}" data-no-lod="true" alt="${displayAlt}" class="my-1.5 mr-2 w-[140px] sm:w-[165px] max-h-[260px] rounded-xl border-2 border-amber-500/60 shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />&nbsp;`
-        : `<img src="${url}" data-shortcode="${shortTag}" data-no-lod="true" alt="${displayAlt}" class="my-1.5 mr-2 max-w-full sm:max-w-[300px] max-h-[320px] rounded-xl border border-[#3b4254] shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-blue-400 transition" />&nbsp;`;
+        : `<img src="${url}" data-shortcode="${shortTag}" data-no-lod="true" alt="${displayAlt}" class="my-1.5 mr-2 max-w-full sm:max-w-[300px] max-h-[320px] rounded-xl border border-[#3b4254] shadow-lg object-contain inline-block align-middle cursor-pointer hover:ring-2 hover:ring-amber-400 transition" />&nbsp;`;
 
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && wysiwygRef.current.contains(sel.getRangeAt(0).commonAncestorContainer)) {
@@ -915,6 +919,22 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
   };
+
+  // [WP9 잔여] 서버 작성 빈도 제한(429) 안내
+  useEffect(() => {
+    const onLimited = (e: Event) => {
+      const detail = (e as CustomEvent<RateLimitedDetail>).detail;
+      setToastMessage(rateLimitMessage(detail));
+      setTimeout(() => setToastMessage(null), 4000);
+    };
+    const onCommentsChanged = () => setItems([...getFeedbackList()]);
+    window.addEventListener(RATE_LIMITED_EVENT, onLimited);
+    window.addEventListener(COMMENTS_CHANGED_EVENT, onCommentsChanged);
+    return () => {
+      window.removeEventListener(RATE_LIMITED_EVENT, onLimited);
+      window.removeEventListener(COMMENTS_CHANGED_EVENT, onCommentsChanged);
+    };
+  }, []);
 
   const syncLocalList = () => {
     setItems([...getFeedbackList()]);
@@ -1621,7 +1641,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
                   TCG SIMULATOR
                 </span>
-                <span className="px-2 py-0.5 rounded-md bg-blue-500/20 border border-blue-500/40 text-blue-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
+                <span className="px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/40 text-amber-300 text-[10px] sm:text-xs font-bold whitespace-nowrap">
                   공식 채널
                 </span>
               </div>
@@ -1669,7 +1689,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 setShowColorPicker(false);
                 setIsWriteModalOpen(true);
               }}
-              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-blue-500/25 active:scale-95 whitespace-nowrap"
+              className="flex-1 md:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-[#f59e0b] hover:bg-[#d97706] text-slate-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-lg shadow-amber-500/25 active:scale-95 whitespace-nowrap"
             >
               <Plus className="w-4 h-4 stroke-[3] shrink-0" />
               <span>글쓰기</span>
@@ -1696,8 +1716,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         : tab.id === 'NOTICE'
                         ? 'bg-[#2b3347] text-amber-300 border border-amber-400/50 shadow-md ring-1 ring-amber-400/30'
                         : tab.id === 'TIP'
-                        ? 'bg-cyan-600 text-white shadow-md'
-                        : 'bg-[#3b82f6] text-white shadow-md'
+                        ? 'bg-cyan-600 text-slate-950 shadow-md'
+                        : 'bg-[#f59e0b] text-slate-950 shadow-md'
                       : 'bg-[#181d2a] text-slate-400 hover:text-white hover:bg-[#22283a]'
                   }`}
                 >
@@ -2204,7 +2224,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       value={commentAuthor}
                       onChange={(e) => setCommentAuthor(e.target.value)}
                       placeholder="닉네임 (기본: 방랑자)"
-                      className="w-36 sm:w-40 px-3 py-1.5 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400"
+                      className="w-36 sm:w-40 px-3 py-1.5 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                     />
                     <input
                       type="password"
@@ -2212,7 +2232,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       onChange={(e) => setCommentPassword(e.target.value)}
                       placeholder="비밀번호 (수정/삭제용)"
                       maxLength={20}
-                      className="w-36 sm:w-40 px-3 py-1.5 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 font-mono"
+                      className="w-36 sm:w-40 px-3 py-1.5 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 font-mono"
                     />
                     <span className="text-[11px] text-slate-500 hidden md:inline">
                       타인을 비방하거나 불쾌감을 주는 댓글은 삭제될 수 있습니다.
@@ -2225,11 +2245,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       onChange={(e) => setCommentText(e.target.value)}
                       placeholder={replyingTo ? `@${replyingTo.author} 님에게 답글을 입력하세요...` : "댓글을 입력하세요..."}
                       rows={2}
-                      className="flex-1 px-3 py-2 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-400 resize-none font-sans"
+                      className="flex-1 px-3 py-2 rounded-md bg-[#1b2030] border border-[#2a3247] text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 resize-none font-sans"
                     />
                     <button
                       onClick={() => handleAddComment(selectedPost.id)}
-                      className="px-5 py-2.5 rounded-md bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-xs transition cursor-pointer self-end sm:self-stretch flex items-center justify-center gap-1 shadow-md shadow-blue-500/20 active:scale-95"
+                      className="px-5 py-2.5 rounded-md bg-[#f59e0b] hover:bg-[#d97706] text-slate-950 font-bold text-xs transition cursor-pointer self-end sm:self-stretch flex items-center justify-center gap-1 shadow-md shadow-amber-500/20 active:scale-95"
                     >
                       <Send className="w-3.5 h-3.5" />
                       <span>작성</span>
@@ -2251,7 +2271,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   </button>
                   <button
                     onClick={() => setIsWriteModalOpen(true)}
-                    className="px-3.5 py-1.5 rounded-md bg-[#3b82f6] hover:bg-[#2563eb] text-white text-xs font-bold transition cursor-pointer"
+                    className="px-3.5 py-1.5 rounded-md bg-[#f59e0b] hover:bg-[#d97706] text-slate-950 text-xs font-bold transition cursor-pointer"
                   >
                     ✏️ 글쓰기
                   </button>
@@ -2334,7 +2354,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                 <p className="text-sm font-bold">게시글이 존재하지 않습니다.</p>
                 <button
                   onClick={() => setIsWriteModalOpen(true)}
-                  className="mt-3 px-4 py-2 rounded-lg bg-[#3b82f6] text-white text-xs font-bold transition cursor-pointer"
+                  className="mt-3 px-4 py-2 rounded-lg bg-[#f59e0b] text-slate-950 text-xs font-bold transition cursor-pointer"
                 >
                   첫 글 작성하기
                 </button>
@@ -2349,7 +2369,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     onClick={() => handleSelectPost(item.id)}
                     className={`p-3.5 transition cursor-pointer flex flex-col gap-1.5 ${
                       isCurrentActive
-                        ? 'bg-[#222b40] border-l-3 border-l-blue-400'
+                        ? 'bg-[#222b40] border-l-3 border-l-amber-400'
                         : 'hover:bg-[#1f2536] active:bg-[#242b3d]'
                     }`}
                   >
@@ -2500,7 +2520,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       <p className="text-base font-bold">게시글이 존재하지 않습니다.</p>
                       <button
                         onClick={() => setIsWriteModalOpen(true)}
-                        className="mt-3.5 px-4 py-2 rounded-lg bg-[#3b82f6] text-white text-xs sm:text-sm font-bold transition cursor-pointer"
+                        className="mt-3.5 px-4 py-2 rounded-lg bg-[#f59e0b] text-slate-950 text-xs sm:text-sm font-bold transition cursor-pointer"
                       >
                         첫 글 작성하기
                       </button>
@@ -2518,7 +2538,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         onClick={() => handleSelectPost(item.id)}
                         className={`transition cursor-pointer group ${
                           isCurrentActive
-                            ? 'bg-[#222b40] border-l-2 border-l-blue-400'
+                            ? 'bg-[#222b40] border-l-2 border-l-amber-400'
                             : 'hover:bg-[#1f2536]'
                         }`}
                       >
@@ -2643,7 +2663,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   onClick={() => setCurrentPage(p)}
                   className={`w-9 h-9 sm:w-10 sm:h-10 rounded border text-xs sm:text-sm font-mono font-bold transition cursor-pointer ${
                     currentPage === p
-                      ? 'bg-[#3b82f6] border-[#3b82f6] text-white shadow-md'
+                      ? 'bg-[#f59e0b] border-[#f59e0b] text-slate-950 shadow-md'
                       : 'border-[#2a3245] bg-[#1b2030] text-slate-400 hover:text-white hover:bg-[#252c40]'
                   }`}
                 >
@@ -2670,7 +2690,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             {/* 하단 글쓰기 버튼 */}
             <button
               onClick={() => setIsWriteModalOpen(true)}
-              className="px-5 py-2.5 rounded-lg bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-sm sm:text-base transition cursor-pointer flex items-center gap-2 shadow-md shadow-blue-500/20 active:scale-95"
+              className="px-5 py-2.5 rounded-lg bg-[#f59e0b] hover:bg-[#d97706] text-slate-950 font-bold text-sm sm:text-base transition cursor-pointer flex items-center gap-2 shadow-md shadow-amber-500/20 active:scale-95"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
               <span>글쓰기</span>
@@ -2685,7 +2705,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             <select
               value={searchField}
               onChange={(e) => setSearchField(e.target.value as any)}
-              className="px-3.5 py-2 rounded-lg bg-[#1a202e] border border-[#2d354a] text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-blue-400"
+              className="px-3.5 py-2 rounded-lg bg-[#1a202e] border border-[#2d354a] text-slate-300 text-xs sm:text-sm focus:outline-none focus:border-amber-400"
             >
               <option value="all">전체</option>
               <option value="title">제목</option>
@@ -2704,7 +2724,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   setCurrentPage(1);
                 }}
                 placeholder="검색어를 입력하세요"
-                className="w-full px-4 py-2 rounded-lg bg-[#1a202e] border border-[#2d354a] text-slate-200 placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-blue-400"
+                className="w-full px-4 py-2 rounded-lg bg-[#1a202e] border border-[#2d354a] text-slate-200 placeholder-slate-500 text-xs sm:text-sm focus:outline-none focus:border-amber-400"
               />
               {searchQuery && (
                 <button
@@ -2738,7 +2758,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
             {/* 상단 슬림 채널 헤더 */}
             <div className="px-5 py-3 border-b border-[#2a2e39] bg-[#15171d] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse" />
                 <h3 className="font-black text-base sm:text-lg text-white tracking-tight">
                   {editingPostId ? '글 수정 - 명조 배틀 채널' : '글쓰기 - 명조 배틀 채널'}
                 </h3>
@@ -2760,7 +2780,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   <select
                     value={category}
                     onChange={(e) => handleCategoryChange(e.target.value as FeedbackCategory)}
-                    className="w-full px-3.5 py-2 rounded bg-[#14161b] border border-[#323642] text-sm font-bold text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
+                    className="w-full px-3.5 py-2 rounded bg-[#14161b] border border-[#323642] text-sm font-bold text-slate-100 focus:outline-none focus:border-amber-500 cursor-pointer"
                   >
                     <option value="GENERAL">일반</option>
                     <option value="NOTICE">📢 공지</option>
@@ -2776,7 +2796,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     value={contact}
                     onChange={(e) => setContact(e.target.value)}
                     placeholder="닉네임 (방랑자)"
-                    className="w-1/2 sm:w-36 px-3 py-2 rounded bg-[#14161b] border border-[#323642] text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-1/2 sm:w-36 px-3 py-2 rounded bg-[#14161b] border border-[#323642] text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                   />
                   <input
                     type="password"
@@ -2784,7 +2804,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="비밀번호"
                     maxLength={20}
-                    className="w-1/2 sm:w-36 px-3 py-2 rounded bg-[#14161b] border border-[#323642] text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-1/2 sm:w-36 px-3 py-2 rounded bg-[#14161b] border border-[#323642] text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono"
                   />
                 </div>
               </div>
@@ -2797,7 +2817,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="제목"
                   maxLength={256}
-                  className="w-full px-3.5 py-2.5 rounded bg-[#14161b] border border-[#323642] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2.5 rounded bg-[#14161b] border border-[#323642] text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 />
               </div>
 
@@ -2971,7 +2991,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                   execEditorFormat('fontSizePx', sz);
                                   setShowFontSizeMenu(false);
                                 }}
-                                className="px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-blue-600 hover:text-white transition cursor-pointer flex items-center justify-between"
+                                className="px-3 py-1.5 text-left text-xs text-slate-200 hover:bg-amber-600 hover:text-white transition cursor-pointer flex items-center justify-between"
                               >
                                 <span style={{ fontSize: parseInt(sz, 10) > 20 ? '16px' : sz }}>{sz.replace('px', '')}</span>
                                 <span className="text-[10px] text-slate-400">{sz}</span>
@@ -3007,7 +3027,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                 execEditorFormat('justifyLeft');
                                 setShowAlignMenu(false);
                               }}
-                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-blue-600 hover:text-white cursor-pointer"
+                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-amber-600 hover:text-white cursor-pointer"
                             >
                               ⬅ 왼쪽 정렬
                             </button>
@@ -3018,7 +3038,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                 execEditorFormat('justifyCenter');
                                 setShowAlignMenu(false);
                               }}
-                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-blue-600 hover:text-white cursor-pointer"
+                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-amber-600 hover:text-white cursor-pointer"
                             >
                               ↔ 가운데 정렬
                             </button>
@@ -3029,7 +3049,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                 execEditorFormat('justifyRight');
                                 setShowAlignMenu(false);
                               }}
-                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-blue-600 hover:text-white cursor-pointer"
+                              className="px-3 py-1.5 text-left text-slate-200 hover:bg-amber-600 hover:text-white cursor-pointer"
                             >
                               ➡ 오른쪽 정렬
                             </button>
@@ -3237,7 +3257,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       }}
                       className={`px-2.5 h-7 rounded text-xs font-mono font-bold transition cursor-pointer flex items-center gap-1 border ${
                         isPreviewMode
-                          ? 'bg-blue-600 border-blue-400 text-white shadow'
+                          ? 'bg-amber-600 border-amber-400 text-slate-950 shadow'
                           : 'bg-[#1a1d24] border-[#363b48] text-slate-300 hover:text-white hover:bg-[#2c313d]'
                       }`}
                       title="시각적 편집(위지윅) ⇄ 원본 태그/코드 보기 전환"
@@ -3288,16 +3308,16 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       })}
                     </div>
                     <span className="text-[10px] text-slate-400 ml-auto shrink-0 hidden md:inline">
-                      💡 본문 안의 이미지를 클릭하면 <b className="text-blue-300">가로/세로 배치 및 크기 조절</b>이 가능합니다
+                      💡 본문 안의 이미지를 클릭하면 <b className="text-amber-300">가로/세로 배치 및 크기 조절</b>이 가능합니다
                     </span>
                   </div>
                 )}
 
                 {/* 선택된 이미지 크기 조절 & 가로/세로 배치 컨트롤 바 (워드 프로그램 스타일) */}
                 {!isPreviewMode && selectedImgMeta && (
-                  <div className="px-3 py-2 bg-blue-950/60 border-b border-blue-500/40 flex flex-wrap items-center justify-between gap-2 text-xs animate-in fade-in duration-100">
+                  <div className="px-3 py-2 bg-amber-950/60 border-b border-amber-500/40 flex flex-wrap items-center justify-between gap-2 text-xs animate-in fade-in duration-100">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="font-black text-blue-300 mr-1">
+                      <span className="font-black text-amber-300 mr-1">
                         🖼️ {selectedImgMeta.shortcode} 설정:
                       </span>
                       {/* 크기 프리셋 */}
@@ -3315,7 +3335,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                           onClick={() => handleResizeSelectedImg(preset.val)}
                           className={`px-2 py-1 rounded font-bold transition cursor-pointer border ${
                             selectedImgMeta.width === preset.val
-                              ? 'bg-blue-600 border-blue-400 text-white shadow'
+                              ? 'bg-amber-600 border-amber-400 text-slate-950 shadow'
                               : 'bg-[#1a1f2e] border-[#333e59] text-slate-300 hover:bg-[#252d42] hover:text-white'
                           }`}
                         >
@@ -3490,7 +3510,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-2 rounded bg-[#3b82f6] hover:bg-[#2563eb] text-white font-bold text-xs sm:text-sm transition cursor-pointer shadow-md active:scale-95"
+                    className="px-6 py-2 rounded bg-[#f59e0b] hover:bg-[#d97706] text-slate-950 font-bold text-xs sm:text-sm transition cursor-pointer shadow-md active:scale-95"
                   >
                     {editingPostId ? '수정 완료' : '작성'}
                   </button>

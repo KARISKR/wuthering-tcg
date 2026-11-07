@@ -30,6 +30,7 @@ function clearSavedMultiplayerSession(): void {
 const GameBoard = lazy(() => import('./components/GameBoard').then((m) => ({ default: m.GameBoard })));
 const DeckBuilder = lazy(() => import('./components/DeckBuilder').then((m) => ({ default: m.DeckBuilder })));
 const BattleReplayStage = lazy(() => import('./components/BattleReplayStage').then((m) => ({ default: m.BattleReplayStage })));
+const BattleReplayV2Stage = lazy(() => import('./components/battle/BattleReplayV2Stage').then((m) => ({ default: m.BattleReplayV2Stage })));
 const ScriptedTutorialBattle = lazy(() => import('./components/ScriptedTutorialBattle').then((m) => ({ default: m.ScriptedTutorialBattle })));
 const CommunityBoard = lazy(() => import('./components/CommunityBoard').then((m) => ({ default: m.CommunityBoard })));
 
@@ -392,10 +393,17 @@ export function App() {
         )}
 
         {currentView === 'REPLAY_STAGE' && activeReplay && (
-          <BattleReplayStage
-            replay={activeReplay}
-            onExit={handleExitReplay}
-          />
+          activeReplay.v2 ? (
+            <BattleReplayV2Stage
+              replay={activeReplay}
+              onExit={handleExitReplay}
+            />
+          ) : (
+            <BattleReplayStage
+              replay={activeReplay}
+              onExit={handleExitReplay}
+            />
+          )
         )}
 
         {currentView === 'BOARD' && (

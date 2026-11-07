@@ -13,15 +13,19 @@ interface LeaderSelectModalProps {
   titlePrefix?: string; // 예: "플레이어 1" 또는 "플레이어 2"
 }
 
-export const LeaderSelectModal: React.FC<LeaderSelectModalProps> = ({
-  isOpen,
+// 닫혀 있을 때는 아무것도 그리지 않고, 열릴 때마다 내부 컴포넌트를 새로 마운트해 선택값을 기본 리더로 초기화한다.
+// (이전: early return 뒤에 useState가 있어 rules-of-hooks 위반 — 열림/닫힘이 바뀌면 훅 개수가 달라짐)
+export const LeaderSelectModal: React.FC<LeaderSelectModalProps> = ({ isOpen, ...rest }) => {
+  if (!isOpen) return null;
+  return <LeaderSelectModalBody {...rest} />;
+};
+
+const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = ({
   player,
   isFirstTurnPlayer,
   onConfirm,
   titlePrefix,
 }) => {
-  if (!isOpen) return null;
-
   // 출전 가능한 3명의 기본 캐릭터 목록
   const candidates: CharacterCard[] = [
     player.slots.leader,

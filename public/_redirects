@@ -1,5 +1,7 @@
-# Cloudflare Pages Redirects & SPA Rewrite
+# Cloudflare Pages Redirects
 # https://developers.cloudflare.com/pages/configuration/redirects/
-
-# SPA 라우팅 지원: 모든 하위 URL 요청을 index.html로 200 상태 코드로 포워딩
-/*    /index.html   200
+#
+# [WP4] SPA 폴백(/* /index.html 200) 제거.
+# 앱은 해시 라우팅(#battle-stage 등)만 사용하므로 경로 폴백이 필요 없음.
+# 폴백이 있으면 없는 카드·오디오·JS 청크 요청에 index.html이 200으로 응답되어
+# 1년 캐시·서비스 워커에 HTML이 저장되는 문제가 있었음. 이제 없는 파일은 public/404.html(404)로 응답.

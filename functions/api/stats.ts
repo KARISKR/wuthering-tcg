@@ -71,15 +71,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const dailyId = `daily_${dateKey}`;
 
   const nowTs = Date.now();
-  const expiredTs = nowTs - 90 * 1000; // 90초 유효 세션
+  // 접속 판정 시간: 클라이언트 핑 간격(5분)의 2배. 이 시간 안에 핑을 보낸 세션을 접속자로 셈
+  const SESSION_TTL_MS = 10 * 60 * 1000;
+  const expiredTs = nowTs - SESSION_TTL_MS;
+  // 만료 세션 청소는 요청 20회 중 1회만 수행 (COUNT는 last_seen 조건으로 세므로 정확도 영향 없음, D1 쓰기 절감)
+  const shouldCleanup = Math.random() < 0.05;
 
   // Cloudflare D1 (일일 100,000회 무료 쓰기, 5,000,000회 무료 읽기)
   if (env.DB) {
     try {
       const statements: D1PreparedStatement[] = [];
 
-      // 만료된 활성 세션 청소
-      statements.push(env.DB.prepare('DELETE FROM active_sessions WHERE last_seen < ?').bind(expiredTs));
+      // 만료된 활성 세션 청소 (가끔만)
+      if (shouldCleanup) {
+        statements.push(env.DB.prepare('DELETE FROM active_sessions WHERE last_seen < ?').bind(expiredTs));
+      }
 
       if (!shouldExclude) {
         if (action === 'visit') {
@@ -114,10 +120,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       }
 
       // 동시 쿼리 조회: 실시간 세션, total 카운터, 오늘 daily 카운터, 전체 daily 카운터들의 누적합
+      // 일일 방문자 누적합(SUM)은 전체 날짜 행을 매번 읽으므로, 하루 1회 발생하는 'visit' 요청에서만 계산해 total을 보정
       const [onlineRes, countersRes, sumDailyRes] = await Promise.all([
         env.DB.prepare('SELECT COUNT(*) as count FROM active_sessions WHERE last_seen >= ?').bind(expiredTs).first<{ count: number }>(),
         env.DB.prepare('SELECT id, val FROM stats_counters WHERE id IN (\'total\', ?)').bind(dailyId).all<{ id: string; val: number }>(),
-        env.DB.prepare('SELECT SUM(val) as total_sum FROM stats_counters WHERE id LIKE \'daily_%\'').first<{ total_sum: number | null }>(),
+        action === 'visit'
+          ? env.DB.prepare('SELECT SUM(val) as total_sum FROM stats_counters WHERE id LIKE \'daily_%\'').first<{ total_sum: number | null }>()
+          : Promise.resolve(null as { total_sum: number | null } | null),
       ]);
 
       const online = Math.max(1, onlineRes?.count || 1);

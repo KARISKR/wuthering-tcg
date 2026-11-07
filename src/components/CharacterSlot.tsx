@@ -1,4 +1,5 @@
 import React from 'react';
+import { CardArt } from './CardArt';
 import { CharacterCard } from '../types/tcg';
 import { CardView } from './CardView';
 import { ArrowLeftRight, ChevronUp, Crown, UserCheck, Layers } from 'lucide-react';
@@ -134,9 +135,11 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
                   className={`absolute ${cardSizeClass} ${baseTopClass} ${hoverTopClass} ${rotateClass} ${zClass} rounded-xl border border-[#f97316]/80 bg-slate-900 shadow-2xl overflow-hidden transition-all duration-300 ease-out cursor-pointer hover:border-[#f97316] hover:ring-2 hover:ring-[#f97316]/50 group/undercard`}
                   title={`클릭하여 진화 계보 전체 보기 | Lv.${underCard.level} [${underCard.nameKr}] (상속 스킬 보유 중)`}
                 >
-                  <img
-                    src={underCard.artUrl}
+                  <CardArt
+                    artUrl={underCard.artUrl}
+                    sizes="120px"
                     alt={underCard.nameKr}
+                    fallbackName={underCard.nameKr}
                     className="w-full h-full object-cover opacity-80 group-hover/undercard:opacity-100 transition-opacity"
                   />
                   <div className="absolute top-1 left-1 flex items-center gap-0.5 bg-black/90 backdrop-blur-sm px-1.5 py-0.5 rounded border border-[#f97316] text-[#f97316] font-mono font-black text-[8px] shadow-lg">

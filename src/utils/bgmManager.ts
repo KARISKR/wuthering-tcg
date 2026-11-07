@@ -369,20 +369,73 @@ class BgmManager {
     };
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // [WP2] 전투 BGM 미리 받기
+  // 로비에 머무는 동안 다음 전투 트랙을 미리 정해 별도 Audio 요소로 버퍼링해 둔다.
+  // 전투 진입 시 같은 트랙을 재생하므로, 효과음·카드 이미지와 대역폭을 다투지 않고 바로 재생된다.
+  // ─────────────────────────────────────────────────────────────────────────
+  private preparedBattleIdx: number | null = null;
+  private warmAudio: HTMLAudioElement | null = null;
+  private prepareTimer: ReturnType<typeof setTimeout> | null = null;
+
+  public prepareBattleTrack() {
+    if (typeof window === 'undefined') return;
+    // getCurrentTracks()의 battle 모드 순서와 동일해야 같은 인덱스가 같은 곡을 가리킴
+    const tracks = this.customBattleTracks.length > 0
+      ? [...this.customBattleTracks, ...BATTLE_BGM_TRACKS]
+      : BATTLE_BGM_TRACKS;
+    if (tracks.length === 0) return;
+    if (this.preparedBattleIdx === null) {
+      this.preparedBattleIdx = this.isShuffle ? Math.floor(Math.random() * tracks.length) : 0;
+    }
+    const track = tracks[this.preparedBattleIdx];
+    if (!track) return;
+    if (!this.warmAudio) {
+      this.warmAudio = new Audio();
+      this.warmAudio.muted = true;
+    }
+    if (!this.warmAudio.src.endsWith(track.src)) {
+      this.warmAudio.preload = 'auto';
+      this.warmAudio.src = track.src;
+      this.warmAudio.load();
+    }
+  }
+
+  private scheduleBattlePrepare() {
+    if (this.prepareTimer) clearTimeout(this.prepareTimer);
+    // 로비 진입 직후의 초기 로딩(폰트·배경·로비 BGM)과 겹치지 않도록 잠시 뒤에 시작
+    this.prepareTimer = setTimeout(() => {
+      this.prepareTimer = null;
+      if (this.mode === 'lobby') this.prepareBattleTrack();
+    }, 15000);
+  }
+
   public setMode(newMode: BgmMode) {
     if (this.lockedTrackTitle) return; // 특정 BGM(예: 튜토리얼) 고정 시 모드 자동 전환 차단
-    if (this.mode === newMode) return;
+    if (this.mode === newMode) {
+      if (newMode === 'lobby' && this.preparedBattleIdx === null) this.scheduleBattlePrepare();
+      return;
+    }
     this.mode = newMode;
     try {
       localStorage.setItem('wuthering_bgm_mode', newMode);
     } catch {}
 
     const tracks = this.getCurrentTracks();
-    if (this.isShuffle && tracks.length > 0) {
+    if (newMode === 'battle' && this.preparedBattleIdx !== null && tracks[this.preparedBattleIdx]) {
+      // [WP2] 로비에서 미리 받아둔 전투 트랙을 사용
+      this.currentTrackIdx = this.preparedBattleIdx;
+      this.preparedBattleIdx = null;
+      if (this.warmAudio) {
+        this.warmAudio.removeAttribute('src');
+        this.warmAudio.load();
+      }
+    } else if (this.isShuffle && tracks.length > 0) {
       this.currentTrackIdx = Math.floor(Math.random() * tracks.length);
     } else {
       this.currentTrackIdx = 0;
     }
+    if (newMode === 'lobby') this.scheduleBattlePrepare();
 
     if (this.audio) {
       const track = tracks[this.currentTrackIdx] || tracks[0];

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { CardArt } from './CardArt';
 import { ActionCard, GamePhase } from '../types/tcg';
 import { CardView } from './CardView';
 import { BatteryCharging, Swords, Zap, Trash2, X, Sparkles, Flame, AlertTriangle } from 'lucide-react';
@@ -356,9 +357,11 @@ export const HandView: React.FC<HandViewProps> = ({
 
                 {/* 1. 일러스트 영역 */}
                 <div className="w-full h-[88px] sm:h-[96px] rounded-lg overflow-hidden bg-slate-950 border border-white/10 relative shrink-0">
-                  <img
-                    src={card.artUrl}
+                  <CardArt
+                    artUrl={card.artUrl}
+                    sizes="160px"
                     alt={card.nameKr}
+                    fallbackName={card.nameKr}
                     className="w-full h-full object-cover object-top group-hover:object-center transition-all duration-200"
                   />
                   {card.isRevealed && (

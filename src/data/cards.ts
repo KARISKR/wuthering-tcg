@@ -1,3 +1,4 @@
+import { engineRandom } from '../engine/rng';
 import { CharacterCard, ActionCard } from '../types/tcg';
 import { OFFICIAL_CARDS, OfficialCardData } from './officialCards';
 
@@ -258,7 +259,7 @@ export const STARTER_PRESETS: Record<'STARTER_ROVER' | 'STARTER_CHIXIA', Starter
 export function shuffleArray<T>(array: T[]): T[] {
   const newArr = [...array];
   for (let i = newArr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(engineRandom() * (i + 1)); // [WP6] 시드 난수 (같은 시드면 같은 셔플)
     [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
   }
   return newArr;

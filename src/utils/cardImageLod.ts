@@ -101,6 +101,9 @@ function getSharedResizeObserver(): ResizeObserver | null {
 }
 
 function watch(img: LodImg) {
+  // [WP3] <CardArt>가 직접 관리하는 이미지는 건드리지 않음 (srcSet + 자체 재시도/대체 처리)
+  if (img.getAttribute('data-no-lod') === 'true' && img.hasAttribute('srcset')) return;
+  if (img.getAttribute('data-no-lod') === 'true' && !img.getAttribute('src')?.includes(ORIG_PREFIX)) return;
   const attr = img.getAttribute('src') || '';
   if (!attr.includes(ORIG_PREFIX) && !img.__lodOrig) return;
   const ro = getSharedResizeObserver();

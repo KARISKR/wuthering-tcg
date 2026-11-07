@@ -5,11 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "lod-manifest": "node scripts/build_card_lod_manifest.mjs",
+    "prebuild": "node scripts/build_card_lod_manifest.mjs",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
     "sync-audio": "node scripts/sync_all_audio.cjs",
-    "deploy:cf": "npm run build && wrangler pages deploy dist"
+    "deploy:cf": "npm test && npm run build && wrangler pages deploy dist",
+    "test": "vitest run"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
@@ -31,6 +34,7 @@
     "postcss": "^8.5.29",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.3.0"
+    "vite": "^8.3.0",
+    "vitest": "^3.2.7"
   }
 }

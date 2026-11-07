@@ -33,6 +33,9 @@ import {
   toggleLikeFeedback,
   addCommentToFeedback,
   formatForClipboard,
+  RATE_LIMITED_EVENT,
+  rateLimitMessage,
+  type RateLimitedDetail,
   exportFeedbackAsJson,
   getDraft,
   saveDraft,
@@ -88,6 +91,17 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
   };
+
+  // [WP9 잔여] 서버 작성 빈도 제한(429) 안내
+  useEffect(() => {
+    const onLimited = (e: Event) => {
+      const detail = (e as CustomEvent<RateLimitedDetail>).detail;
+      setToastMessage(rateLimitMessage(detail));
+      setTimeout(() => setToastMessage(null), 4000);
+    };
+    window.addEventListener(RATE_LIMITED_EVENT, onLimited);
+    return () => window.removeEventListener(RATE_LIMITED_EVENT, onLimited);
+  }, []);
 
   const refreshList = () => {
     setItems(getFeedbackList());

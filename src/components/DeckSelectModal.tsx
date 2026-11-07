@@ -3,6 +3,8 @@ import { X, Swords, Bot, Users, Shuffle, Crown, Check, Layers, ArrowLeft, Sparkl
 import type { CustomDeckConfig, DeckPreset } from '../types/tcg';
 import { getStoredPresets, presetToCustomDeck, getUserDecks, customDeckToPreset } from '../utils/deckCode';
 
+import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
+import { preloadDeckCards } from '../utils/cardImagePreloader';
 interface DeckSelectModalProps {
   isOpen: boolean;
   mode: 'AI' | 'SOLO_DUAL';
@@ -235,7 +237,7 @@ const DeckColumn: React.FC<{
                         }`}
                         title={c.nameKr}
                       >
-                        <img src={c.artUrl} alt={c.nameKr} className="w-full h-full object-cover object-top" />
+                        <CardArt sizes="48px" artUrl={c.artUrl} alt={c.nameKr} className="w-full h-full object-cover object-top" />
                         {i === 0 && <Crown className="absolute top-0.5 left-0.5 w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 text-amber-300 drop-shadow" />}
                       </div>
                     ))}
@@ -301,6 +303,17 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
 
   const decksById = useMemo(() => new Map(presets.map((p) => [p.id, p])), [presets]);
 
+  // [WP3 잔여] 고른 덱의 카드 이미지를 전투 진입 전에 미리 받는다 (0.5초 디바운스, 랜덤 상대는 확정 전이라 제외)
+  useEffect(() => {
+    if (!isOpen || !myId) return;
+    const t = window.setTimeout(() => {
+      const my = decksById.get(myId);
+      const opp = oppId && oppId !== RANDOM_ID ? decksById.get(oppId) : undefined;
+      preloadDeckCards([my ? presetToCustomDeck(my) : null, opp ? presetToCustomDeck(opp) : null]);
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [isOpen, myId, oppId, decksById]);
+
   if (!isOpen) return null;
 
   const isAi = mode === 'AI';
@@ -314,7 +327,10 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
     if (!oppPreset) return;
     localStorage.setItem(LAST_MY_KEY, myId);
     localStorage.setItem(LAST_OPP_KEY, oppId);
-    onConfirm(presetToCustomDeck(myPreset), presetToCustomDeck(oppPreset));
+    const myDeck = presetToCustomDeck(myPreset);
+    const oppDeck = presetToCustomDeck(oppPreset);
+    preloadDeckCards([myDeck, oppDeck]); // 랜덤으로 정해진 상대 덱 포함, 확정 즉시
+    onConfirm(myDeck, oppDeck);
   };
 
   return (
@@ -391,7 +407,7 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
               >
                 {myDeck ? (
                   <div className="relative w-8 h-10 rounded overflow-hidden border border-amber-400/60 shrink-0">
-                    <img src={myDeck.leader.artUrl} alt="" className="w-full h-full object-cover object-top" />
+                    <CardArt sizes="32px" artUrl={myDeck.leader.artUrl} alt="" className="w-full h-full object-cover object-top" />
                     <Crown className="absolute top-0.5 left-0.5 w-2.5 h-2.5 text-amber-300" />
                   </div>
                 ) : (
@@ -432,7 +448,7 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
                   </div>
                 ) : oppDeck ? (
                   <div className="relative w-8 h-10 rounded overflow-hidden border border-indigo-400/60 shrink-0">
-                    <img src={oppDeck.leader.artUrl} alt="" className="w-full h-full object-cover object-top" />
+                    <CardArt sizes="32px" artUrl={oppDeck.leader.artUrl} alt="" className="w-full h-full object-cover object-top" />
                   </div>
                 ) : (
                   <div className="w-8 h-10 rounded bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0">

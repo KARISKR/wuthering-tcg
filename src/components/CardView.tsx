@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CardArt } from './CardArt';
 import type { ActionCard, CharacterCard, AnyCard, CardColor } from '../types/tcg';
 import {
   Shield,
@@ -11,6 +12,14 @@ import {
   X,
 } from 'lucide-react';
 import { formatEffectText } from '../utils/formatEffectText';
+
+// [WP3] CardView 크기별 표시 너비 (sizeStyles의 w-24 / w-36 / w-48 / 최대 w-72와 일치)
+const CARD_ART_SIZES: Record<'sm' | 'md' | 'lg' | 'xl', string> = {
+  sm: '96px',
+  md: '144px',
+  lg: '192px',
+  xl: '288px',
+};
 
 interface CardViewProps {
   card?: AnyCard | null;
@@ -188,15 +197,15 @@ const ActionCardView: React.FC<{
       {/* 실제 공식 카드 아트 이미지가 있는 경우 (흐림/블러/어두운 오버레이 완전 제거하여 일러스트 원본 100% 선명 보존) */}
       {hasArt ? (
         <div className="relative w-full h-full flex items-center justify-center rounded-xl overflow-hidden">
-          <img
-            src={artUrl}
+          {/* [WP3] 축소본 srcSet + 실패 시 재시도→원본→대체 화면 (이전: onError에서 display:none → 검은 카드) */}
+          <CardArt
+            artUrl={artUrl}
+            sizes={CARD_ART_SIZES[size]}
             alt={card.nameKr}
+            fallbackName={card.nameKr}
             loading="eager"
             decoding="async"
             className="w-full h-full object-contain drop-shadow transition-transform duration-300 group-hover:scale-[1.02]"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
           />
 
           {badge && (
@@ -300,15 +309,16 @@ const CharacterCardView: React.FC<{
       {/* 실제 캐릭터 일러스트 (흐림/블러/어두운 오버레이 완전 제거하여 일러스트 원본 100% 선명 보존) */}
       {hasArt ? (
         <div className="relative w-full h-full flex items-center justify-center rounded-xl overflow-hidden">
-          <img
-            src={card.artUrl}
+          {/* [WP3] 축소본 srcSet + 실패 시 재시도→원본→대체 화면 (이전: onError에서 display:none → 검은 카드) */}
+          <CardArt
+            artUrl={card.artUrl}
+            sizes={CARD_ART_SIZES[size]}
             alt={card.nameKr}
+            fallbackName={card.nameKr}
+            fallbackSub={`Lv.${card.level}`}
             loading="eager"
             decoding="async"
             className="w-full h-full object-contain drop-shadow transition-transform duration-300 group-hover:scale-[1.02]"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = 'none';
-            }}
           />
 
           {/* 방랑자(남) vs 방랑자(여) 명확한 시각적 성별 뱃지 오버레이 */}

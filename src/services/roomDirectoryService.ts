@@ -77,7 +77,7 @@ class RoomDirectoryService {
           }),
         });
       } catch {}
-    }, 7000);
+    }, 20000); // [WP1] 7초 → 20초 (서버 ROOM_TTL_MS 60초 = 하트비트 3회분)
   }
 
   public stopHeartbeat() {

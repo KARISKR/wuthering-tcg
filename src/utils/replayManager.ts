@@ -1,4 +1,22 @@
-import { LogItem, PlayerState, CharacterCard } from '../types/tcg';
+import { LogItem, PlayerState, CustomDeckConfig } from '../types/tcg';
+import { GameAction } from '../engine/events';
+
+export interface ReplayV2 {
+  format: 2;
+  engineVersion: string; // CURRENT_GAME_VERSION. 엔진 규칙이 바뀌면 옛 v2는 재생 불일치 가능 -> 화면에 경고
+  start: {
+    p0PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA';
+    p1PresetKey: 'STARTER_ROVER' | 'STARTER_CHIXIA';
+    gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER';
+    p0Deck: CustomDeckConfig | null;
+    p1Deck: CustomDeckConfig | null;
+    p0Name?: string;
+    p1Name?: string;
+    seed: number;
+  };
+  actions: GameAction[];
+  finalFingerprint: string; // 종료 상태 지문
+}
 
 export interface BattleReplaySummary {
   id: string;
@@ -23,10 +41,12 @@ export interface BattleReplaySummary {
   p0Name: string;
   p1Name: string;
   totalLogCount: number;
+  v2?: ReplayV2;
 }
 
 export interface BattleReplayData extends BattleReplaySummary {
   logs: LogItem[];
+  v2?: ReplayV2;
   // 각 플레이어 시작/최종 덱 정보 요약
   p0DeckSummary?: {
     leaderName: string;
@@ -75,14 +95,34 @@ export function getSavedReplays(): BattleReplayData[] {
 }
 
 /**
+ * [WP8 버그 수정] 리플레이 목록 저장. 브라우저 저장 공간이 부족하면 가장 오래된 리플레이부터 빼면서 다시 시도한다.
+ * (이전: 공간이 차면 setItem이 실패해서 방금 끝난 경기의 리플레이가 조용히 저장되지 않았다)
+ * list는 최신순이어야 한다. 실제로 저장된 목록을 돌려준다.
+ */
+function writeReplayList(list: BattleReplayData[]): BattleReplayData[] {
+  let current = list;
+  for (;;) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+      if (current.length < list.length) {
+        console.warn(`[replayManager] 저장 공간이 부족해 오래된 리플레이 ${list.length - current.length}개를 정리했습니다.`);
+      }
+      return current;
+    } catch (e) {
+      if (current.length <= 1) throw e;
+      current = current.slice(0, -1);
+    }
+  }
+}
+
+/**
  * 기본 명경기 샘플 리플레이 복원
  */
 export function restoreSampleReplays(): BattleReplayData[] {
   try {
     const current = getSavedReplays();
-    const merged = [...SAMPLE_BATTLE_REPLAYS, ...current];
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
-    return merged.sort((a, b) => b.timestamp - a.timestamp);
+    const merged = [...SAMPLE_BATTLE_REPLAYS, ...current].sort((a, b) => b.timestamp - a.timestamp);
+    return writeReplayList(merged);
   } catch (e) {
     console.error('Failed to restore sample replays:', e);
     return [...SAMPLE_BATTLE_REPLAYS];
@@ -97,7 +137,8 @@ export function createBattleReplayData(
   players: [PlayerState, PlayerState],
   logs: LogItem[],
   totalTurns: number,
-  gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER'
+  gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER',
+  v2?: ReplayV2
 ): BattleReplayData {
   const p0Leader = players[0].slots.leader;
   const p1Leader = players[1].slots.leader;
@@ -132,6 +173,7 @@ export function createBattleReplayData(
     p1Name: players[1].name,
     totalLogCount: logs.length,
     logs: [...logs],
+    v2,
     p0DeckSummary: {
       leaderName: p0Leader.nameKr,
       leftSupportName: players[0].slots.leftSupport?.nameKr,
@@ -156,7 +198,7 @@ export function saveReplayObject(replay: BattleReplayData): BattleReplayData {
       const existing = getSavedReplays();
       // 중복 방지 (동일 id) 및 최대 개수 제한(20개)
       const updated = [replay, ...existing.filter((r) => r.id !== replay.id)].slice(0, MAX_REPLAYS);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      writeReplayList(updated);
     }
   } catch (e) {
     console.error('Failed to save battle replay:', e);
@@ -186,7 +228,7 @@ export function deleteBattleReplay(replayId: string): boolean {
     if (typeof localStorage === 'undefined') return true;
     const existing = getSavedReplays();
     const updated = existing.filter((r) => r.id !== replayId);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    writeReplayList(updated);
     return true;
   } catch (e) {
     console.error('Failed to delete battle replay:', e);
@@ -244,7 +286,7 @@ export function importReplayFromJson(jsonString: string): { success: boolean; re
 
     const existing = getSavedReplays();
     const updated = [importedReplay, ...existing.filter((r) => r.id !== importedReplay.id)].slice(0, MAX_REPLAYS);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    writeReplayList(updated);
 
     return { success: true, replay: importedReplay };
   } catch (err: any) {

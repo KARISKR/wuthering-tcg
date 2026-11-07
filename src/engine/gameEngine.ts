@@ -1,3 +1,5 @@
+import { engineRandom, engineTick, engineTag, seedEngineRng, newEngineSeed, logTimestamp } from './rng';
+import { emitUpgradeFx, emitEffectFx, engineFxMark, engineEffectsSince } from './fxSink';
 import {
   GameState,
   PlayerState,
@@ -504,7 +506,7 @@ export function addCardsToHand(player: PlayerState, cards: ActionCard[]): void {
     if (!cardToAdd.id || existingIds.has(cardToAdd.id)) {
       cardToAdd = {
         ...cardToAdd,
-        id: `card-${cardToAdd.code || 'action'}-${player.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        id: `card-${cardToAdd.code || 'action'}-${player.id}-${engineTick()}-${engineTag()}`,
       };
     }
     player.hand.push(cardToAdd);
@@ -945,8 +947,12 @@ export function createInitialGameState(
   p0CustomDeck?: CustomDeckConfig | null,
   p1CustomDeck?: CustomDeckConfig | null,
   p0CustomName?: string,
-  p1CustomName?: string
+  p1CustomName?: string,
+  /** [WP6] 같은 시드 + 같은 엔진 호출 순서면 항상 같은 게임이 재현됨. 생략하면 무작위 시드 */
+  seed?: number
 ): GameState {
+  const rngSeed = (seed ?? newEngineSeed()) >>> 0;
+  seedEngineRng(rngSeed);
   let p0Deck = generateStarterActionDeck(p0PresetKey);
   let p1Deck = generateStarterActionDeck(p1PresetKey);
   let p0PresetObj = STARTER_PRESETS[p0PresetKey];
@@ -968,13 +974,13 @@ export function createInitialGameState(
   p0Deck = shuffleActionDeck(
     p0Deck.map((c, i) => ({
       ...c,
-      id: `card-${c.code}-p0-${i}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: `card-${c.code}-p0-${i}-${engineTick()}-${engineTag()}`,
     }))
   );
   p1Deck = shuffleActionDeck(
     p1Deck.map((c, i) => ({
       ...c,
-      id: `card-${c.code}-p1-${i}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      id: `card-${c.code}-p1-${i}-${engineTick()}-${engineTag()}`,
     }))
   );
 
@@ -1013,7 +1019,7 @@ export function createInitialGameState(
       turn: 1,
       text: `《명조: 대결 (Wuthering Waves TCG)》 배틀이 시작되었습니다!`,
       type: 'SYSTEM',
-      timestamp: Date.now(),
+      timestamp: logTimestamp(),
       snapshot: initSnapshot,
     },
     {
@@ -1021,12 +1027,14 @@ export function createInitialGameState(
       turn: 1,
       text: `출격할 시작 리더(LEADER) 카드를 선택하세요.`,
       type: 'SYSTEM',
-      timestamp: Date.now(),
+      timestamp: logTimestamp(),
       snapshot: initSnapshot,
     },
   ];
 
   return {
+    rngSeed,
+    seed: rngSeed,
     turn: 1,
     activePlayerIndex: 0, // 플레이어 선공 기본값 (주사위 결정 시 갱신)
     firstPlayerIndex: 0,
@@ -1194,12 +1202,12 @@ export function addLog(
   const snapshot = createBoardSnapshot(state);
 
   const newLog: LogItem = {
-    id: `log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    id: `log-${engineTick()}-${engineTag()}`,
     turn: state.turn,
     playerIndex,
     text,
     type,
-    timestamp: Date.now(),
+    timestamp: logTimestamp(),
     cardArt: meta?.cardArt,
     cardName: meta?.cardName,
     amount: meta?.amount,
@@ -1271,8 +1279,6 @@ export function executeStartPhase(state: GameState): GameState {
   let newState: GameState = {
     ...state,
     phase: 'START_PHASE' as GamePhase,
-    // 직전 턴 배틀 종료 직전에 발생한 레벨업 연출이 아직 표시/확인되지 않았다면 유지 (화면에서 확인 시 clearLastUpgrade로 해제)
-    lastUpgrade: state.lastUpgrade ?? null,
     lastComboStrike: null,
     players: [p0, p1],
   };
@@ -1337,21 +1343,21 @@ export function executeStartPhase(state: GameState): GameState {
         activeIdx,
         { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '턴 시작 효과 드로우' }
       );
-      newState.lastEffectEvent = {
-        id: `effect-rover-female-draw-${Date.now()}`,
+      emitEffectFx({
+        id: `effect-rover-female-draw-${engineTick()}`,
         effectType: 'DRAW',
         title: '방랑자(여) Lv.2 턴 시작 효과',
         description: `【자신의 턴 시작 시】${slotNameKr} 자리에 있는 방랑자(여)의 효과로 [${card.nameKr}] 1장을 드로우했습니다.`,
         sourceCardName: '방랑자(여) Lv.2 [SD01-001]',
         sourceCardArt: roverArt,
         playerIndex: activeIdx,
-        timestamp: Date.now(),
-      };
+        timestamp: logTimestamp(),
+      });
 
       // 플레이어가 방랑자(여) 효과로 뽑은 1장을 먼저 명확하게 확인할 수 있도록 EffectDrawOverlay 표출 후 드로우 페이즈로 이동!
       if (!activePlayer.isAi || state.gameMode === 'SOLO_DUAL') {
         newState.lastEffectDraw = {
-          id: `eff-draw-rover-female-${Date.now()}`,
+          id: `eff-draw-rover-female-${engineTick()}`,
           playerIndex: activeIdx,
           cards: [card],
           sourceCardName: `방랑자(여) Lv.2 [SD01-001] 턴 시작 효과 (${slotNameKr})`,
@@ -1533,15 +1539,15 @@ export function upgradeCharacter(
   player.actionFlags.upgraded = true;
 
   let newState: GameState = { ...state, players: [p0, p1] };
-  newState.lastUpgrade = {
-    id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+  emitUpgradeFx({
+    id: `upgrade-${engineTick()}-${engineTag()}`,
     playerIndex,
     playerName: player.name,
     character: { ...upgradeCard },
     previousLevel: currentSlotCard.level as 0 | 1 | 2,
     newLevel: upgradeCard.level as 1 | 2,
     slotName: targetSlot,
-  };
+  });
   newState = addLog(
     newState,
     `[캐릭터 레벨업!] ${player.name}이(가) [${currentSlotCard.nameKr}]을(를) [${upgradeCard.nameKr}](Lv.${upgradeCard.level})(으)로 진화시켰습니다! (패 ${discarded.length}장 소비)`,
@@ -1658,7 +1664,7 @@ export function applyCharacterEvolutionSkills(
         }
       } else {
         const choice: PendingChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `choice-${engineTick()}-${engineTag()}`,
           playerIndex,
           title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (트래시 회수)`,
           sourceCardName: '카멜리아 [BP01-003]',
@@ -1682,19 +1688,19 @@ export function applyCharacterEvolutionSkills(
         playerIndex,
         { cardArt: cam1.artUrl, cardName: cam1.nameKr, effectTag: '효과 대상 없음' }
       );
-      newState.lastEffectEvent = {
-        id: `eff-${Date.now()}-cam1-empty`,
+      emitEffectFx({
+        id: `eff-${engineTick()}-cam1-empty`,
         sourceCardName: '카멜리아 [BP01-003]',
         sourceCardArt: cam1.artUrl,
         effectType: 'DRAW',
         title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과`,
         description: '트래시 에리어에 회수할 수 있는 <일반 공격> 카드가 없습니다.',
         playerIndex,
-        timestamp: Date.now(),
-      };
+        timestamp: logTimestamp(),
+      });
       if (!player.isAi) {
         const infoChoice: PendingChoice = {
-          id: `choice-${Date.now()}-cam1-empty`,
+          id: `choice-${engineTick()}-cam1-empty`,
           playerIndex,
           title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
           sourceCardName: '카멜리아 [BP01-003]',
@@ -1733,7 +1739,7 @@ export function applyCharacterEvolutionSkills(
         }
       } else {
         const choice: PendingChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `choice-${engineTick()}-${engineTag()}`,
           playerIndex,
           title: `파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (트래시 회수)`,
           sourceCardName: '파수인 [BP01-009]',
@@ -1758,7 +1764,7 @@ export function applyCharacterEvolutionSkills(
       );
       if (!player.isAi) {
         const infoChoice: PendingChoice = {
-          id: `choice-${Date.now()}-sh1-empty`,
+          id: `choice-${engineTick()}-sh1-empty`,
           playerIndex,
           title: `파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
           sourceCardName: '파수인 [BP01-009]',
@@ -1801,7 +1807,7 @@ export function applyCharacterEvolutionSkills(
         }
       } else {
         const choice: PendingChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `choice-${engineTick()}-${engineTag()}`,
           playerIndex,
           title: `앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (트래시 회수)`,
           sourceCardName: '앙코 [BP01-013]',
@@ -1826,7 +1832,7 @@ export function applyCharacterEvolutionSkills(
       );
       if (!player.isAi) {
         const infoChoice: PendingChoice = {
-          id: `choice-${Date.now()}-anke1-empty`,
+          id: `choice-${engineTick()}-anke1-empty`,
           playerIndex,
           title: `앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
           sourceCardName: '앙코 [BP01-013]',
@@ -1865,7 +1871,7 @@ export function applyCharacterEvolutionSkills(
         }
       } else {
         const choice: PendingChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `choice-${engineTick()}-${engineTag()}`,
           playerIndex,
           title: `치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (트래시 회수)`,
           sourceCardName: '치샤 [BP01-026]',
@@ -1890,7 +1896,7 @@ export function applyCharacterEvolutionSkills(
       );
       if (!player.isAi) {
         const infoChoice: PendingChoice = {
-          id: `choice-${Date.now()}-chixia1-empty`,
+          id: `choice-${engineTick()}-chixia1-empty`,
           playerIndex,
           title: `치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
           sourceCardName: '치샤 [BP01-026]',
@@ -1926,7 +1932,7 @@ export function applyCharacterEvolutionSkills(
         );
       } else {
         const choice: PendingChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `choice-${engineTick()}-${engineTag()}`,
           playerIndex,
           title: `산화 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (협주 배치)`,
           sourceCardName: '산화 [BP01-032]',
@@ -1951,7 +1957,7 @@ export function applyCharacterEvolutionSkills(
       );
       if (!player.isAi) {
         const infoChoice: PendingChoice = {
-          id: `choice-${Date.now()}-sanhua1-empty`,
+          id: `choice-${engineTick()}-sanhua1-empty`,
           playerIndex,
           title: `산화 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
           sourceCardName: '산화 [BP01-032]',
@@ -1988,7 +1994,7 @@ export function applyCharacterEvolutionSkills(
         );
         if (!newState.players[0].isAi) {
           const aiRevealChoice: PendingChoice = {
-            id: `choice-${Date.now()}-ai-rover1-reveal`,
+            id: `choice-${engineTick()}-ai-rover1-reveal`,
             playerIndex: 0,
             title: `상대 카드 공개 확인 — 방랑자 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과`,
             sourceCardName: `${rover1.nameKr} [${rover1.code}]`,
@@ -2005,7 +2011,7 @@ export function applyCharacterEvolutionSkills(
         }
       } else {
         const choice: PendingChoice = {
-          id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          id: `choice-${engineTick()}-${engineTag()}`,
           playerIndex,
           title: `방랑자 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 — 카드 공개 및 패 추가`,
           sourceCardName: `${rover1.nameKr} [${rover1.code}]`,
@@ -2024,7 +2030,7 @@ export function applyCharacterEvolutionSkills(
     } else {
       if (!player.isAi) {
         const infoChoice: PendingChoice = {
-          id: `choice-${Date.now()}-rover1-empty`,
+          id: `choice-${engineTick()}-rover1-empty`,
           playerIndex,
           title: `방랑자 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
           sourceCardName: `${rover1.nameKr} [${rover1.code}]`,
@@ -2054,16 +2060,16 @@ export function applyCharacterEvolutionSkills(
     if (topCard) {
       addCardsToConcertoZone(player, [topCard]);
       newState.players[playerIndex] = player;
-      newState.lastEffectEvent = {
-        id: `eff-${Date.now()}-yang1-${playerIndex}`,
+      emitEffectFx({
+        id: `eff-${engineTick()}-yang1-${playerIndex}`,
         sourceCardName: `${yangCard.nameKr} [${yangCard.code}]`,
         sourceCardArt: yangCard.artUrl,
         effectType: 'CHARGE',
         title: `양양 Lv.1 ${isYangEntry ? '등장' : '레벨업'} 효과`,
         description: `【${isYangEntry ? '등장' : '레벨업'}】 효과로 덱 위의 카드 1장을 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length}/10)`,
         playerIndex,
-        timestamp: Date.now(),
-      };
+        timestamp: logTimestamp(),
+      });
       newState = addLog(
         newState,
         `[협주 충전] [양양 Lv.1 ${isYangEntry ? '등장' : '레벨업'} 효과] 덱에서 [${topCard.nameKr}] 카드를 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length}/10)`,
@@ -2073,7 +2079,7 @@ export function applyCharacterEvolutionSkills(
       );
       if (!player.isAi) {
         const infoChoice: PendingChoice = {
-          id: `choice-${Date.now()}-yang1-concerto`,
+          id: `choice-${engineTick()}-yang1-concerto`,
           playerIndex,
           title: `양양 Lv.1 ${isYangEntry ? '등장' : '레벨업'} 효과 발동`,
           sourceCardName: `${yangCard.nameKr} [${yangCard.code}]`,
@@ -2110,7 +2116,7 @@ export function applyCharacterEvolutionSkills(
     );
     if (!player.isAi) {
       const infoChoice: PendingChoice = {
-        id: `choice-${Date.now()}-cam2-return`,
+        id: `choice-${engineTick()}-cam2-return`,
         playerIndex,
         title: '카멜리아 Lv.2 레벨업 효과 발동',
         sourceCardName: `${cam2ReturnCard.nameKr} [${cam2ReturnCard.code}]`,
@@ -2199,7 +2205,7 @@ export function triggerShorekeeperSwitchSkill(
       '/cards/card_images/BP01-008_파수인_1908.webp';
 
     const decisionChoice: PendingChoice = {
-      id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-sh-switch-prompt`,
+      id: `choice-${engineTick()}-${engineTag()}-sh-switch-prompt`,
       playerIndex,
       title: '파수인 Lv.1 교체 효과 — 카드 드로우 여부 선택',
       sourceCardName: '파수인 Lv.1 [BP01-008]',
@@ -2237,7 +2243,7 @@ export function recordHpChange(
 ): GameState {
   if (amount <= 0 && prevHp === newHp) return state;
   const entry: HpHistoryEntry = {
-    id: `hp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: `hp-${engineTick()}-${engineTag()}`,
     turn: state.turn,
     playerIndex,
     type,
@@ -2247,7 +2253,7 @@ export function recordHpChange(
     reason,
     sourceCardName,
     sourceCardArt,
-    timestamp: Date.now(),
+    timestamp: logTimestamp(),
   };
   return {
     ...state,
@@ -2297,7 +2303,7 @@ export function triggerShorekeeperHealPassive(
 
   // 플레이어: 뽑기 "가능"이므로 덱에서 뽑을 것인지 선택 요청
   const decisionChoice: PendingChoice = {
-    id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}-sh-lv2-heal-prompt`,
+    id: `choice-${engineTick()}-${engineTag()}-sh-lv2-heal-prompt`,
     playerIndex,
     title: '파수인 Lv.2 상시 효과 — 카드 드로우 여부 선택',
     sourceCardName: '파수인 Lv.2 [BP01-006]',
@@ -2378,7 +2384,7 @@ export function applyBossEchoHitEffects(
     const removedNames: string[] = [];
     const discardedCards: ActionCard[] = [];
     for (let k = 0; k < removeCount && defender.hand.length > 0; k++) {
-      const randIdx = Math.floor(Math.random() * defender.hand.length);
+      const randIdx = Math.floor(engineRandom() * defender.hand.length); // [WP6] 시드 난수
       const [discarded] = defender.hand.splice(randIdx, 1);
       if (discarded) {
         discardedCards.push(discarded);
@@ -2395,17 +2401,17 @@ export function applyBossEchoHitEffects(
         attackerIndex
       );
       const eff: TriggeredEffectEvent = {
-        id: `eff-bp01-035-${Date.now()}`,
+        id: `eff-bp01-035-${engineTick()}`,
         sourceCardName: card.nameKr,
         sourceCardArt: card.artUrl,
         effectType: 'DISCARD',
         title: '지옥불 기사 — 【우세】 패 제거',
         description: desc,
         playerIndex: attackerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       };
       triggeredEffects.push(eff);
-      newState.lastEffectEvent = eff;
+      emitEffectFx(eff);
     }
   }
 
@@ -2421,22 +2427,22 @@ export function applyBossEchoHitEffects(
       attackerIndex
     );
     const eff: TriggeredEffectEvent = {
-      id: `eff-bp01-037-${Date.now()}`,
+      id: `eff-bp01-037-${engineTick()}`,
       sourceCardName: card.nameKr,
       sourceCardArt: card.artUrl,
       effectType: 'DISCARD',
       title: '반디의 군세 — 【우세】 협주 파괴',
       description: desc,
       playerIndex: attackerIndex,
-      timestamp: Date.now(),
+      timestamp: logTimestamp(),
     };
     triggeredEffects.push(eff);
-    newState.lastEffectEvent = eff;
+    emitEffectFx(eff);
   }
 
   // BP01-039 폭주의 고릴라: 【우세】상대에게 데미지를 입힐 시 상대의 패를 무작위로 1장 상대 덱 맨 아래로 되돌린다.
   if (baseCode === 'BP01-039' && defender.hand.length > 0) {
-    const randIdx = Math.floor(Math.random() * defender.hand.length);
+    const randIdx = Math.floor(engineRandom() * defender.hand.length); // [WP6] 시드 난수
     const [returnedCard] = defender.hand.splice(randIdx, 1);
     if (returnedCard) {
       defender.actionDeck.push(returnedCard);
@@ -2449,17 +2455,17 @@ export function applyBossEchoHitEffects(
         attackerIndex
       );
       const eff: TriggeredEffectEvent = {
-        id: `eff-bp01-039-${Date.now()}`,
+        id: `eff-bp01-039-${engineTick()}`,
         sourceCardName: card.nameKr,
         sourceCardArt: card.artUrl,
         effectType: 'DISCARD',
         title: '폭주의 고릴라 — 【우세】 패 덱 귀환',
         description: desc,
         playerIndex: attackerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       };
       triggeredEffects.push(eff);
-      newState.lastEffectEvent = eff;
+      emitEffectFx(eff);
     }
   }
 
@@ -2475,17 +2481,17 @@ export function applyBossEchoHitEffects(
       attackerIndex
     );
     const eff: TriggeredEffectEvent = {
-      id: `eff-bp01-041-${Date.now()}`,
+      id: `eff-bp01-041-${engineTick()}`,
       sourceCardName: card.nameKr,
       sourceCardArt: card.artUrl,
       effectType: 'DISCARD',
       title: '크라운리스 — 【우세】 덱 밀링',
       description: desc,
       playerIndex: attackerIndex,
-      timestamp: Date.now(),
+      timestamp: logTimestamp(),
     };
     triggeredEffects.push(eff);
-    newState.lastEffectEvent = eff;
+    emitEffectFx(eff);
   }
 
   // BP01-043 애곡하는 아익스: 【우세】상대에게 데미지를 입힐 시 상대의 트래시 에리어에서 카드를 최대 2장까지 상대의 덱 맨 아래로 되돌린다.
@@ -2509,17 +2515,17 @@ export function applyBossEchoHitEffects(
         attackerIndex
       );
       const eff: TriggeredEffectEvent = {
-        id: `eff-bp01-043-${Date.now()}`,
+        id: `eff-bp01-043-${engineTick()}`,
         sourceCardName: card.nameKr,
         sourceCardArt: card.artUrl,
         effectType: 'CANCEL',
         title: '애곡하는 아익스 — 【우세】 트래시 덱 귀환',
         description: desc,
         playerIndex: attackerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       };
       triggeredEffects.push(eff);
-      newState.lastEffectEvent = eff;
+      emitEffectFx(eff);
     }
   }
 
@@ -2658,7 +2664,7 @@ export function decideClash(state: GameState, startClash: boolean): GameState {
         } else {
           // 카드를 미리 모달로 까발리지 않고 3D 드로우 연출을 통해 패에 드로우
           const effectDrawObj: EffectDrawAnimation = {
-            id: `eff-draw-${Date.now()}-bp007`,
+            id: `eff-draw-${engineTick()}-bp007`,
             playerIndex: activeIdx,
             cards: drawn,
             sourceCardName: '파수인 Lv.2 [BP01-007]',
@@ -2767,7 +2773,7 @@ export function setClashCard(
       // 상대방(비턴 플레이어)에게 턴 플레이어의 패를 확인하는 팝업 띄우기
       const opponentIndex = (playerIndex === 0 ? 1 : 0) as 0 | 1;
       const revealChoice: PendingChoice = {
-        id: `choice-${Date.now()}-clash-hand-reveal`,
+        id: `choice-${engineTick()}-clash-hand-reveal`,
         playerIndex: opponentIndex,
         title: `【공식 룰 604.1.1.2】 턴 플레이어(${player.name}) 패 공개 확인`,
         sourceCardName: '공식 룰 604.1.1.2 (배틀 스텝)',
@@ -2924,14 +2930,14 @@ export function applyBattleStepSkills(state: GameState): GameState {
           );
         }
         const effEvent: TriggeredEffectEvent = {
-          id: `eff-${Date.now()}-chixia0-${playerIndex}`,
+          id: `eff-${engineTick()}-chixia0-${playerIndex}`,
           sourceCardName: '치샤',
           sourceCardArt: player.slots.leader.artUrl,
           effectType: 'DAMAGE',
           title: '치샤 배틀 효과',
           description: `적색 카드로 배틀에 돌입하여 상대에게 ${dealt}pt 데미지를 입혔습니다!`,
           playerIndex,
-          timestamp: Date.now(),
+          timestamp: logTimestamp(),
         };
         battleStepEffects.push(effEvent);
         newState = addLog(
@@ -2966,14 +2972,14 @@ export function applyBattleStepSkills(state: GameState): GameState {
           );
         }
         const effEvent: TriggeredEffectEvent = {
-          id: `eff-${Date.now()}-jinhsi0-${playerIndex}`,
+          id: `eff-${engineTick()}-jinhsi0-${playerIndex}`,
           sourceCardName: '금희',
           sourceCardArt: player.slots.leader.artUrl,
           effectType: 'DAMAGE',
           title: '금희 배틀 효과',
           description: `적색 카드로 배틀에 돌입하여 상대에게 ${dealt}pt 데미지를 입혔습니다!`,
           playerIndex,
-          timestamp: Date.now(),
+          timestamp: logTimestamp(),
         };
         battleStepEffects.push(effEvent);
         newState = addLog(
@@ -3051,7 +3057,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
           );
           if (!newState.players[0].isAi) {
             const aiRoverReveal: PendingChoice = {
-              id: `choice-${Date.now()}-ai-rover0-reveal`,
+              id: `choice-${engineTick()}-ai-rover0-reveal`,
               playerIndex: 0,
               title: '상대 카드 공개 확인 — 방랑자 배틀 효과',
               sourceCardName: `${player.slots.leader.nameKr}`,
@@ -3070,7 +3076,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
         } else {
           // Human 유저: 덱 카드를 미리 보여주지 않고, 몇 장을 공개하여 패에 추가할지 먼저 선택! (덱 잔여가 1장이어도 공식 Q&A Q5에 따라 최대 2장 선언 가능)
           const roverChoice: PendingChoice = {
-            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            id: `choice-${engineTick()}-${engineTag()}`,
             playerIndex,
             title: '방랑자 배틀 효과 — 카드 공개 및 패 추가',
             sourceCardName: player.slots.leader.nameKr || '방랑자',
@@ -3111,7 +3117,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
             );
             if (!newState.players[0].isAi) {
               const aiShoreReveal: PendingChoice = {
-                id: `choice-${Date.now()}-ai-shore0-reveal`,
+                id: `choice-${engineTick()}-ai-shore0-reveal`,
                 playerIndex: 0,
                 title: '상대 카드 공개 확인 — 파수인 Lv.0 배틀 효과',
                 sourceCardName: '파수인 [BP01-010]',
@@ -3129,7 +3135,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
             players[playerIndex] = player;
           } else {
             const shoreChoice: PendingChoice = {
-              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              id: `choice-${engineTick()}-${engineTag()}`,
               playerIndex,
               title: '파수인 Lv.0 배틀 효과 — 카드 공개 및 패 추가',
               sourceCardName: '파수인 [BP01-010]',
@@ -3173,7 +3179,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
           } else {
             const charName = hasYangyang0 ? '양양' : '산화';
             const concertoChoice: PendingChoice = {
-              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              id: `choice-${engineTick()}-${engineTag()}`,
               playerIndex,
               title: `${charName} 배틀 효과 (협주 배치 선택)`,
               sourceCardName: `${charName} [배틀 효과]`,
@@ -3209,15 +3215,15 @@ export function applyBattleStepSkills(state: GameState): GameState {
               ...nextCam,
               underlyingCards: [...prevUnderlying, { ...currentCam, underlyingCards: undefined }],
             };
-            newState.lastUpgrade = {
-              id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            emitUpgradeFx({
+              id: `upgrade-${engineTick()}-${engineTag()}`,
               playerIndex,
               playerName: player.name,
               character: { ...nextCam },
               previousLevel: currentCam.level as 0 | 1 | 2,
               newLevel: nextCam.level as 1 | 2,
               slotName: camSlotKey,
-            };
+            });
             newState = addLog(
               newState,
               `[피어난 동백꽃 BP01-048 배틀 효과] [카멜리아]가 [${nextCam.nameKr}](Lv.${nextCam.level})(으)로 각성 레벨업했습니다!`,
@@ -3231,7 +3237,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
             players[playerIndex] = player;
           } else {
             const upgradeChoice: PendingChoice = {
-              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              id: `choice-${engineTick()}-${engineTag()}`,
               playerIndex,
               title: '피어난 동백꽃 — 카멜리아 레벨업 대상 선택',
               sourceCardName: '피어난 동백꽃 [BP01-048]',
@@ -3277,15 +3283,15 @@ export function applyBattleStepSkills(state: GameState): GameState {
               ...lv2Anke,
               underlyingCards: [...prevUnderlying, { ...currentAnke, underlyingCards: undefined }],
             };
-            newState.lastUpgrade = {
-              id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            emitUpgradeFx({
+              id: `upgrade-${engineTick()}-${engineTag()}`,
               playerIndex,
               playerName: player.name,
               character: { ...lv2Anke },
               previousLevel: currentAnke.level as 0 | 1 | 2,
               newLevel: 2,
               slotName: 'leader',
-            };
+            });
             newState = addLog(
               newState,
               `[그늘이의 대폭주 BP01-062 배틀 효과] 앙코를 Lv.2 [${lv2Anke.code}]로 각성시키고 리더를 [앙코]로 교체했습니다!`,
@@ -3306,7 +3312,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
               { cardArt: clashCard.artUrl, cardName: '그늘이의 대폭주', effectTag: '리더 교체&진화' }
             );
             const upgradeChoice: PendingChoice = {
-              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              id: `choice-${engineTick()}-${engineTag()}`,
               playerIndex,
               title: '그늘이의 대폭주 — Lv.2 앙코 레벨업 카드 선택',
               sourceCardName: '그늘이의 대폭주 [BP01-062]',
@@ -3356,7 +3362,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
         } else {
           // Human 플레이어는 선택 모달 제공 (minSelect: 0, maxSelect: 1, 교체하지 않고 건너뛰기 가능)
           const choice: PendingChoice = {
-            id: `choice-${Date.now()}-sanhua-spine-swap`,
+            id: `choice-${engineTick()}-sanhua-spine-swap`,
             playerIndex,
             title: '매서운 가시 — 리더 교체 선택',
             sourceCardName: '매서운 가시 [BP01-076]',
@@ -3398,7 +3404,7 @@ export function applyBattleStepSkills(state: GameState): GameState {
             );
           } else {
             const recoverChoice: PendingChoice = {
-              id: `choice-${Date.now()}-oppress-recover`,
+              id: `choice-${engineTick()}-oppress-recover`,
               playerIndex,
               title: '억압 — 트래시 카드 회수',
               sourceCardName: '억압 [BP01-072]',
@@ -3446,14 +3452,14 @@ export function applyBattleStepSkills(state: GameState): GameState {
     if (clashCard.code === 'SD02-010') {
       player.actionFlags.leaderSwapLockedThisTurn = true;
       battleStepEffects.push({
-        id: `eff-${Date.now()}-sd02-010-lock-${playerIndex}`,
+        id: `eff-${engineTick()}-sd02-010-lock-${playerIndex}`,
         sourceCardName: clashCard.nameKr,
         sourceCardArt: clashCard.artUrl,
         effectType: 'CANCEL',
         title: '이번 턴 리더 교체 불가',
         description: '【배틀】 효과로 이번 턴에는 자신의 리더를 교체할 수 없습니다.',
         playerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(
         newState,
@@ -3505,7 +3511,7 @@ export function resolveClash(state: GameState): GameState {
           }
         } else {
           const costChoice: PendingChoice = {
-            id: `choice-${Date.now()}-clash-concerto-p${playerIndex}`,
+            id: `choice-${engineTick()}-clash-concerto-p${playerIndex}`,
             playerIndex,
             title: `【대결 코스트 지불】 [${player.clashCard.nameKr}] 협주 소모`,
             sourceCardName: player.clashCard.nameKr,
@@ -3733,14 +3739,14 @@ export function finishClashJudgment(state: GameState): GameState {
     if (extraDmg > 0) {
       baseDmg += extraDmg;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-dmg-boost`,
+        id: `eff-${engineTick()}-dmg-boost`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'DAMAGE',
         title: '공격력 강화 효과',
         description: `판정 효과로 공격 피해가 +${extraDmg} 증가했습니다!`,
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
     }
 
@@ -3783,7 +3789,7 @@ export function finishClashJudgment(state: GameState): GameState {
         ([0, 1] as const).forEach((idx) => {
           if (!newState.players[idx].isAi) {
             const jinhsiRevealChoice: PendingChoice = {
-              id: `choice-${Date.now()}-jinhsi-top5-reveal-${idx}`,
+              id: `choice-${engineTick()}-jinhsi-top5-reveal-${idx}`,
               playerIndex: idx,
               title: idx === winnerIndex
                 ? '📢 [양측 공개] 금희 Lv.2 판정 효과 (덱 위 5장 공개)'
@@ -3849,7 +3855,7 @@ export function finishClashJudgment(state: GameState): GameState {
           );
         } else {
           const camChoice: PendingChoice = {
-            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            id: `choice-${engineTick()}-${engineTag()}`,
             playerIndex: winnerIndex,
             title: '카멜리아 판정 효과 (트래시 회수)',
             sourceCardName: '카멜리아 [BP01-005]',
@@ -3900,14 +3906,14 @@ export function finishClashJudgment(state: GameState): GameState {
         );
       }
       triggeredEffects.push({
-        id: `eff-${Date.now()}-leader-heal`,
+        id: `eff-${engineTick()}-leader-heal`,
         sourceCardName: '파수인 [BP01-010]',
         sourceCardArt: winnerPlayer.slots.leader.artUrl,
         effectType: 'HEAL',
         title: '생명력 회복 (리더 효과)',
         description: '녹색 카드 판정 승리로 생명력(HP)을 1 회복했습니다.',
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(
         newState,
@@ -3918,7 +3924,7 @@ export function finishClashJudgment(state: GameState): GameState {
       );
       if (!winnerPlayer.isAi) {
         const healNotice: PendingChoice = {
-          id: `choice-${Date.now()}-sh-leader-heal`,
+          id: `choice-${engineTick()}-sh-leader-heal`,
           playerIndex: winnerIndex,
           title: '파수인 [BP01-010] 리더 효과 발동',
           sourceCardName: '파수인 [BP01-010]',
@@ -3951,15 +3957,15 @@ export function finishClashJudgment(state: GameState): GameState {
               ...nextSh,
               underlyingCards: [...prevUnderlying, currentSh],
             };
-            newState.deferredUpgrade = {
-              id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            emitUpgradeFx({
+              id: `upgrade-${engineTick()}-${engineTag()}`,
               playerIndex: winnerIndex,
               playerName: winnerPlayer.name,
               character: { ...nextSh },
               previousLevel: currentSh.level as 0 | 1,
               newLevel: nextSh.level as 1 | 2,
               slotName: shSlotKey,
-            };
+            });
             newState = addLog(
               newState,
               `[혼돈의 이론 BP01-056 효과] [파수인]이 [${nextSh.nameKr}](Lv.${nextSh.level})(으)로 각성 레벨업했습니다!`,
@@ -3974,7 +3980,7 @@ export function finishClashJudgment(state: GameState): GameState {
             else p1 = winnerPlayer;
           } else {
             const upgradeChoice: PendingChoice = {
-              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              id: `choice-${engineTick()}-${engineTag()}`,
               playerIndex: winnerIndex,
               title: '혼돈의 이론 — 파수인 레벨업 대상 선택',
               sourceCardName: '혼돈의 이론 [BP01-056]',
@@ -4012,15 +4018,15 @@ export function finishClashJudgment(state: GameState): GameState {
             ...nextSanhua,
             underlyingCards: [...prevUnderlying, currentSanhua],
           };
-          newState.deferredUpgrade = {
-            id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          emitUpgradeFx({
+            id: `upgrade-${engineTick()}-${engineTag()}`,
             playerIndex: winnerIndex,
             playerName: winnerPlayer.name,
             character: { ...nextSanhua },
             previousLevel: currentSanhua.level as 0 | 1,
             newLevel: nextSanhua.level as 1 | 2,
             slotName: 'leader',
-          };
+          });
           newState = addLog(
             newState,
             `[매서운 가시 BP01-076 효과] [산화]가 [${nextSanhua.nameKr}](Lv.${nextSanhua.level})(으)로 각성 레벨업했습니다!`,
@@ -4035,7 +4041,7 @@ export function finishClashJudgment(state: GameState): GameState {
           else p1 = winnerPlayer;
         } else {
           const upgradeChoice: PendingChoice = {
-            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            id: `choice-${engineTick()}-${engineTag()}`,
             playerIndex: winnerIndex,
             title: '매서운 가시 — 산화 레벨업 대상 선택',
             sourceCardName: '매서운 가시 [BP01-076]',
@@ -4066,14 +4072,14 @@ export function finishClashJudgment(state: GameState): GameState {
         const [blueCard] = winnerPlayer.dropZone.splice(blueIdx, 1);
         addCardsToHand(winnerPlayer, [blueCard as ActionCard]);
         triggeredEffects.push({
-          id: `eff-${Date.now()}-bp01-070`,
+          id: `eff-${engineTick()}-bp01-070`,
           sourceCardName: winCard.nameKr,
           sourceCardArt: winCard.artUrl,
           effectType: 'DRAW',
           title: '트래시 청색 카드 회수',
           description: `트래시 에리어에서 청색 카드 [${blueCard.nameKr}]을(를) 패에 회수했습니다.`,
           playerIndex: winnerIndex,
-          timestamp: Date.now(),
+          timestamp: logTimestamp(),
         });
         newState = addLog(
           newState,
@@ -4095,14 +4101,14 @@ export function finishClashJudgment(state: GameState): GameState {
       if (chargedList.length > 0) {
         addCardsToConcertoZone(winnerPlayer, chargedList);
         triggeredEffects.push({
-          id: `eff-${Date.now()}-sd02-015`,
+          id: `eff-${engineTick()}-sd02-015`,
           sourceCardName: winCard.nameKr,
           sourceCardArt: winCard.artUrl,
           effectType: 'CHARGE',
           title: `협주 에리어 +${chargedList.length}장 배치`,
           description: `판정 승리로 덱 위 카드 ${chargedList.length}장을 협주 에리어에 배치했습니다!`,
           playerIndex: winnerIndex,
-          timestamp: Date.now(),
+          timestamp: logTimestamp(),
         });
         newState = addLog(
           newState,
@@ -4113,7 +4119,7 @@ export function finishClashJudgment(state: GameState): GameState {
         );
         if (!winnerPlayer.isAi) {
           const concertoNotice: PendingChoice = {
-            id: `choice-${Date.now()}-sd02-015-concerto`,
+            id: `choice-${engineTick()}-sd02-015-concerto`,
             playerIndex: winnerIndex,
             title: '만년적설 — 협주 에리어 배치 확인',
             sourceCardName: '만년적설 [SD02-015]',
@@ -4140,20 +4146,20 @@ export function finishClashJudgment(state: GameState): GameState {
         card.isRevealed = true;
         winnerPlayer.actionDeck = shuffleActionDeck(winnerPlayer.actionDeck);
         triggeredEffects.push({
-          id: `eff-${Date.now()}-rainbow`,
+          id: `eff-${engineTick()}-rainbow`,
           sourceCardName: winCard.nameKr,
           sourceCardArt: winCard.artUrl,
           effectType: 'DRAW',
           title: '용을 타고 하늘로 향해 서치',
           description: '덱에서 [용을 타고 하늘로 향해]를 찾아 패에 추가하고 덱을 셔플합니다.',
           playerIndex: winnerIndex,
-          timestamp: Date.now(),
+          timestamp: logTimestamp(),
         });
         if (winnerPlayer.isAi) {
           addCardsToHand(winnerPlayer, [card]);
           if (!newState.players[0].isAi) {
             const oppRainbowReveal: PendingChoice = {
-              id: `choice-${Date.now()}-opp-rainbow-reveal`,
+              id: `choice-${engineTick()}-opp-rainbow-reveal`,
               playerIndex: 0,
               title: '📢 [상대 카드 공개] 창공의 무지개 서치 효과',
               sourceCardName: winCard.nameKr,
@@ -4177,7 +4183,7 @@ export function finishClashJudgment(state: GameState): GameState {
           );
         } else {
           const searchChoice: PendingChoice = {
-            id: `choice-${Date.now()}-rainbow-search`,
+            id: `choice-${engineTick()}-rainbow-search`,
             playerIndex: winnerIndex,
             title: '창공의 무지개 — 서치 카드 공개 및 패 추가',
             sourceCardName: winCard.nameKr,
@@ -4199,14 +4205,14 @@ export function finishClashJudgment(state: GameState): GameState {
     if (winCard.code === 'BP01-057') {
       winnerPlayer.introSkillBonusDrawCount = 2;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-bp01-057`,
+        id: `eff-${engineTick()}-bp01-057`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'BUFF',
         title: '변주 스킬 드로우 부여',
         description: '이번 턴에 다음 사용할 2장의 <변주 스킬>에 【콤보】카드 1장 드로우 효과가 부여되었습니다!',
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(
         newState,
@@ -4252,14 +4258,14 @@ export function finishClashJudgment(state: GameState): GameState {
       if (drawnCards.length > 0) {
         addCardsToHand(winnerPlayer, drawnCards);
         triggeredEffects.push({
-          id: `eff-${Date.now()}-draw`,
+          id: `eff-${engineTick()}-draw`,
           sourceCardName: winCard.nameKr,
           sourceCardArt: winCard.artUrl,
           effectType: 'DRAW',
           title: `카드 드로우 +${drawnCards.length}장`,
           description: `덱에서 카드 ${drawnCards.length}장을 뽑아 패에 추가합니다.`,
           playerIndex: winnerIndex,
-          timestamp: Date.now(),
+          timestamp: logTimestamp(),
         });
         if (winnerPlayer.isAi) {
           newState = addLog(
@@ -4276,7 +4282,7 @@ export function finishClashJudgment(state: GameState): GameState {
         } else {
           // 플레이어: 미리 팝업으로 카드를 보여주지 않고, 3D 드로우 화면을 먼저 띄운 뒤 드로우 모션에서 짠! 공개
           const effectDrawObj: EffectDrawAnimation = {
-            id: `eff-draw-${Date.now()}`,
+            id: `eff-draw-${engineTick()}`,
             playerIndex: winnerIndex,
             cards: drawnCards,
             sourceCardName: winCard.nameKr,
@@ -4304,18 +4310,18 @@ export function finishClashJudgment(state: GameState): GameState {
       const loserIndex = (winnerIndex === 0 ? 1 : 0) as 0 | 1;
       const loserPlayer = loserIndex === 0 ? p0 : p1;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-scan`,
+        id: `eff-${engineTick()}-scan`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'BUFF',
         title: '상대의 패 확인 [스캔]',
         description: `상대방(${loserPlayer.name})의 패(${loserPlayer.hand.length}장)를 모두 확인합니다.`,
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       if (!winnerPlayer.isAi) {
         const scanChoice: PendingChoice = {
-          id: `choice-${Date.now()}-scan`,
+          id: `choice-${engineTick()}-scan`,
           playerIndex: winnerIndex,
           title: `${winCard.nameKr} [상대의 패 확인]`,
           sourceCardName: winCard.nameKr,
@@ -4343,14 +4349,14 @@ export function finishClashJudgment(state: GameState): GameState {
       const drawn = drawSingleCardFromDeck(winnerPlayer);
       if (drawn) {
         triggeredEffects.push({
-          id: `eff-${Date.now()}-sd018-draw-discard`,
+          id: `eff-${engineTick()}-sd018-draw-discard`,
           sourceCardName: winCard.nameKr,
           sourceCardArt: winCard.artUrl,
           effectType: 'DRAW',
           title: '1장 드로우 후 패 1장 버리기',
           description: '판정 승리로 카드 1장을 뽑고, 자신의 패 1장을 트래시 에리어로 버립니다.',
           playerIndex: winnerIndex,
-          timestamp: Date.now(),
+          timestamp: logTimestamp(),
         });
       }
       if (winnerPlayer.isAi) {
@@ -4385,7 +4391,7 @@ export function finishClashJudgment(state: GameState): GameState {
           // 플레이어: 미리 카드를 까발리지 않고 3D 드로우 화면을 먼저 띄운 뒤, 손패 안착 후 버릴 카드 선택 모달 오픈!
           addCardsToHand(winnerPlayer, [drawn]);
           const discardChoice: PendingChoice = {
-            id: `choice-${Date.now()}-sd018-discard`,
+            id: `choice-${engineTick()}-sd018-discard`,
             playerIndex: winnerIndex,
             title: `${winCard.nameKr} — 버릴 카드 선택`,
             sourceCardName: winCard.nameKr,
@@ -4398,7 +4404,7 @@ export function finishClashJudgment(state: GameState): GameState {
             sourceZone: 'HAND',
           };
           const effectDrawObj: EffectDrawAnimation = {
-            id: `eff-draw-${Date.now()}`,
+            id: `eff-draw-${engineTick()}`,
             playerIndex: winnerIndex,
             cards: [drawn],
             sourceCardName: winCard.nameKr,
@@ -4439,14 +4445,14 @@ export function finishClashJudgment(state: GameState): GameState {
         );
       }
       triggeredEffects.push({
-        id: `eff-${Date.now()}-heal`,
+        id: `eff-${engineTick()}-heal`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'HEAL',
         title: '생명력 회복 효과',
         description: `생명력(HP)을 ${healAmount} 회복했습니다.`,
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(
         newState,
@@ -4470,14 +4476,14 @@ export function finishClashJudgment(state: GameState): GameState {
       const c2 = drawSingleCardFromDeck(winnerPlayer);
       if (c2) addCardsToHand(winnerPlayer, [c2]);
       triggeredEffects.push({
-        id: `eff-${Date.now()}-charge`,
+        id: `eff-${engineTick()}-charge`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'CHARGE',
         title: '협주 급속 충전',
         description: '협주 에너지를 1장 충전하고 카드 1장을 드로우했습니다.',
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(
         newState,
@@ -4498,14 +4504,14 @@ export function finishClashJudgment(state: GameState): GameState {
       comboGranted = 99;
       winnerPlayer.comboUnlimited = true;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-red-combo`,
+        id: `eff-${engineTick()}-red-combo`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'COMBO',
         title: '적색 승리 [연격 무제한]',
         description: '적색 카드로 승리하여 이번 턴 연속 연격 공격이 무제한으로 가능합니다!',
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
     } else {
       comboGranted = 0;
@@ -4574,7 +4580,7 @@ export function finishClashJudgment(state: GameState): GameState {
           );
         } else {
           const choice: PendingChoice = {
-            id: `choice-${Date.now()}-sanhua-swap`,
+            id: `choice-${engineTick()}-sanhua-swap`,
             playerIndex: winnerIndex,
             title: `${isSanhuaLv2Leader ? '산화 Lv.2' : '얼음 파편'} — 리더 교체 선택`,
             sourceCardName: isSanhuaLv2Leader ? '산화 Lv.2 [BP01-031]' : '얼음 파편 [BP01-077]',
@@ -4595,14 +4601,14 @@ export function finishClashJudgment(state: GameState): GameState {
         comboGranted += officialPursuit;
       }
       triggeredEffects.push({
-        id: `eff-${Date.now()}-pursuit`,
+        id: `eff-${engineTick()}-pursuit`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'COMBO',
         title: `카드 특수 효과 [추격 +${officialPursuit}]`,
         description: `연격 연속 공격 횟수를 +${officialPursuit}회 획득했습니다!`,
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
     }
 
@@ -4611,14 +4617,14 @@ export function finishClashJudgment(state: GameState): GameState {
       loserPlayer.tempCostPenaltyRed = (loserPlayer.tempCostPenaltyRed || 0) + 1;
       loserPlayer.tempCostPenaltyRedTurns = activeIdx === loserIndex ? 2 : 1;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-sd01-016`,
+        id: `eff-${engineTick()}-sd01-016`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'CANCEL',
         title: '상대 적색 카드 COST +1',
         description: '다음 상대의 턴 종료 시까지 상대가 사용하는 적색 카드의 코스트가 +1 증가합니다!',
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(
         newState,
@@ -4634,14 +4640,14 @@ export function finishClashJudgment(state: GameState): GameState {
       loserPlayer.comboBlockedNextTurn = true;
       loserPlayer.comboBlockedTurns = activeIdx === loserIndex ? 2 : 1;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-sd02-016`,
+        id: `eff-${engineTick()}-sd02-016`,
         sourceCardName: winCard.nameKr,
         sourceCardArt: winCard.artUrl,
         effectType: 'CANCEL',
         title: '다음 턴 상대 콤보 봉쇄',
         description: '다음 상대의 턴 종료 시까지 상대는 콤보를 발동할 수 없습니다!',
         playerIndex: winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(
         newState,
@@ -4690,14 +4696,14 @@ export function finishClashJudgment(state: GameState): GameState {
         }
       }
       triggeredEffects.push({
-        id: `eff-${Date.now()}-combo-blocked`,
+        id: `eff-${engineTick()}-combo-blocked`,
         sourceCardName: loserCard?.code === 'BP01-058' ? loserCard.nameKr : winCard.nameKr,
         sourceCardArt: loserCard?.code === 'BP01-058' ? loserCard.artUrl : winCard.artUrl,
         effectType: 'CANCEL',
         title: loserCard?.code === 'BP01-058' ? '[해금] 우세 효과 [연격 봉쇄]' : '연격(콤보) 제약 발동',
         description: comboBlockedReason,
         playerIndex: loserCard?.code === 'BP01-058' ? loserIndex : winnerIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
     }
 
@@ -4719,14 +4725,14 @@ export function finishClashJudgment(state: GameState): GameState {
       addCardsToHand(loserPlayer, [loserCard]);
       loserPlayer.clashCard = null;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-sd01-010-recover`,
+        id: `eff-${engineTick()}-sd01-010-recover`,
         sourceCardName: loserCard.nameKr,
         sourceCardArt: loserCard.artUrl,
         effectType: 'DRAW',
         title: '청색 카드 패배 시 패 회수',
         description: '청색 카드에 패배하여 [투쟁의 마음]을(를) 패로 회수했습니다!',
         playerIndex: loserIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(newState, `[투쟁의 마음 SD01-010 효과] 청색 카드에 패배하여 패로 회수했습니다!`, 'ACTION', loserIndex);
     }
@@ -4743,14 +4749,14 @@ export function finishClashJudgment(state: GameState): GameState {
     ) {
       loserPlayer.ankePendingRetaliationDmg = loserCard.damage;
       triggeredEffects.push({
-        id: `eff-${Date.now()}-anke-retaliation`,
+        id: `eff-${engineTick()}-anke-retaliation`,
         sourceCardName: loserPlayer.slots.leader.nameKr,
         sourceCardArt: loserPlayer.slots.leader.artUrl,
         effectType: 'DAMAGE',
         title: `배틀 종료 반격 ${loserCard.damage} 데미지 예약`,
         description: `적색 카드에 패배하여 배틀 페이즈 종료 시 상대에게 ${loserCard.damage} 데미지를 입힙니다!`,
         playerIndex: loserIndex,
-        timestamp: Date.now(),
+        timestamp: logTimestamp(),
       });
       newState = addLog(
         newState,
@@ -4793,20 +4799,20 @@ export function finishClashJudgment(state: GameState): GameState {
           c.isRevealed = true;
         });
         triggeredEffects.push({
-          id: `eff-${Date.now()}-leader-defeat-draw`,
+          id: `eff-${engineTick()}-leader-defeat-draw`,
           sourceCardName: loserPlayer.slots.leader.nameKr,
           sourceCardArt: loserPlayer.slots.leader.artUrl,
           effectType: 'DRAW',
           title: `${loserPlayer.slots.leader.nameKr} [판정 패배 지원]`,
           description: '상성 패배 시 덱 위의 카드를 공개하고 패에 추가하는 리더 효과가 발동했습니다!',
           playerIndex: loserIndex,
-          timestamp: Date.now(),
+          timestamp: logTimestamp(),
         });
         if (loserPlayer.isAi) {
           addCardsToHand(loserPlayer, revealed);
           if (!newState.players[0].isAi) {
             const oppDefeatReveal: PendingChoice = {
-              id: `choice-${Date.now()}-opp-defeat-reveal`,
+              id: `choice-${engineTick()}-opp-defeat-reveal`,
               playerIndex: 0,
               title: `📢 [상대 카드 공개] ${loserPlayer.slots.leader.nameKr} 판정 패배 효과`,
               sourceCardName: loserPlayer.slots.leader.nameKr,
@@ -4830,7 +4836,7 @@ export function finishClashJudgment(state: GameState): GameState {
           );
         } else {
           const defeatChoice: PendingChoice = {
-            id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            id: `choice-${engineTick()}-${engineTag()}`,
             playerIndex: loserIndex,
             title: `${loserPlayer.slots.leader.nameKr} 판정 패배 효과 (공개 후 패 추가)`,
             sourceCardName: loserPlayer.slots.leader.nameKr,
@@ -4873,9 +4879,8 @@ export function finishClashJudgment(state: GameState): GameState {
     p1.hasDominance = false;
   }
   newState.players = [p0, p1];
-  if (triggeredEffects.length > 0) {
-    newState.deferredEffectEvent = triggeredEffects[0];
-  }
+  // (예전: deferredEffectEvent = triggeredEffects[0] — 결과창 뒤에 다시 보여 주던 알림. 각 효과는 발생 시점에
+  //  emitEffectFx로 이미 내보냈고, 결과창이 닫힐 때까지 기다리는 일은 fxRegistry의 waitFor가 맡는다)
 
   const winCard = winnerIndex === 0 ? c0 : c1;
   if (winnerIndex !== -1 && winCard) {
@@ -4977,14 +4982,12 @@ export function proceedAfterClashReveal(state: GameState): GameState {
   }
   newState.deferredChoices = [];
   newState.deferredChoice = null;
-  if (newState.deferredUpgrade) {
-    newState.lastUpgrade = newState.deferredUpgrade;
-    newState.deferredUpgrade = null;
-  }
-  if (newState.deferredEffectEvent) {
-    newState.lastEffectEvent = newState.deferredEffectEvent;
-    newState.deferredEffectEvent = null;
-  }
+  // 결과창이 닫히는 시점에 이번 대결의 첫 효과를 알림으로 표시
+  // (예전: resolveClash에서 deferredEffectEvent = triggeredEffects[0]로 미뤄 두었다가 여기서 lastEffectEvent로 승격.
+  //  같은 목록이 clashResult.triggeredEffects에 남아 있으므로 그 첫 항목을 그대로 사용)
+  //  예전 화면은 알림을 보여 준 뒤 CLEAR_LAST_EFFECT_EVENT로 지웠기 때문에, 배틀 스텝에서 이미 본 효과도 여기서 한 번 더 표시됐다. 같은 동작 유지)
+  const firstClashEffect = state.clashResult?.triggeredEffects?.[0];
+  if (firstClashEffect) emitEffectFx(firstClashEffect);
 
   // 보류되었던 효과 드로우 활성화 (대결 판정 결과창이 닫힌 후 화면 겹침 없이 순차적으로 3D 드로우 실행)
   if (newState.deferredEffectDraws && newState.deferredEffectDraws.length > 0) {
@@ -5249,21 +5252,21 @@ export function executeComboAttack(
                 underlyingCards: [...prevUnder, { ...curCam, underlyingCards: undefined }],
               };
               comboSwappedTo = player.slots.leader;
-              newState.lastUpgrade = {
-                id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              emitUpgradeFx({
+                id: `upgrade-${engineTick()}-${engineTag()}`,
                 playerIndex,
                 playerName: player.name,
                 character: { ...nextCam },
                 previousLevel: curCam.level as 0 | 1 | 2,
                 newLevel: nextCam.level as 1 | 2,
                 slotName: 'leader',
-              };
+              });
               newState.players[playerIndex] = player;
               newState = applyCharacterEvolutionSkills(newState, playerIndex, 'leader', nextCam, curCam, false);
               player = { ...newState.players[playerIndex] };
             } else {
               const upgradeChoice: PendingChoice = {
-                id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+                id: `choice-${engineTick()}-${engineTag()}`,
                 playerIndex,
                 title: '팔천의 춘추 — 카멜리아 레벨업 대상 선택',
                 sourceCardName: '팔천의 춘추 [BP01-046]',
@@ -5315,16 +5318,16 @@ export function executeComboAttack(
             card.artUrl
           );
         }
-        newState.lastEffectEvent = {
-          id: `eff-bp054-heal-${Date.now()}`,
+        emitEffectFx({
+          id: `eff-bp054-heal-${engineTick()}`,
           sourceCardName: '계발 [BP01-054]',
           sourceCardArt: card.artUrl,
           effectType: 'HEAL',
           title: '계발 [BP01-054] 변주 회복!',
           description: `「파수인」이 교체되어 생명력(HP)을 +1 회복했습니다! (현재 HP: ${player.hp}/${player.maxHp})`,
           playerIndex,
-          timestamp: Date.now(),
-        };
+          timestamp: logTimestamp(),
+        });
       }
       newState = addLog(
         newState,
@@ -5375,7 +5378,7 @@ export function executeComboAttack(
             }
           } else {
             const recoverChoice: PendingChoice = {
-              id: `choice-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              id: `choice-${engineTick()}-${engineTag()}`,
               playerIndex,
               title: '양들의 도움 — 앙코 적색 카드 회수',
               sourceCardName: '양들의 도움 [BP01-063]',
@@ -5411,7 +5414,7 @@ export function executeComboAttack(
           comboEffectDesc = `리더를 [${newLeaderName}](으)로 교체하고 덱 위에서 [${charged.nameKr}]을(를) 협주 에리어에 충전했습니다! (협주: ${player.concertoZone.length}/10)`;
           if (!player.isAi) {
             const concertoInfoChoice: PendingChoice = {
-              id: `choice-${Date.now()}-${card.code}-concerto`,
+              id: `choice-${engineTick()}-${card.code}-concerto`,
               playerIndex,
               title: `${card.nameKr} — 협주 에리어 배치 확인`,
               sourceCardName: `${card.nameKr} [${card.code}]`,
@@ -5447,7 +5450,7 @@ export function executeComboAttack(
           comboEffectDesc = `리더를 [${newLeaderName}](으)로 교체하고 덱에서 [${drawn.nameKr}] 카드를 1장 드로우했습니다!`;
           if (!player.isAi) {
             const effectDrawObj: EffectDrawAnimation = {
-              id: `eff-draw-${Date.now()}-wanderer`,
+              id: `eff-draw-${engineTick()}-wanderer`,
               playerIndex,
               cards: [drawn],
               sourceCardName: `${card.nameKr} [${card.code}]`,
@@ -5489,19 +5492,19 @@ export function executeComboAttack(
         addCardsToConcertoZone(player, [charged]);
         comboEffectTitle = '【콤보】 협주 에너지 +1 충전!';
         comboEffectDesc = `직전 <체공> 카드 연계로 덱 위에서 [${charged.nameKr}]을(를) 협주 에리어에 충전했습니다.`;
-        newState.lastEffectEvent = {
-          id: `eff-combo-bp071-${Date.now()}`,
+        emitEffectFx({
+          id: `eff-combo-bp071-${engineTick()}`,
           sourceCardName: '복성재우 [BP01-071]',
           sourceCardArt: card.artUrl,
           effectType: 'CHARGE',
           title: '복성재우 콤보 효과 발동!',
           description: `방금 사용한 <체공> 카드([${prevActionCard?.nameKr || '체공'}])의 연계로 덱 맨 위에서 협주 에너지 1장을 충전했습니다!`,
           playerIndex,
-          timestamp: Date.now(),
-        };
+          timestamp: logTimestamp(),
+        });
         if (!player.isAi) {
           const bp071InfoChoice: PendingChoice = {
-            id: `choice-${Date.now()}-bp071-concerto`,
+            id: `choice-${engineTick()}-bp071-concerto`,
             playerIndex,
             title: '복성재우 — 협주 에리어 배치 확인',
             sourceCardName: '복성재우 [BP01-071]',
@@ -5541,7 +5544,7 @@ export function executeComboAttack(
       addCardsToHand(player, [d]);
       if (!player.isAi) {
         const effectDrawObj: EffectDrawAnimation = {
-          id: `eff-draw-${Date.now()}-bp057-bonus`,
+          id: `eff-draw-${engineTick()}-bp057-bonus`,
           playerIndex,
           cards: [d],
           sourceCardName: '결말의 순환 [BP01-057]',
@@ -5694,7 +5697,7 @@ export function executeComboAttack(
   const isLethal = opponent.hp <= 0;
 
   newState.lastComboStrike = {
-    id: `combo-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    id: `combo-${engineTick()}-${engineTag()}`,
     attackerIndex: playerIndex,
     attackerName: player.slots.leader.characterName || player.name,
     card,
@@ -5745,7 +5748,7 @@ export function executeComboAttack(
       );
       if (!player.isAi) {
         newState = queueEffectDraw(newState, {
-          id: `eff-draw-${Date.now()}-bp060`,
+          id: `eff-draw-${engineTick()}-bp060`,
           playerIndex,
           cards: [drawn],
           sourceCardName: card.nameKr,
@@ -5829,16 +5832,16 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
           '치샤 Lv.2 [BP01-025]',
           p.slots.leader.artUrl
         );
-        newState.lastEffectEvent = {
-          id: `eff-bp01-025-end-${Date.now()}`,
+        emitEffectFx({
+          id: `eff-bp01-025-end-${engineTick()}`,
           playerIndex: pIdx,
           effectType: 'DAMAGE',
           title: '치샤 Lv.2 — 배틀 종료 효과',
           description: `액션 에리어에 기본 공격이 ${normalAttacksInAction}장 있어 상대 리더에게 ${dealt}pt 피해를 입혔습니다!`,
           sourceCardName: '치샤 Lv.2 [BP01-025]',
           sourceCardArt: p.slots.leader.artUrl,
-          timestamp: Date.now(),
-        };
+          timestamp: logTimestamp(),
+        });
       }
       newState = addLog(
         newState,
@@ -5879,16 +5882,16 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
           '앙코 Lv.1 [BP01-014]',
           p.slots.leader.artUrl
         );
-        newState.lastEffectEvent = {
-          id: `eff-bp01-014-retaliate-${Date.now()}`,
+        emitEffectFx({
+          id: `eff-bp01-014-retaliate-${engineTick()}`,
           playerIndex: pIdx,
           effectType: 'DAMAGE',
           title: '앙코 Lv.1 — 배틀 종료 반격',
           description: `적색 카드에 패배한 반격으로 상대에게 ${dealt}pt 피해를 입혔습니다!`,
           sourceCardName: '앙코 Lv.1 [BP01-014]',
           sourceCardArt: p.slots.leader.artUrl,
-          timestamp: Date.now(),
-        };
+          timestamp: logTimestamp(),
+        });
       }
       newState = addLog(
         newState,
@@ -5933,7 +5936,7 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
       } else {
         // Human 유저: 1 COST로 지불할 협주 카드 직접 선택 모달 띄우기 (공식 룰: 비용으로 소모할 협주 카드는 플레이어가 직접 선택)
         const choice: PendingChoice = {
-          id: `choice-${Date.now()}-wing-recover-${pIdx}`,
+          id: `choice-${engineTick()}-wing-recover-${pIdx}`,
           playerIndex: pIdx,
           title: '날개의 뜻·회피 — 협주 코스트 지불 및 패 회수',
           sourceCardName: '날개의 뜻·회피 [BP01-069]',
@@ -6034,11 +6037,7 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
   let newState: GameState = {
     ...state,
     phase: 'END_PHASE' as GamePhase,
-    // 배틀 종료 직전에 발생한 레벨업(혼돈의 이론 등) 연출이 아직 표시되지 않았다면 지우지 않고 유지/승격
-    lastUpgrade: state.lastUpgrade ?? state.deferredUpgrade ?? null,
-    deferredUpgrade: null,
     lastComboStrike: null,
-    lastEffectEvent: skipEndTurnSkills ? state.lastEffectEvent : null,
     players: [p0, p1],
   };
 
@@ -6056,22 +6055,22 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
           addCardsToHand(pl, [drawn]);
           newState = addLog(newState, `[효과 드로우] [방랑자(남) Lv.2 턴 종료 효과] 카드 1장을 드로우했습니다.`, 'ACTION', i as 0 | 1);
           newState = queueEffectDraw(newState, {
-            id: `edraw-sd02-001-end-${newState.turn}-${i}-${Date.now()}`,
+            id: `edraw-sd02-001-end-${newState.turn}-${i}-${engineTick()}`,
             playerIndex: i as 0 | 1,
             cards: [drawn],
             sourceCardName: '방랑자(남) Lv.2 [SD02-001] (턴 종료 효과)',
             sourceCardArt: pl.slots.leader.artUrl,
           });
-          newState.lastEffectEvent = {
-            id: `eff-sd02-001-end-${newState.turn}-${i}-${Date.now()}`,
+          emitEffectFx({
+            id: `eff-sd02-001-end-${newState.turn}-${i}-${engineTick()}`,
             playerIndex: i as 0 | 1,
             effectType: 'DRAW',
             title: '방랑자(남) Lv.2 — 턴 종료 효과',
             description: `【각 턴 종료 시】 효과로 카드를 1장 뽑았습니다!`,
             sourceCardName: '방랑자(남) Lv.2 [SD02-001]',
             sourceCardArt: pl.slots.leader.artUrl,
-            timestamp: Date.now(),
-          };
+            timestamp: logTimestamp(),
+          });
         }
       }
 
@@ -6081,16 +6080,16 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
         if (charged) {
           addCardsToConcertoZone(pl, [charged]);
           newState = addLog(newState, `[협주 충전] [산화 Lv.2 턴 종료 효과] [${charged.nameKr}]을(를) 협주 에리어에 충전했습니다! (현재 협주: ${pl.concertoZone.length}/10)`, 'ACTION', i as 0 | 1);
-          newState.lastEffectEvent = {
-            id: `eff-sd02-003-end-${newState.turn}-${i}-${Date.now()}`,
+          emitEffectFx({
+            id: `eff-sd02-003-end-${newState.turn}-${i}-${engineTick()}`,
             playerIndex: i as 0 | 1,
             effectType: 'CHARGE',
             title: '산화 Lv.2 — 턴 종료 협주 충전',
             description: `【각 턴 종료 시】 덱 위에서 [${charged.nameKr}] 카드를 협주 에리어에 충전했습니다! (현재 협주: ${pl.concertoZone.length}/10)`,
             sourceCardName: '산화 Lv.2 [SD02-003]',
             sourceCardArt: pl.slots.leader.artUrl,
-            timestamp: Date.now(),
-          };
+            timestamp: logTimestamp(),
+          });
         }
       }
 
@@ -6114,21 +6113,21 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
                 'ACTION',
                 i as 0 | 1
               );
-              newState.lastEffectEvent = {
-                id: `eff-bp01-012-end-${newState.turn}-${i}-${Date.now()}`,
+              emitEffectFx({
+                id: `eff-bp01-012-end-${newState.turn}-${i}-${engineTick()}`,
                 playerIndex: i as 0 | 1,
                 effectType: 'DRAW',
                 title: '앙코 Lv.2 — 턴 종료 트래시 회수',
                 description: `상대가 데미지를 받아 트래시에서 [${reclaimed.nameKr}]을(를) 패로 회수했습니다!`,
                 sourceCardName: '앙코 Lv.2 [BP01-012]',
                 sourceCardArt: pl.slots.leader.artUrl,
-                timestamp: Date.now(),
-              };
+                timestamp: logTimestamp(),
+              });
             }
           } else {
             const ankeLeaderCard = lCards.find((c) => c.code?.startsWith('BP01-012')) || pl.slots.leader;
             const choice: PendingChoice = {
-              id: `choice-${Date.now()}-anke2-end-${i}`,
+              id: `choice-${engineTick()}-anke2-end-${i}`,
               playerIndex: i as 0 | 1,
               title: '앙코 Lv.2 — 턴 종료 트래시 회수',
               sourceCardName: '앙코 Lv.2 [BP01-012]',
@@ -6170,21 +6169,21 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
                   'ACTION',
                   i as 0 | 1
                 );
-                newState.lastEffectEvent = {
-                  id: `eff-bp01-022-end-${newState.turn}-${i}-${Date.now()}`,
+                emitEffectFx({
+                  id: `eff-bp01-022-end-${newState.turn}-${i}-${engineTick()}`,
                   playerIndex: i as 0 | 1,
                   effectType: 'BUFF',
                   title: '양양 Lv.2 — 턴 종료 리더 교체',
                   description: `패 [${discarded.nameKr}]을(를) 버리고 리더를 [${yangyangCard.characterName || '양양'}]으로 교체했습니다!`,
                   sourceCardName: '양양 Lv.2 [BP01-022]',
                   sourceCardArt: yangyangCard.artUrl,
-                  timestamp: Date.now(),
-                };
+                  timestamp: logTimestamp(),
+                });
               }
             }
           } else {
             const choice: PendingChoice = {
-              id: `choice-${Date.now()}-yangyang-swap-${i}`,
+              id: `choice-${engineTick()}-yangyang-swap-${i}`,
               playerIndex: i as 0 | 1,
               title: '양양 Lv.2 — 리더 교체 선택',
               sourceCardName: '양양 Lv.2 [BP01-022]',
@@ -6313,8 +6312,6 @@ export function checkGameOver(state: GameState): GameState {
       winner: winnerIdx,
       clashResult: null,
       lastComboStrike: null,
-      lastUpgrade: null,
-      deferredUpgrade: null,
       pendingChoice: null,
       pendingChoiceQueue: [],
       deferredChoice: null,
@@ -6347,6 +6344,7 @@ export function resolvePendingChoice(
   chosenCardIds: string[]
 ): GameState {
   if (!state.pendingChoice) return state;
+  const fxMarkAtStart = engineFxMark(); // 이 함수 안에서 새로 나온 효과 알림을 찾기 위한 기준점
 
   const { playerIndex, revealedCards, sourceCardName, onResolveType } = state.pendingChoice;
   const p0 = clonePlayer(state.players[0]);
@@ -6422,10 +6420,10 @@ export function resolvePendingChoice(
 
       // 레벨업 대상 선택 직후 '진화 완료' 연출(UpgradeEffectOverlay)을 즉시 표시.
       // (대결 결과창이 아직 열려 있을 때만 보류했다가 결과창을 닫는 시점에 표시)
-      // ※ 기존에는 대결 결과창을 닫은 뒤 선택해도 deferredUpgrade에 보류되어,
+      // ※ 기존에는 대결 결과창을 닫은 뒤 선택해도 보류되어,
       //    다음 proceedAfterClashReveal(다음 턴 대결)까지 연출이 밀리는 버그가 있었음.
       const upgradeAnim = {
-        id: `upgrade-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        id: `upgrade-${engineTick()}-${engineTag()}`,
         playerIndex,
         playerName: player.name,
         character: { ...lv2Card },
@@ -6433,21 +6431,17 @@ export function resolvePendingChoice(
         newLevel: stackedCard.level as 1 | 2,
         slotName: targetSlot,
       };
-      if (newState.clashResult) {
-        newState.deferredUpgrade = upgradeAnim;
-      } else {
-        newState.lastUpgrade = upgradeAnim;
-      }
+      emitUpgradeFx(upgradeAnim); // 결과창이 열려 있으면 fxRegistry의 waitFor가 닫힐 때까지 기다림
 
-      newState.lastEffectEvent = {
-        id: `eff-upg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      emitEffectFx({
+        id: `eff-upg-${engineTick()}-${engineTag()}`,
         sourceCardName,
         effectType: 'BUFF',
         title: `${stackedCard.nameKr} 즉시 각성!`,
         description: `[${sourceCardName}] 효과로 선택한 [${stackedCard.nameKr} (${stackedCard.code})] 카드로 중첩 레벨업했습니다!`,
         playerIndex,
-        timestamp: Date.now(),
-      };
+        timestamp: logTimestamp(),
+      });
 
       newState = addLog(
         newState,
@@ -6511,15 +6505,15 @@ export function resolvePendingChoice(
     // (트래시에서 공개된 미선택 카드는 dropZone에 그대로 유지되며, 덱에 절대 추가되지 않음!)
 
     if (chosenActionCards.length > 0) {
-      newState.lastEffectEvent = {
-        id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      emitEffectFx({
+        id: `eff-${engineTick()}-${engineTag()}`,
         sourceCardName,
         effectType: 'CHARGE',
         title: '협주 에리어 배치 완료',
         description: `[${sourceCardName}] 효과로 카드 ${chosenActionCards.length}장을 협주 에리어에 배치했습니다!`,
         playerIndex,
-        timestamp: Date.now(),
-      };
+        timestamp: logTimestamp(),
+      });
       newState = addLog(
         newState,
         `[협주 충전] [${sourceCardName}] ${player.name}이(가) [${chosenActionCards.map((c) => c.nameKr).join(', ')}]을(를) 협주 에리어에 배치했습니다. (현재 협주: ${player.concertoZone.length}/10)`,
@@ -6556,15 +6550,15 @@ export function resolvePendingChoice(
     }
 
     if (recoveredCards.length > 0) {
-      newState.lastEffectEvent = {
-        id: `eff-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      emitEffectFx({
+        id: `eff-${engineTick()}-${engineTag()}`,
         sourceCardName,
         effectType: 'DRAW',
         title: '트래시 카드 회수 완료',
         description: `[${sourceCardName}] 효과로 [${recoveredCards.map((c) => c.nameKr).join(', ')}]을(를) 패에 회수했습니다!`,
         playerIndex,
-        timestamp: Date.now(),
-      };
+        timestamp: logTimestamp(),
+      });
       newState = addLog(
         newState,
         `[트래시 회수] [${sourceCardName}] ${player.name}이(가) 트래시에서 [${recoveredCards.map((c) => c.nameKr).join(', ')}]을(를) 패에 회수했습니다.`,
@@ -6601,15 +6595,15 @@ export function resolvePendingChoice(
         player.slots.leader = player.slots[targetSlot]!;
         player.slots[targetSlot] = prevLeader;
 
-        newState.lastEffectEvent = {
-          id: `eff-swap-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        emitEffectFx({
+          id: `eff-swap-${engineTick()}-${engineTag()}`,
           sourceCardName,
           effectType: 'BUFF',
           title: '리더 교체 완료',
           description: `[${sourceCardName}] 효과로 리더를 [${prevLeader.nameKr}]에서 [${player.slots.leader.nameKr}](으)로 교체했습니다!`,
           playerIndex,
-          timestamp: Date.now(),
-        };
+          timestamp: logTimestamp(),
+        });
 
         newState = addLog(
           newState,
@@ -6656,15 +6650,15 @@ export function resolvePendingChoice(
         addCardsToHand(player, [recovered]);
       }
 
-      newState.lastEffectEvent = {
-        id: `eff-recover-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      emitEffectFx({
+        id: `eff-recover-${engineTick()}-${engineTag()}`,
         sourceCardName: '날개의 뜻·회피 [BP01-069]',
         effectType: 'DRAW',
         title: '날개의 뜻 패 회수 완료',
         description: `선택한 협주 카드 [${spent.nameKr}] 1장을 지불하고 [날개의 뜻·회피]를 패로 회수했습니다!`,
         playerIndex,
-        timestamp: Date.now(),
-      };
+        timestamp: logTimestamp(),
+      });
 
       newState = addLog(
         newState,
@@ -6763,7 +6757,7 @@ export function resolvePendingChoice(
 
         // 2단계: 방금 뽑은 카드를 포함하여 버릴 패 1장 선택
         const discardChoice: PendingChoice = {
-          id: `choice-${Date.now()}-sh-switch-discard`,
+          id: `choice-${engineTick()}-sh-switch-discard`,
           playerIndex,
           title: '파수인 Lv.1 교체 효과 — 버릴 카드 선택',
           sourceCardName: '파수인 Lv.1 [BP01-008]',
@@ -6778,7 +6772,7 @@ export function resolvePendingChoice(
 
         // 드로우 연출 및 카드 인지 오버레이 활성화 (완료 후 discardChoice 표출)
         newState = queueEffectDraw(newState, {
-          id: `eff-draw-${Date.now()}`,
+          id: `eff-draw-${engineTick()}`,
           playerIndex,
           cards: [drawn],
           sourceCardName: '파수인 Lv.1 [BP01-008] 교체 효과',
@@ -6828,20 +6822,20 @@ export function resolvePendingChoice(
         newState.battleStepEffects = [
           ...(newState.battleStepEffects || []),
           {
-            id: `eff-${Date.now()}-rover0-battle-draw`,
+            id: `eff-${engineTick()}-rover0-battle-draw`,
             sourceCardName: sourceCardName || '방랑자',
             sourceCardArt: state.pendingChoice.sourceCardArt || drawnCards[0].artUrl,
             effectType: 'DRAW',
             title: '배틀 스킬 [카드 공개 & 패 추가]',
             description: `녹색 카드를 내어 덱에서 카드 ${actualCount}장을 공개하고 패에 추가했습니다!`,
             playerIndex,
-            timestamp: Date.now(),
+            timestamp: logTimestamp(),
           },
         ];
       }
 
       newState.lastEffectDraw = {
-        id: `eff-draw-${Date.now()}`,
+        id: `eff-draw-${engineTick()}`,
         playerIndex,
         cards: drawnCards,
         sourceCardName: `${sourceCardName || '방랑자'} 배틀 효과`,
@@ -6863,7 +6857,7 @@ export function resolvePendingChoice(
       const oppIdx = (playerIndex === 0 ? 1 : 0) as 0 | 1;
       if (!newState.players[oppIdx].isAi) {
         const oppRoverReveal: PendingChoice = {
-          id: `choice-${Date.now()}-opp-rover0-reveal`,
+          id: `choice-${engineTick()}-opp-rover0-reveal`,
           playerIndex: oppIdx,
           title: '📢 [상대 카드 공개 확인] 방랑자 배틀 효과',
           sourceCardName: sourceCardName || '방랑자',
@@ -6898,19 +6892,19 @@ export function resolvePendingChoice(
           newState.battleStepEffects = [
             ...(newState.battleStepEffects || []),
             {
-              id: `eff-${Date.now()}-sk0-battle-draw`,
+              id: `eff-${engineTick()}-sk0-battle-draw`,
               sourceCardName: '파수인 Lv.0 [BP01-010]',
               sourceCardArt: state.pendingChoice.sourceCardArt || drawn.artUrl,
               effectType: 'DRAW',
               title: '배틀 스킬 [카드 1장 드로우]',
               description: '녹색 카드를 내어 덱에서 카드 1장을 드로우했습니다!',
               playerIndex,
-              timestamp: Date.now(),
+              timestamp: logTimestamp(),
             },
           ];
         }
         newState.lastEffectDraw = {
-          id: `eff-draw-${Date.now()}`,
+          id: `eff-draw-${engineTick()}`,
           playerIndex,
           cards: [drawn],
           sourceCardName: '파수인 Lv.0 [BP01-010] 배틀 효과',
@@ -6946,7 +6940,7 @@ export function resolvePendingChoice(
           addCardsToHand(player, [drawn]);
           newState.players[playerIndex] = player;
           const effectDrawObj: EffectDrawAnimation = {
-            id: `eff-draw-${Date.now()}`,
+            id: `eff-draw-${engineTick()}`,
             playerIndex,
             cards: [drawn],
             sourceCardName: '파수인 Lv.2 [BP01-006] 회복 드로우',
@@ -6991,7 +6985,7 @@ export function resolvePendingChoice(
         { cardArt: chosenActionCards[0].artUrl, cardName: chosenActionCards[0].nameKr, effectTag: '효과 드로우' }
       );
       const discardChoice: PendingChoice = {
-        id: `choice-${Date.now()}-sh-switch-discard`,
+        id: `choice-${engineTick()}-sh-switch-discard`,
         playerIndex,
         title: '파수인 Lv.1 교체 효과 — 버릴 카드 선택',
         sourceCardName: '파수인 Lv.1 [BP01-008]',
@@ -7004,7 +6998,7 @@ export function resolvePendingChoice(
         sourceZone: 'HAND',
       };
       newState.lastEffectDraw = {
-        id: `eff-draw-${Date.now()}`,
+        id: `eff-draw-${engineTick()}`,
         playerIndex,
         cards: [chosenActionCards[0]],
         sourceCardName: '파수인 Lv.1 [BP01-008] 교체 효과',
@@ -7025,7 +7019,7 @@ export function resolvePendingChoice(
   } else if (onResolveType === 'DRAW_THEN_DISCARD_CONFIRM') {
     addCardsToHand(player, chosenActionCards);
     const discardChoice: PendingChoice = {
-      id: `choice-${Date.now()}-draw-discard`,
+      id: `choice-${engineTick()}-draw-discard`,
       playerIndex,
       title: `${sourceCardName} — 버릴 카드 선택`,
       sourceCardName,
@@ -7039,7 +7033,7 @@ export function resolvePendingChoice(
     };
     if (chosenActionCards.length > 0) {
       newState.lastEffectDraw = {
-        id: `eff-draw-${Date.now()}`,
+        id: `eff-draw-${engineTick()}`,
         playerIndex,
         cards: chosenActionCards,
         sourceCardName: sourceCardName || '효과 드로우',
@@ -7086,7 +7080,7 @@ export function resolvePendingChoice(
         const addedNames = chosenActionCards.map((c) => `[${c.nameKr}]`).join(', ') || '없음';
         const unchosenNames = unchosenCards.map((c) => `[${c.nameKr}]`).join(', ');
         const oppRevealChoice: PendingChoice = {
-          id: `choice-${Date.now()}-opp-public-reveal-${oppIdx}`,
+          id: `choice-${engineTick()}-opp-public-reveal-${oppIdx}`,
           playerIndex: oppIdx,
           title: `📢 [상대 카드 공개 확인] ${sourceCardName || '공개 효과'}`,
           sourceCardName: sourceCardName || '카드 공개 효과',
@@ -7107,7 +7101,7 @@ export function resolvePendingChoice(
     if (chosenActionCards.length > 0) {
       if (!state.pendingChoice.isPublicReveal) {
         newState.lastEffectDraw = {
-          id: `eff-draw-${Date.now()}`,
+          id: `eff-draw-${engineTick()}`,
           playerIndex,
           cards: chosenActionCards,
           sourceCardName: sourceCardName || '효과 드로우',
@@ -7119,14 +7113,14 @@ export function resolvePendingChoice(
         newState.battleStepEffects = [
           ...(newState.battleStepEffects || []),
           {
-            id: `eff-${Date.now()}-battle-add-hand`,
+            id: `eff-${engineTick()}-battle-add-hand`,
             sourceCardName,
             sourceCardArt: state.pendingChoice.sourceCardArt || chosenActionCards[0]?.artUrl,
             effectType: 'DRAW',
             title: `배틀 스킬 [카드 +${chosenActionCards.length}장 추가]`,
             description: `[${sourceCardName}] 효과로 카드 ${chosenActionCards.length}장을 패에 추가했습니다!`,
             playerIndex,
-            timestamp: Date.now(),
+            timestamp: logTimestamp(),
           },
         ];
       }
@@ -7153,18 +7147,16 @@ export function resolvePendingChoice(
     );
   }
 
-  // 배틀 스텝(판정 이전 CLASH_REVEAL)에서 협주 배치/트래시 회수/리더 교체/레벨업 등으로 lastEffectEvent가 생성된 경우 battleStepEffects에도 누적
-  if (
-    newState.phase === 'CLASH_REVEAL' &&
-    !newState.clashResult &&
-    newState.lastEffectEvent &&
-    newState.lastEffectEvent.id !== state.lastEffectEvent?.id
-  ) {
+  // 배틀 스텝(판정 이전 CLASH_REVEAL)에서 협주 배치/트래시 회수/리더 교체/레벨업 등으로 효과 알림이 생긴 경우 battleStepEffects에도 누적
+  // (예전에는 lastEffectEvent 필드로 판단. 지금은 이 함수가 실행되는 동안 새로 나온 효과 알림 중 마지막 것 — 예전과 같은 규칙)
+  const newEffectsHere = engineEffectsSince(fxMarkAtStart);
+  const latestEffectHere = newEffectsHere[newEffectsHere.length - 1];
+  if (newState.phase === 'CLASH_REVEAL' && !newState.clashResult && latestEffectHere) {
     newState.battleStepEffects = [
       ...(newState.battleStepEffects || []),
       {
-        ...newState.lastEffectEvent,
-        sourceCardArt: state.pendingChoice.sourceCardArt || newState.lastEffectEvent.sourceCardArt,
+        ...latestEffectHere,
+        sourceCardArt: state.pendingChoice.sourceCardArt || latestEffectHere.sourceCardArt,
       },
     ];
   }

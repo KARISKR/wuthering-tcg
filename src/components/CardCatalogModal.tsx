@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { formatEffectText } from '../utils/formatEffectText';
 
+import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
 interface CardCatalogModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -343,9 +344,9 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
             <div className="min-w-0">
               <div className="flex items-center gap-2 min-w-0">
                 <h3 className="font-black text-base sm:text-lg text-white tracking-wide truncate">
-                  공식 카드 도감 <span className="hidden md:inline">(CARD CATALOG)</span>
+                  카드 도감 <span className="hidden md:inline">(CARD CATALOG)</span>
                 </h3>
-                <span className="text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/40 whitespace-nowrap shrink-0">
+                <span className="hidden sm:inline-flex text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-mono font-bold border border-amber-500/40 whitespace-nowrap shrink-0">
                   {filteredCards.length} / {OFFICIAL_CARDS.length}종
                 </span>
               </div>
@@ -679,8 +680,9 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                     title={`${card.nameKr} [${card.code}] (${card.rarity || '★~★★'}) - 클릭 시 상세 보기`}
                   >
                     {/* 100% 순수 카드 일러스트 (LOD 256px 고효율 WebP로 초고속 렌더링) */}
-                    <img
-                      src={getLodUrl(card.artUrl, 256)}
+                    <CardArt
+                      sizes="(max-width: 640px) 46vw, 230px"
+                      artUrl={card.artUrl}
                       alt={card.nameKr}
                       loading="lazy"
                       decoding="async"
@@ -737,8 +739,9 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                         >
                           {/* 1. 일러스트 썸네일 (LOD 256 WebP) */}
                           <td className="py-2.5 px-3 text-center align-middle">
-                            <img
-                              src={getLodUrl(c.artUrl, 256)}
+                            <CardArt
+                              sizes="40px"
+                              artUrl={c.artUrl}
                               alt={c.nameKr}
                               loading="lazy"
                               decoding="async"
@@ -1002,8 +1005,9 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                           }`}
                         >
                           {/* 미니 썸네일 대형화 */}
-                          <img
-                            src={v.artUrl}
+                          <CardArt
+                            sizes="48px"
+                            artUrl={v.artUrl}
                             alt={v.nameKr}
                             className="w-12 h-16 object-contain rounded-lg border border-slate-700 bg-slate-950 shrink-0 shadow"
                           />

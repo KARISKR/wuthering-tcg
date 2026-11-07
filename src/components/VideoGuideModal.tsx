@@ -5,7 +5,6 @@ import {
   RotateCcw,
   Clock,
   BookOpen,
-  ArrowLeft,
   ExternalLink,
   Film,
   Sparkles,
@@ -103,15 +102,6 @@ export const VideoGuideModal: React.FC<VideoGuideModalProps> = ({
         {/* ========================================================= */}
         <header className="px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-amber-400/20 bg-[#0d1226]/90 flex items-center justify-between shrink-0 z-20 gap-2">
           <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
-            <button
-              onClick={onClose}
-              className="flex items-center gap-1.5 px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow"
-              title="대기실로 나가기"
-            >
-              <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
-              <span className="hidden sm:inline">대기실로 나가기</span>
-              <span className="sm:hidden">나가기</span>
-            </button>
 
             <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-red-600 to-amber-600 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
               <Film className="w-4 h-4 sm:w-5 sm:h-5 text-white" />

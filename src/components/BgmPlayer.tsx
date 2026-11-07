@@ -20,7 +20,12 @@ import {
   Zap,
 } from 'lucide-react';
 
-export const BgmPlayer: React.FC = () => {
+interface BgmPlayerProps {
+  /** [로비 개편] 로비 헤더용 축약형: 셔플·반복·인라인 볼륨 슬라이더를 숨기고 플레이리스트 팝업에서 조절 */
+  compact?: boolean;
+}
+
+export const BgmPlayer: React.FC<BgmPlayerProps> = ({ compact = false }) => {
   const [bgmState, setBgmState] = useState(() => bgmManager.getState());
   const [sfxVolume, setSfxVolume] = useState(() => soundEffects.getVolume());
   const [isSfxMuted, setIsSfxMuted] = useState(() => soundEffects.getMuted());
@@ -182,7 +187,7 @@ export const BgmPlayer: React.FC = () => {
       {/* 셔플 (랜덤 재생) 토글 버튼 */}
       <button
         onClick={() => bgmManager.toggleShuffle()}
-        className={`p-1 rounded-lg transition cursor-pointer hidden md:flex items-center ${
+        className={`p-1 rounded-lg transition cursor-pointer hidden ${compact ? '' : 'md:flex'} items-center ${
           isShuffle ? 'text-amber-400 bg-amber-950/60 border border-amber-500/30' : 'text-slate-500 hover:text-slate-300'
         }`}
         title={isShuffle ? '랜덤 재생 켜짐 (기본)' : '랜덤 재생 꺼짐 (순차)'}
@@ -193,7 +198,7 @@ export const BgmPlayer: React.FC = () => {
       {/* 한 곡 반복(Loop) 토글 버튼 */}
       <button
         onClick={() => bgmManager.toggleLoop()}
-        className={`p-1 rounded-lg transition cursor-pointer hidden md:flex items-center ${
+        className={`p-1 rounded-lg transition cursor-pointer hidden ${compact ? '' : 'md:flex'} items-center ${
           isLooping ? 'text-emerald-400 bg-emerald-950/60 border border-emerald-500/30' : 'text-slate-500 hover:text-slate-300'
         }`}
         title={isLooping ? '한 곡 반복 켜짐' : '한 곡 반복 꺼짐'}
@@ -217,7 +222,7 @@ export const BgmPlayer: React.FC = () => {
       </button>
 
       {/* BGM 볼륨 슬라이더 (기본 10%의 정말 작은 소리로 세팅) */}
-      <div className="hidden sm:flex items-center gap-1">
+      <div className={`hidden ${compact ? '' : 'sm:flex'} items-center gap-1`}>
         <input
           type="range"
           min="0"
@@ -242,7 +247,7 @@ export const BgmPlayer: React.FC = () => {
       </div>
 
       {/* 효과음 & 캐릭터 보이스 마스터 볼륨 슬라이더 */}
-      <div className="hidden md:flex items-center gap-1 border-l border-slate-700/80 pl-2">
+      <div className={`hidden ${compact ? '' : 'md:flex'} items-center gap-1 border-l border-slate-700/80 pl-2`}>
         <button
           onClick={() => soundEffects.toggleMute()}
           className="p-1 rounded-lg text-slate-400 hover:text-slate-200 cursor-pointer transition"
@@ -284,6 +289,7 @@ export const BgmPlayer: React.FC = () => {
           showPlaylist ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-white'
         }`}
         title="플레이리스트 & 볼륨 설정 선택"
+        aria-label="플레이리스트와 음량 설정"
       >
         <ListMusic className="w-3.5 h-3.5" />
       </button>

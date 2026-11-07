@@ -1,4 +1,5 @@
 import { GameState, ActionCard, PlayerState, CharacterCard, CardColor } from '../types/tcg';
+import { aiRandom } from './rng';
 import {
   upgradeCharacter,
   switchLeader,
@@ -1566,7 +1567,7 @@ export function selectAiClashCard(state: GameState, idx: 0 | 1 = 1, level: AiLev
 
   const scored = usableCards.map((c) => ({
     c,
-    ev: clashEV(state, idx, c, probs, level, burstPlan) + (Math.random() - 0.5) * 2 * paramsFor(level).noise,
+    ev: clashEV(state, idx, c, probs, level, burstPlan) + (aiRandom() - 0.5) * 2 * paramsFor(level).noise,
   }));
   scored.sort((a, b) => b.ev - a.ev);
   return scored[0].c.id;

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BgmPlayer } from './BgmPlayer';
 import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 import type { CustomDeckConfig } from '../types/tcg';
-import { VisitorStatsWidget } from './VisitorStatsWidget';
+import { useVisitorStats } from '../utils/visitorStats';
 
 const DeckSelectModal = lazy(() => import('./DeckSelectModal').then((m) => ({ default: m.DeckSelectModal })));
 const OfficialManualModal = lazy(() => import('./OfficialManualModal').then((m) => ({ default: m.OfficialManualModal })));
@@ -18,28 +18,14 @@ const MultiplayerLobbyModal = lazy(() => import('./MultiplayerLobbyModal').then(
 const AppInstallModal = lazy(() => import('./AppInstallModal').then((m) => ({ default: m.AppInstallModal })));
 import type { MultiplayerRole } from '../types/multiplayer';
 import {
-  Swords,
-  Layers,
-  BookOpen,
   Bot,
   User,
   Users,
-  Sparkles,
   ChevronRight,
-  Shield,
-  Flame,
-  Wind,
-  Trophy,
-  BookmarkCheck,
-  Film,
-  ScrollText,
   Volume2,
-  Share2,
-  History,
-  Bug,
-  MessageSquare,
   Sliders,
   Download,
+  X,
 } from 'lucide-react';
 
 import { BattleReplayData } from '../utils/replayManager';
@@ -61,6 +47,20 @@ interface LobbyNoticeSummary {
 }
 
 const LOBBY_NOTICE_CACHE_KEY = 'wuthering_lobby_notice_cache_v1';
+// [로비 개편 2026-11] 튜토리얼을 한 번 시작하거나 안내를 닫았는지
+const TUTORIAL_SEEN_KEY = 'wtcg_tutorial_seen';
+
+// 공지 본문 간단 정리 (기존 로비 패널과 같은 규칙)
+const sanitizeNotice = (raw: string) =>
+  raw
+    .replace(/\r\n/g, '\n')
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '')
+    .replace(/javascript:[^"']*/gi, '')
+    .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="my-1.5 rounded-lg max-h-24 object-contain" />')
+    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
 interface LobbyProps {
   onStartGame: (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, opponentDeck?: CustomDeckConfig) => void;
@@ -273,6 +273,136 @@ export const Lobby: React.FC<LobbyProps> = ({
     return () => window.removeEventListener('hashchange', syncHashToModals);
   }, []);
 
+  // [로비 개편 2026-11] 방문자 통계는 훅 하나만 사용 (훅마다 핑을 보내므로 한 곳에서만 호출)
+  const visitor = useVisitorStats();
+
+  // [로비 개편 2026-11] 튜토리얼 배너: 한 번 시작하거나 닫으면 메뉴 타일로만 남김
+  const [tutorialSeen, setTutorialSeen] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(TUTORIAL_SEEN_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const markTutorialSeen = () => {
+    setTutorialSeen(true);
+    try {
+      localStorage.setItem(TUTORIAL_SEEN_KEY, '1');
+    } catch {}
+  };
+  const dismissTutorialBanner = () => markTutorialSeen();
+  const startTutorial = () => {
+    markTutorialSeen();
+    if (onStartTutorial) {
+      onStartTutorial();
+    } else {
+      setHash('#tutorial');
+      setIsInteractiveTutorialOpen(true);
+    }
+  };
+
+  const openMultiplayer = () => {
+    setHash('#multiplayer');
+    setIsMultiplayerModalOpen(true);
+  };
+  const openNotice = () => {
+    if (!onOpenBoard) return;
+    if (latestNotice) onOpenBoard(latestNotice.id);
+    else onOpenBoard();
+  };
+  const openPatchNotes = () => {
+    setHash('#patchnotes');
+    setIsPatchNotesOpen(true);
+  };
+  const openInstall = () => {
+    setHash('#install');
+    setIsAppInstallOpen(true);
+  };
+
+  const menuItems: { key: string; label: string; icon: string; onClick: () => void; badge?: boolean }[] = [
+    { key: 'deck', label: '내 덱', icon: '/images/menu_icons/deck-builder.webp', onClick: () => onOpenDeckBuilder() },
+    { key: 'gallery', label: '카드 도감', icon: '/images/menu_icons/card-gallery.webp', onClick: () => setHash('#card-gallery') },
+    { key: 'board', label: '자유게시판', icon: '/images/menu_icons/board.webp', onClick: () => onOpenBoard && onOpenBoard(), badge: hasNewBoardPosts },
+    { key: 'shared', label: '공유 덱', icon: '/images/menu_icons/shared-decks.webp', onClick: () => setHash('#shared-decks') },
+    { key: 'replay', label: '리플레이', icon: '/images/menu_icons/replay.webp', onClick: () => setHash('#replay') },
+    { key: 'rulebook', label: '룰북 & FAQ', icon: '/images/menu_icons/rulebook.webp', onClick: () => setHash('#rulebook') },
+    { key: 'video', label: '영상 가이드', icon: '/images/menu_icons/video-guide.webp', onClick: () => setHash('#guide') },
+    { key: 'tutorial', label: '튜토리얼', icon: '/images/menu_icons/tutorial.webp', onClick: startTutorial },
+  ];
+
+  type CardVariant = 'desktop' | 'mobile' | 'short';
+  const CARD_SIZE: Record<CardVariant, { box: string; title: string; sub: string; badge: string }> = {
+    desktop: { box: 'h-[280px] lg:h-[320px] 2xl:h-[380px] lg:[@media(max-height:760px)]:h-[290px] p-6 rounded-[18px]', title: 'text-4xl lg:text-[42px]', sub: 'text-sm', badge: 'text-[11px] px-2.5 py-1' },
+    mobile: { box: 'h-[132px] p-3 rounded-2xl', title: 'text-[21px]', sub: 'text-[11px]', badge: 'text-[10px] px-2 py-0.5' },
+    short: { box: 'h-[148px] p-3.5 rounded-2xl', title: 'text-2xl', sub: 'text-xs', badge: 'text-[10px] px-2 py-0.5' },
+  };
+
+  const renderSingleCard = (variant: CardVariant) => {
+    const s = CARD_SIZE[variant];
+    return (
+      <button
+        onClick={() => setHash('#battle')}
+        className={`group relative overflow-hidden ${s.box} border-2 border-amber-400 shadow-[0_0_28px_rgba(245,158,11,0.3)] hover:shadow-[0_0_40px_rgba(245,158,11,0.5)] flex flex-col justify-between text-left cursor-pointer transition active:scale-[0.98]`}
+      >
+        <span
+          className="absolute inset-0 bg-cover transition-transform duration-700 group-hover:scale-105"
+          style={{ backgroundImage: `url('/images/bg-battle-rovers.webp')`, backgroundPosition: 'center 12%' }}
+        />
+        <span className="absolute inset-0 bg-gradient-to-t from-[#090b11] via-[#090b11]/55 to-transparent" />
+        <span className={`relative self-start rounded-full bg-[#090b11]/75 border border-amber-400/50 font-black tracking-wider text-amber-300 ${s.badge}`}>
+          SINGLE · AI
+        </span>
+        <span className="relative flex flex-col gap-1.5">
+          <span className={`font-black text-white leading-none ${s.title}`}>전투 시작</span>
+          <span className={`text-slate-200 ${s.sub}`}>{variant === 'desktop' ? 'AI 대전 또는 1인 2역 연습. 덱을 고르고 바로 시작합니다.' : 'AI 대전 · 1인 2역'}</span>
+          {variant === 'desktop' && (
+            <span className="mt-2.5 self-start h-11 px-5 rounded-xl bg-amber-400 group-hover:bg-amber-300 text-slate-950 text-[15px] font-black flex items-center gap-1.5 transition">
+              입장하기 <ChevronRight className="w-4 h-4" />
+            </span>
+          )}
+        </span>
+      </button>
+    );
+  };
+
+  const renderMultiCard = (variant: CardVariant) => {
+    const s = CARD_SIZE[variant];
+    const img = variant === 'desktop' ? '/images/bg-battle-multi.webp' : '/images/bg-battle-multi-640.webp';
+    return (
+      <button
+        onClick={openMultiplayer}
+        className={`group relative overflow-hidden ${s.box} border-2 border-violet-400 shadow-[0_0_28px_rgba(139,92,246,0.3)] hover:shadow-[0_0_40px_rgba(139,92,246,0.5)] flex flex-col justify-between text-left cursor-pointer transition active:scale-[0.98]`}
+      >
+        <span
+          className="absolute inset-0 bg-cover transition-transform duration-700 group-hover:scale-105"
+          style={{ backgroundImage: `url('${img}')`, backgroundPosition: variant === 'desktop' ? '72% 30%' : '80% 22%' }}
+        />
+        <span className="absolute inset-0 bg-gradient-to-t from-[#120e24] via-[#120e24]/45 to-transparent" />
+        <span className="absolute inset-0 bg-gradient-to-r from-[#120e24]/70 via-transparent to-transparent" />
+        <span className={`relative self-start flex items-center gap-1.5 rounded-full bg-[#090b11]/75 border border-emerald-400/50 font-black tracking-wider text-emerald-300 ${s.badge}`}>
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          ONLINE · 1:1
+        </span>
+        <span className="relative flex flex-col gap-1.5">
+          <span className={`font-black text-white leading-none ${s.title}`}>멀티배틀</span>
+          <span className={`text-violet-100 ${s.sub}`}>{variant === 'desktop' ? '친구와 실시간 1:1. 방을 만들거나 목록에서 입장합니다.' : '친구와 실시간 1:1'}</span>
+          {variant === 'desktop' && (
+            <span className="mt-2.5 self-start h-11 px-5 rounded-xl bg-violet-400 group-hover:bg-violet-300 text-[#160f2c] text-[15px] font-black flex items-center gap-1.5 transition">
+              방 만들기 · 참가 <ChevronRight className="w-4 h-4" />
+            </span>
+          )}
+        </span>
+      </button>
+    );
+  };
+
+  const renderStatsLine = (extra: string) => (
+    <span className={`flex items-center gap-1.5 text-slate-400 ${extra}`} title="실시간 접속 및 방문자 수">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+      {visitor.isLoading ? '접속자 확인 중' : `접속 중 ${visitor.online.toLocaleString()}명 · 오늘 ${visitor.today.toLocaleString()}명`}
+      {visitor.isExcluded && <span className="text-amber-400/80 ml-1">(집계 제외)</span>}
+    </span>
+  );
   return (
     <div className="relative min-h-screen w-full bg-[#080b13] text-slate-100 flex flex-col overflow-x-hidden selection:bg-amber-500/30 selection:text-amber-200">
       {/* 통짜 배경화면: 파수인 피아노 오로라 공식 일러스트 (5K Full-Bleed Wallpaper) */}
@@ -291,851 +421,271 @@ export const Lobby: React.FC<LobbyProps> = ({
       <div className="fixed inset-0 z-0 bg-gradient-to-b from-[#080b13]/35 via-transparent to-[#080b13]/60 pointer-events-none" />
       <div className="fixed inset-0 z-0 bg-[radial-gradient(ellipse_90%_70%_at_50%_-10%,rgba(34,211,238,0.06),transparent_70%)] pointer-events-none" />
 
-      {/* 1. 상단 내비게이션 바 (명조 게임 클라이언트 스타일) */}
-      <header className="relative z-30 h-14 sm:h-15 border-b border-slate-800/80 bg-[#090d18]/85 backdrop-blur-xl px-2.5 sm:px-8 flex items-center justify-between gap-2">
-        {/* 좌측: 명조 배틀 공식 로고 + FAN-MADE ONLINE SIMULATOR (10회 클릭 시 개발자/화면편집 모드 활성화) */}
+      {/* [로비 개편 2026-11] 상단 바: 로고 · 개발자 도구 · 앱 설치 · 축약형 BGM 플레이어 (가운데 탭 메뉴 제거) */}
+      <header className="relative z-30 h-14 short:h-12 sm:h-15 border-b border-white/[0.08] bg-[#090b11]/85 backdrop-blur-xl px-3 sm:px-8 flex items-center justify-between gap-2">
         <div
           onClick={handleLogoEasterEggClick}
-          className="flex items-center gap-2 sm:gap-3 shrink-0 cursor-pointer select-none group"
-          title="명조 배틀 (클릭)"
+          className="flex items-center gap-2 sm:gap-3 shrink-0 cursor-pointer select-none"
+          title="명조 배틀"
         >
           <img
             src="/images/logo-battle-trans.webp"
             alt="명조 배틀"
-            className="h-7 sm:h-10 w-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.25)] group-hover:scale-105 transition-transform"
+            className="h-7 sm:h-9 w-auto object-contain short:hidden"
           />
-          <div className="hidden sm:flex flex-col justify-center">
-            <span className="text-xs sm:text-sm font-black tracking-widest text-white uppercase font-sans drop-shadow-sm">
-              FAN-MADE ONLINE SIMULATOR
-            </span>
-            <span className="text-[10px] text-amber-400 font-mono tracking-wider font-bold">
-              NON-OFFICIAL PROJECT // 2026
-            </span>
+          <div className="hidden sm:flex short:flex flex-col justify-center">
+            <span className="text-xs sm:text-sm font-black tracking-widest text-white uppercase">FAN-MADE ONLINE SIMULATOR</span>
+            <span className="text-[10px] text-amber-400 font-bold tracking-wider short:hidden">NON-OFFICIAL PROJECT // 2026</span>
           </div>
         </div>
 
-        {/* 중앙 상단 빠른 내비게이션 탭 (화면 정중앙 absolute 완벽 정렬) */}
-        <nav className="hidden lg:flex absolute left-1/2 -translate-x-1/2 items-center gap-1 bg-slate-950/75 p-1 rounded-xl border border-slate-800/90 shadow-lg shadow-black/40">
-          <button
-            onClick={() => setHash('#battle')}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500/25 via-amber-500/20 to-amber-500/10 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer shadow-sm shadow-amber-500/20"
-          >
-            <Swords className="w-3.5 h-3.5 text-amber-400" />
-            <span>전투 시작</span>
-          </button>
-          <button
-            onClick={onOpenDeckBuilder}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition cursor-pointer"
-          >
-            <img src="/images/menu_icons/deck-builder.webp" alt="" className="w-4 h-4 object-contain" />
-            <span>덱 빌더</span>
-          </button>
-          <button
-            onClick={() => setHash('#card-gallery')}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition cursor-pointer"
-          >
-            <BookOpen className="w-3.5 h-3.5 text-amber-400" />
-            <span>카드 도감</span>
-          </button>
-          <button
-            onClick={() => onOpenBoard && onOpenBoard()}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs font-bold transition cursor-pointer shadow-sm"
-            title="자유게시판 (덱공유, 소통, 버그제보)"
-          >
-            <img src="/images/menu_icons/board.webp" alt="" className="w-4 h-4 object-contain" />
-            <span>자유게시판</span>
-            {hasNewBoardPosts && (
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_6px_rgba(239,68,68,0.8)]" />
-            )}
-          </button>
-          <button
-            onClick={() => setHash('#shared-decks')}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition cursor-pointer"
-          >
-            <img src="/images/menu_icons/shared-decks.webp" alt="" className="w-4 h-4 object-contain" />
-            <span>공유된 덱</span>
-          </button>
-          <button
-            onClick={() => setHash('#replay')}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 text-xs font-bold transition cursor-pointer"
-          >
-            <img src="/images/menu_icons/replay.webp" alt="" className="w-4 h-4 object-contain" />
-            <span>대전 리플레이</span>
-          </button>
-        </nav>
-
-        {/* 우측 상단 유틸 버튼들 (개발자 모드 활성화 시에만 화면 편집 & SFX 노출, BGM은 상시 노출) */}
-        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
           {isDevMode && (
             <>
-              {/* 화면 편집 (직접 마우스 조절) 버튼 */}
               <button
                 onClick={() => setIsEditingLayout(!isEditingLayout)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black transition cursor-pointer shadow-md ${
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-black transition cursor-pointer ${
                   isEditingLayout
-                    ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-[0_0_15px_rgba(245,158,11,0.7)]'
+                    ? 'bg-amber-400 text-slate-950 border-amber-300'
                     : 'bg-slate-800/90 hover:bg-slate-700/90 text-amber-300 border-amber-500/40'
                 }`}
                 title="마우스로 직접 이미지 크기, 위치, UI 간격 조절"
               >
                 <Sliders className="w-3.5 h-3.5" />
-                <span className="font-sans font-bold">화면 편집</span>
+                <span>화면 편집</span>
               </button>
-
-              {/* SFX 버튼 */}
               <button
                 onClick={() => setHash('#sfx')}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer shadow-md"
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-black transition cursor-pointer"
                 title="효과음(SFX) 커스텀 및 가이드 열기"
               >
-                <Volume2 className="w-3.5 h-3.5 text-amber-400" />
-                <span className="font-mono font-black text-amber-300 tracking-wider">SFX</span>
+                <Volume2 className="w-3.5 h-3.5" />
+                <span>SFX</span>
               </button>
             </>
           )}
 
-          {/* PWA 앱 설치 버튼 (모바일 홈 화면 또는 데스크톱 앱 바로가기) */}
-          <button
-            onClick={() => {
-              setHash('#install');
-              setIsAppInstallOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/25 text-amber-300 border border-amber-400/40 text-xs font-bold transition cursor-pointer shadow-sm active:scale-95"
-            title="모바일/PC 홈 화면에 앱으로 설치하기"
-          >
-            <Download className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline font-sans">앱 설치</span>
-          </button>
+          <div className="min-w-0">
+            <BgmPlayer compact />
+          </div>
 
-          <BgmPlayer />
+          <button
+            onClick={openInstall}
+            className="shrink-0 h-9 sm:h-10 px-2.5 sm:px-3.5 flex items-center gap-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs sm:text-[13px] font-bold transition cursor-pointer"
+            title="모바일/PC 홈 화면에 앱으로 설치하기"
+            aria-label="앱 설치"
+          >
+            <Download className="w-4 h-4" />
+            <span className="hidden md:inline short:hidden">앱 설치</span>
+          </button>
         </div>
       </header>
 
-      {/* 개발자 모드 토스트 안내 알림 */}
       {devToastMessage && (
-        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900/95 border border-amber-400/90 text-amber-300 text-xs font-black shadow-2xl backdrop-blur-md animate-bounce pointer-events-none">
+        <div className="fixed top-18 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900/95 border border-amber-400/90 text-amber-300 text-xs font-black shadow-2xl backdrop-blur-md pointer-events-none">
           {devToastMessage}
         </div>
       )}
 
-      {/* 1.5 실시간 방문자 & 접속자 현황 위젯 (모바일에서는 화면 확보를 위해 숨김) */}
-      <div className="hidden md:block w-full px-4 sm:px-8 pt-2 sm:absolute sm:top-18 sm:left-8 sm:w-auto sm:pt-0 z-30 pointer-events-auto">
-        <VisitorStatsWidget />
-      </div>
-
-
-
-      {/* 2. 메인 중앙 콘텐츠 (로고와 하단 인터페이스 간의 여백을 넉넉하게 확보) */}
       <main
-        className="relative z-20 flex-1 max-w-[1720px] 2xl:max-w-[1860px] w-full mx-auto px-4 sm:px-8 pt-2 sm:pt-4 pb-16 sm:pb-24 flex flex-col items-center justify-start transition-transform duration-150"
+        className="relative z-20 flex-1 w-full max-w-[1440px] 2xl:max-w-[1640px] mx-auto px-4 sm:px-8 lg:px-12 short:px-5 pt-3 sm:pt-5 short:pt-3 pb-6 flex flex-col items-center md:[@media(min-height:960px)]:justify-center md:[@media(min-height:960px)]:pb-16"
         style={{
-          transform: typeof window !== 'undefined' && window.innerWidth >= 1024 ? `scale(${layout.uiScale})` : 'none',
+          transform: typeof window !== 'undefined' && window.innerWidth >= 1024 && layout.uiScale !== 1 ? `scale(${layout.uiScale})` : undefined,
           transformOrigin: 'top center',
         }}
       >
-        {/* 중앙 히어로 로고 영역 (사이즈 확대 & 안정적인 시각적 중심 배치) */}
+        {/* 히어로 로고 (가로 모바일에서는 왼쪽 열로 이동) */}
         <div
           onWheel={handleLogoWheel}
-          className={`text-center flex flex-col items-center justify-center select-none pt-1 sm:pt-2 transition-all duration-200 ${
-            isEditingLayout ? 'ring-2 ring-amber-400/60 ring-dashed rounded-2xl p-2 cursor-ns-resize bg-amber-950/20' : ''
+          className={`short:hidden text-center flex flex-col items-center select-none ${
+            isEditingLayout ? 'ring-2 ring-amber-400/60 ring-dashed rounded-2xl p-2 cursor-ns-resize' : ''
           }`}
-          style={{
-            transform: `scale(${layout.logoScale})`,
-            transformOrigin: 'top center',
-            marginBottom: `${layout.logoGap}px`,
-          }}
-          title={isEditingLayout ? "마우스 휠로 로고 크기 조절" : undefined}
+          style={{ transform: layout.logoScale !== 1 ? `scale(${layout.logoScale})` : undefined, transformOrigin: 'top center' }}
+          title={isEditingLayout ? '마우스 휠로 로고 크기 조절' : undefined}
         >
-          {isEditingLayout && (
-            <div className="px-2 py-0.5 mb-1 rounded bg-amber-500/95 text-slate-950 font-black text-[10px] tracking-wider pointer-events-none shadow-md">
-              로고: 마우스 휠로 크기조절
+          <img
+            src="/images/logo-battle-trans.webp"
+            alt="명조 배틀"
+            className="h-20 sm:h-24 lg:h-[118px] 2xl:h-[140px] lg:[@media(max-height:760px)]:h-[92px] w-auto max-w-[80vw] object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+          />
+          <span className="mt-2 text-[10px] sm:text-xs font-black tracking-[0.3em] text-white uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+            FAN MADE ONLINE BATTLE SIMULATOR
+          </span>
+        </div>
+
+        {/* ===================== 모바일 세로 ===================== */}
+        <div className="w-full flex md:hidden short:hidden flex-col gap-3 mt-3 select-none">
+          <button
+            onClick={openNotice}
+            className="w-full h-11 px-3 rounded-xl border border-amber-400/40 bg-[#0c111d]/90 flex items-center gap-2.5 text-left cursor-pointer active:scale-[0.99] transition"
+          >
+            <span className="shrink-0 px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300 text-[11px] font-black">공지</span>
+            <span className="flex-1 min-w-0 text-[13px] font-semibold text-slate-100 truncate">
+              {latestNotice?.title || `최신 업데이트 ${CURRENT_GAME_VERSION} 패치노트`}
+            </span>
+            <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
+          </button>
+
+          {!tutorialSeen && (
+            <div className="relative h-16 pl-2 pr-1 rounded-2xl border border-rose-400/55 bg-[#231221]/92 flex items-center gap-2.5">
+              <img src="/images/tutorial/abby_guide.webp" alt="" className="h-[58px] w-auto self-end object-contain" />
+              <button onClick={startTutorial} className="flex-1 min-w-0 text-left cursor-pointer">
+                <span className="block text-sm font-black text-white">처음이신가요?</span>
+                <span className="block text-xs text-rose-200/80">아브와 함께 튜토리얼부터</span>
+              </button>
+              <button onClick={startTutorial} className="h-9 px-3 rounded-lg bg-rose-400 text-[#1a0b12] text-xs font-black cursor-pointer">시작</button>
+              <button onClick={dismissTutorialBanner} aria-label="튜토리얼 안내 닫기" className="w-9 h-9 flex items-center justify-center text-rose-200/80 cursor-pointer">
+                <X className="w-4 h-4" />
+              </button>
             </div>
           )}
-          {/* 공식 명조 배틀 로고 이미지 (요청에 따라 크기 확대) */}
-          <div className="relative flex items-center justify-center">
-            <img
-              src="/images/logo-battle-trans.webp"
-              alt="명조 배틀"
-              className="h-28 sm:h-36 md:h-48 lg:h-52 xl:h-56 2xl:h-60 w-auto max-w-[85vw] object-contain drop-shadow-[0_0_36px_rgba(255,255,255,0.35)] hover:scale-[1.02] transition-transform duration-300"
-            />
+
+          <div className="grid grid-cols-2 gap-2.5">
+            {renderSingleCard('mobile')}
+            {renderMultiCard('mobile')}
           </div>
 
-          {/* 영문 서브타이틀: FAN MADE ONLINE BATTLE SIMULATOR */}
-          <div className="mt-2 sm:mt-2.5 flex items-center gap-2">
-            <span className="text-xs sm:text-sm md:text-base font-black tracking-[0.32em] text-white uppercase drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] font-sans">
-              FAN MADE ONLINE BATTLE SIMULATOR
-            </span>
+          <nav aria-label="메뉴" className="grid grid-cols-4 gap-2">
+            {menuItems.map((m) => (
+              <button
+                key={m.key}
+                onClick={m.onClick}
+                className="relative h-20 rounded-xl border border-amber-400/25 bg-[#0c111d]/88 flex flex-col items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition"
+              >
+                {m.badge && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500" aria-label="새 글" />}
+                <img src={m.icon} alt="" className="w-[30px] h-[30px] object-contain" />
+                <span className="text-[11px] font-bold text-slate-100">{m.label}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* ===================== 모바일 가로 (높이 500px 이하) ===================== */}
+        <div className="w-full hidden short:grid grid-cols-[190px_minmax(0,1fr)] gap-4 select-none">
+          <div className="flex flex-col gap-2.5">
+            <img src="/images/logo-battle-trans.webp" alt="명조 배틀" className="h-[88px] w-auto object-contain self-center" />
+            <button
+              onClick={openNotice}
+              className="min-h-11 px-2.5 py-1.5 rounded-xl border border-amber-400/40 bg-[#0c111d]/90 text-left cursor-pointer"
+            >
+              <span className="block text-[10px] font-black text-amber-300">공지</span>
+              <span className="block text-xs font-semibold text-slate-100 truncate">
+                {latestNotice?.title || `${CURRENT_GAME_VERSION} 패치노트`}
+              </span>
+            </button>
+            {!tutorialSeen && (
+              <button
+                onClick={startTutorial}
+                className="h-11 px-2.5 rounded-xl border border-rose-400/55 bg-[#231221]/92 flex items-center justify-between text-xs font-black text-white cursor-pointer"
+              >
+                처음이세요? 튜토리얼
+                <ChevronRight className="w-3.5 h-3.5 text-rose-300" />
+              </button>
+            )}
+            {renderStatsLine('text-[11px]')}
+          </div>
+          <div className="flex flex-col gap-2.5 min-w-0">
+            <div className="grid grid-cols-2 gap-2.5">
+              {renderSingleCard('short')}
+              {renderMultiCard('short')}
+            </div>
+            <nav aria-label="메뉴" className="grid grid-cols-4 gap-2">
+              {menuItems.map((m) => (
+                <button
+                  key={m.key}
+                  onClick={m.onClick}
+                  className="relative h-12 px-2.5 rounded-xl border border-amber-400/25 bg-[#0c111d]/88 flex items-center gap-2 cursor-pointer active:scale-95 transition"
+                >
+                  {m.badge && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500" aria-label="새 글" />}
+                  <img src={m.icon} alt="" className="w-[26px] h-[26px] object-contain shrink-0" />
+                  <span className="text-xs font-bold text-slate-100 truncate">{m.label}</span>
+                </button>
+              ))}
+            </nav>
           </div>
         </div>
 
-        {/* ========================================================= */}
-        {/* 모바일 전용 타일형 레이아웃 (세로/모바일 최적화: 공지바 + 2대형타일 + 3x3타일) */}
-        {/* ========================================================= */}
-        <div className="w-full flex md:hidden flex-col gap-3 pb-8 select-none">
-          {/* 1. 상단 슬림 1줄 공지사항 배너 */}
-          <div
-            onClick={() => (latestNotice && onOpenBoard ? onOpenBoard(latestNotice.id) : onOpenBoard && onOpenBoard())}
-            className="w-full bg-[#0c111d]/90 border border-amber-400/60 p-2.5 rounded-xl shadow-md flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] transition backdrop-blur-md"
-          >
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="shrink-0 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-mono text-[10px] font-black border border-amber-400/40">
-                📢 공지
-              </span>
-              <span className="text-xs font-bold text-slate-100 truncate">
-                {latestNotice?.title || '공식 공지사항 및 업데이트 안내'}
-              </span>
+        {/* ===================== 데스크톱·태블릿 ===================== */}
+        <div className="w-full hidden md:flex short:hidden flex-col gap-4 mt-5 select-none">
+          {!tutorialSeen && (
+            <div className="h-16 pl-5 pr-3 rounded-2xl border border-rose-400/55 bg-[#231221]/90 flex items-center gap-4">
+              <img src="/images/tutorial/abby_guide.webp" alt="" className="h-14 w-auto self-end object-contain" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[15px] font-black text-white truncate">처음이신가요? 아브와 함께 튜토리얼부터 해보세요</p>
+                <p className="text-xs text-rose-200/80 truncate">규칙과 첫 전투를 실습으로 익힙니다. 한 번 시작하면 이 배너는 아래 메뉴로 들어갑니다.</p>
+              </div>
+              <button onClick={startTutorial} className="h-10 px-4 rounded-xl bg-rose-400 hover:bg-rose-300 text-[#1a0b12] text-[13px] font-black cursor-pointer transition shrink-0">
+                튜토리얼 시작
+              </button>
+              <button onClick={dismissTutorialBanner} aria-label="튜토리얼 안내 닫기" className="w-10 h-10 flex items-center justify-center text-rose-200/80 hover:text-white cursor-pointer shrink-0">
+                <X className="w-4 h-4" />
+              </button>
             </div>
-            <ChevronRight className="w-4 h-4 text-amber-400 shrink-0" />
-          </div>
+          )}
 
-          {/* 2. 메인 대결 2열 대형 타일 (전투 시작 + 멀티배틀) */}
-          <div className="w-full grid grid-cols-2 gap-2.5">
-            {/* 좌: 싱글 전투 시작 */}
-            <div
-              onClick={() => setHash('#battle')}
-              className="relative h-28 rounded-2xl border-2 border-amber-400/80 bg-[#0d101a] p-3 flex flex-col justify-between overflow-hidden shadow-lg shadow-amber-500/20 active:scale-95 transition cursor-pointer"
-            >
-              <div
-                className="absolute inset-0 bg-cover bg-top opacity-50"
-                style={{ backgroundImage: `url('/images/bg-battle-rovers.webp')`, backgroundPosition: 'center 10%' }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-300 font-mono text-[9px] font-black border border-amber-400/40">
-                  SINGLE
-                </span>
-                <Swords className="w-4 h-4 text-amber-300" />
+          <div className="grid grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(280px,340px)] gap-4">
+            {renderSingleCard('desktop')}
+            {renderMultiCard('desktop')}
+
+            {/* 공지 패널: 공지가 없으면 최근 업데이트로 채움 */}
+            <section className="col-span-2 lg:col-span-1 rounded-[18px] border border-white/12 bg-[#0c111d]/90 backdrop-blur-xl p-5 flex flex-col gap-3 min-h-[180px] lg:h-[320px] 2xl:h-[380px] lg:[@media(max-height:760px)]:h-[290px]">
+              <div className="flex items-center justify-between">
+                <span className="text-[15px] font-black text-amber-300">공지사항</span>
+                <button onClick={() => onOpenBoard && onOpenBoard()} className="text-xs text-slate-400 hover:text-amber-200 flex items-center gap-0.5 cursor-pointer">
+                  자유게시판 <ChevronRight className="w-3 h-3" />
+                </button>
               </div>
-              <div className="relative z-10">
-                <h4 className="text-base font-black text-white drop-shadow">전투 시작</h4>
-                <p className="text-[10px] font-mono font-bold text-amber-300">AI / 1인 2역 듀얼</p>
-              </div>
-            </div>
-
-            {/* 우: 멀티배틀 */}
-            <div
-              onClick={() => {
-                setHash('#multiplayer');
-                setIsMultiplayerModalOpen(true);
-              }}
-              className="relative h-28 rounded-2xl border-2 border-violet-400/80 bg-gradient-to-br from-[#120e24] to-[#1c1236] p-3 flex flex-col justify-between overflow-hidden shadow-lg shadow-violet-500/25 active:scale-95 transition cursor-pointer"
-            >
-              <div className="relative z-10 flex items-center justify-between">
-                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[9px] font-black border border-emerald-400/40 flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  ONLINE
-                </span>
-                <Users className="w-4 h-4 text-violet-300" />
-              </div>
-              <div className="relative z-10">
-                <h4 className="text-base font-black text-white drop-shadow">멀티배틀</h4>
-                <p className="text-[10px] font-mono font-bold text-violet-300">1:1 실시간 친선전</p>
-              </div>
-            </div>
-          </div>
-
-          {/* 3. 모바일 3x3 보조 메뉴 타일 */}
-          <div className="w-full grid grid-cols-3 gap-2">
-            {/* 1) 튜토리얼 */}
-            <button
-              onClick={() => {
-                if (onStartTutorial) {
-                  onStartTutorial();
-                } else {
-                  setHash('#tutorial');
-                  setIsInteractiveTutorialOpen(true);
-                }
-              }}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center overflow-hidden">
-                <img
-                  src="/images/menu_icons/tutorial.webp"
-                  alt="튜토리얼"
-                  className="w-7 h-7 object-contain"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = '/images/tutorial/abby_guide.webp';
-                  }}
-                />
-              </div>
-              <span className="text-xs font-black text-white">튜토리얼</span>
-            </button>
-
-            {/* 2) 덱 편집기 */}
-            <button
-              onClick={() => {
-                setHash('#deckbuilder');
-                if (onOpenDeckBuilder) onOpenDeckBuilder();
-              }}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/deck-builder.webp" alt="덱 편집기" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">덱 편집기</span>
-            </button>
-
-            {/* 3) 카드 도감 */}
-            <button
-              onClick={() => setHash('#card-gallery')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img
-                  src="/images/menu_icons/card-gallery.webp"
-                  alt="카드 도감"
-                  className="w-6 h-6 object-contain"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = '/images/menu_icons/deck-preset.webp';
-                  }}
-                />
-              </div>
-              <span className="text-xs font-black text-white">카드 도감</span>
-            </button>
-
-            {/* 4) 자유게시판 */}
-            <button
-              onClick={() => (onOpenBoard ? onOpenBoard() : setHash('#board'))}
-              className="relative flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              {hasNewBoardPosts && (
-                <span className="absolute top-1.5 right-1.5 px-1 py-0.2 rounded-full bg-rose-500 text-white font-black text-[8px] animate-pulse">
-                  NEW
-                </span>
-              )}
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/board.webp" alt="자유게시판" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">자유게시판</span>
-            </button>
-
-            {/* 5) 공유된 덱 */}
-            <button
-              onClick={() => setHash('#shared-decks')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/shared-decks.webp" alt="공유된 덱" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">공유된 덱</span>
-            </button>
-
-            {/* 6) 대전 리플레이 */}
-            <button
-              onClick={() => setHash('#replay')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/replay.webp" alt="리플레이" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">리플레이</span>
-            </button>
-
-            {/* 7) 공식 룰북 */}
-            <button
-              onClick={() => setHash('#rulebook')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/rulebook.webp" alt="공식 룰북" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">공식 룰북</span>
-            </button>
-
-            {/* 8) 룰 영상 가이드 */}
-            <button
-              onClick={() => setHash('#guide')}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center">
-                <img src="/images/menu_icons/video-guide.webp" alt="영상 가이드" className="w-6 h-6 object-contain" />
-              </div>
-              <span className="text-xs font-black text-white">영상 가이드</span>
-            </button>
-
-            {/* 9) 앱 설치 (PWA) */}
-            <button
-              onClick={() => {
-                setHash('#install');
-                setIsAppInstallOpen(true);
-              }}
-              className="flex flex-col items-center justify-center p-2.5 rounded-xl border border-amber-400/60 bg-[#0c111d]/90 shadow-md active:scale-95 transition cursor-pointer gap-1.5"
-            >
-              <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-400/40 flex items-center justify-center text-amber-300">
-                <Download className="w-5 h-5" />
-              </div>
-              <span className="text-xs font-black text-white">앱 설치</span>
-            </button>
-          </div>
-
-          {/* 4. 모바일 하단 패치노트 바 */}
-          <div
-            onClick={() => {
-              setHash('#patchnotes');
-              setIsPatchNotesOpen(true);
-            }}
-            className="w-full bg-[#0c111d]/80 border border-slate-700/60 p-2.5 rounded-xl shadow-md flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] transition backdrop-blur-md"
-          >
-            <div className="flex items-center gap-2">
-              <ScrollText className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="text-xs font-bold text-slate-200">업데이트 패치노트</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] font-mono text-amber-300 font-bold">{CURRENT_GAME_VERSION}</span>
-              <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
-            </div>
-          </div>
-        </div>
-
-        {/* ========================================================= */}
-        {/* 데스크톱/태블릿 비대칭 벤토 그리드 [md 이상 화면 전용] */}
-        {/* ========================================================= */}
-        <div className="w-full hidden md:grid md:grid-cols-2 lg:grid-cols-[1fr_270px_250px_310px] xl:grid-cols-[1fr_290px_270px_340px] 2xl:grid-cols-[1.05fr_310px_280px_360px] gap-3.5 sm:gap-4.5 lg:h-[500px] xl:h-[520px]">
-          {/* ========================================================= */}
-          {/* [1열] 좌측: 전투 시작 (상단) + 인터랙티브 튜토리얼 (하단) */}
-          {/* ========================================================= */}
-          <div className="flex flex-col gap-3.5 h-full">
-            {/* [1-1] 전투 시작 (메인 대형 배너) */}
-            <div
-              onClick={() => setHash('#battle')}
-              className="group relative flex-[3.8] border-2 border-amber-400/80 hover:border-amber-300 bg-[#0d101a]/90 backdrop-blur-xl flex flex-col justify-between shadow-[0_0_28px_rgba(245,158,11,0.3)] hover:shadow-[0_0_45px_rgba(245,158,11,0.55)] transition-all duration-300 cursor-pointer overflow-hidden select-none min-h-[300px]"
-              style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
-            >
-              <div className="absolute inset-1.5 border border-amber-400/30 pointer-events-none z-10" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
-              <div className="absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
-
-              {/* 상단 인디케이터 */}
-              <div className="relative z-20 p-3.5 sm:p-4 flex items-center justify-between w-full">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-black/60 border border-amber-400/40 text-[11px] font-mono tracking-widest text-amber-300 font-bold uppercase backdrop-blur-sm">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  <span>BATTLE // ARENA</span>
-                </div>
-                <span className="font-mono text-[11px] text-amber-200/50 tracking-[2px]">01_INIT</span>
-              </div>
-
-              {/* 메인 캐릭터 일러스트 */}
-              <div className="absolute inset-0 z-0 overflow-hidden">
-                <div
-                  className="absolute inset-0 bg-cover bg-top transition-transform duration-700 ease-out group-hover:scale-105"
-                  style={{
-                    backgroundImage: `url('/images/bg-battle-rovers.webp')`,
-                    backgroundPosition: 'center 12%',
-                    backgroundSize: 'cover',
-                  }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-[#090b11] via-[#090b11]/55 to-transparent pointer-events-none" />
-                <div className="absolute bottom-0 inset-x-0 h-48 bg-gradient-to-t from-amber-600/20 via-amber-500/10 to-transparent pointer-events-none" />
-              </div>
-
-              {/* 중앙/하단 텍스트 플레이트 */}
-              <div className="relative z-20 px-5 pb-4 sm:pb-5 pt-2 flex flex-col items-center text-center mt-auto">
-                <h2 className="text-3xl sm:text-4xl lg:text-[42px] font-black text-white tracking-wide drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)] group-hover:text-amber-100 transition-colors">
-                  전투 시작
-                </h2>
-                <span className="text-xs sm:text-sm font-mono font-black text-amber-400 tracking-[0.3em] uppercase mt-1 drop-shadow">
-                  (BATTLE START)
-                </span>
-
-                <div className="w-full mt-3 pt-2.5 border-t border-amber-400/25 flex items-center justify-between text-[11px] font-mono text-amber-300/80">
-                  <span>WUTHERING WAVES TCG</span>
-                  <span className="flex items-center gap-1 group-hover:translate-x-1.5 transition-transform text-amber-300 font-bold">
-                    ENTER <ChevronRight className="w-3.5 h-3.5 stroke-[3]" />
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* [1-2] 전투 시작 밑 튜토리얼 버튼 (길게 뽑은 배너) */}
-            <div
-              onClick={() => { if (onStartTutorial) onStartTutorial(); else setHash('#tutorial'); }}
-              className="group relative flex-[1.2] border-2 border-rose-500/80 hover:border-rose-400 bg-gradient-to-r from-[#170e1a]/95 via-[#231221]/90 to-[#170e1a]/95 backdrop-blur-xl px-4 sm:px-5 py-3 flex items-center justify-between shadow-[0_0_22px_rgba(244,63,94,0.25)] hover:shadow-[0_0_36px_rgba(244,63,94,0.55)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
-              style={{ clipPath: 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)' }}
-            >
-              <div className="absolute inset-1.5 border border-rose-500/25 pointer-events-none z-10" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-rose-400 z-20 pointer-events-none" />
-              <div className="absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-rose-400 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-rose-400 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-rose-400 z-20 pointer-events-none" />
-
-              <img
-                src="/images/tutorial/abby_guide.webp"
-                alt="아브 (Abby)"
-                className="absolute left-[18px] top-0 bottom-0 h-full w-auto object-contain z-10 py-1 drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] group-hover:scale-110 origin-bottom transition-transform duration-300 pointer-events-none"
-              />
-              <div className="flex-1 flex flex-col items-center justify-center text-center z-10 min-w-0 pl-20 sm:pl-24 pr-2">
-                <span className="text-lg sm:text-xl xl:text-2xl font-black text-white group-hover:text-rose-200 tracking-tight transition-colors drop-shadow">
-                  명조 배틀 튜토리얼 바로가기
-                </span>
-                <span className="text-xs sm:text-sm text-slate-300 font-semibold truncate mt-1 max-w-full">
-                  아브와 함께 배우는 『명조: 배틀』 공식 룰 & 실습 가이드
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 z-10 shrink-0 pl-2">
-                <span className="hidden sm:inline font-mono text-[11px] font-black text-rose-300 tracking-wider uppercase">
-                  START GUIDE
-                </span>
-                <ChevronRight className="w-5 h-5 text-rose-400 group-hover:text-rose-200 group-hover:translate-x-1 transition-all" />
-              </div>
-            </div>
-          </div>
-
-          {/* ========================================================= */}
-          {/* [2열] 중앙: 덱 빌더 & 카드 도감 & 멀티배틀 (3행 균등 분할) */}
-          {/* ========================================================= */}
-          <div className="flex flex-col gap-3.5 h-full">
-            
-            {/* [2-1] 덱 빌더 (골드/앰버 네온 테두리) */}
-            <div
-              onClick={onOpenDeckBuilder}
-              className="group relative flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c101b]/90 hover:bg-[#1a150e]/95 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.22)] hover:shadow-[0_0_35px_rgba(245,158,11,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
-              style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
-            >
-              <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-10" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
-
-              <div className="relative z-20 flex flex-col justify-center">
-                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-amber-200 transition-colors tracking-tight drop-shadow">
-                  덱 빌더
-                </h3>
-                <span className="text-[11px] sm:text-xs font-mono font-black text-amber-400 tracking-wider uppercase mt-1">
-                  (DECK BUILDER)
-                </span>
-              </div>
-
-              <div className="relative z-10 w-18 h-18 sm:w-22 sm:h-22 flex items-center justify-center shrink-0">
-                <img
-                  src="/images/menu_icons/deck-builder.webp"
-                  alt="덱 빌더"
-                  className="w-14 h-14 sm:w-18 sm:h-18 object-contain drop-shadow-[0_0_18px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-500"
-                />
-              </div>
-            </div>
-
-            {/* [2-2] 카드 도감 (골드/앰버 네온 테두리) */}
-            <div
-              onClick={() => setHash('#card-gallery')}
-              className="group relative flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c101b]/90 hover:bg-[#1a150e]/95 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.22)] hover:shadow-[0_0_35px_rgba(245,158,11,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
-              style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
-            >
-              <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-10" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
-
-              <div className="relative z-20 flex flex-col justify-center">
-                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-amber-200 transition-colors tracking-tight drop-shadow">
-                  카드 도감
-                </h3>
-                <span className="text-[11px] sm:text-xs font-mono font-black text-amber-400 tracking-wider uppercase mt-1">
-                  (CARD GALLERY)
-                </span>
-              </div>
-
-              <div className="relative z-10 w-18 h-18 sm:w-22 sm:h-22 flex items-center justify-center shrink-0">
-                <div className="relative w-16 h-16 sm:w-18 sm:h-18 flex items-center justify-center">
-                  <div className="absolute w-11 h-15 sm:w-13 sm:h-17 rounded-md border border-amber-300/70 bg-gradient-to-br from-amber-500/40 to-amber-950/70 shadow-[0_0_10px_rgba(245,158,11,0.45)] transform -rotate-18 -translate-x-3 group-hover:-translate-x-4 transition-transform duration-500 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-amber-200" />
-                  </div>
-                  <div className="absolute w-13 h-17 sm:w-15 sm:h-19 rounded-md border border-amber-400/80 bg-[#0c1426] shadow-[0_0_14px_rgba(245,158,11,0.4)] transform rotate-6 z-10 group-hover:scale-105 transition-transform duration-500 overflow-hidden flex items-center justify-center">
-                    <img
-                      src="/cards/card_back_character.webp"
-                      alt="Official Card"
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
-                    />
-                    <span className="absolute inset-0 flex items-center justify-center text-amber-300 font-serif font-black text-lg pointer-events-none">
-                      ✦
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* [2-3] 멀티배틀 (온라인 1:1 P2P 대전 - 골드/앰버 네온 테두리) */}
-            <div
-              onClick={() => {
-                setHash('#multiplayer');
-                setIsMultiplayerModalOpen(true);
-              }}
-              className="group relative flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c101b]/90 hover:bg-[#1a150e]/95 backdrop-blur-xl px-5 sm:px-6 py-3.5 flex items-center justify-between shadow-[0_0_20px_rgba(245,158,11,0.22)] hover:shadow-[0_0_36px_rgba(245,158,11,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none"
-              style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
-            >
-              <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-10" />
-              <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
-
-              <div className="relative z-20 flex flex-col justify-center">
-                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-amber-200 transition-colors tracking-tight drop-shadow">
-                  멀티배틀
-                </h3>
-                <span className="text-[11px] sm:text-xs font-mono font-black text-amber-400 tracking-wider uppercase mt-1">
-                  (ONLINE 1:1 BATTLE)
-                </span>
-                <span className="mt-1.5 inline-flex w-fit items-center gap-1.5 px-2 py-0.5 rounded border border-amber-400/60 bg-amber-500/10 text-amber-300 text-[11px] font-black tracking-wide">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-                  P2P 온라인 1:1 대전
-                </span>
-              </div>
-
-              <div className="relative z-10 w-18 h-18 sm:w-22 sm:h-22 flex items-center justify-center shrink-0">
-                <Swords className="w-12 h-12 sm:w-14 sm:h-14 text-amber-300 drop-shadow-[0_0_18px_rgba(245,158,11,0.6)] group-hover:scale-110 transition-transform duration-300" />
-              </div>
-            </div>
-
-          </div>
-
-          {/* ========================================================= */}
-          {/* [3열] 우측: 보조 메뉴 5개 균등 분할 */}
-          {/* ========================================================= */}
-          <div className="flex flex-col gap-2.5 sm:gap-3 h-full">
-
-
-            
-            {/* 1. 자유게시판 (골드/앰버 네온) */}
-            <div
-              onClick={() => onOpenBoard && onOpenBoard()}
-              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.25)] hover:shadow-[0_0_32px_rgba(245,158,11,0.55)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
-              style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
-            >
-              <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
-
-              <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
-                <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
-                  <img
-                    src="/images/menu_icons/board.webp"
-                    alt="자유게시판"
-                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.6)] group-hover:scale-110 transition-transform duration-300"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
-                    자유게시판
-                  </span>
-                  {hasNewBoardPosts && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-red-600 text-white font-black text-[9px] tracking-wider uppercase animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.9)]">
-                      NEW
-                    </span>
-                  )}
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
-            </div>
-
-            {/* 2. 공유된 덱 리스트 (골드/앰버 네온) */}
-            <div
-              onClick={() => setHash('#shared-decks')}
-              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.22)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
-              style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
-            >
-              <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
-
-              <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
-                <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
-                  <img
-                    src="/images/menu_icons/shared-decks.webp"
-                    alt="공유된 덱 리스트"
-                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-300"
-                  />
-                </div>
-                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
-                  공유된 덱 리스트
-                </span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
-            </div>
-
-            {/* 3. 대전 리플레이 & 복기 (골드/앰버 네온) */}
-            <div
-              onClick={() => setHash('#replay')}
-              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.22)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
-              style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
-            >
-              <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
-
-              <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
-                <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
-                  <img
-                    src="/images/menu_icons/replay.webp"
-                    alt="대전 리플레이 & 복기"
-                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-300"
-                  />
-                </div>
-                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
-                  대전 리플레이 & 복기
-                </span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
-            </div>
-
-            {/* 4. 공식 룰북 & FAQ (골드/앰버 네온) */}
-            <div
-              onClick={() => setHash('#rulebook')}
-              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.22)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
-              style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
-            >
-              <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
-
-              <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
-                <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
-                  <img
-                    src="/images/menu_icons/rulebook.webp"
-                    alt="공식 룰북 & FAQ"
-                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-300"
-                  />
-                </div>
-                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
-                  공식 룰북 & FAQ
-                </span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
-            </div>
-
-            {/* 5. 룰 영상 가이드 (골드/앰버 네온) */}
-            <div
-              onClick={() => setHash('#guide')}
-              className="group flex-1 border-2 border-amber-400/80 hover:border-amber-300 bg-[#0c111d]/90 hover:bg-[#1f170c]/95 backdrop-blur-xl px-3.5 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shadow-[0_0_18px_rgba(245,158,11,0.22)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all duration-200 cursor-pointer relative overflow-hidden select-none"
-              style={{ clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)' }}
-            >
-              <div className="absolute inset-1 border border-amber-400/20 pointer-events-none" />
-              <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-amber-300 pointer-events-none" />
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-amber-300 pointer-events-none" />
-
-              <div className="flex items-center gap-3 sm:gap-3.5 z-10 min-w-0 flex-1">
-                <div className="w-12 h-12 sm:w-13 sm:h-13 shrink-0 flex items-center justify-center">
-                  <img
-                    src="/images/menu_icons/video-guide.webp"
-                    alt="룰 영상 가이드"
-                    className="w-full h-full object-contain drop-shadow-[0_0_14px_rgba(245,158,11,0.5)] group-hover:scale-110 transition-transform duration-300"
-                  />
-                </div>
-                <span className="text-sm sm:text-base lg:text-[16px] xl:text-base font-black text-white group-hover:text-amber-200 tracking-tight transition-colors drop-shadow whitespace-nowrap">
-                  룰 영상 가이드
-                </span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-amber-400/70 group-hover:text-amber-300 group-hover:translate-x-1 transition-all z-10 shrink-0 ml-1.5" />
-            </div>
-
-          </div>
-        
-          {/* ========================================================= */}
-          {/* [4열] 최우측: 최신 공식 공지사항 대형 패널 (쇼어키퍼 피아노 위 하늘 공간) */}
-          {/* ========================================================= */}
-          <div
-            onClick={() => (latestNotice && onOpenBoard ? onOpenBoard(latestNotice.id) : onOpenBoard && onOpenBoard())}
-            className="group relative border-2 border-amber-400/80 hover:border-amber-300 bg-[#0b0e18]/90 hover:bg-[#121624]/95 backdrop-blur-2xl p-4 sm:p-5 flex flex-col justify-between shadow-[0_0_24px_rgba(245,158,11,0.25)] hover:shadow-[0_0_40px_rgba(245,158,11,0.5)] transition-all duration-300 cursor-pointer overflow-hidden select-none h-full min-h-[350px] lg:min-h-0"
-            style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
-          >
-            {/* 챔퍼 코너 장식 */}
-            <div className="absolute inset-1.5 border border-amber-400/25 pointer-events-none z-10" />
-            <div className="absolute top-0 left-0 w-3.5 h-3.5 border-t-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
-            <div className="absolute top-0 right-0 w-3.5 h-3.5 border-t-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-3.5 h-3.5 border-b-2 border-l-2 border-amber-300 z-20 pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-20 pointer-events-none" />
-
-            {/* 상단 헤더 */}
-            <div className="relative z-10 flex items-center justify-between border-b border-amber-400/20 pb-2.5">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="text-xs sm:text-sm font-black text-amber-300 tracking-wider uppercase font-mono flex items-center gap-1.5">
-                  <span>📢</span>
-                  <span>NOTICE // 공식 공지</span>
-                </span>
-              </div>
-              <span className="text-[10px] sm:text-[11px] font-mono text-slate-400 group-hover:text-amber-200 transition-colors flex items-center gap-0.5 font-bold">
-                전체보기 <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-              </span>
-            </div>
-
-            {/* 본문 영역 */}
-            <div className="relative z-10 flex-1 my-3 overflow-hidden flex flex-col justify-start">
               {latestNotice ? (
-                <div className="space-y-2.5 h-full flex flex-col">
-                  <div>
-                    <h3 className="text-base sm:text-lg font-black text-white group-hover:text-amber-200 line-clamp-2 leading-snug drop-shadow transition-colors">
-                      {latestNotice.title}
-                    </h3>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono">
-                    <span className="text-amber-300/90 font-bold">{latestNotice.contact || '운영진'}</span>
-                    <span>•</span>
-                    <span>{new Date(latestNotice.createdAt).toLocaleDateString('ko-KR')}</span>
-                    {(latestNotice.commentCount || 0) > 0 && (
-                      <>
-                        <span>•</span>
-                        <span className="text-cyan-400 font-bold">댓글 {latestNotice.commentCount}</span>
-                      </>
-                    )}
-                  </div>
-
-                  {/* 공지 본문 내용 (서식 및 줄바꿈 안전 렌더링) */}
-                  <div
-                    className="text-xs sm:text-[13px] text-slate-200/90 leading-relaxed overflow-y-auto pr-1 line-clamp-6 font-sans select-text flex-1 whitespace-pre-wrap break-words"
-                    dangerouslySetInnerHTML={{
-                      __html: (latestNotice.content || '')
-                        .replace(/\r\n/g, '\n')
-                        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                        .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-                        .replace(/on\w+="[^"]*"/gi, '')
-                        .replace(/on\w+='[^']*'/gi, '')
-                        .replace(/javascript:[^"']*/gi, '')
-                        .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="my-1.5 rounded-lg max-h-24 object-contain border border-[#2d354a]" />')
-                        .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>'),
-                    }}
+                <button onClick={openNotice} className="flex-1 min-h-0 flex flex-col gap-2 text-left cursor-pointer group">
+                  <span className="text-base font-black text-white group-hover:text-amber-200 line-clamp-2 leading-snug">{latestNotice.title}</span>
+                  <span className="text-[11px] text-slate-400">
+                    {latestNotice.contact || '운영진'} · {new Date(latestNotice.createdAt).toLocaleDateString('ko-KR')}
+                    {(latestNotice.commentCount || 0) > 0 ? ` · 댓글 ${latestNotice.commentCount}` : ''}
+                  </span>
+                  <span
+                    className="text-[13px] text-slate-200/90 leading-relaxed line-clamp-6 whitespace-pre-wrap break-words"
+                    dangerouslySetInnerHTML={{ __html: sanitizeNotice(latestNotice.content || '') }}
                   />
-                </div>
+                </button>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-4 text-slate-500">
-                  <p className="text-xs">등록된 최신 공지사항이 없습니다.</p>
+                <div className="flex-1 flex flex-col gap-3">
+                  <span className="text-xs text-slate-400">새 공지가 없어 최근 업데이트를 보여드려요.</span>
+                  <button
+                    onClick={openPatchNotes}
+                    className="rounded-xl border border-amber-400/35 bg-amber-400/[0.06] hover:bg-amber-400/[0.12] p-3.5 flex flex-col gap-1.5 text-left cursor-pointer transition"
+                  >
+                    <span className="text-[11px] font-black tracking-wider text-amber-400">PATCH NOTE · {CURRENT_GAME_VERSION}</span>
+                    <span className="text-sm font-black text-white">최신 업데이트 내용 보기</span>
+                  </button>
                 </div>
               )}
-            </div>
-
-            {/* 하단 푸터 바 */}
-            <div className="relative z-10 pt-2.5 border-t border-amber-400/20 flex items-center justify-between text-[11px] font-mono text-slate-400">
-              <span className="text-amber-400/80 font-bold">WUTHERING TCG</span>
-              <span className="text-amber-300 group-hover:translate-x-1 transition-transform flex items-center gap-1 font-bold">
-                자유게시판 이동 <ChevronRight className="w-3.5 h-3.5" />
-              </span>
-            </div>
+            </section>
           </div>
 
+          <nav aria-label="메뉴" className="grid grid-cols-4 lg:grid-cols-8 gap-3">
+            {menuItems.map((m) => (
+              <button
+                key={m.key}
+                onClick={m.onClick}
+                className="relative h-[92px] rounded-2xl border border-amber-400/25 hover:border-amber-400/70 bg-[#0c111d]/86 hover:bg-[#1f170c]/92 flex flex-col items-center justify-center gap-2 cursor-pointer transition"
+              >
+                {m.badge && (
+                  <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black">NEW</span>
+                )}
+                <img src={m.icon} alt="" className="w-[38px] h-[38px] object-contain" />
+                <span className="text-[13px] font-bold text-slate-100">{m.label}</span>
+              </button>
+            ))}
+          </nav>
         </div>
       </main>
 
-      {/* 푸터 영역 */}
-      <footer className="relative z-20 shrink-0 min-h-14 py-3 border-t border-slate-900 bg-slate-950/80 px-6 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-        <div>
-          <span>Wuthering Waves: Battle TCG Simulator · Complete Official Edition</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span>Official 192 Card Database</span>
-          <span>•</span>
-          <button
-            onClick={() => {
-              setHash('#patchnotes');
-              setIsPatchNotesOpen(true);
-            }}
-            className="hover:text-amber-400 text-slate-400 transition cursor-pointer flex items-center gap-1.5 font-mono"
-            title="패치노트 열기"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-            <span>Game {CURRENT_GAME_VERSION}</span>
-            <span className="text-[10px] text-amber-500/90 underline font-sans font-bold">(패치노트)</span>
+      <footer className="relative z-20 shrink-0 short:hidden h-10 sm:h-11 px-4 sm:px-8 border-t border-white/[0.06] bg-[#090b11]/80 flex items-center justify-between gap-3 text-[11px] sm:text-xs text-slate-400">
+        {renderStatsLine('')}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="hidden lg:inline truncate">Wuthering Waves: Battle TCG Simulator · 공식 카드 192종 ·</span>
+          <button onClick={openPatchNotes} className="text-amber-400 hover:text-amber-300 font-bold cursor-pointer shrink-0">
+            {CURRENT_GAME_VERSION} 패치노트
           </button>
         </div>
       </footer>
@@ -1384,6 +934,14 @@ export const Lobby: React.FC<LobbyProps> = ({
               clearHash();
               onOpenDeckBuilder();
             }}
+            onSwitchHub={(t) => {
+              if (t === 'mine') {
+                setIsPresetOpen(false);
+                onOpenDeckBuilder();
+              } else {
+                setHash('#shared-decks');
+              }
+            }}
           />
         )}
 
@@ -1406,6 +964,14 @@ export const Lobby: React.FC<LobbyProps> = ({
             onSelectAndEdit={() => {
               clearHash();
               onOpenDeckBuilder();
+            }}
+            onSwitchHub={(t) => {
+              if (t === 'mine') {
+                setIsCommunityDeckOpen(false);
+                onOpenDeckBuilder();
+              } else {
+                setHash('#preset');
+              }
             }}
           />
         )}

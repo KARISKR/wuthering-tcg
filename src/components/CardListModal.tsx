@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { formatEffectText } from '../utils/formatEffectText';
 
+import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
 interface CardListModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -216,8 +217,9 @@ export const CardListModal: React.FC<CardListModalProps> = ({
                   >
                     {/* 카드 썸네일 & 줌 힌트 오버레이 - 온전한 세로 비율로 잘림 없이 표시 */}
                     <div className="w-full aspect-[5/7] rounded-xl overflow-hidden bg-slate-950 mb-2.5 border border-slate-700/60 shadow-md relative flex items-center justify-center">
-                      <img
-                        src={card.artUrl}
+                      <CardArt
+                        sizes="(max-width: 640px) 46vw, 170px"
+                        artUrl={card.artUrl}
                         alt={card.nameKr}
                         className="w-full h-full object-contain group-hover:scale-105 transition duration-200"
                       />

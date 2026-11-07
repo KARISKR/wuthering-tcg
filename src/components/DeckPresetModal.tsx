@@ -20,6 +20,8 @@ import { DEDUPED_LV0_CHARACTERS, ACTION_CARD_TEMPLATES } from '../data/cards';
 import { OFFICIAL_CARDS, OfficialCardData } from '../data/officialCards';
 import { DeckExportModal } from './DeckExportModal';
 import { CommunityDeckModal } from './CommunityDeckModal';
+import { CardArt } from './CardArt';
+import { DeckHubTabs, type DeckHubTab } from './DeckHubTabs'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
 import {
   X,
   Copy,
@@ -45,7 +47,6 @@ import {
   Search,
   Zap,
   Info,
-  ArrowLeft,
   Users,
   Bot,
 } from 'lucide-react';
@@ -57,6 +58,8 @@ interface DeckPresetModalProps {
   onSelectAndEdit?: (deck: CustomDeckConfig) => void;
   onApplyActiveDeck?: (deck: CustomDeckConfig) => void;
   currentEditingDeck?: CustomDeckConfig | null;
+  /** [메뉴 최적화 2026-11] 덱 공통 탭 전환. 없으면 공유 덱은 내부 팝업, 내 덱은 닫기로 처리 */
+  onSwitchHub?: (tab: DeckHubTab) => void;
 }
 
 export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
@@ -65,6 +68,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   onSelectAndBattle,
   onSelectAndEdit,
   onApplyActiveDeck,
+  onSwitchHub,
   currentEditingDeck,
 }) => {
   const [presets, setPresets] = useState<DeckPreset[]>([]);
@@ -356,23 +360,13 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       <header className="h-auto lg:h-16 py-2.5 lg:py-0 px-3.5 sm:px-6 border-b border-slate-800 bg-slate-950/95 flex flex-col lg:flex-row lg:items-center justify-between shrink-0 z-20 gap-2">
         <div className="flex items-center justify-between lg:justify-start gap-2.5 sm:gap-3.5 min-w-0 w-full lg:w-auto">
           <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-            {/* 좌상단 대기실로 나가기 버튼 통일 */}
-            <button
-              onClick={onClose}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs sm:text-sm transition cursor-pointer shrink-0 border border-slate-700/80 shadow whitespace-nowrap"
-              title="대기실로 나가기"
-            >
-              <ArrowLeft className="w-4 h-4 text-amber-400 shrink-0" />
-              <span className="hidden sm:inline">대기실로 나가기</span>
-              <span className="sm:hidden">나가기</span>
-            </button>
             <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400/20 to-yellow-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
               <img src="/images/menu_icons/deck-preset.webp" alt="덱 프리셋" className="w-7 h-7 sm:w-9 sm:h-9 object-contain drop-shadow" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h2 className="text-sm sm:text-lg font-black text-white tracking-wide truncate">
-                  덱 프리셋 &amp; 코드 보관함
+                  추천 덱 · 덱 코드
                 </h2>
                 <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full hidden md:inline whitespace-nowrap">
                   FULLSCREEN MASTER DECK ARCHIVE
@@ -413,15 +407,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
             </button>
           )}
 
-          {/* 공유된 덱 리스트 열기 버튼 */}
-          <button
-            onClick={() => setIsCommunityOpen(true)}
-            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/50 text-xs font-black transition cursor-pointer shadow-md whitespace-nowrap shrink-0"
-            title="다른 유저들의 공유 덱 둘러보기 및 내 덱 공유"
-          >
-            <Share2 className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-            <span>공유된 덱 리스트</span>
-          </button>
 
           {/* 덱 코드 가져오기 드로어 토글 */}
           <button
@@ -460,6 +445,15 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
           </button>
         </div>
       </header>
+
+      <DeckHubTabs
+        active="preset"
+        onSwitch={(t) => {
+          if (onSwitchHub) onSwitchHub(t);
+          else if (t === 'shared') setIsCommunityOpen(true);
+          else onClose();
+        }}
+      />
 
       {/* ========================================================= */}
       {/* [상단 슬라이드 드로어] 덱 코드 입력 / 가져오기 패널 */}
@@ -521,18 +515,21 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between flex-wrap gap-3 animate-in fade-in">
                 <div className="flex items-center gap-3">
                   <div className="flex -space-x-2">
-                    <img
-                      src={parsedPreviewDeck.leader.artUrl}
+                    <CardArt
+                      sizes="40px"
+                      artUrl={parsedPreviewDeck.leader.artUrl}
                       alt="리더"
                       className="w-10 h-10 rounded-full object-cover border-2 border-amber-400 shadow"
                     />
-                    <img
-                      src={parsedPreviewDeck.leftSupport.artUrl}
+                    <CardArt
+                      sizes="40px"
+                      artUrl={parsedPreviewDeck.leftSupport.artUrl}
                       alt="서포터1"
                       className="w-10 h-10 rounded-full object-cover border-2 border-slate-700 shadow"
                     />
-                    <img
-                      src={parsedPreviewDeck.rightSupport.artUrl}
+                    <CardArt
+                      sizes="40px"
+                      artUrl={parsedPreviewDeck.rightSupport.artUrl}
                       alt="서포터2"
                       className="w-10 h-10 rounded-full object-cover border-2 border-slate-700 shadow"
                     />
@@ -690,14 +687,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
             >
               공식 스타터 ({presets.filter((p) => p.isOfficial).length})
             </button>
-            <button
-              onClick={() => setIsCommunityOpen(true)}
-              className="py-2 px-2.5 rounded-xl text-xs font-black transition cursor-pointer text-indigo-300 hover:text-white bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-500/40 flex items-center justify-center gap-1 shrink-0 shadow ml-auto"
-              title="커뮤니티 공유된 덱 리스트 열기"
-            >
-              <Share2 className="w-3.5 h-3.5 text-indigo-400" />
-              <span>공유 덱</span>
-            </button>
           </div>
 
           {/* 프리셋 검색창 */}
@@ -808,8 +797,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                       {/* 3인 출전 캐릭터 미니 썸네일 */}
                       <div className="flex items-center gap-1.5">
                         <div className="relative w-8 h-8 rounded-lg overflow-hidden border-2 border-amber-400 shadow">
-                          <img
-                            src={deck.leader.artUrl}
+                          <CardArt
+                            sizes="32px"
+                            artUrl={deck.leader.artUrl}
                             alt={deck.leader.nameKr}
                             className="w-full h-full object-cover"
                           />
@@ -817,15 +807,17 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                           <Crown className="w-2.5 h-2.5 text-amber-400 absolute bottom-0.5 right-0.5" />
                         </div>
                         <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-slate-700 shadow">
-                          <img
-                            src={deck.leftSupport.artUrl}
+                          <CardArt
+                            sizes="32px"
+                            artUrl={deck.leftSupport.artUrl}
                             alt={deck.leftSupport.nameKr}
                             className="w-full h-full object-cover"
                           />
                         </div>
                         <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-slate-700 shadow">
-                          <img
-                            src={deck.rightSupport.artUrl}
+                          <CardArt
+                            sizes="32px"
+                            artUrl={deck.rightSupport.artUrl}
                             alt={deck.rightSupport.nameKr}
                             className="w-full h-full object-cover"
                           />
@@ -1085,8 +1077,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                         }`}
                         title={`${charCard.nameKr} (Lv.${charCard.level}) - 클릭하여 고해상도 상세 정보 확인`}
                       >
-                        <img
-                          src={charCard.artUrl}
+                        <CardArt
+                          sizes="64px"
+                          artUrl={charCard.artUrl}
                           alt={charCard.nameKr}
                           className="w-full h-full object-cover object-top"
                         />
@@ -1196,8 +1189,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                             }`}
                             title={`${card.nameKr} (${count}장) - 클릭하여 상세 정보 보기`}
                           >
-                            <img
-                              src={card.artUrl}
+                            <CardArt
+                              sizes="(max-width: 640px) 30vw, 120px"
+                              artUrl={card.artUrl}
                               alt={card.nameKr}
                               className="w-full h-full object-cover object-top transition duration-300 group-hover:scale-105"
                             />
@@ -1373,6 +1367,14 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
           reloadPresets();
         }}
         currentEditingDeck={currentPreviewDeck}
+        onSwitchHub={(t) => {
+          setIsCommunityOpen(false);
+          reloadPresets();
+          if (t === 'mine') {
+            if (onSwitchHub) onSwitchHub('mine');
+            else onClose();
+          }
+        }}
         onSelectAndBattle={(deck) => {
           setIsCommunityOpen(false);
           if (onSelectAndBattle) {
