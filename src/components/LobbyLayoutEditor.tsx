@@ -7,7 +7,7 @@ export interface LobbyLayoutConfig {
   characterY: number; // -300 ~ 300px (기본 0)
   logoScale: number; // 0.5 ~ 1.8 (기본 1.0)
   logoGap: number; // 10 ~ 120px (기본 40)
-  uiScale: number; // 0.85 ~ 1.25 (기본 1.0)
+  uiScale: number; // 0.8 ~ 1.5 (기본 1.25)
   bgDim: number; // 0 ~ 80% (배경 어둡기/투명도, 기본 30)
   bgBlur: number; // 0 ~ 10px (배경 블러, 기본 0)
 }
@@ -17,13 +17,13 @@ export const DEFAULT_LOBBY_LAYOUT: LobbyLayoutConfig = {
   characterX: -165,
   characterY: -50,
   logoScale: 0.88,
-  logoGap: 10,
-  uiScale: 1.0,
+  logoGap: 8,
+  uiScale: 1.25,
   bgDim: 30,
   bgBlur: 0,
 };
 
-export const LOBBY_LAYOUT_STORAGE_KEY = 'wuthering_lobby_layout_v6';
+export const LOBBY_LAYOUT_STORAGE_KEY = 'wuthering_lobby_layout_v7';
 
 export function loadLobbyLayout(): LobbyLayoutConfig {
   try {
@@ -205,7 +205,7 @@ export const LobbyLayoutEditor: React.FC<LobbyLayoutEditorProps> = ({
           <input
             type="range"
             min={0.8}
-            max={1.25}
+            max={1.5}
             step={0.01}
             value={layout.uiScale}
             onChange={(e) => update('uiScale', parseFloat(e.target.value))}

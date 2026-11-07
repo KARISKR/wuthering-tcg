@@ -488,10 +488,9 @@ export const Lobby: React.FC<LobbyProps> = ({
       )}
 
       <main
-        className="relative z-20 flex-1 w-full max-w-[1440px] 2xl:max-w-[1640px] mx-auto px-4 sm:px-8 lg:px-12 short:px-5 pt-3 sm:pt-5 short:pt-3 pb-6 flex flex-col items-center md:[@media(min-height:960px)]:justify-center md:[@media(min-height:960px)]:pb-16"
+        className="relative z-20 flex-1 w-full max-w-[1440px] 2xl:max-w-[1640px] mx-auto px-4 sm:px-8 lg:px-10 short:px-5 pt-1 sm:pt-2 short:pt-2 pb-4 flex flex-col items-center justify-start"
         style={{
-          transform: typeof window !== 'undefined' && window.innerWidth >= 1024 && layout.uiScale !== 1 ? `scale(${layout.uiScale})` : undefined,
-          transformOrigin: 'top center',
+          zoom: typeof window !== 'undefined' && window.innerWidth >= 1024 && layout.uiScale !== 1 ? layout.uiScale : undefined,
         }}
       >
         {/* 히어로 로고 (가로 모바일에서는 왼쪽 열로 이동) */}
@@ -506,9 +505,9 @@ export const Lobby: React.FC<LobbyProps> = ({
           <img
             src="/images/logo-battle-trans.webp"
             alt="명조 배틀"
-            className="h-20 sm:h-24 lg:h-[118px] 2xl:h-[140px] lg:[@media(max-height:760px)]:h-[92px] w-auto max-w-[80vw] object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+            className="h-20 sm:h-24 lg:h-[104px] 2xl:h-[120px] lg:[@media(max-height:760px)]:h-[86px] w-auto max-w-[80vw] object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]"
           />
-          <span className="mt-2 text-[10px] sm:text-xs font-black tracking-[0.3em] text-white uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+          <span className="mt-1 text-[10px] sm:text-xs font-black tracking-[0.3em] text-white uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
             FAN MADE ONLINE BATTLE SIMULATOR
           </span>
         </div>
@@ -606,7 +605,10 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
 
         {/* ===================== 데스크톱·태블릿 ===================== */}
-        <div className="w-full hidden md:flex short:hidden flex-col gap-4 mt-5 select-none">
+        <div
+          className="w-full hidden md:flex short:hidden flex-col gap-3.5 mt-2 select-none"
+          style={{ marginTop: typeof window !== 'undefined' && window.innerWidth >= 768 ? `${layout.logoGap ?? 8}px` : undefined }}
+        >
           {!tutorialSeen && (
             <div className="h-16 pl-5 pr-3 rounded-2xl border border-rose-400/55 bg-[#231221]/90 flex items-center gap-4">
               <img src="/images/tutorial/abby_guide.webp" alt="" className="h-14 w-auto self-end object-contain" />
@@ -680,7 +682,7 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </main>
 
-      <footer className="relative z-20 shrink-0 short:hidden h-10 sm:h-11 px-4 sm:px-8 border-t border-white/[0.06] bg-[#090b11]/80 flex items-center justify-between gap-3 text-[11px] sm:text-xs text-slate-400">
+      <footer className="relative z-20 mt-auto shrink-0 short:hidden h-10 sm:h-11 px-4 sm:px-8 border-t border-white/[0.06] bg-[#090b11]/80 flex items-center justify-between gap-3 text-[11px] sm:text-xs text-slate-400">
         {renderStatsLine('')}
         <div className="flex items-center gap-2 min-w-0">
           <span className="hidden lg:inline truncate">Wuthering Waves: Battle TCG Simulator · 공식 카드 192종 ·</span>
