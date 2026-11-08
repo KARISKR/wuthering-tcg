@@ -1,16 +1,40 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ActionCard, PlayerState } from '../types/tcg';
+import { ActionCard, GameMode, GameState, PlayerState } from '../types/tcg';
 import { soundEffects } from '../utils/soundEffects';
 import { Sparkles, Zap, ArrowDown, Bot, Layers } from 'lucide-react';
 
-interface CenterDrawOverlayProps {
+export interface CenterDrawOverlayProps {
   isOpen: boolean;
   activePlayerIndex: 0 | 1;
   controlledPlayerIndex: 0 | 1;
   activePlayer: PlayerState;
   drawCount: number;
   onExecuteDraw: (playerIndex: 0 | 1) => void;
+  onDraw?: (playerIndex: 0 | 1) => void;
   isSpectator?: boolean;
+  isSoloDual?: boolean;
+  gameMode?: GameMode;
+  gameState?: GameState;
+}
+
+/**
+ * 드로우 오버레이에서 현재 로컬 유저가 드로우를 조작할 수 있는 턴인지 판정
+ * 1인 2역(SOLO_DUAL) 모드에서는 양측 플레이어 모두 로컬 유저가 제어하므로 첫 프레임부터 즉시 true 반환
+ */
+export function isCenterDrawUserTurn(params: {
+  isSpectator?: boolean;
+  activePlayerIsAi: boolean;
+  activePlayerIndex: 0 | 1;
+  controlledPlayerIndex: 0 | 1;
+  isSoloDual?: boolean;
+  gameMode?: GameMode;
+}): boolean {
+  const isSoloDual = Boolean(params.isSoloDual || params.gameMode === 'SOLO_DUAL');
+  return (
+    !params.isSpectator &&
+    !params.activePlayerIsAi &&
+    (isSoloDual || params.activePlayerIndex === params.controlledPlayerIndex)
+  );
 }
 
 type DrawStage = 'READY' | 'PULLING' | 'REVEAL' | 'FLYING' | 'COMPLETED';
@@ -22,13 +46,30 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
   activePlayer,
   drawCount = 2,
   onExecuteDraw,
+  onDraw,
   isSpectator = false,
+  isSoloDual: isSoloDualProp,
+  gameMode,
+  gameState,
 }) => {
   const [stage, setStage] = useState<DrawStage>('READY');
   const [revealedCards, setRevealedCards] = useState<ActionCard[]>([]);
   const hasTriggeredRef = useRef(false);
 
-  const isUserTurn = !isSpectator && activePlayerIndex === controlledPlayerIndex && !activePlayer.isAi;
+  const isSoloDual = Boolean(
+    isSoloDualProp ||
+    gameMode === 'SOLO_DUAL' ||
+    gameState?.gameMode === 'SOLO_DUAL'
+  );
+
+  const isUserTurn = isCenterDrawUserTurn({
+    isSpectator,
+    activePlayerIsAi: activePlayer.isAi,
+    activePlayerIndex,
+    controlledPlayerIndex,
+    isSoloDual,
+    gameMode: gameMode || gameState?.gameMode,
+  });
   const isAi = activePlayer.isAi;
 
   // 드로우 대상 카드 사전 추출 (덱 맨 위에서 drawCount장)
@@ -89,7 +130,12 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
     const completeDelay = flyDelay + 500;
     setTimeout(() => {
       setStage('COMPLETED');
-      onExecuteDraw(activePlayerIndex);
+      const targetPlayerIndex = activePlayerIndex;
+      if (onDraw) {
+        onDraw(targetPlayerIndex);
+      } else {
+        onExecuteDraw(targetPlayerIndex);
+      }
     }, completeDelay);
   };
 

@@ -309,6 +309,8 @@ export interface HpHistoryEntry {
   timestamp: number;
 }
 
+export type GameMode = 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER'; // AI 대전 vs 1인 2역 듀얼 vs 온라인 P2P 대전
+
 export interface GameState {
   /** [WP6] 엔진 시드 난수의 시드. 같은 시드 + 같은 엔진 호출 순서 → 같은 게임 */
   rngSeed?: number;
@@ -334,7 +336,7 @@ export interface GameState {
   winner: 0 | 1 | null;
   logs: LogItem[];
   hpHistory?: HpHistoryEntry[]; // 체력 변동 상세 기록 (대미지/회복 원인 및 카드 정보)
-  gameMode: 'AI' | 'SOLO_DUAL' | 'MULTIPLAYER'; // AI 대전 vs 1인 2역 듀얼 vs 온라인 P2P 대전
+  gameMode: GameMode; // AI 대전 vs 1인 2역 듀얼 vs 온라인 P2P 대전
   isOpponentHandScanned?: boolean; // 스캔 효과 등으로 상대의 손패가 필드에 공개된 상태
 }
 

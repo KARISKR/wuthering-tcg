@@ -328,6 +328,9 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
         drawCount={currentTurnDrawCount}
         onExecuteDraw={(pIdx) => handleDrawCards(pIdx)}
         isSpectator={isSpectator}
+        isSoloDual={gameState.gameMode === 'SOLO_DUAL'}
+        gameMode={gameState.gameMode}
+        gameState={gameState}
       />
 
       {/* 선공 결정 주사위 모달 (양측 주사위 투척 연출, 관전자는 제외) */}
