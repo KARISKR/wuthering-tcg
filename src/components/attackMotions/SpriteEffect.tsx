@@ -19,7 +19,7 @@ export type SheetMeta = {
 };
 
 /** 스프라이트를 다시 뽑아 같은 파일명으로 교체할 때마다 올린다 (1년 캐시·서비스 워커 무효화) */
-export const FX_VERSION = '2';
+export const FX_VERSION = '3';
 const BASE = '/effects/attack/';
 /** 스프라이트 프레임 안에서 대상 카드 중심 위치 (생성기 common.py의 IMPACT) */
 export const FX_IMPACT = { x: 276 / 384, y: 176 / 384 };
