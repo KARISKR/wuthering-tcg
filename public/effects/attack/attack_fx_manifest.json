@@ -8,28 +8,28 @@
         "file": "jinhsi_t1.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 14,
+        "frames": 15,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 5
+        "impactFrame": 3
       },
       "2": {
         "file": "jinhsi_t2.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 18,
+        "frames": 15,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 10
+        "impactFrame": 3
       },
       "3": {
         "file": "jinhsi_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 24,
+        "frames": 23,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 11
+        "impactFrame": 9
       }
     }
   },
@@ -42,28 +42,28 @@
         "file": "camellya_t1.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 12,
+        "frames": 15,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 3
+        "impactFrame": 6
       },
       "2": {
         "file": "camellya_t2.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 16,
+        "frames": 17,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 7
+        "impactFrame": 8
       },
       "3": {
         "file": "camellya_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 22,
+        "frames": 21,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 12
+        "impactFrame": 8
       }
     }
   },
@@ -76,28 +76,28 @@
         "file": "sanhua_t1.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 12,
+        "frames": 17,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 3
+        "impactFrame": 4
       },
       "2": {
         "file": "sanhua_t2.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 16,
+        "frames": 17,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 7
+        "impactFrame": 4
       },
       "3": {
         "file": "sanhua_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 22,
+        "frames": 20,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 12
+        "impactFrame": 7
       }
     }
   },
@@ -144,16 +144,16 @@
         "file": "rover_t1.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 12,
+        "frames": 16,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 3
+        "impactFrame": 4
       },
       "2": {
         "file": "rover_t2.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 16,
+        "frames": 19,
         "columns": 6,
         "fps": 24,
         "impactFrame": 7
@@ -162,10 +162,10 @@
         "file": "rover_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 22,
+        "frames": 26,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 12
+        "impactFrame": 8
       }
     }
   },
@@ -178,16 +178,16 @@
         "file": "rover_male_t1.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 12,
+        "frames": 16,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 3
+        "impactFrame": 4
       },
       "2": {
         "file": "rover_male_t2.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 16,
+        "frames": 19,
         "columns": 6,
         "fps": 24,
         "impactFrame": 7
@@ -196,10 +196,10 @@
         "file": "rover_male_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 22,
+        "frames": 26,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 12
+        "impactFrame": 8
       }
     }
   },
@@ -212,16 +212,16 @@
         "file": "rover_female_t1.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 12,
+        "frames": 16,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 3
+        "impactFrame": 4
       },
       "2": {
         "file": "rover_female_t2.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 16,
+        "frames": 19,
         "columns": 6,
         "fps": 24,
         "impactFrame": 7
@@ -230,10 +230,10 @@
         "file": "rover_female_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 22,
+        "frames": 26,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 12
+        "impactFrame": 8
       }
     }
   },
@@ -246,34 +246,34 @@
         "file": "chixia_t1.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 12,
+        "frames": 13,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 5
+        "impactFrame": 2
       },
       "2": {
         "file": "chixia_t2.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 16,
+        "frames": 28,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 9
+        "impactFrame": 7
       },
       "3": {
         "file": "chixia_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 24,
+        "frames": 22,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 15
+        "impactFrame": 12
       }
     }
   },
   "encore": {
     "label": "앙코",
-    "weapon": "rectifier",
+    "weapon": "flame",
     "element": "fusion",
     "tiers": {
       "1": {
@@ -283,7 +283,7 @@
         "frames": 14,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 6
+        "impactFrame": 5
       },
       "2": {
         "file": "encore_t2.webp",
@@ -292,21 +292,21 @@
         "frames": 18,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 11
+        "impactFrame": 10
       },
       "3": {
         "file": "encore_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 24,
+        "frames": 22,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 12
+        "impactFrame": 8
       }
     }
   },
   "shorekeeper": {
-    "label": "파수인",
+    "label": "파수인 (공격)",
     "weapon": "rectifier",
     "element": "starry",
     "tiers": {
@@ -314,28 +314,96 @@
         "file": "shorekeeper_t1.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 14,
+        "frames": 25,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 6
+        "impactFrame": 8
       },
       "2": {
         "file": "shorekeeper_t2.webp",
         "frameWidth": 384,
         "frameHeight": 384,
-        "frames": 18,
+        "frames": 29,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 11
+        "impactFrame": 10
       },
       "3": {
         "file": "shorekeeper_t3.webp",
         "frameWidth": 384,
         "frameHeight": 384,
+        "frames": 33,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 21
+      }
+    }
+  },
+  "shorekeeper_heal": {
+    "label": "파수인 (회복)",
+    "weapon": "heal",
+    "element": "emerald",
+    "tiers": {
+      "1": {
+        "file": "shorekeeper_heal_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 14,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 5
+      },
+      "2": {
+        "file": "shorekeeper_heal_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 18,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "shorekeeper_heal_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
         "frames": 24,
         "columns": 6,
         "fps": 24,
-        "impactFrame": 12
+        "impactFrame": 9
+      }
+    }
+  },
+  "heal_card": {
+    "label": "카드 효과 (회복)",
+    "weapon": "heal",
+    "element": "emerald",
+    "tiers": {
+      "1": {
+        "file": "heal_card_t1.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 14,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 5
+      },
+      "2": {
+        "file": "heal_card_t2.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 18,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "heal_card_t3.webp",
+        "frameWidth": 384,
+        "frameHeight": 384,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 9
       }
     }
   }
