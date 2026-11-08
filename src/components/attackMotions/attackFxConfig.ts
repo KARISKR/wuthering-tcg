@@ -12,30 +12,30 @@ export interface AttackFxSceneConfig {
 }
 
 export interface AttackFxGlobalConfig {
-  impactX: number; // 대상 중심 상대 X (기본 276 / 384 = 0.71875)
-  impactY: number; // 대상 중심 상대 Y (기본 176 / 384 = 0.45833)
+  impactX: number; // 대상 중심 상대 X (기본 256 / 512 = 0.5)
+  impactY: number; // 대상 중심 상대 Y (기본 256 / 512 = 0.5)
   clash: AttackFxSceneConfig;
   combo: AttackFxSceneConfig;
 }
 
 export const DEFAULT_ATTACK_FX_CONFIG: AttackFxGlobalConfig = {
-  impactX: 276 / 384,
-  impactY: 176 / 384,
+  impactX: 256 / 512,
+  impactY: 256 / 512,
   clash: {
-    size: 360,
+    size: 480,
     offsetX: 0,
     offsetY: 0,
-    scale: 1.0,
+    scale: 1.4,
   },
   combo: {
-    size: 420,
+    size: 560,
     offsetX: 0,
     offsetY: 0,
-    scale: 1.0,
+    scale: 1.4,
   },
 };
 
-export const ATTACK_FX_STORAGE_KEY = 'wuthering_attack_fx_config_v1';
+export const ATTACK_FX_STORAGE_KEY = 'wuthering_attack_fx_config_v3';
 
 let cachedConfig: AttackFxGlobalConfig | null = null;
 

@@ -19,10 +19,12 @@ export type SheetMeta = {
 };
 
 /** 스프라이트를 다시 뽑아 같은 파일명으로 교체할 때마다 올린다 (1년 캐시·서비스 워커 무효화) */
-export const FX_VERSION = '3';
+export const FX_VERSION = '7';
 const BASE = '/effects/attack/';
-/** 스프라이트 프레임 안에서 대상 카드 중심 위치 (생성기 common.py의 IMPACT) */
-export const FX_IMPACT = { x: 276 / 384, y: 176 / 384 };
+/** 스프라이트 프레임 안에서 대상 카드 중심 위치
+ * 512px 캔버스 정중앙 매핑: 256 / 512 = 0.5
+ */
+export const FX_IMPACT = { x: 256 / 512, y: 256 / 512 };
 
 const cache = new Map<string, Promise<{ img: HTMLImageElement; meta: SheetMeta }>>();
 const resolvedMeta = new Map<string, SheetMeta>();
@@ -180,12 +182,19 @@ export function AttackFx(props: {
   if (!characterKey || tier <= 0 || failed) return <>{fallback}</>;
 
   const sceneConfig = scene ? activeConfig[scene] : undefined;
-  const baseSize = props.size ?? sceneConfig?.size ?? (scene === 'combo' ? 420 : 360);
+  // 512px 캔버스 규격: 기본 연격 크기 560px, 격돌 크기 480px로 넉넉하게 확장 (잘림 원천 방지)
+  const defaultSize = scene === 'combo' ? 560 : 480;
+  const baseSize = props.size ?? sceneConfig?.size ?? defaultSize;
   const scale = props.scale ?? sceneConfig?.scale ?? 1.0;
   const size = Math.round(baseSize * scale);
 
-  const impactX = activeConfig.impactX ?? FX_IMPACT.x;
-  const impactY = activeConfig.impactY ?? FX_IMPACT.y;
+  // 512px 프레임 메타가 들어오면 동적으로 앵커 포인트 계산
+  const meta = peekSheetMeta(`${characterKey}_t${tier}`);
+  const is512 = meta ? meta.frameWidth >= 512 : true;
+  const currentImpact = is512 ? { x: 340 / 512, y: 240 / 512 } : { x: 276 / 384, y: 176 / 384 };
+
+  const impactX = activeConfig.impactX && activeConfig.impactX !== 276 / 384 ? activeConfig.impactX : currentImpact.x;
+  const impactY = activeConfig.impactY && activeConfig.impactY !== 176 / 384 ? activeConfig.impactY : currentImpact.y;
 
   const baseOffsetX = props.offsetX ?? sceneConfig?.offsetX ?? 0;
   const baseOffsetY = props.offsetY ?? sceneConfig?.offsetY ?? 0;

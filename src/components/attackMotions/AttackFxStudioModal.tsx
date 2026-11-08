@@ -33,15 +33,18 @@ interface CharacterOption {
 }
 
 const CHARACTERS: CharacterOption[] = [
-  { key: 'jinhsi', name: '금희', artUrl: '/images/cards/jinhsi.webp' },
-  { key: 'camellya', name: '카멜리아', artUrl: '/images/cards/camellya.webp' },
-  { key: 'chixia', name: '치샤', artUrl: '/images/cards/chixia.webp' },
-  { key: 'encore', name: '앙코', artUrl: '/images/cards/encore.webp' },
-  { key: 'rover_female', name: '방랑자 (여)', artUrl: '/images/cards/rover_female.webp' },
-  { key: 'rover_male', name: '방랑자 (남)', artUrl: '/images/cards/rover_male.webp' },
-  { key: 'sanhua', name: '산화', artUrl: '/images/cards/sanhua.webp' },
-  { key: 'shorekeeper', name: '파수인', artUrl: '/images/cards/shorekeeper.webp' },
-  { key: 'yangyang', name: '양양', artUrl: '/images/cards/yangyang.webp' },
+  { key: 'jinhsi', name: '금희', artUrl: '/cards/card_images/BP01-028_금희_1924.webp' },
+  { key: 'camellya', name: '카멜리아', artUrl: '/cards/card_images/BP01-001_카멜리아_1901.webp' },
+  { key: 'chixia', name: '치샤', artUrl: '/cards/card_images/BP01-025_치샤_1922.webp' },
+  { key: 'encore', name: '앙코', artUrl: '/cards/card_images/BP01-011_앙코_1911.webp' },
+  { key: 'rover_female', name: '방랑자 (여)', artUrl: '/cards/card_images/SD01-001_방랑자(여)_1139.webp' },
+  { key: 'rover_male', name: '방랑자 (남)', artUrl: '/cards/card_images/BP01-016_방랑자(남)_1916.webp' },
+  { key: 'sanhua', name: '산화', artUrl: '/cards/card_images/BP01-031_산화_1926.webp' },
+  { key: 'shorekeeper', name: '파수인', artUrl: '/cards/card_images/BP01-006_파수인_1906.webp' },
+  { key: 'yangyang', name: '양양', artUrl: '/cards/card_images/BP01-022_양양_1920.webp' },
+  { key: 'jianxin', name: '감심', artUrl: '/cards/card_images/BP01-001_카멜리아_1901.webp' },
+  { key: 'xiangliyao', name: '상리요', artUrl: '/cards/card_images/BP01-028_금희_1924.webp' },
+  { key: 'yinlin', name: '음림', artUrl: '/cards/card_images/BP01-025_치샤_1922.webp' },
 ];
 
 export function AttackFxStudioModal(props: { onClose: () => void }) {
@@ -251,7 +254,7 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
                       }`}
                     >
                       <img
-                        src={attackerOnRight ? '/images/cards/rover_female.webp' : currentCharData.artUrl}
+                        src={attackerOnRight ? '/cards/card_images/SD01-001_방랑자(여)_1139.webp' : currentCharData.artUrl}
                         alt="P0"
                         className="w-full h-full object-cover"
                       />
@@ -311,7 +314,7 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
                       }`}
                     >
                       <img
-                        src={!attackerOnRight ? '/images/cards/rover_female.webp' : currentCharData.artUrl}
+                        src={!attackerOnRight ? '/cards/card_images/SD01-001_방랑자(여)_1139.webp' : currentCharData.artUrl}
                         alt="P1"
                         className="w-full h-full object-cover"
                       />
@@ -426,7 +429,7 @@ export const ATTACK_FX_CUSTOM = ${JSON.stringify(config, null, 2)};`;
                 <span>공격 캐릭터 선택</span>
                 <span className="text-[11px] font-mono text-amber-400">{currentCharData.name}</span>
               </label>
-              <div className="grid grid-cols-3 gap-1.5">
+              <div className="grid grid-cols-4 gap-1.5">
                 {CHARACTERS.map((char) => (
                   <button
                     key={char.key}

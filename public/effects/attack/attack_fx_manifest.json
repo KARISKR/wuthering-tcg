@@ -6,8 +6,8 @@
     "tiers": {
       "1": {
         "file": "jinhsi_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 15,
         "columns": 6,
         "fps": 24,
@@ -15,8 +15,8 @@
       },
       "2": {
         "file": "jinhsi_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 15,
         "columns": 6,
         "fps": 24,
@@ -24,8 +24,8 @@
       },
       "3": {
         "file": "jinhsi_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 23,
         "columns": 6,
         "fps": 24,
@@ -40,8 +40,8 @@
     "tiers": {
       "1": {
         "file": "camellya_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 15,
         "columns": 6,
         "fps": 24,
@@ -49,8 +49,8 @@
       },
       "2": {
         "file": "camellya_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 17,
         "columns": 6,
         "fps": 24,
@@ -58,8 +58,8 @@
       },
       "3": {
         "file": "camellya_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 21,
         "columns": 6,
         "fps": 24,
@@ -74,8 +74,8 @@
     "tiers": {
       "1": {
         "file": "sanhua_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 17,
         "columns": 6,
         "fps": 24,
@@ -83,8 +83,8 @@
       },
       "2": {
         "file": "sanhua_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 17,
         "columns": 6,
         "fps": 24,
@@ -92,8 +92,8 @@
       },
       "3": {
         "file": "sanhua_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 20,
         "columns": 6,
         "fps": 24,
@@ -108,8 +108,8 @@
     "tiers": {
       "1": {
         "file": "yangyang_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 12,
         "columns": 6,
         "fps": 24,
@@ -117,8 +117,8 @@
       },
       "2": {
         "file": "yangyang_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 16,
         "columns": 6,
         "fps": 24,
@@ -126,8 +126,8 @@
       },
       "3": {
         "file": "yangyang_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 22,
         "columns": 6,
         "fps": 24,
@@ -142,8 +142,8 @@
     "tiers": {
       "1": {
         "file": "rover_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 16,
         "columns": 6,
         "fps": 24,
@@ -151,8 +151,8 @@
       },
       "2": {
         "file": "rover_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 19,
         "columns": 6,
         "fps": 24,
@@ -160,8 +160,8 @@
       },
       "3": {
         "file": "rover_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 26,
         "columns": 6,
         "fps": 24,
@@ -176,8 +176,8 @@
     "tiers": {
       "1": {
         "file": "rover_male_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 16,
         "columns": 6,
         "fps": 24,
@@ -185,8 +185,8 @@
       },
       "2": {
         "file": "rover_male_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 19,
         "columns": 6,
         "fps": 24,
@@ -194,8 +194,8 @@
       },
       "3": {
         "file": "rover_male_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 26,
         "columns": 6,
         "fps": 24,
@@ -210,8 +210,8 @@
     "tiers": {
       "1": {
         "file": "rover_female_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 16,
         "columns": 6,
         "fps": 24,
@@ -219,8 +219,8 @@
       },
       "2": {
         "file": "rover_female_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 19,
         "columns": 6,
         "fps": 24,
@@ -228,8 +228,8 @@
       },
       "3": {
         "file": "rover_female_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 26,
         "columns": 6,
         "fps": 24,
@@ -244,8 +244,8 @@
     "tiers": {
       "1": {
         "file": "chixia_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 13,
         "columns": 6,
         "fps": 24,
@@ -253,8 +253,8 @@
       },
       "2": {
         "file": "chixia_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 28,
         "columns": 6,
         "fps": 24,
@@ -262,8 +262,8 @@
       },
       "3": {
         "file": "chixia_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 22,
         "columns": 6,
         "fps": 24,
@@ -278,8 +278,8 @@
     "tiers": {
       "1": {
         "file": "encore_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 14,
         "columns": 6,
         "fps": 24,
@@ -287,8 +287,8 @@
       },
       "2": {
         "file": "encore_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 18,
         "columns": 6,
         "fps": 24,
@@ -296,8 +296,8 @@
       },
       "3": {
         "file": "encore_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 22,
         "columns": 6,
         "fps": 24,
@@ -312,8 +312,8 @@
     "tiers": {
       "1": {
         "file": "shorekeeper_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 25,
         "columns": 6,
         "fps": 24,
@@ -321,8 +321,8 @@
       },
       "2": {
         "file": "shorekeeper_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 29,
         "columns": 6,
         "fps": 24,
@@ -330,8 +330,8 @@
       },
       "3": {
         "file": "shorekeeper_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 33,
         "columns": 6,
         "fps": 24,
@@ -346,8 +346,8 @@
     "tiers": {
       "1": {
         "file": "shorekeeper_heal_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 14,
         "columns": 6,
         "fps": 24,
@@ -355,8 +355,8 @@
       },
       "2": {
         "file": "shorekeeper_heal_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 18,
         "columns": 6,
         "fps": 24,
@@ -364,8 +364,8 @@
       },
       "3": {
         "file": "shorekeeper_heal_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 24,
         "columns": 6,
         "fps": 24,
@@ -380,8 +380,8 @@
     "tiers": {
       "1": {
         "file": "heal_card_t1.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 14,
         "columns": 6,
         "fps": 24,
@@ -389,8 +389,8 @@
       },
       "2": {
         "file": "heal_card_t2.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 18,
         "columns": 6,
         "fps": 24,
@@ -398,12 +398,148 @@
       },
       "3": {
         "file": "heal_card_t3.webp",
-        "frameWidth": 384,
-        "frameHeight": 384,
+        "frameWidth": 512,
+        "frameHeight": 512,
         "frames": 24,
         "columns": 6,
         "fps": 24,
         "impactFrame": 9
+      }
+    }
+  },
+  "shield_card": {
+    "label": "카드 효과 (보호막)",
+    "weapon": "shield",
+    "element": "spectro",
+    "tiers": {
+      "1": {
+        "file": "shield_card_t1.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 4
+      },
+      "2": {
+        "file": "shield_card_t2.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 6
+      },
+      "3": {
+        "file": "shield_card_t3.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 8
+      }
+    }
+  },
+  "yinlin": {
+    "label": "음림",
+    "weapon": "rectifier",
+    "element": "electro",
+    "tiers": {
+      "1": {
+        "file": "yinlin_t1.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 14,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 6
+      },
+      "2": {
+        "file": "yinlin_t2.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 18,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 11
+      },
+      "3": {
+        "file": "yinlin_t3.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "xiangliyao": {
+    "label": "상리요",
+    "weapon": "gauntlet",
+    "element": "electro",
+    "tiers": {
+      "1": {
+        "file": "xiangliyao_t1.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 4
+      },
+      "2": {
+        "file": "xiangliyao_t2.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "xiangliyao_t3.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
+      }
+    }
+  },
+  "jianxin": {
+    "label": "감심",
+    "weapon": "gauntlet",
+    "element": "aero",
+    "tiers": {
+      "1": {
+        "file": "jianxin_t1.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 12,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 4
+      },
+      "2": {
+        "file": "jianxin_t2.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 16,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 7
+      },
+      "3": {
+        "file": "jianxin_t3.webp",
+        "frameWidth": 512,
+        "frameHeight": 512,
+        "frames": 24,
+        "columns": 6,
+        "fps": 24,
+        "impactFrame": 12
       }
     }
   }
