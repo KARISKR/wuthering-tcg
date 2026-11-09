@@ -478,19 +478,21 @@ export function cloneGameState(state: GameState): GameState {
     pendingChoice: state.pendingChoice
       ? {
           ...state.pendingChoice,
-          revealedCards: state.pendingChoice.revealedCards.map((c) => ({ ...c })),
+          revealedCards: state.pendingChoice.revealedCards
+            ? state.pendingChoice.revealedCards.map((c) => ({ ...c }))
+            : [],
         }
       : null,
     pendingChoiceQueue: state.pendingChoiceQueue
       ? state.pendingChoiceQueue.map((ch) => ({
           ...ch,
-          revealedCards: ch.revealedCards.map((c) => ({ ...c })),
+          revealedCards: ch.revealedCards ? ch.revealedCards.map((c) => ({ ...c })) : [],
         }))
       : [],
     deferredChoices: state.deferredChoices
       ? state.deferredChoices.map((ch) => ({
           ...ch,
-          revealedCards: ch.revealedCards.map((c) => ({ ...c })),
+          revealedCards: ch.revealedCards ? ch.revealedCards.map((c) => ({ ...c })) : [],
         }))
       : [],
     deferredEffectDraws: state.deferredEffectDraws ? [...state.deferredEffectDraws] : [],

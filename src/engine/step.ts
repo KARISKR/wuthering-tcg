@@ -26,6 +26,7 @@ import {
   checkGameOver,
   finishClashJudgment,
   continuePostClashOrBattlePhase,
+  createBoardSnapshot,
 } from './gameEngine';
 import {
   decideAiMulligan,
@@ -500,29 +501,25 @@ export function step(prevState: GameState, action: GameAction): { state: GameSta
       const winnerIdx: 0 | 1 = surrenderIdx === 0 ? 1 : 0;
       const surrenderName = nextState.players[surrenderIdx].name;
       const winnerName = nextState.players[winnerIdx].name;
-      nextState = {
-        ...nextState,
-        phase: 'GAME_OVER',
-        winner: winnerIdx,
-        clashResult: null,
-        pendingChoice: null,
-        pendingChoiceQueue: [],
-        lastEffectDraw: null,
-        deferredEffectDraws: [],
-        deferredEffectDraw: null,
-        lastComboStrike: null,
-        logs: [
-          ...nextState.logs,
-          {
-            id: `log-surrender-${engineTick()}`,
-            turn: nextState.turn,
-            text: `🏳️ [항복 선언] ${surrenderName}이(가) 항복을 선언하여 ${winnerName}이(가) 승리했습니다!`,
-            type: 'SYSTEM',
-            playerIndex: surrenderIdx,
-            timestamp: logTimestamp(),
-          },
-        ],
+      nextState.phase = 'GAME_OVER';
+      nextState.winner = winnerIdx;
+      nextState.clashResult = null;
+      nextState.pendingChoice = null;
+      nextState.pendingChoiceQueue = [];
+      nextState.lastEffectDraw = null;
+      nextState.deferredEffectDraws = [];
+      nextState.deferredEffectDraw = null;
+      nextState.lastComboStrike = null;
+      const newLog = {
+        id: `log-surrender-${engineTick()}`,
+        turn: nextState.turn,
+        text: `🏳️ [항복 선언] ${surrenderName}이(가) 항복을 선언하여 ${winnerName}이(가) 승리했습니다!`,
+        type: 'SYSTEM' as const,
+        playerIndex: surrenderIdx,
+        timestamp: logTimestamp(),
+        snapshot: createBoardSnapshot(nextState),
       };
+      nextState.logs = [newLog, ...nextState.logs].slice(0, 1000);
       break;
     }
 
@@ -530,22 +527,27 @@ export function step(prevState: GameState, action: GameAction): { state: GameSta
       if (nextState.phase === 'GAME_OVER' || nextState.winner !== null) break;
       const loserIdx = action.loserIndex;
       const winnerIdx: 0 | 1 = loserIdx === 0 ? 1 : 0;
-      nextState = {
-        ...nextState,
-        phase: 'GAME_OVER',
-        winner: winnerIdx,
-        logs: [
-          ...nextState.logs,
-          {
-            id: `log-timeout-${engineTick()}`,
-            turn: nextState.turn,
-            text: `⏰ [시간 초과] ${nextState.players[loserIdx].name}의 제한 시간이 초과되어 ${nextState.players[winnerIdx].name}이(가) 승리했습니다!`,
-            type: 'SYSTEM',
-            playerIndex: loserIdx,
-            timestamp: logTimestamp(),
-          },
-        ],
+      const loserName = nextState.players[loserIdx].name;
+      const winnerName = nextState.players[winnerIdx].name;
+      nextState.phase = 'GAME_OVER';
+      nextState.winner = winnerIdx;
+      nextState.clashResult = null;
+      nextState.pendingChoice = null;
+      nextState.pendingChoiceQueue = [];
+      nextState.lastEffectDraw = null;
+      nextState.deferredEffectDraws = [];
+      nextState.deferredEffectDraw = null;
+      nextState.lastComboStrike = null;
+      const newLog = {
+        id: `log-timeout-${engineTick()}`,
+        turn: nextState.turn,
+        text: `⏰ [시간 초과] ${loserName}의 제한 시간이 초과되어 ${winnerName}이(가) 승리했습니다!`,
+        type: 'SYSTEM' as const,
+        playerIndex: loserIdx,
+        timestamp: logTimestamp(),
+        snapshot: createBoardSnapshot(nextState),
       };
+      nextState.logs = [newLog, ...nextState.logs].slice(0, 1000);
       break;
     }
 
