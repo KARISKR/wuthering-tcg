@@ -8,6 +8,8 @@ import {
   shouldPauseBattleTimer,
   getTimerResetSeconds,
   getTimerActivePlayerIndex,
+  executeTimeoutForceAdvance,
+  type TimeoutForceAdvanceCallbacks,
 } from '../src/hooks/useBattleTimer';
 import type { TimeLimitConfig } from '../src/types/multiplayer';
 import type { GameState } from '../src/types/tcg';
@@ -220,5 +222,127 @@ describe('step() TIME_OUT and SURRENDER log ordering and snapshot integrity', ()
     expect(surrenderLog.playerIndex).toBe(1);
     expect(surrenderLog.snapshot).toBeDefined();
     expect(surrenderLog.snapshot?.phase).toBe('GAME_OVER');
+  });
+});
+
+describe('executeTimeoutForceAdvance (자동 행동 강제 종료 및 다음 단계 진행)', () => {
+  function createMockCallbacks() {
+    const calls: { name: string; args: any[] }[] = [];
+    const callbacks: TimeoutForceAdvanceCallbacks = {
+      onResolvePendingChoice: (...args) => calls.push({ name: 'onResolvePendingChoice', args }),
+      onDrawCards: (...args) => calls.push({ name: 'onDrawCards', args }),
+      onDecideClash: (...args) => calls.push({ name: 'onDecideClash', args }),
+      onSetClashCard: (...args) => calls.push({ name: 'onSetClashCard', args }),
+      onFinishCombo: (...args) => calls.push({ name: 'onFinishCombo', args }),
+      onDiscardOverflow: (...args) => calls.push({ name: 'onDiscardOverflow', args }),
+      onCloseLocalModals: () => calls.push({ name: 'onCloseLocalModals', args: [] }),
+    };
+    return { calls, callbacks };
+  }
+
+  it('1. pendingChoice: resolves choice automatically with minSelect slice or empty', () => {
+    const state = createInitialGameState('STARTER_ROVER', 'STARTER_CHIXIA', 'AI', null, null, undefined, undefined, 100);
+    const { calls, callbacks } = createMockCallbacks();
+
+    // 1-1: minSelect = 0 (건너뛰기/확인)
+    state.pendingChoice = {
+      id: 'c1',
+      playerIndex: 0,
+      choiceType: 'EFFECT_TARGET',
+      minSelect: 0,
+      maxSelect: 1,
+      revealedCards: [{ id: 'card-1' } as any, { id: 'card-2' } as any],
+    };
+    executeTimeoutForceAdvance(state, callbacks);
+    expect(calls).toEqual([{ name: 'onResolvePendingChoice', args: [[]] }]);
+
+    // 1-2: minSelect = 1 (최소 수량만큼 앞쪽 카드 자동 선택)
+    calls.length = 0;
+    state.pendingChoice.minSelect = 1;
+    executeTimeoutForceAdvance(state, callbacks);
+    expect(calls).toEqual([{ name: 'onResolvePendingChoice', args: [['card-1']] }]);
+  });
+
+  it('2. DRAW_PHASE: automatically triggers draw for active player', () => {
+    const state = createInitialGameState('STARTER_ROVER', 'STARTER_CHIXIA', 'AI', null, null, undefined, undefined, 101);
+    state.phase = 'DRAW_PHASE';
+    state.activePlayerIndex = 1;
+    const { calls, callbacks } = createMockCallbacks();
+
+    executeTimeoutForceAdvance(state, callbacks);
+    expect(calls).toEqual([{ name: 'onDrawCards', args: [1] }]);
+  });
+
+  it('3. ACTION_PHASE / CLASH_SELECT: closes local modals and passes turn without clash', () => {
+    const state = createInitialGameState('STARTER_ROVER', 'STARTER_CHIXIA', 'AI', null, null, undefined, undefined, 102);
+    state.phase = 'ACTION_PHASE';
+    state.activePlayerIndex = 0;
+    const { calls, callbacks } = createMockCallbacks();
+
+    executeTimeoutForceAdvance(state, callbacks);
+    expect(calls).toEqual([
+      { name: 'onCloseLocalModals', args: [] },
+      { name: 'onDecideClash', args: [false] },
+    ]);
+  });
+
+  it('4. CLASH_SET: sequential set (turn player first with usable card or null, then defender with null)', () => {
+    const state = createInitialGameState('STARTER_ROVER', 'STARTER_CHIXIA', 'AI', null, null, undefined, undefined, 103);
+    state.phase = 'CLASH_SET';
+    state.activePlayerIndex = 0;
+    state.players[0].clashCardReady = false;
+    state.players[1].clashCardReady = false;
+    const { calls, callbacks } = createMockCallbacks();
+
+    // 4-1: 턴 플레이어가 세트하지 않았을 때
+    executeTimeoutForceAdvance(state, callbacks);
+    expect(calls.length).toBe(1);
+    expect(calls[0].name).toBe('onSetClashCard');
+    expect(calls[0].args[0]).toBe(0); // activePlayerIndex
+
+    // 4-2: 턴 플레이어가 이미 세트했고, 수비자가 미세트일 때
+    calls.length = 0;
+    state.players[0].clashCardReady = true;
+    executeTimeoutForceAdvance(state, callbacks);
+    expect(calls).toEqual([
+      { name: 'onSetClashCard', args: [1, null] },
+    ]);
+  });
+
+  it('5. COMBO_STEP: closes modals and calls onFinishCombo for combo player', () => {
+    const state = createInitialGameState('STARTER_ROVER', 'STARTER_CHIXIA', 'AI', null, null, undefined, undefined, 104);
+    state.phase = 'COMBO_STEP';
+    state.players[0].comboCount = 0;
+    state.players[1].comboCount = 2; // P1이 연격 진행 중
+    const { calls, callbacks } = createMockCallbacks();
+
+    executeTimeoutForceAdvance(state, callbacks);
+    expect(calls).toEqual([
+      { name: 'onCloseLocalModals', args: [] },
+      { name: 'onFinishCombo', args: [1] },
+    ]);
+  });
+
+  it('6. DISCARD_OVERFLOW: automatically calculates and discards cards exceeding 8 limit', () => {
+    const state = createInitialGameState('STARTER_ROVER', 'STARTER_CHIXIA', 'AI', null, null, undefined, undefined, 105);
+    state.phase = 'DISCARD_OVERFLOW';
+    state.players[0].hand = [
+      { id: 'c1' } as any,
+      { id: 'c2' } as any,
+      { id: 'c3' } as any,
+      { id: 'c4' } as any,
+      { id: 'c5' } as any,
+      { id: 'c6' } as any,
+      { id: 'c7' } as any,
+      { id: 'c8' } as any,
+      { id: 'c9' } as any,
+      { id: 'c10' } as any,
+    ]; // 10장 -> 초과 2장
+    const { calls, callbacks } = createMockCallbacks();
+
+    executeTimeoutForceAdvance(state, callbacks);
+    expect(calls).toEqual([
+      { name: 'onDiscardOverflow', args: [0, ['c9', 'c10']] },
+    ]);
   });
 });

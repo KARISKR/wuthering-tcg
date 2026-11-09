@@ -18,7 +18,12 @@ import {
 import { formatEffectText } from '../utils/formatEffectText';
 import { getOfficialCardByCode } from '../data/officialCards';
 import { useGame } from '../hooks/useGame';
-import { useBattleTimer, formatChessTime } from '../hooks/useBattleTimer';
+import {
+  useBattleTimer,
+  formatChessTime,
+  executeTimeoutForceAdvance,
+  type TimeoutForceAdvanceCallbacks,
+} from '../hooks/useBattleTimer';
 import { useMultiplayerBattle } from '../hooks/useMultiplayerBattle';
 import { useBattleAudio } from '../hooks/useBattleAudio';
 import { useBattleViewport } from '../hooks/useBattleViewport';
@@ -150,14 +155,21 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     ? (isGuest ? gameState.activePlayerIndex === 1 : gameState.activePlayerIndex === 0)
     : controlledPlayerIndex === gameState.activePlayerIndex;
 
+  const timeoutCallbacksRef = useRef<TimeoutForceAdvanceCallbacks>({
+    onResolvePendingChoice: (ids) => engineResolvePendingChoice(ids),
+    onDrawCards: (pIdx) => engineDrawCards(pIdx),
+    onDecideClash: (startClash) => engineDecideClash(startClash),
+    onSetClashCard: (pIdx, cardId, spentIds) => engineSetClashCard(pIdx, cardId, spentIds),
+    onFinishCombo: (pIdx) => engineFinishCombo(pIdx),
+    onDiscardOverflow: (pIdx, ids) => engineDiscardOverflow(pIdx, ids),
+  });
+
   const handleTriggerTimeOut = useCallback(
-    (timedOutPlayerIndex: 0 | 1) => {
-      if (!isMultiplayer || !isHost) return;
-      const reason = '제한 시간 초과';
-      multiplayerService.send({ type: 'TIME_OUT', loserIndex: timedOutPlayerIndex, reason });
-      engineTimeOut(timedOutPlayerIndex, reason);
+    (_timedOutPlayerIndex: 0 | 1) => {
+      if (isMultiplayer && !isHost) return;
+      executeTimeoutForceAdvance(gameState, timeoutCallbacksRef.current);
     },
-    [isMultiplayer, isHost, engineTimeOut]
+    [isMultiplayer, isHost, gameState]
   );
 
   const [timeLimitConfig, setTimeLimitConfig] = useState<TimeLimitConfig>(() => {
@@ -253,6 +265,41 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     engineTimeOut,
     handleSetInitiative,
   });
+
+  timeoutCallbacksRef.current = {
+    onResolvePendingChoice: (ids) => {
+      if (isMultiplayer) handleResolvePendingChoice(ids);
+      else engineResolvePendingChoice(ids);
+    },
+    onDrawCards: (pIdx) => {
+      if (isMultiplayer) handleDrawCards(pIdx);
+      else engineDrawCards(pIdx);
+    },
+    onDecideClash: (startClash) => {
+      if (isMultiplayer) handleDecideClash(startClash);
+      else engineDecideClash(startClash);
+    },
+    onSetClashCard: (pIdx, cardId, spentIds) => {
+      if (isMultiplayer) handleSetClashCard(pIdx, cardId || '', spentIds);
+      else engineSetClashCard(pIdx, cardId, spentIds);
+    },
+    onFinishCombo: (pIdx) => {
+      if (isMultiplayer) handleFinishCombo(pIdx);
+      else engineFinishCombo(pIdx);
+    },
+    onDiscardOverflow: (pIdx, ids) => {
+      if (isMultiplayer) handleDiscardOverflow(pIdx, ids);
+      else engineDiscardOverflow(pIdx, ids);
+    },
+    onCloseLocalModals: () => {
+      battleStore.setState({
+        upgradeTarget: null,
+        cardListModalState: null,
+        concertoModalState: { isOpen: false, actionType: 'CLASH', targetCard: null, requiredCost: 0, playerIndex: 0 },
+        introSwapModalState: { isOpen: false, targetCard: null, spentConcertoIds: undefined, playerIndex: 0 },
+      });
+    },
+  };
 
   const isActionLockedByModal = Boolean(
     gameState.pendingChoice ||
