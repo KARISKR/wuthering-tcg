@@ -43,12 +43,12 @@ const DicePips: React.FC<{ value: number; colorClass: string }> = ({ value, colo
   const activeIndices = new Set(pipsMap[value] || [4]);
 
   return (
-    <div className="grid grid-cols-3 grid-rows-3 w-16 h-16 sm:w-20 sm:h-20 p-2 gap-1.5 sm:gap-2">
+    <div className="grid grid-cols-3 grid-rows-3 w-12 h-12 sm:w-16 sm:h-16 md:w-20 md:h-20 p-1 sm:p-2 gap-1 sm:gap-1.5">
       {Array.from({ length: 9 }).map((_, idx) => (
         <div key={idx} className="flex items-center justify-center">
           {activeIndices.has(idx) && (
             <div
-              className={`w-3.5 h-3.5 sm:w-4.5 sm:h-4.5 rounded-full shadow-md transition-all duration-150 ${colorClass} ${
+              className={`w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 md:w-4.5 md:h-4.5 rounded-full shadow-md transition-all duration-150 ${colorClass} ${
                 value === 1 && idx === 4 ? 'scale-125' : ''
               }`}
             />
@@ -338,8 +338,8 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
   const isP1Win = winnerIndex === 1;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
-      <div className="relative mobile-modal-scaled w-full max-w-2xl max-h-[94dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/60 p-3 sm:p-4 lg:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-1.5 sm:p-3 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
+      <div className="relative w-full max-w-2xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/60 p-2.5 sm:p-4 lg:p-6 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center justify-between">
         {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -350,35 +350,35 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
         {!isSpectator && (!isMultiplayer || myPlayerIndex === 0) && (
           <button
             onClick={handleSkip}
-            className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white text-[11px] sm:text-xs font-bold transition cursor-pointer border border-white/15 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
+            className="absolute top-2 sm:top-3 right-2 sm:right-3 flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-white text-[10px] sm:text-xs font-bold transition cursor-pointer border border-white/15 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]"
             title="주사위 연출을 건너뛰고 즉시 게임을 시작합니다"
           >
             <span>스킵</span>
-            <FastForward className="w-3 sm:w-3.5 h-3 sm:h-3.5" />
+            <FastForward className="w-3 h-3" />
           </button>
         )}
 
         {/* 상단 타이틀 */}
-        <div className="text-center space-y-1 mb-3 sm:mb-6">
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-0.5 sm:py-1 bg-[#111520] border border-[#f97316]/40 text-[#f97316] text-[10px] sm:text-xs font-black tracking-wider shadow-inner">
-            <Sparkles className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-[#f97316] animate-spin" style={{ animationDuration: '4s' }} />
+        <div className="text-center space-y-0.5 mb-1.5 sm:mb-3 shrink-0">
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.2 sm:py-0.5 bg-[#111520] border border-[#f97316]/40 text-[#f97316] text-[9px] sm:text-xs font-black tracking-wider shadow-inner">
+            <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-[#f97316] animate-spin" style={{ animationDuration: '4s' }} />
             <span>선공/후공 결정전 (INITIATIVE ROLL)</span>
           </div>
-          <h2 className="text-lg sm:text-2xl md:text-3xl font-black text-white tracking-wide flex items-center justify-center gap-2">
+          <h2 className="text-sm sm:text-lg md:text-2xl font-black text-white tracking-wide flex items-center justify-center gap-1.5">
             <span>🎲 운명의 주사위 대결</span>
           </h2>
-          <p className="text-[11px] sm:text-xs text-slate-400 hidden sm:block">
+          <p className="text-[10px] sm:text-xs text-slate-400 hidden sm:block">
             주사위에서 승리한 플레이어가 1턴 선공(First) 또는 후공(Second)을 직접 선택합니다.
           </p>
         </div>
 
         {/* 메인 주사위 대치 아레나 */}
-        <div className="w-full flex items-center justify-around gap-4 sm:gap-8 my-2">
+        <div className="w-full flex items-center justify-around gap-2 sm:gap-6 my-1 flex-1 min-h-0">
           {/* 1P (플레이어) */}
-          <div className="flex flex-col items-center space-y-3">
+          <div className="flex flex-col items-center space-y-1.5 sm:space-y-2">
             {/* 플레이어 아바타 & 명칭 */}
-            <div className="flex items-center gap-2">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-cyan-400 shadow-md">
+            <div className="flex items-center gap-1.5">
+              <div className="relative w-7 h-7 sm:w-9 sm:h-9 rounded-full overflow-hidden border border-cyan-400 shadow-md">
                 <img
                   src={player0.slots.leader.artUrl}
                   alt={player0.name}
@@ -386,10 +386,10 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
                 />
               </div>
               <div className="text-left">
-                <div className={`text-xs font-black ${myPlayerIndex === 0 ? 'text-cyan-300' : 'text-slate-300'}`}>
+                <div className={`text-[10px] sm:text-xs font-black ${myPlayerIndex === 0 ? 'text-cyan-300' : 'text-slate-300'}`}>
                   {player0.name}
                 </div>
-                <div className="text-[10px] font-bold">
+                <div className="text-[9px] font-bold">
                   {myPlayerIndex === 0 ? (
                     <span className="text-cyan-400">1P (나)</span>
                   ) : (
@@ -401,12 +401,12 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
             {/* 1P 3D 주사위 큐브 */}
             <div
-              className={`relative w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl sm:rounded-3xl flex items-center justify-center transition-all duration-300 ${
+              className={`relative w-14 h-14 sm:w-20 sm:h-20 md:w-28 md:h-28 rounded-xl sm:rounded-2xl md:rounded-3xl flex items-center justify-center transition-all duration-300 ${
                 phase === 'ROLLING'
-                  ? 'animate-dice-roll shadow-[0_0_40px_rgba(34,211,238,0.5)] border-cyan-400/80 bg-slate-900'
+                  ? 'animate-dice-roll shadow-[0_0_30px_rgba(34,211,238,0.5)] border-cyan-400/80 bg-slate-900'
                   : isP0Win
-                  ? 'animate-dice-land shadow-[0_0_50px_rgba(52,211,153,0.7)] border-emerald-400 bg-slate-900 ring-4 ring-emerald-400/30'
-                  : 'shadow-[0_15px_30px_rgba(0,0,0,0.8),inset_0_4px_12px_rgba(255,255,255,0.15),inset_0_-8px_16px_rgba(0,0,0,0.7)] border border-cyan-500/40 bg-gradient-to-br from-slate-900 via-cyan-950/40 to-slate-950'
+                  ? 'animate-dice-land shadow-[0_0_40px_rgba(52,211,153,0.7)] border-emerald-400 bg-slate-900 ring-2 sm:ring-4 ring-emerald-400/30'
+                  : 'shadow-[0_10px_20px_rgba(0,0,0,0.8),inset_0_2px_8px_rgba(255,255,255,0.15)] border border-cyan-500/40 bg-gradient-to-br from-slate-900 via-cyan-950/40 to-slate-950'
               }`}
             >
               {/* 주사위 점 핍 표시 */}
@@ -421,8 +421,8 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
               {/* 승리 크라운 뱃지 */}
               {isP0Win && (
-                <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg animate-bounce">
-                  <Crown className="w-5 h-5 fill-slate-950" />
+                <div className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-amber-400 text-slate-950 flex items-center justify-center shadow-lg animate-bounce">
+                  <Crown className="w-3.5 h-3.5 sm:w-5 sm:h-5 fill-slate-950" />
                 </div>
               )}
             </div>
@@ -430,7 +430,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
             {/* 눈금 숫자 표시 */}
             <div className="text-center">
               <span
-                className={`text-2xl sm:text-3xl font-black font-mono transition-all ${
+                className={`text-lg sm:text-2xl font-black font-mono transition-all ${
                   isP0Win ? 'text-emerald-400 scale-110 drop-shadow' : 'text-cyan-300'
                 }`}
               >
@@ -440,18 +440,18 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
           </div>
 
           {/* 중앙 VS 배지 */}
-          <div className="flex flex-col items-center justify-center space-y-2">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-lg text-white font-black text-sm">
-              <Swords className="w-5 h-5" />
+          <div className="flex flex-col items-center justify-center space-y-1">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center shadow-lg text-white font-black text-xs sm:text-sm">
+              <Swords className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <span className="text-[11px] font-black tracking-widest text-slate-500 uppercase">VS</span>
+            <span className="text-[9px] sm:text-[10px] font-black tracking-widest text-slate-500 uppercase">VS</span>
           </div>
 
           {/* 2P (상대방 / AI) */}
-          <div className="flex flex-col items-center space-y-3">
+          <div className="flex flex-col items-center space-y-1.5 sm:space-y-2">
             {/* 상대방 아바타 & 명칭 */}
-            <div className="flex items-center gap-2">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden border-2 border-purple-400 shadow-md">
+            <div className="flex items-center gap-1.5">
+              <div className="relative w-7 h-7 sm:w-9 sm:h-9 rounded-full overflow-hidden border border-purple-400 shadow-md">
                 <img
                   src={player1.slots.leader.artUrl}
                   alt={player1.name}
@@ -459,10 +459,10 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
                 />
               </div>
               <div className="text-left">
-                <div className={`text-xs font-black ${myPlayerIndex === 1 ? 'text-cyan-300' : 'text-purple-300'}`}>
+                <div className={`text-[10px] sm:text-xs font-black ${myPlayerIndex === 1 ? 'text-cyan-300' : 'text-purple-300'}`}>
                   {player1.name}
                 </div>
-                <div className="text-[10px] font-bold">
+                <div className="text-[9px] font-bold">
                   {myPlayerIndex === 1 ? (
                     <span className="text-cyan-400">2P (나)</span>
                   ) : (
@@ -474,12 +474,12 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
             {/* 2P 3D 주사위 큐브 */}
             <div
-              className={`relative w-20 h-20 sm:w-28 sm:h-28 md:w-32 md:h-32 rounded-2xl sm:rounded-3xl flex items-center justify-center transition-all duration-300 ${
+              className={`relative w-14 h-14 sm:w-20 sm:h-20 md:w-28 md:h-28 rounded-xl sm:rounded-2xl md:rounded-3xl flex items-center justify-center transition-all duration-300 ${
                 phase === 'ROLLING'
-                  ? 'animate-dice-roll shadow-[0_0_40px_rgba(168,85,247,0.5)] border-purple-400/80 bg-slate-900'
+                  ? 'animate-dice-roll shadow-[0_0_30px_rgba(168,85,247,0.5)] border-purple-400/80 bg-slate-900'
                   : isP1Win
-                  ? 'animate-dice-land shadow-[0_0_50px_rgba(168,85,247,0.7)] border-purple-400 bg-slate-900 ring-4 ring-purple-400/30'
-                  : 'shadow-[0_15px_30px_rgba(0,0,0,0.8),inset_0_4px_12px_rgba(255,255,255,0.15),inset_0_-8px_16px_rgba(0,0,0,0.7)] border border-purple-500/40 bg-gradient-to-br from-slate-900 via-purple-950/40 to-slate-950'
+                  ? 'animate-dice-land shadow-[0_0_40px_rgba(168,85,247,0.7)] border-purple-400 bg-slate-900 ring-2 sm:ring-4 ring-purple-400/30'
+                  : 'shadow-[0_10px_20px_rgba(0,0,0,0.8),inset_0_2px_8px_rgba(255,255,255,0.15)] border border-purple-500/40 bg-gradient-to-br from-slate-900 via-purple-950/40 to-slate-950'
               }`}
             >
               {/* 주사위 점 핍 표시 */}
@@ -494,8 +494,8 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
 
               {/* 승리 크라운 뱃지 */}
               {isP1Win && (
-                <div className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-purple-400 text-slate-950 flex items-center justify-center shadow-lg animate-bounce">
-                  <Crown className="w-5 h-5 fill-slate-950" />
+                <div className="absolute -top-2 -right-2 sm:-top-3 sm:-right-3 w-6 h-6 sm:w-8 sm:h-8 rounded-full bg-purple-400 text-slate-950 flex items-center justify-center shadow-lg animate-bounce">
+                  <Crown className="w-3.5 h-3.5 sm:w-5 sm:h-5 fill-slate-950" />
                 </div>
               )}
             </div>
@@ -503,7 +503,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
             {/* 눈금 숫자 표시 */}
             <div className="text-center">
               <span
-                className={`text-2xl sm:text-3xl font-black font-mono transition-all ${
+                className={`text-lg sm:text-2xl font-black font-mono transition-all ${
                   isP1Win ? 'text-purple-400 scale-110 drop-shadow' : 'text-purple-300'
                 }`}
               >
@@ -514,7 +514,7 @@ export const InitiativeDiceModal: React.FC<InitiativeDiceModalProps> = ({
         </div>
 
         {/* 하단 상태 피드백 및 액션 버튼 (sticky 배치로 모바일에서도 상시 노출) */}
-        <div className="mt-3 sm:mt-6 w-full max-w-lg flex flex-col items-center space-y-2 sm:space-y-3 sticky bottom-0 bg-[#0c101b]/95 backdrop-blur-md pt-2 pb-1 z-20">
+        <div className="mt-1 sm:mt-3 w-full max-w-lg flex flex-col items-center space-y-1.5 sm:space-y-2 shrink-0">
           {/* 주사위 결과 화면 */}
           {phase === 'RESULT' && winnerIndex !== null && (() => {
             const isWinner = isMultiplayer

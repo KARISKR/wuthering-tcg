@@ -195,7 +195,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
-      <div className="relative mobile-modal-scaled w-full max-w-3xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/70 p-2.5 sm:p-5 lg:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-2 sm:gap-3.5">
+      <div className="relative w-full max-w-3xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/70 p-2.5 sm:p-4 lg:p-6 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-1.5 sm:gap-2.5">
         {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -203,21 +203,21 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
         <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
 
         {/* 헤더 */}
-        <div className="flex items-center justify-between gap-2.5 sm:gap-3.5 border-b border-white/10 pb-2 sm:pb-3.5">
-          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
-            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-[#111520] border border-[#f97316]/50 flex items-center justify-center text-[#f97316] shadow overflow-hidden shrink-0">
+        <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5 sm:pb-2.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-[#111520] border border-[#f97316]/50 flex items-center justify-center text-[#f97316] shadow overflow-hidden shrink-0">
               {choice.sourceCardArt ? (
                 <img src={choice.sourceCardArt} alt="" className="w-full h-full object-cover" />
               ) : (
-                <Sparkles className="w-5 h-5 sm:w-7 sm:h-7 animate-pulse" />
+                <Sparkles className="w-4 h-4 sm:w-6 sm:h-6 animate-pulse" />
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap">
-                <h2 className="text-base sm:text-xl lg:text-2xl font-black text-white flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <h2 className="text-sm sm:text-lg lg:text-xl font-black text-white flex items-center gap-1.5 flex-wrap">
                   <span>{titleInfo.mainText}</span>
                   {titleInfo.tagText && (
-                    <span className={`text-[10px] sm:text-xs px-2 py-0.5 border font-black rounded ${titleInfo.tagClass}`}>
+                    <span className={`text-[9px] sm:text-xs px-1.5 py-0.2 border font-black rounded ${titleInfo.tagClass}`}>
                       [{titleInfo.tagText}]
                     </span>
                   )}
@@ -498,8 +498,8 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
               </div>
             )}
 
-            {/* 공개된 카드 리스트 (모바일 zoom 시 찌그러짐 원천 차단: 내부 vh 제한 제거 및 반응형 카드 크기) */}
-            <div className="w-full flex-1 min-h-0 flex items-center justify-center gap-2 sm:gap-3.5 py-2 flex-wrap">
+            {/* 공개된 카드 리스트 (모바일에서도 한 화면에 쏙 들어오도록 반응형 카드 크기) */}
+            <div className="w-full flex-1 min-h-0 flex items-center justify-center gap-1.5 sm:gap-3 py-1.5 flex-wrap overflow-y-auto custom-scrollbar">
               {displayCards.map((card, idx) => {
                   const isSelected = selectedIds.includes(card.id);
                   const isViewOnly = choice.onResolveType === 'VIEW_ONLY';
@@ -510,7 +510,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                       onClick={() => {
                         if (!isViewOnly) toggleSelect(card.id);
                       }}
-                      className={`relative w-28 sm:w-36 md:w-44 aspect-[5/7] overflow-hidden border transition transform select-none shadow-xl ${
+                      className={`relative max-h-[28vh] sm:max-h-[34vh] lg:max-h-[220px] aspect-[5/7] w-auto overflow-hidden border transition transform select-none shadow-xl ${
                         isViewOnly
                           ? 'border-cyan-500/50 hover:border-cyan-400 cursor-default'
                           : isSelected

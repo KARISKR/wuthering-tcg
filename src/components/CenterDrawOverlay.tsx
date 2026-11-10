@@ -150,20 +150,20 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
       />
 
       {/* 2. 상단 안내 가이드 타이틀 */}
-      <div className="mobile-modal-scaled flex flex-col items-center justify-center max-h-[96dvh] w-full px-2">
-      <div className="relative z-10 mb-1.5 sm:mb-3 lg:mb-5 flex flex-col items-center text-center animate-bounce-subtle pointer-events-none">
-        <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-0.5 sm:py-1 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] mb-1 sm:mb-2">
+      <div className="flex flex-col items-center justify-center max-h-[96dvh] w-full px-2">
+      <div className="relative z-10 mb-1 sm:mb-2 lg:mb-4 flex flex-col items-center text-center animate-bounce-subtle pointer-events-none shrink-0">
+        <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-0.5 sm:py-1 rounded-full bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border border-amber-400/60 shadow-[0_0_20px_rgba(245,158,11,0.4)] mb-0.5 sm:mb-1.5">
           {isUserTurn ? (
-            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-300 animate-spin" />
+            <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-amber-300 animate-spin" />
           ) : (
-            <Bot className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400 animate-pulse" />
+            <Bot className="w-3 h-3 sm:w-4 sm:h-4 text-cyan-400 animate-pulse" />
           )}
-          <span className="font-mono text-[10px] sm:text-xs font-black tracking-wider text-amber-300 uppercase">
+          <span className="font-mono text-[9px] sm:text-xs font-black tracking-wider text-amber-300 uppercase">
             {isUserTurn ? 'DRAW PHASE · YOUR TURN' : isSpectator ? 'DRAW PHASE · SPECTATING' : "DRAW PHASE · OPPONENT'S TURN"}
           </span>
         </div>
 
-        <h2 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-yellow-100 to-amber-400 drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] tracking-tight">
+        <h2 className="text-base sm:text-xl md:text-2xl lg:text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-yellow-100 to-amber-400 drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)] tracking-tight">
           {stage === 'READY'
             ? isUserTurn
               ? '덱을 클릭하여 카드를 드로우하세요!'
@@ -184,17 +184,17 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
         </h2>
 
         {isUserTurn && stage === 'READY' && (
-          <p className="text-[11px] sm:text-sm font-bold text-amber-200/90 mt-1 sm:mt-1.5 flex items-center gap-1.5 drop-shadow">
-            <ArrowDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 animate-bounce" />
+          <p className="text-[10px] sm:text-xs lg:text-sm font-bold text-amber-200/90 mt-0.5 sm:mt-1 flex items-center gap-1 drop-shadow">
+            <ArrowDown className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-400 animate-bounce" />
             <span>중앙의 덱을 누르면 카드를 뽑습니다 ({drawCount}장)</span>
           </p>
         )}
       </div>
 
       {/* 3. 중앙 마스터듀얼식 3D 입체 덱 & 드로우 카드 오픈 연출 영역 */}
-      <div className="relative z-10 flex items-center justify-center min-w-[200px] sm:min-w-[260px] min-h-[200px] sm:min-h-[280px] lg:min-h-[360px]">
+      <div className="relative z-10 flex items-center justify-center min-w-[160px] min-h-[140px] sm:min-h-[200px] lg:min-h-[360px]">
         {/* 덱 바닥 마법진 오라 링 */}
-        <div className={`absolute -bottom-6 sm:-bottom-8 w-48 sm:w-64 lg:w-80 h-16 sm:h-24 rounded-[100%] bg-gradient-to-r ${
+        <div className={`absolute -bottom-4 sm:-bottom-8 w-36 sm:w-56 lg:w-80 h-12 sm:h-20 lg:h-24 rounded-[100%] bg-gradient-to-r ${
           isUserTurn 
             ? 'from-amber-500/40 via-yellow-400/50 to-amber-500/40 shadow-[0_0_60px_rgba(245,158,11,0.6)]' 
             : 'from-cyan-500/40 via-blue-400/50 to-cyan-500/40 shadow-[0_0_60px_rgba(6,182,212,0.6)]'
@@ -210,34 +210,34 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
               isUserTurn ? 'cursor-pointer hover:scale-105 active:scale-95' : 'cursor-default'
             }`}
           >
-            {/* 3D 덱 두께 레이어 3겹 (스택 입체감 표현) */}
-            <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 w-32 sm:w-44 lg:w-56 aspect-[588/1024] rounded-xl sm:rounded-2xl bg-slate-900 border border-slate-700 shadow-xl opacity-60 pointer-events-none" />
-            <div className="absolute top-1 left-1 w-32 sm:w-44 lg:w-56 aspect-[588/1024] rounded-xl sm:rounded-2xl bg-slate-800 border border-slate-600 shadow-2xl opacity-80 pointer-events-none" />
+            {/* 3D 덱 두께 레이어 3겹 (세로 뷰포트에 맞춘 반응형 높이) */}
+            <div className="absolute top-1 left-1 sm:top-2 sm:left-2 h-[30vh] sm:h-[36vh] lg:h-[320px] max-h-[340px] aspect-[588/1024] w-auto rounded-lg sm:rounded-xl lg:rounded-2xl bg-slate-900 border border-slate-700 shadow-xl opacity-60 pointer-events-none" />
+            <div className="absolute top-0.5 left-0.5 h-[30vh] sm:h-[36vh] lg:h-[320px] max-h-[340px] aspect-[588/1024] w-auto rounded-lg sm:rounded-xl lg:rounded-2xl bg-slate-800 border border-slate-600 shadow-2xl opacity-80 pointer-events-none" />
 
             {/* 메인 맨 위 덱 카드 */}
-            <div className={`relative w-32 sm:w-44 lg:w-56 aspect-[588/1024] rounded-xl sm:rounded-2xl overflow-hidden border-2 bg-slate-950 shadow-[0_15px_45px_rgba(0,0,0,0.9)] transition-all ${
+            <div className={`relative h-[30vh] sm:h-[36vh] lg:h-[320px] max-h-[340px] aspect-[588/1024] w-auto rounded-lg sm:rounded-xl lg:rounded-2xl overflow-hidden border-2 bg-slate-950 shadow-[0_15px_45px_rgba(0,0,0,0.9)] transition-all ${
               isUserTurn 
-                ? 'border-amber-400 ring-4 ring-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.7)] group-hover:shadow-[0_0_55px_rgba(245,158,11,0.95)]' 
+                ? 'border-amber-400 ring-2 sm:ring-4 ring-amber-400/80 shadow-[0_0_35px_rgba(245,158,11,0.7)] group-hover:shadow-[0_0_55px_rgba(245,158,11,0.95)]' 
                 : 'border-cyan-400 ring-2 ring-cyan-400/60'
             }`}>
               <img
                 src="/cards/card_back_action.webp"
                 alt="중앙 액션 덱"
-                className="w-full h-full object-cover rounded-xl sm:rounded-2xl"
+                className="w-full h-full object-cover rounded-lg sm:rounded-xl lg:rounded-2xl"
               />
 
               {/* 홀로그램 광택 레이어 */}
               <div className="absolute inset-0 bg-gradient-to-tr from-amber-500/20 via-white/10 to-transparent pointer-events-none" />
 
               {/* 드로우 매수 알림 중앙 뱃지 */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-2 sm:p-3 text-center bg-black/30 backdrop-blur-[1px]">
-                <div className="p-2 sm:p-3 rounded-full bg-slate-950/80 border-2 border-amber-400/90 shadow-[0_0_20px_rgba(245,158,11,0.8)] mb-1 sm:mb-2 group-hover:scale-110 transition-transform">
-                  <Layers className="w-5 h-5 sm:w-8 sm:h-8 text-amber-300 animate-pulse" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-1.5 sm:p-3 text-center bg-black/30 backdrop-blur-[1px]">
+                <div className="p-1.5 sm:p-2.5 rounded-full bg-slate-950/80 border border-amber-400/90 shadow-[0_0_15px_rgba(245,158,11,0.8)] mb-0.5 sm:mb-1.5 group-hover:scale-110 transition-transform">
+                  <Layers className="w-4 h-4 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-amber-300 animate-pulse" />
                 </div>
-                <span className="text-xs sm:text-base font-black text-amber-200 drop-shadow">
+                <span className="text-[11px] sm:text-sm lg:text-base font-black text-amber-200 drop-shadow">
                   {isUserTurn ? '클릭하여 드로우' : isSpectator ? `${activePlayer.name} 선수의 덱` : '상대 덱'}
                 </span>
-                <span className="text-[10px] sm:text-xs font-mono font-bold text-slate-300 mt-0.5">
+                <span className="text-[9px] sm:text-xs font-mono font-bold text-slate-300 mt-0.5">
                   남은 {activePlayer.actionDeck.length}장
                 </span>
               </div>
@@ -248,14 +248,14 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                   <img
                     src="/cards/card_back_action.webp"
                     alt="뽑히는 카드"
-                    className="w-full h-full object-cover rounded-xl sm:rounded-2xl border-2 border-yellow-300 shadow-[0_0_30px_rgba(253,224,71,0.9)]"
+                    className="w-full h-full object-cover rounded-lg sm:rounded-xl lg:rounded-2xl border-2 border-yellow-300 shadow-[0_0_30px_rgba(253,224,71,0.9)]"
                   />
                 </div>
               )}
             </div>
 
             {/* 하단 그림자 받침 */}
-            <div className="w-28 sm:w-40 lg:w-48 h-3 sm:h-4 rounded-full bg-black/80 blur-md mt-2 sm:mt-4 pointer-events-none" />
+            <div className="w-20 sm:w-32 lg:w-48 h-2 sm:h-3 rounded-full bg-black/80 blur-md mt-1.5 sm:mt-3 pointer-events-none" />
           </div>
         )}
 
@@ -273,24 +273,24 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                     style={{ animationDelay: `${idx * 100}ms` }}
                     className="flex flex-col items-center animate-card-reveal-flip"
                   >
-                    <div className="relative w-32 sm:w-44 lg:w-52 aspect-[588/1024] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-cyan-400/80 ring-2 sm:ring-4 ring-cyan-500/40 bg-slate-950 shadow-[0_0_35px_rgba(6,182,212,0.6)]">
+                    <div className="relative h-[32vh] sm:h-[38vh] lg:h-[340px] max-h-[360px] aspect-[588/1024] w-auto rounded-lg sm:rounded-xl lg:rounded-2xl overflow-hidden border-2 border-cyan-400/80 ring-2 sm:ring-4 ring-cyan-500/40 bg-slate-950 shadow-[0_0_35px_rgba(6,182,212,0.6)]">
                       <img
                         src="/cards/card_back_action.webp"
                         alt="상대 비공개 드로우 카드"
-                        className="w-full h-full object-cover rounded-xl sm:rounded-2xl"
+                        className="w-full h-full object-cover rounded-lg sm:rounded-xl lg:rounded-2xl"
                       />
                       {/* 카드 코너 상단 비공개 뱃지 */}
-                      <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 sm:px-2.5 py-0.5 rounded-full bg-slate-950/90 border border-cyan-400 text-[9px] sm:text-[11px] font-black text-cyan-300 flex items-center gap-1 shadow-lg">
-                        <Bot className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400" />
+                      <div className="absolute top-1 left-1 sm:top-2 sm:left-2 px-1 sm:px-2 py-0.2 sm:py-0.5 rounded-full bg-slate-950/90 border border-cyan-400 text-[8px] sm:text-[10px] font-black text-cyan-300 flex items-center gap-0.5 shadow-lg">
+                        <Bot className="w-2.5 h-2.5 text-cyan-400" />
                         <span>CARD #{idx + 1}</span>
                       </div>
 
                       {/* 중앙 시크릿 워터마크 */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center p-2 sm:p-3 text-center bg-black/40 backdrop-blur-[1px]">
-                        <span className="text-[10px] sm:text-xs lg:text-sm font-black tracking-widest text-cyan-200 uppercase drop-shadow">
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-2 text-center bg-black/40 backdrop-blur-[1px]">
+                        <span className="text-[10px] sm:text-xs font-black tracking-widest text-cyan-200 uppercase drop-shadow">
                           SECRET
                         </span>
-                        <span className="text-[9px] sm:text-[11px] font-bold text-slate-300 mt-0.5">
+                        <span className="text-[8px] sm:text-[10px] font-bold text-slate-300 mt-0.5">
                           비공개 카드
                         </span>
                       </div>
@@ -313,7 +313,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                   style={{ animationDelay: `${idx * 120}ms` }}
                   className="flex flex-col items-center animate-card-reveal-flip"
                 >
-                  <div className={`relative w-32 sm:w-44 lg:w-52 aspect-[588/1024] rounded-xl sm:rounded-2xl overflow-hidden border-2 ring-2 sm:ring-4 bg-slate-900 shadow-2xl ${colorBorder}`}>
+                  <div className={`relative h-[32vh] sm:h-[38vh] lg:h-[340px] max-h-[360px] aspect-[588/1024] w-auto rounded-lg sm:rounded-xl lg:rounded-2xl overflow-hidden border-2 ring-2 sm:ring-4 bg-slate-900 shadow-2xl ${colorBorder}`}>
                     <img
                       src={card.artUrl}
                       alt={card.nameKr}
@@ -321,17 +321,17 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                     />
 
                     {/* 카드 코너 상단 빛나는 DRAW 뱃지 */}
-                    <div className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 sm:px-2 py-0.5 rounded-full bg-slate-950/90 border border-amber-400 text-[9px] sm:text-[11px] font-black text-amber-300 flex items-center gap-1 shadow-lg">
-                      <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-amber-400" />
+                    <div className="absolute top-1 left-1 sm:top-2 sm:left-2 px-1 sm:px-2 py-0.2 sm:py-0.5 rounded-full bg-slate-950/90 border border-amber-400 text-[8px] sm:text-[10px] font-black text-amber-300 flex items-center gap-0.5 shadow-lg">
+                      <Sparkles className="w-2.5 h-2.5 text-amber-400" />
                       <span>DRAW #{idx + 1}</span>
                     </div>
 
                     {/* 카드 하단 정보 바 */}
-                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-1.5 sm:p-2.5 text-center">
-                      <div className="text-[11px] sm:text-xs lg:text-sm font-black text-white truncate drop-shadow">
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-transparent p-1 sm:p-2 text-center">
+                      <div className="text-[10px] sm:text-xs lg:text-sm font-black text-white truncate drop-shadow">
                         {card.nameKr}
                       </div>
-                      <div className="flex items-center justify-center gap-1.5 sm:gap-2 text-[9px] sm:text-[10px] lg:text-[11px] font-bold text-slate-300 mt-0.5">
+                      <div className="flex items-center justify-center gap-1.5 text-[8px] sm:text-[10px] font-bold text-slate-300 mt-0.5">
                         <span className="text-amber-400">COST {card.cost}</span>
                         {card.damage > 0 && <span className="text-rose-400">DMG {card.damage}</span>}
                       </div>
@@ -352,7 +352,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
               <div
                 key={`fly-${card.id}-${idx}`}
                 style={{ animationDelay: `${idx * 100}ms` }}
-                className={`w-28 sm:w-40 lg:w-48 aspect-[588/1024] rounded-xl sm:rounded-2xl overflow-hidden border-2 shadow-2xl ${
+                className={`h-[28vh] sm:h-[34vh] lg:h-[300px] max-h-[320px] aspect-[588/1024] w-auto rounded-lg sm:rounded-xl lg:rounded-2xl overflow-hidden border-2 shadow-2xl ${
                   isUserTurn
                     ? 'border-amber-400 bg-slate-900 animate-fly-to-hand-p0'
                     : 'border-cyan-400 bg-slate-900 animate-fly-to-hand-p1'
@@ -361,7 +361,7 @@ export const CenterDrawOverlay: React.FC<CenterDrawOverlayProps> = ({
                 <img
                   src={isUserTurn ? card.artUrl : '/cards/card_back_action.webp'}
                   alt={isUserTurn ? card.nameKr : '상대 드로우 카드'}
-                  className={`w-full h-full ${isUserTurn ? 'object-contain' : 'object-cover'} rounded-xl sm:rounded-2xl bg-slate-950`}
+                  className={`w-full h-full ${isUserTurn ? 'object-contain' : 'object-cover'} rounded-lg sm:rounded-xl lg:rounded-2xl bg-slate-950`}
                 />
               </div>
             ))}
