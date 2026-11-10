@@ -1467,7 +1467,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                             : 'text-slate-400 hover:text-white hover:bg-slate-900'
                         }`}
                       >
-                        <span>🤖 추천 & 프리셋</span>
+                        <span>📜 공식 & 프리셋</span>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                           deckTab === 'REC_DECKS' ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-300'
                         }`}>
@@ -1483,11 +1483,11 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                   <div className="py-14 px-4 text-center text-slate-400 flex flex-col items-center justify-center gap-2.5">
                     <Layers className="w-12 h-12 text-slate-600 mb-1" />
                     <p className="font-bold text-base text-slate-300">
-                      {deckTab === 'MY_DECKS' ? '저장된 마이 덱이 없습니다.' : '추천 프리셋 덱이 없습니다.'}
+                      {deckTab === 'MY_DECKS' ? '저장된 마이 덱이 없습니다.' : '프리셋 덱이 없습니다.'}
                     </p>
                     <p className="text-xs sm:text-sm text-slate-500">
                       {deckTab === 'MY_DECKS'
-                        ? '메인 화면의 [덱 빌더]에서 나만의 덱을 생성하고 저장하거나 상단의 [추천 & 프리셋] 탭을 이용해 보세요.'
+                        ? '메인 화면의 [덱 빌더]에서 나만의 덱을 생성하고 저장하거나 상단의 [공식 & 프리셋] 탭을 이용해 보세요.'
                         : '기본 프리셋 데이터를 불러오는 중입니다.'}
                     </p>
                     {deckTab === 'MY_DECKS' && onOpenDeckBuilder && (

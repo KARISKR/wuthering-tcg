@@ -430,7 +430,6 @@ export function getDefaultPresets(): DeckPreset[] {
   });
 
   return [
-    ...AI_RECOMMENDED_DECKS,
     {
       id: 'preset-official-sd01',
       name: '공식 스타터 SD01 [빛과 그림자의 방랑자]',

@@ -169,8 +169,8 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
               <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-2 border-amber-400/70 flex items-center justify-center bg-amber-400/10 group-hover:scale-110 transition-transform">
                 <BookmarkCheck className="w-7 h-7 sm:w-10 sm:h-10 text-amber-300" />
               </div>
-              <div className="mt-2.5 sm:mt-4 text-sm sm:text-base font-black text-amber-300">추천 덱으로 시작</div>
-              <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 leading-snug">AI 추천·공식 스타터 덱을<br />골라 바로 쓰기</div>
+              <div className="mt-2.5 sm:mt-4 text-sm sm:text-base font-black text-amber-300">프리셋 덱으로 시작</div>
+              <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 leading-snug">공식 스타터·프리셋 덱을<br />골라 바로 쓰기</div>
             </button>
           )}
 

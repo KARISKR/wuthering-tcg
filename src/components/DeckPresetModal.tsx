@@ -72,7 +72,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   currentEditingDeck,
 }) => {
   const [presets, setPresets] = useState<DeckPreset[]>([]);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'AI_RECOMMENDED' | 'CUSTOM' | 'OFFICIAL'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'CUSTOM' | 'OFFICIAL'>('ALL');
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [presetSearch, setPresetSearch] = useState('');
 
@@ -128,14 +128,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   // 필터링 및 검색된 프리셋 목록
   const filteredPresets = useMemo(() => {
     let result = presets;
-    if (activeTab === 'AI_RECOMMENDED') {
-      result = result.filter((p) => p.id.startsWith('preset-ai-rec-') || p.authorName === 'AI 추천덱!');
-    }
     if (activeTab === 'OFFICIAL') result = result.filter((p) => p.isOfficial);
     if (activeTab === 'CUSTOM') {
-      result = result.filter(
-        (p) => !p.isOfficial && !p.id.startsWith('preset-ai-rec-') && p.authorName !== 'AI 추천덱!'
-      );
+      result = result.filter((p) => !p.isOfficial);
     }
 
     if (presetSearch.trim()) {
@@ -657,17 +652,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               전체 ({presets.length})
             </button>
             <button
-              onClick={() => setActiveTab('AI_RECOMMENDED')}
-              className={`px-3 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1 ${
-                activeTab === 'AI_RECOMMENDED'
-                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20 font-black'
-                  : 'text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 border border-emerald-500/30'
-              }`}
-            >
-              <Bot className="w-3.5 h-3.5" />
-              <span>AI 추천 ({presets.filter((p) => p.id.startsWith('preset-ai-rec-') || p.authorName === 'AI 추천덱!').length})</span>
-            </button>
-            <button
               onClick={() => setActiveTab('CUSTOM')}
               className={`px-3 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
                 activeTab === 'CUSTOM'
@@ -675,7 +659,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                   : 'text-slate-400 hover:text-white bg-slate-900/60'
               }`}
             >
-              내 프리셋 ({presets.filter((p) => !p.isOfficial && !p.id.startsWith('preset-ai-rec-') && p.authorName !== 'AI 추천덱!').length})
+              내 프리셋 ({presets.filter((p) => !p.isOfficial).length})
             </button>
             <button
               onClick={() => setActiveTab('OFFICIAL')}
@@ -734,12 +718,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 mb-1">
-                          {preset.id.startsWith('preset-ai-rec-') || preset.authorName === 'AI 추천덱!' ? (
-                            <span className="text-[10px] font-black text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded-md flex items-center gap-1">
-                              <Bot className="w-3 h-3 text-emerald-400" />
-                              AI 추천덱
-                            </span>
-                          ) : preset.isOfficial ? (
+                          {preset.isOfficial ? (
                             <span className="text-[10px] font-black text-amber-300 bg-amber-400/20 border border-amber-400/40 px-2 py-0.5 rounded-md">
                               공식 레시피
                             </span>

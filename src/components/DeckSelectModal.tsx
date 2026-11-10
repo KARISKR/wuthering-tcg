@@ -16,7 +16,7 @@ const LAST_MY_KEY = 'wuthering_last_my_deck_preset';
 const LAST_OPP_KEY = 'wuthering_last_opp_deck_preset';
 const RANDOM_ID = '__RANDOM__';
 
-export type DeckCategoryTab = 'USER' | 'AI_REC' | 'OFFICIAL' | 'PRESET' | 'ALL';
+export type DeckCategoryTab = 'USER' | 'OFFICIAL' | 'PRESET' | 'ALL';
 
 interface CategoryItem {
   id: DeckCategoryTab;
@@ -26,7 +26,6 @@ interface CategoryItem {
 
 const CATEGORY_TABS: CategoryItem[] = [
   { id: 'USER', label: '보유 덱', badgeLabel: '★ 보유 덱' },
-  { id: 'AI_REC', label: 'AI추천', badgeLabel: '🤖 AI 추천' },
   { id: 'OFFICIAL', label: '공식', badgeLabel: '👑 공식' },
   { id: 'PRESET', label: '프리셋', badgeLabel: '📜 프리셋' },
   { id: 'ALL', label: '전체', badgeLabel: '전체' },
@@ -36,16 +35,12 @@ function isUserPreset(preset: DeckPreset): boolean {
   return preset.authorName === '내 덱' || preset.id.startsWith('user-deck-');
 }
 
-function isAiRecPreset(preset: DeckPreset): boolean {
-  return preset.id.startsWith('preset-ai-rec-') || preset.authorName === 'AI 추천덱!';
-}
-
 function isOfficialPreset(preset: DeckPreset): boolean {
   return Boolean(preset.isOfficial) || preset.id.startsWith('preset-official-');
 }
 
 function isGeneralPreset(preset: DeckPreset): boolean {
-  return !isUserPreset(preset) && !isAiRecPreset(preset) && !isOfficialPreset(preset);
+  return !isUserPreset(preset) && !isOfficialPreset(preset);
 }
 
 const DeckColumn: React.FC<{
@@ -60,27 +55,25 @@ const DeckColumn: React.FC<{
 }> = ({ title, subtitle, accent, presets, selectedId, onSelect, defaultCategory = 'ALL', allowRandom }) => {
   const [activeCategory, setActiveCategory] = useState<DeckCategoryTab>(defaultCategory);
 
-  // 4개 카테고리별 덱 개수 집계
+  // 카테고리별 덱 개수 집계
   const counts = useMemo(() => {
     return {
       USER: presets.filter(isUserPreset).length,
-      AI_REC: presets.filter(isAiRecPreset).length,
       OFFICIAL: presets.filter(isOfficialPreset).length,
       PRESET: presets.filter(isGeneralPreset).length,
       ALL: presets.length,
     };
   }, [presets]);
 
-  // 보유 덱이 없는데 기본값이 USER인 경우 자동으로 전체 또는 AI추천으로 fallback
+  // 보유 덱이 없는데 기본값이 USER인 경우 자동으로 공식 스타터로 fallback
   useEffect(() => {
     if (activeCategory === 'USER' && counts.USER === 0 && counts.ALL > 0) {
-      setActiveCategory('AI_REC');
+      setActiveCategory('OFFICIAL');
     }
   }, [counts, activeCategory]);
 
   const filteredPresets = useMemo(() => {
     if (activeCategory === 'USER') return presets.filter(isUserPreset);
-    if (activeCategory === 'AI_REC') return presets.filter(isAiRecPreset);
     if (activeCategory === 'OFFICIAL') return presets.filter(isOfficialPreset);
     if (activeCategory === 'PRESET') return presets.filter(isGeneralPreset);
     return presets;
@@ -189,7 +182,6 @@ const DeckColumn: React.FC<{
             const valid = deck.actionCards.length >= 40;
             const selected = selectedId === preset.id;
             const isUser = isUserPreset(preset);
-            const isAi = isAiRecPreset(preset);
             const isOff = isOfficialPreset(preset);
 
             return (
@@ -208,8 +200,6 @@ const DeckColumn: React.FC<{
                       className={`shrink-0 text-[10px] sm:text-xs font-black px-1.5 sm:px-2 py-0.2 sm:py-0.5 rounded-md ${
                         isUser
                           ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50'
-                          : isAi
-                          ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/50'
                           : isOff
                           ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
                           : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
@@ -217,8 +207,6 @@ const DeckColumn: React.FC<{
                     >
                       {isUser
                         ? '★ 보유'
-                        : isAi
-                        ? '🤖 AI추천'
                         : isOff
                         ? '👑 공식'
                         : '📜 프리셋'}
@@ -497,7 +485,7 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
               presets={presets}
               selectedId={oppId}
               onSelect={setOppId}
-              defaultCategory="AI_REC"
+              defaultCategory="OFFICIAL"
               allowRandom
             />
           </div>
