@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Mobile battle UI measurements (scripts/measure-mobile-battle.mjs)
+.measure
