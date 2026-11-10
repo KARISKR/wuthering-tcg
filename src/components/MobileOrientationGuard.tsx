@@ -1,81 +1,111 @@
 import React, { useState, useEffect } from 'react';
-import { Smartphone, RotateCw, Maximize2, X } from 'lucide-react';
+import { Smartphone, RotateCw, Maximize2 } from 'lucide-react';
+
+// 전투·리플레이·튜토리얼 전투는 가로 모드 전용 (설계서: _docs/모바일_전투UI_반응형_설계서_2026-11-11.md 4절)
+// - 터치 기기(pointer: coarse)에서 세로일 때만 차단. 마우스 PC는 창이 세로로 길어도 차단하지 않는다.
+// - 닫기(세로로 계속 보기) 없음. 기기를 가로로 돌리면 자동으로 사라진다.
+// - 자동 가로 전환은 전체화면 + screen.orientation.lock 을 지원하는 브라우저(주로 Android)에서만 시도한다.
+//   iPhone Safari 등 미지원·실패 시 버튼을 숨기고 직접 회전 안내만 보여 준다.
+
+type LockableOrientation = { lock?: (orientation: 'landscape') => Promise<void> };
+
+const COARSE_POINTER_QUERY = '(pointer: coarse)';
+
+const isBlockedPortrait = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const isCoarse = window.matchMedia?.(COARSE_POINTER_QUERY).matches ?? false;
+  return isCoarse && window.innerHeight > window.innerWidth;
+};
+
+const canAutoRotate = (): boolean => {
+  if (typeof document === 'undefined' || typeof screen === 'undefined') return false;
+  const orientation = screen.orientation as unknown as LockableOrientation | undefined;
+  return typeof document.documentElement.requestFullscreen === 'function' && typeof orientation?.lock === 'function';
+};
 
 export const MobileOrientationGuard: React.FC = () => {
-  const [isPortrait, setIsPortrait] = useState<boolean>(false);
-  const [isDismissed, setIsDismissed] = useState<boolean>(false);
+  const [isPortrait, setIsPortrait] = useState<boolean>(() => isBlockedPortrait());
+  const [autoRotateFailed, setAutoRotateFailed] = useState<boolean>(false);
 
   useEffect(() => {
-    const checkOrientation = () => {
-      if (typeof window === 'undefined') return;
-      // 화면 너비가 작고 높이가 더 긴 세로(Portrait) 상태 감지
-      const isMobileSize = window.innerWidth < 820;
-      const isTall = window.innerHeight > window.innerWidth;
-      setIsPortrait(isMobileSize && isTall);
-    };
+    const checkOrientation = () => setIsPortrait(isBlockedPortrait());
+    const pointerQuery = window.matchMedia?.(COARSE_POINTER_QUERY);
 
     checkOrientation();
     window.addEventListener('resize', checkOrientation);
     window.addEventListener('orientationchange', checkOrientation);
+    pointerQuery?.addEventListener?.('change', checkOrientation);
     return () => {
       window.removeEventListener('resize', checkOrientation);
       window.removeEventListener('orientationchange', checkOrientation);
+      pointerQuery?.removeEventListener?.('change', checkOrientation);
     };
   }, []);
 
-  const handleRequestFullscreenAndLandscape = async () => {
+  const handleRequestLandscape = async () => {
     try {
       if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen?.();
+        await document.documentElement.requestFullscreen();
       }
-      if ('orientation' in screen && 'lock' in (screen.orientation as any)) {
-        await (screen.orientation as any).lock('landscape').catch(() => {});
-      }
-    } catch {}
-    setIsDismissed(true);
+      const orientation = screen.orientation as unknown as LockableOrientation;
+      await orientation.lock?.('landscape');
+    } catch {
+      setAutoRotateFailed(true);
+    }
   };
 
-  if (!isPortrait || isDismissed) return null;
+  if (!isPortrait) return null;
+
+  const showRotateButton = canAutoRotate() && !autoRotateFailed;
 
   return (
-    <div className="fixed inset-0 z-[999] bg-[#070a13]/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200">
+    <div
+      data-testid="orientation-guard"
+      role="alertdialog"
+      aria-modal="true"
+      aria-labelledby="orientation-guard-title"
+      className="fixed inset-0 z-[999] bg-[#070a13]/95 backdrop-blur-xl flex flex-col items-center justify-center p-6 text-center select-none animate-in fade-in duration-200"
+    >
       <div className="relative max-w-sm w-full bg-[#0c101b] border-2 border-[#f97316] p-6 shadow-[0_0_50px_rgba(0,0,0,0.95),0_0_25px_rgba(249,115,22,0.4)] flex flex-col items-center gap-4">
         {/* 네 모서리 명조 택티컬 오렌지/시안 코너 브라켓 */}
-        <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
-        <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
-        <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
-        <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
+        <span aria-hidden="true" className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
+        <span aria-hidden="true" className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
+        <span aria-hidden="true" className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
+        <span aria-hidden="true" className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
 
-        <div className="relative w-16 h-16 bg-[#111520] border border-[#f97316]/50 rounded-2xl flex items-center justify-center text-[#f97316] shadow-lg">
+        <div
+          aria-hidden="true"
+          className="relative w-16 h-16 bg-[#111520] border border-[#f97316]/50 rounded-2xl flex items-center justify-center text-[#f97316] shadow-lg"
+        >
           <Smartphone className="w-8 h-8 animate-pulse" />
           <RotateCw className="w-5 h-5 absolute -bottom-1 -right-1 text-cyan-400 animate-spin" style={{ animationDuration: '6s' }} />
         </div>
 
         <div className="space-y-1.5">
-          <h3 className="text-lg font-black text-white flex items-center justify-center gap-2">
-            <span>📱 가로 모드(Landscape) 권장</span>
+          <h3 id="orientation-guard-title" className="text-lg font-black text-white">
+            가로 모드 전용 화면입니다
           </h3>
-          <p className="text-xs sm:text-sm text-slate-300 leading-relaxed break-keep">
-            상대 리더 카드 및 손패 텍스트를 또렷하게 확인하려면 <strong className="text-[#f97316]">기기를 가로로 회전</strong>해 주세요.
+          <p className="text-sm text-slate-300 leading-relaxed break-keep">
+            대결 화면은 가로에서만 플레이할 수 있어요. <strong className="text-[#f97316]">기기를 가로로 돌려</strong> 주세요.
           </p>
         </div>
 
-        <div className="w-full flex flex-col gap-2 pt-2">
+        {showRotateButton ? (
           <button
-            onClick={handleRequestFullscreenAndLandscape}
-            className="w-full py-2.5 px-4 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs sm:text-sm shadow-md transition cursor-pointer flex items-center justify-center gap-2 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+            type="button"
+            onClick={handleRequestLandscape}
+            className="w-full min-h-[44px] py-3 px-4 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-sm shadow-md transition cursor-pointer flex items-center justify-center gap-2 [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
           >
-            <Maximize2 className="w-4 h-4" />
-            <span>⛶ 전체화면으로 가로 전환</span>
+            <Maximize2 aria-hidden="true" className="w-4 h-4" />
+            <span>가로 모드로 전환</span>
           </button>
-          <button
-            onClick={() => setIsDismissed(true)}
-            className="w-full py-2 px-3 bg-[#111520] hover:bg-[#1a2234] text-slate-400 hover:text-slate-200 font-bold text-xs border border-white/10 transition cursor-pointer flex items-center justify-center gap-1.5"
-          >
-            <X className="w-3.5 h-3.5" />
-            <span>세로 화면으로 계속 보기</span>
-          </button>
-        </div>
+        ) : (
+          <div className="w-full px-3 py-2.5 bg-[#111520] border border-white/10 text-xs text-slate-300 leading-relaxed break-keep text-left space-y-1">
+            {autoRotateFailed && <p className="text-amber-300 font-bold">이 브라우저는 자동 가로 전환을 지원하지 않아요.</p>}
+            <p>화면이 돌아가지 않으면 <strong className="text-white">화면 회전 잠금</strong>을 꺼 주세요.</p>
+            <p className="text-slate-400">iPhone: 제어 센터 → 화면 방향 잠금 끄기</p>
+          </div>
+        )}
       </div>
     </div>
   );
