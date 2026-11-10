@@ -2,6 +2,7 @@
 // [WP8-4] 전장 뷰포트 스케일, 모바일 모드, 좌/우측 패널 레이아웃 및 프리뷰 스크롤 동기화 훅
 import React, { useState, useEffect, useRef } from 'react';
 import type { AnyCard } from '../types/tcg';
+import { decideBattleLayoutMode, readForcedLayout, type BattleLayoutMode } from '../battle/layoutMode';
 
 export type LeftPanelSize = 'compact' | 'normal' | 'wide';
 
@@ -120,6 +121,17 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
     return isMobileHash || isMobileUa || isSmallScreen;
   };
 
+  // 레이아웃 모드 판정 (설계서 2-1절). 3단계에서는 값만 계산하고 화면 배치에는 아직 쓰지 않는다.
+  const calcBattleLayoutMode = (): BattleLayoutMode => {
+    if (typeof window === 'undefined') return 'standard';
+    return decideBattleLayoutMode({
+      width: window.innerWidth,
+      height: window.innerHeight,
+      coarsePointer: window.matchMedia?.('(pointer: coarse)').matches ?? false,
+      forced: readForcedLayout(window.location.search),
+    });
+  };
+
   // 모바일 팝업/모달 자동 다운스케일 줌 계산 헬퍼
   const calcModalZoomScale = (): number => {
     if (typeof window === 'undefined') return 0.52;
@@ -137,6 +149,7 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
 
   // 모바일 전용 배틀 모드 상태
   const [isMobileBattle, setIsMobileBattle] = useState<boolean>(() => checkIsMobileBattle());
+  const [battleLayoutMode, setBattleLayoutMode] = useState<BattleLayoutMode>(() => calcBattleLayoutMode());
 
   const [showMobileCardModal, setShowMobileCardModal] = useState<boolean>(false);
   const [showMobileLogModal, setShowMobileLogModal] = useState<boolean>(false);
@@ -200,6 +213,7 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
     const updateViewportScale = () => {
       const isMobile = checkIsMobileBattle();
       setIsMobileBattle(isMobile);
+      setBattleLayoutMode(calcBattleLayoutMode());
 
       const availH = Math.max(280, window.innerHeight - 38);
       const leftW = isMobile
@@ -294,6 +308,7 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
     changeLeftPanelSize,
     isMobileBattle,
     setIsMobileBattle,
+    battleLayoutMode,
     showMobileCardModal,
     setShowMobileCardModal,
     showMobileLogModal,

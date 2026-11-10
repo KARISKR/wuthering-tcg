@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Smartphone, RotateCw, Maximize2 } from 'lucide-react';
+import { decideBattleLayoutMode } from '../battle/layoutMode';
 
 // 전투·리플레이·튜토리얼 전투는 가로 모드 전용 (설계서: _docs/모바일_전투UI_반응형_설계서_2026-11-11.md 4절)
 // - 터치 기기(pointer: coarse)에서 세로일 때만 차단. 마우스 PC는 창이 세로로 길어도 차단하지 않는다.
@@ -11,10 +12,16 @@ type LockableOrientation = { lock?: (orientation: 'landscape') => Promise<void> 
 
 const COARSE_POINTER_QUERY = '(pointer: coarse)';
 
+// 판정은 전투 레이아웃 모드와 같은 함수를 쓴다 (?layout=phone 강제는 세로 차단에 적용하지 않음)
 const isBlockedPortrait = (): boolean => {
   if (typeof window === 'undefined') return false;
-  const isCoarse = window.matchMedia?.(COARSE_POINTER_QUERY).matches ?? false;
-  return isCoarse && window.innerHeight > window.innerWidth;
+  return (
+    decideBattleLayoutMode({
+      width: window.innerWidth,
+      height: window.innerHeight,
+      coarsePointer: window.matchMedia?.(COARSE_POINTER_QUERY).matches ?? false,
+    }) === 'portrait-blocked'
+  );
 };
 
 const canAutoRotate = (): boolean => {

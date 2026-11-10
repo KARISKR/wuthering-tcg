@@ -382,6 +382,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     resetArenaZoom,
     isLogPanelExpanded,
     setIsLogPanelExpanded,
+    battleLayoutMode,
   } = useBattleViewport({ initialPreviewCard: gameState.players[0].slots.leader });
 
   const {
@@ -615,6 +616,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     <BattleStoreProvider store={battleStore}>
       <div
         className={isMobileBattle ? 'mobile-battle-mode' : ''}
+        data-battle-layout={battleLayoutMode}
         style={{ '--modal-zoom': String(modalZoomScale) } as React.CSSProperties}
       >
         <BattleLayout {...layoutProps} />

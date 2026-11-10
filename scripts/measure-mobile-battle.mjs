@@ -18,7 +18,13 @@ const arg = (name, def) => {
 };
 const flag = (name) => args.includes(`--${name}`);
 
-const BASE_URL = arg('url', 'http://localhost:5173').replace(/\/$/, '');
+const BASE_URL = arg('url', 'http://localhost:5173');
+// 검색어(?layout=phone 등)를 살린 채 해시만 바꾼 주소
+const pageUrl = (hash) => {
+  const u = new URL(BASE_URL);
+  u.hash = hash;
+  return u.toString();
+};
 const SIZES = arg('sizes', '667x375,740x360,844x390,915x412,932x430')
   .split(',')
   .map((s) => s.trim().split('x').map(Number))
@@ -178,6 +184,9 @@ function measureInPage() {
     viewport: { w: vw, h: vh, dpr: devicePixelRatio },
     hash: location.hash,
     arenaZoom,
+    // 전투 레이아웃 모드 (GameBoard의 data-battle-layout, 3단계부터) / 기존 모바일 모드 클래스
+    layoutMode: document.querySelector('[data-battle-layout]')?.getAttribute('data-battle-layout') ?? null,
+    mobileBattleClass: !!document.querySelector('.mobile-battle-mode'),
     modalZoom: getComputedStyle(document.documentElement).getPropertyValue('--modal-zoom').trim() || null,
     cardArea,
     text: {
@@ -253,13 +262,13 @@ async function measureSize(browser, W, H) {
 
   if (FLOW === 'tutorial' || FLOW === 'replay') {
     const hash = FLOW === 'tutorial' ? '#tutorial-battle' : '#replay-stage';
-    await page.goto(`${BASE_URL}/${hash}`, { waitUntil: 'networkidle', timeout: 60000 });
+    await page.goto(pageUrl(hash), { waitUntil: 'networkidle', timeout: 60000 });
     await page.waitForTimeout(4000);
     await snap(FLOW);
     return finish();
   }
 
-  await page.goto(`${BASE_URL}/#battle`, { waitUntil: 'networkidle', timeout: 60000 });
+  await page.goto(pageUrl('#battle'), { waitUntil: 'networkidle', timeout: 60000 });
   await page.waitForTimeout(1500);
   await click('AI 봇 대전');
   await page.waitForTimeout(1200);
@@ -323,6 +332,8 @@ for (const [W, H] of SIZES) {
     summary.push({
       size: r.size,
       reached: r.reached.join(','),
+      layoutMode: b.layoutMode ?? '-',
+      mobileClass: b.mobileBattleClass,
       arenaZoom: b.arenaZoom,
       modalZoom: b.modalZoom ? +(+b.modalZoom).toFixed(4) : null,
       cardWidthPct: b.cardArea ? +(b.cardArea.widthRatio * 100).toFixed(1) : null,
@@ -345,7 +356,7 @@ await browser.close();
 fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify({ url: BASE_URL, at: new Date().toISOString(), summary }, null, 1));
 
 // 보고서에 그대로 붙일 수 있는 마크다운 표
-const cols = ['size', 'arenaZoom', 'cardWidthPct', 'bottomOverflowPx', 'readableUnder10Pct', 'readableMinPx', 'buttonsUnder44', 'fixedOverlays', 'orientationGuard', 'guardButtons', 'consoleErrors'];
+const cols = ['size', 'layoutMode', 'mobileClass', 'arenaZoom', 'modalZoom', 'cardWidthPct', 'bottomOverflowPx', 'readableUnder10Pct', 'readableMinPx', 'buttonsUnder44', 'fixedOverlays', 'orientationGuard', 'guardButtons', 'consoleErrors'];
 console.log(`\n측정 대상: ${BASE_URL} (flow: ${FLOW}${DESKTOP ? ', desktop' : ''})\n결과 폴더: ${OUT}\n`);
 console.log(`| ${cols.join(' | ')} |`);
 console.log(`|${cols.map(() => '---').join('|')}|`);
