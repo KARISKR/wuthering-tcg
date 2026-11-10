@@ -613,43 +613,48 @@ export const GameBoard: React.FC<GameBoardProps> = ({
 
   return (
     <BattleStoreProvider store={battleStore}>
-      <BattleLayout {...layoutProps} />
+      <div
+        className={isMobileBattle ? 'mobile-battle-mode' : ''}
+        style={{ '--modal-zoom': String(modalZoomScale) } as React.CSSProperties}
+      >
+        <BattleLayout {...layoutProps} />
 
-      {/* [WP8-3] 모달 및 오버레이 전담 호스트 */}
-      <BattleOverlayHost
-        currentTurnDrawCount={currentTurnDrawCount}
-        isMultiplayer={isMultiplayer}
-        isDrawFlightActive={isDrawFlightActive}
-        controlledPlayerIndex={controlledPlayerIndex}
-        viewerPlayerIndex={viewerPlayerIndex}
-        isSpectator={isSpectator}
-        isHost={isHost}
-        isGuest={isGuest}
-        multiplayerRole={multiplayerRole}
-        onExitToLobby={onExitToLobby}
-        restartGame={restartGame}
-        handleRestartBattle={handleRestartBattle}
-        currentMatchReplay={currentMatchReplay}
-        onPlayBattleReplay={onPlayBattleReplay}
-        handleSurrenderConfirm={handleSurrenderConfirm}
-        handleDecideClash={handleDecideClash}
-        handleSetClashCard={handleSetClashCard}
-        handleDrawCards={handleDrawCards}
-        handleSelectStartingLeader={handleSelectStartingLeader}
-        handleMulligan={handleMulligan}
-        handleUpgrade={handleUpgrade}
-        handleComboAttack={handleComboAttack}
-        handleFinishCombo={handleFinishCombo}
-        handleProceedAfterClash={handleProceedAfterClash}
-        handleResolvePendingChoice={handleResolvePendingChoice}
-        handleFinishEffectDrawWithCooldown={() => {}}
-        handleSetInitiative={handleSetInitiative}
-        lastRoll0Ref={lastRoll0Ref}
-        lastRoll1Ref={lastRoll1Ref}
-      />
+        {/* [WP8-3] 모달 및 오버레이 전담 호스트 */}
+        <BattleOverlayHost
+          currentTurnDrawCount={currentTurnDrawCount}
+          isMultiplayer={isMultiplayer}
+          isDrawFlightActive={isDrawFlightActive}
+          controlledPlayerIndex={controlledPlayerIndex}
+          viewerPlayerIndex={viewerPlayerIndex}
+          isSpectator={isSpectator}
+          isHost={isHost}
+          isGuest={isGuest}
+          multiplayerRole={multiplayerRole}
+          onExitToLobby={onExitToLobby}
+          restartGame={restartGame}
+          handleRestartBattle={handleRestartBattle}
+          currentMatchReplay={currentMatchReplay}
+          onPlayBattleReplay={onPlayBattleReplay}
+          handleSurrenderConfirm={handleSurrenderConfirm}
+          handleDecideClash={handleDecideClash}
+          handleSetClashCard={handleSetClashCard}
+          handleDrawCards={handleDrawCards}
+          handleSelectStartingLeader={handleSelectStartingLeader}
+          handleMulligan={handleMulligan}
+          handleUpgrade={handleUpgrade}
+          handleComboAttack={handleComboAttack}
+          handleFinishCombo={handleFinishCombo}
+          handleProceedAfterClash={handleProceedAfterClash}
+          handleResolvePendingChoice={handleResolvePendingChoice}
+          handleFinishEffectDrawWithCooldown={() => {}}
+          handleSetInitiative={handleSetInitiative}
+          lastRoll0Ref={lastRoll0Ref}
+          lastRoll1Ref={lastRoll1Ref}
+        />
 
-      {/* [WP8-4] 연출 큐 전담 호스트 */}
-      <FxQueueHost queue={battleStore.fxQueue} />
+        {/* [WP8-4] 연출 큐 전담 호스트 */}
+        <FxQueueHost queue={battleStore.fxQueue} />
+      </div>
     </BattleStoreProvider>
   );
 };

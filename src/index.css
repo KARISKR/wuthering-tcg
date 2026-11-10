@@ -843,14 +843,16 @@
    ===================================================================== */
 .mobile-battle-mode .mobile-modal-scaled {
   zoom: var(--modal-zoom, 0.52);
-  max-height: calc(94dvh / var(--modal-zoom, 0.52));
+  max-height: calc(96dvh / var(--modal-zoom, 0.52)) !important;
+  max-width: calc(96vw / var(--modal-zoom, 0.52)) !important;
 }
 
 @supports not (zoom: 1) {
   .mobile-battle-mode .mobile-modal-scaled {
     transform: scale(var(--modal-zoom, 0.52));
     transform-origin: center center;
-    max-height: calc(94dvh / var(--modal-zoom, 0.52));
+    max-height: calc(96dvh / var(--modal-zoom, 0.52)) !important;
+    max-width: calc(96vw / var(--modal-zoom, 0.52)) !important;
   }
 }
 

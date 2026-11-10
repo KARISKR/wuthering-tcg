@@ -195,7 +195,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
-      <div className="relative mobile-modal-scaled w-full max-w-3xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/70 p-3.5 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-3 sm:gap-4">
+      <div className="relative mobile-modal-scaled w-full max-w-3xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/70 p-2.5 sm:p-5 lg:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-2 sm:gap-3.5">
         {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -203,26 +203,26 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
         <span className="pointer-events-none absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-[#22d3ee]" />
 
         {/* 헤더 */}
-        <div className="flex items-center justify-between gap-3.5 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-14 h-14 bg-[#111520] border border-[#f97316]/50 flex items-center justify-center text-[#f97316] shadow overflow-hidden shrink-0">
+        <div className="flex items-center justify-between gap-2.5 sm:gap-3.5 border-b border-white/10 pb-2 sm:pb-3.5">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 bg-[#111520] border border-[#f97316]/50 flex items-center justify-center text-[#f97316] shadow overflow-hidden shrink-0">
               {choice.sourceCardArt ? (
                 <img src={choice.sourceCardArt} alt="" className="w-full h-full object-cover" />
               ) : (
-                <Sparkles className="w-7 h-7 animate-pulse" />
+                <Sparkles className="w-5 h-5 sm:w-7 sm:h-7 animate-pulse" />
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2.5 flex-wrap">
+                <h2 className="text-base sm:text-xl lg:text-2xl font-black text-white flex items-center gap-1.5 sm:gap-2 flex-wrap">
                   <span>{titleInfo.mainText}</span>
                   {titleInfo.tagText && (
-                    <span className={`text-xs sm:text-sm px-2.5 py-0.5 border font-black rounded ${titleInfo.tagClass}`}>
+                    <span className={`text-[10px] sm:text-xs px-2 py-0.5 border font-black rounded ${titleInfo.tagClass}`}>
                       [{titleInfo.tagText}]
                     </span>
                   )}
                 </h2>
-                <span className="text-xs sm:text-sm px-3 py-0.5 bg-[#141a29] text-[#f97316] border border-[#f97316]/40 font-bold font-mono">
+                <span className="text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 bg-[#141a29] text-[#f97316] border border-[#f97316]/40 font-bold font-mono">
                   {choice.isPublicReveal
                     ? choice.onResolveType === 'VIEW_ONLY'
                       ? '📢 상대 공개 카드 확인'
@@ -246,7 +246,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                     : '선택 발동'}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-300 mt-1 font-medium truncate">
+              <p className="text-[10px] sm:text-xs text-slate-300 mt-0.5 sm:mt-1 font-medium truncate">
                 출처: <strong className="text-[#f97316]">{choice.sourceCardName}</strong>
               </p>
             </div>
@@ -256,7 +256,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
           <button
             type="button"
             onClick={() => setIsFieldPeek(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-cyan-300 border border-cyan-500/40 text-xs sm:text-sm font-bold transition shadow-md cursor-pointer hover:scale-105 active:scale-95 shrink-0"
+            className="flex items-center gap-1 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-cyan-300 border border-cyan-500/40 text-[10px] sm:text-xs font-bold transition shadow-md cursor-pointer hover:scale-105 active:scale-95 shrink-0"
             title="팝업을 잠시 접어두고 필드 상황을 확인합니다"
           >
             <Eye className="w-4 h-4 text-cyan-400" />
@@ -268,67 +268,67 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             방랑자 Lv.0 녹색 배틀 효과 카드 장수 선택 프롬프트 (ROVER_0_DRAW_PROMPT)
            ============================================================ */}
         {choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ? (
-          <div className="flex flex-col items-center gap-4 py-2 my-1">
+          <div className="flex flex-col items-center gap-2 sm:gap-3 py-1 my-0.5">
             {/* 1. 중앙: 캐릭터 카드 풀 프레임 */}
-            <div className="relative w-52 sm:w-60 aspect-[5/7] rounded-2xl overflow-hidden border-2 border-emerald-500 ring-4 ring-emerald-500/30 shadow-[0_0_35px_rgba(16,185,129,0.45)] select-none">
+            <div className="relative w-36 sm:w-48 md:w-56 aspect-[5/7] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-emerald-500 ring-2 sm:ring-4 ring-emerald-500/30 shadow-[0_0_35px_rgba(16,185,129,0.45)] select-none">
               <img
                 src={choice.sourceCardArt || '/cards/card_images/BP01-018_방랑자(여)_1141.webp'}
                 alt={choice.sourceCardName}
                 className="w-full h-full object-cover object-top"
               />
-              <div className="absolute top-2.5 left-2.5 bg-black/85 backdrop-blur-sm px-2.5 py-1 text-xs font-mono font-bold text-emerald-300 border border-emerald-500/40 rounded">
+              <div className="absolute top-2 left-2 bg-black/85 backdrop-blur-sm px-2 py-0.5 text-[10px] sm:text-xs font-mono font-bold text-emerald-300 border border-emerald-500/40 rounded">
                 {choice.sourceCardName}
               </div>
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-3 text-center">
-                <span className="text-sm font-black text-white drop-shadow block">
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-2 sm:p-2.5 text-center">
+                <span className="text-xs sm:text-sm font-black text-white drop-shadow block">
                   {choice.sourceCardName}
                 </span>
-                <span className="text-xs font-bold text-emerald-400">
+                <span className="text-[10px] sm:text-xs font-bold text-emerald-400">
                   【리더】【배틀】녹색 카드 배틀 효과
                 </span>
               </div>
             </div>
 
             {/* 2. 하단: 설명 안내 박스 */}
-            <div className="w-full max-w-xl bg-[#111520]/95 border border-emerald-500/50 p-4 sm:p-5 rounded-xl shadow-inner text-center">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-xs sm:text-sm mb-2">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
+            <div className="w-full max-w-xl bg-[#111520]/95 border border-emerald-500/50 p-2.5 sm:p-4 rounded-xl shadow-inner text-center">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-[10px] sm:text-xs mb-1 sm:mb-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
                 <span>【덱 위 카드 공개 장수 선택 (최대 2장)】</span>
               </div>
-              <div className="text-sm sm:text-base text-slate-100 font-bold leading-relaxed whitespace-pre-line">
+              <div className="text-xs sm:text-sm text-slate-100 font-bold leading-relaxed whitespace-pre-line">
                 {formatEffectText(choice.description, 'md')}
               </div>
             </div>
           </div>
         ) : choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' || choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' || choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' ? (
-          <div className="flex flex-col items-center gap-4 py-2 my-1">
+          <div className="flex flex-col items-center gap-2 sm:gap-3 py-1 my-0.5">
             {/* 1. 중앙: 캐릭터 카드 풀 프레임 */}
-            <div className="relative w-52 sm:w-60 aspect-[5/7] rounded-2xl overflow-hidden border-2 border-[#f97316] ring-4 ring-[#f97316]/30 shadow-[0_0_35px_rgba(249,115,22,0.45)] select-none">
+            <div className="relative w-36 sm:w-48 md:w-56 aspect-[5/7] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-[#f97316] ring-2 sm:ring-4 ring-[#f97316]/30 shadow-[0_0_35px_rgba(249,115,22,0.45)] select-none">
               <img
                 src={choice.sourceCardArt || '/cards/card_images/BP01-008_파수인_1908.webp'}
                 alt={choice.sourceCardName}
                 className="w-full h-full object-cover object-top"
               />
-              <div className="absolute top-2.5 left-2.5 bg-black/85 backdrop-blur-sm px-2.5 py-1 text-xs font-mono font-bold text-amber-300 border border-amber-500/40 rounded">
+              <div className="absolute top-2 left-2 bg-black/85 backdrop-blur-sm px-2 py-0.5 text-[10px] sm:text-xs font-mono font-bold text-amber-300 border border-amber-500/40 rounded">
                 {choice.sourceCardName}
               </div>
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-3 text-center">
-                <span className="text-sm font-black text-white drop-shadow block">
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-2 sm:p-2.5 text-center">
+                <span className="text-xs sm:text-sm font-black text-white drop-shadow block">
                   {choice.sourceCardName}
                 </span>
-                <span className="text-xs font-bold text-[#f97316]">
+                <span className="text-[10px] sm:text-xs font-bold text-[#f97316]">
                   {choice.title.includes('배틀') ? '【배틀】 드로우 효과' : choice.title.includes('상시') || choice.title.includes('회복') ? '【상시】 회복 드로우 효과' : '【교체】 드로우 효과'}
                 </span>
               </div>
             </div>
 
             {/* 2. 하단: 교체효과 발동 여부 안내 박스 */}
-            <div className="w-full max-w-xl bg-[#111520]/95 border border-[#f97316]/50 p-4 sm:p-5 rounded-xl shadow-inner text-center">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#f97316]/20 border border-[#f97316]/40 text-[#f97316] font-black text-xs sm:text-sm mb-2">
-                <Sparkles className="w-4 h-4 text-[#f97316]" />
+            <div className="w-full max-w-xl bg-[#111520]/95 border border-[#f97316]/50 p-2.5 sm:p-4 rounded-xl shadow-inner text-center">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#f97316]/20 border border-[#f97316]/40 text-[#f97316] font-black text-[10px] sm:text-xs mb-1 sm:mb-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#f97316]" />
                 <span>【카드 드로우 진행 여부 선택】</span>
               </div>
-              <div className="text-sm sm:text-base text-slate-100 font-bold leading-relaxed whitespace-pre-line">
+              <div className="text-xs sm:text-sm text-slate-100 font-bold leading-relaxed whitespace-pre-line">
                 {formatEffectText(choice.description, 'md')}
               </div>
             </div>
@@ -337,9 +337,9 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
           /* ============================================================
               대상/공개 카드 없는 단순 효과 발동 안내 뷰 (중복 텍스트 완전 제거, 풀사이즈 카드 & 대형 네모칸)
              ============================================================ */
-          <div className="flex flex-col md:flex-row items-center justify-center gap-6 py-4 my-2">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-3 sm:gap-5 py-2 my-1">
             {/* 대형 캐릭터 카드 풀 프레임 */}
-            <div className="relative w-52 sm:w-60 md:w-64 aspect-[5/7] rounded-2xl overflow-hidden border-2 border-[#f97316] ring-4 ring-[#f97316]/30 shadow-[0_0_35px_rgba(249,115,22,0.45)] shrink-0 select-none">
+            <div className="relative w-36 sm:w-48 md:w-56 aspect-[5/7] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-[#f97316] ring-2 sm:ring-4 ring-[#f97316]/30 shadow-[0_0_35px_rgba(249,115,22,0.45)] shrink-0 select-none">
               {choice.sourceCardArt ? (
                 <img
                   src={choice.sourceCardArt}
@@ -348,18 +348,18 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                 />
               ) : (
                 <div className="w-full h-full bg-[#111520] flex items-center justify-center text-[#f97316]">
-                  <Sparkles className="w-16 h-16 animate-pulse" />
+                  <Sparkles className="w-12 h-12 animate-pulse" />
                 </div>
               )}
-              <div className="absolute top-2.5 left-2.5 bg-black/85 backdrop-blur-sm px-2.5 py-1 text-xs font-mono font-bold text-amber-300 border border-amber-500/40 rounded">
+              <div className="absolute top-2 left-2 bg-black/85 backdrop-blur-sm px-2 py-0.5 text-[10px] sm:text-xs font-mono font-bold text-amber-300 border border-amber-500/40 rounded">
                 {choice.sourceCardName}
               </div>
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-3 text-center">
-                <span className="text-sm font-black text-white drop-shadow block truncate">
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/70 to-transparent p-2 text-center">
+                <span className="text-xs sm:text-sm font-black text-white drop-shadow block truncate">
                   {choice.sourceCardName}
                 </span>
                 {titleInfo.tagText && (
-                  <span className={`text-xs font-black inline-block mt-0.5 px-2 py-0.5 rounded border ${titleInfo.tagClass}`}>
+                  <span className={`text-[10px] sm:text-xs font-black inline-block mt-0.5 px-1.5 py-0.5 rounded border ${titleInfo.tagClass}`}>
                     [{titleInfo.tagText}]
                   </span>
                 )}
@@ -367,17 +367,17 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             </div>
 
             {/* 확장된 안내 네모칸: 텍스트 중복 제거, 카드에 맞춘 대형 레이아웃 및 폰트 확대 */}
-            <div className="w-full max-w-xl bg-[#111520]/95 border-2 border-[#f97316]/60 p-6 rounded-2xl shadow-2xl flex flex-col gap-3">
-              <div className="flex items-center gap-2 text-[#f97316] font-black text-base sm:text-lg">
-                <Sparkles className="w-5 h-5 text-[#f97316] shrink-0" />
+            <div className="w-full max-w-xl bg-[#111520]/95 border-2 border-[#f97316]/60 p-3 sm:p-5 rounded-xl sm:rounded-2xl shadow-2xl flex flex-col gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[#f97316] font-black text-xs sm:text-base">
+                <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-[#f97316] shrink-0" />
                 <span>
                   {titleInfo.tagText ? `【${titleInfo.tagText} 효과 발동 결과】` : '【효과 발동 결과】'}
                 </span>
               </div>
-              <div className="text-base sm:text-lg text-slate-100 font-bold leading-relaxed whitespace-pre-line py-1">
+              <div className="text-xs sm:text-sm text-slate-100 font-bold leading-relaxed whitespace-pre-line py-0.5">
                 {formatEffectText(choice.description, 'md')}
               </div>
-              <div className="mt-2 pt-3 border-t border-white/10 text-xs sm:text-sm text-slate-400 font-medium">
+              <div className="mt-1 pt-2 border-t border-white/10 text-[10px] sm:text-xs text-slate-400 font-medium">
                 아래 [확인 완료] 버튼을 누르면 다음 행동으로 계속 진행합니다.
               </div>
             </div>
@@ -385,9 +385,9 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
         ) : (
           <>
             {/* 효과 설명 */}
-            <div className="bg-[#111520]/90 border border-[#f97316]/40 p-4 sm:p-5 text-sm sm:text-base text-slate-100 leading-relaxed shadow-inner">
-              <div className="flex items-center gap-2 text-[#f97316] font-extrabold text-sm sm:text-base mb-1.5">
-                <Eye className="w-5 h-5 text-[#f97316] shrink-0" />
+            <div className="bg-[#111520]/90 border border-[#f97316]/40 p-2.5 sm:p-4 text-xs sm:text-sm text-slate-100 leading-relaxed shadow-inner">
+              <div className="flex items-center gap-1.5 sm:gap-2 text-[#f97316] font-extrabold text-xs sm:text-sm mb-1">
+                <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-[#f97316] shrink-0" />
                 <span>
                   {choice.onResolveType === 'VIEW_ONLY'
                     ? choice.title.includes('상대의 패') || choice.title.includes('스캔')
@@ -420,12 +420,12 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                     : `덱 위의 카드 ${displayCards.length}장이 공개되었습니다!`}
                 </span>
               </div>
-              <div className="text-sm sm:text-base text-slate-200 font-medium leading-relaxed whitespace-pre-line mt-1">
+              <div className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed whitespace-pre-line mt-0.5">
                 {formatEffectText(choice.description, 'md')}
               </div>
               {choice.isPublicReveal && (
-                <div className="mt-2.5 flex items-center gap-2 px-3 py-1.5 bg-amber-500/15 border border-amber-400/50 text-amber-200 text-xs sm:text-sm font-bold">
-                  <Eye className="w-4 h-4 text-amber-400 shrink-0" />
+                <div className="mt-1.5 sm:mt-2.5 flex items-center gap-1.5 px-2.5 py-1 bg-amber-500/15 border border-amber-400/50 text-amber-200 text-[10px] sm:text-xs font-bold">
+                  <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-400 shrink-0" />
                   <span>
                     {choice.onResolveType === 'VIEW_ONLY'
                       ? '📢 [공개 효과] 상대가 덱에서 공개한 카드입니다. 확인 완료 시 상대 손패에 공개 상태(앞면)로 추가됩니다.'
@@ -437,8 +437,8 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
 
             {/* 선택 카운터 & 단축 버튼 (VIEW_ONLY가 아닐 때만 노출) */}
             {choice.onResolveType !== 'VIEW_ONLY' ? (
-              <div className="flex items-center justify-between bg-[#111520] border border-white/10 px-4 sm:px-5 py-2.5 flex-wrap gap-2">
-                <div className="flex items-center gap-2.5 text-xs sm:text-sm">
+              <div className="flex items-center justify-between bg-[#111520] border border-white/10 px-2.5 sm:px-4 py-1.5 sm:py-2 flex-wrap gap-1.5">
+                <div className="flex items-center gap-2 text-[11px] sm:text-xs">
                   <span className="text-slate-300 font-bold">
                     {choice.onResolveType === 'SELECT_EFFECT_UPGRADE'
                       ? '중첩할 레벨업 캐릭터 카드 선택:'
@@ -458,24 +458,24 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                       ? '트래시로 보낼 패 선택:'
                       : '패에 추가할 카드 선택:'}
                   </span>
-                  <span className="font-mono font-black text-[#f97316] px-2.5 py-0.5 bg-[#0c101b] border border-[#f97316]/50 text-xs sm:text-sm">
+                  <span className="font-mono font-black text-[#f97316] px-2 py-0.5 bg-[#0c101b] border border-[#f97316]/50 text-[10px] sm:text-xs">
                     {minSelect > 0
                       ? `${selectedIds.length} / ${choice.maxSelect}장 (필수 ${minSelect}장 선택)`
                       : `${selectedIds.length} / 최대 ${choice.maxSelect}장 (0장 선택 가능)`}
                   </span>
                 </div>
                 {!isUpgradeChoice && (
-                  <div className="flex items-center gap-2.5 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2 text-[10px] sm:text-xs">
                     <button
                       onClick={selectAll}
-                      className="text-[#f97316] hover:text-[#fb923c] font-bold px-2.5 py-1 transition cursor-pointer"
+                      className="text-[#f97316] hover:text-[#fb923c] font-bold px-2 py-0.5 transition cursor-pointer"
                     >
                       전체 선택 ({choice.maxSelect}장)
                     </button>
                     <span className="text-slate-600">|</span>
                     <button
                       onClick={clearAll}
-                      className="text-slate-400 hover:text-slate-200 font-bold px-2.5 py-1 transition cursor-pointer"
+                      className="text-slate-400 hover:text-slate-200 font-bold px-2 py-0.5 transition cursor-pointer"
                     >
                       선택 초기화 (0장)
                     </button>
@@ -483,23 +483,23 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                 )}
               </div>
             ) : (
-              <div className="flex items-center justify-between bg-cyan-950/40 border border-cyan-800/60 px-4 sm:px-5 py-2.5">
-                <span className="text-xs sm:text-sm font-bold text-cyan-200 flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-cyan-400 shrink-0" />
+              <div className="flex items-center justify-between bg-cyan-950/40 border border-cyan-800/60 px-3 sm:px-4 py-1.5 sm:py-2">
+                <span className="text-[11px] sm:text-xs font-bold text-cyan-200 flex items-center gap-1.5">
+                  <Eye className="w-4 h-4 text-cyan-400 shrink-0" />
                   {choice.title.includes('상대의 패') || choice.title.includes('스캔')
                     ? '상대방이 보유하고 있는 패 카드입니다. 확인 후 [확인 완료] 버튼을 누르세요.'
                     : '효과 처리 결과를 확인하신 후 아래 [확인 완료] 버튼을 누르세요.'}
                 </span>
                 {displayCards.length > 0 && (
-                  <span className="text-xs sm:text-sm font-mono font-black text-cyan-200 bg-cyan-900/60 px-3 py-0.5 border border-cyan-700">
+                  <span className="text-[10px] sm:text-xs font-mono font-black text-cyan-200 bg-cyan-900/60 px-2 py-0.5 border border-cyan-700">
                     총 {displayCards.length}장
                   </span>
                 )}
               </div>
             )}
 
-            {/* 공개된 카드 리스트 */}
-            <div className="flex items-center justify-center gap-4 py-2 flex-wrap max-h-[50vh] overflow-y-auto custom-scrollbar">
+            {/* 공개된 카드 리스트 (모바일 zoom 시 찌그러짐 원천 차단: 내부 vh 제한 제거 및 반응형 카드 크기) */}
+            <div className="w-full flex-1 min-h-0 flex items-center justify-center gap-2 sm:gap-3.5 py-2 flex-wrap">
               {displayCards.map((card, idx) => {
                   const isSelected = selectedIds.includes(card.id);
                   const isViewOnly = choice.onResolveType === 'VIEW_ONLY';
@@ -510,7 +510,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                       onClick={() => {
                         if (!isViewOnly) toggleSelect(card.id);
                       }}
-                      className={`relative w-48 aspect-[5/7] overflow-hidden border transition transform select-none shadow-xl ${
+                      className={`relative w-28 sm:w-36 md:w-44 aspect-[5/7] overflow-hidden border transition transform select-none shadow-xl ${
                         isViewOnly
                           ? 'border-cyan-500/50 hover:border-cyan-400 cursor-default'
                           : isSelected
@@ -525,7 +525,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                       />
 
                       {/* 공개 순서 라벨 */}
-                      <div className="absolute top-2 left-2 bg-black/85 backdrop-blur-sm px-2 py-0.5 text-xs font-mono font-bold text-slate-200 border border-white/20">
+                      <div className="absolute top-1.5 left-1.5 bg-black/85 backdrop-blur-sm px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-xs font-mono font-bold text-slate-200 border border-white/20">
                         {choice.isPublicReveal
                           ? `📢 공개 #${idx + 1}`
                           : choice.onResolveType === 'VIEW_ONLY'
@@ -546,32 +546,32 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                       {/* 선택 상태 오버레이 */}
                       {isSelected && (
                         <div className="absolute inset-0 bg-[#ea580c]/30 backdrop-blur-[1px] flex items-center justify-center">
-                          <div className="w-12 h-12 rounded-full bg-[#f97316] text-white flex items-center justify-center shadow-xl animate-in zoom-in-75">
-                            <Check className="w-8 h-8 stroke-[3]" />
+                          <div className="w-8 h-8 sm:w-12 sm:h-12 rounded-full bg-[#f97316] text-white flex items-center justify-center shadow-xl animate-in zoom-in-75">
+                            <Check className="w-5 h-5 sm:w-8 sm:h-8 stroke-[3]" />
                           </div>
                         </div>
                       )}
 
                   {/* 카드 정보 하단 배너 */}
-                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/85 to-transparent p-2.5 text-left">
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/85 to-transparent p-1.5 sm:p-2.5 text-left">
                     {isCharCard ? (
                       <>
-                        <div className="flex items-center justify-between text-xs mb-1">
+                        <div className="flex items-center justify-between text-[10px] sm:text-xs mb-0.5 sm:mb-1">
                           <span className="font-black text-white truncate">{card.nameKr}</span>
-                          <span className="text-[10px] font-black px-1.5 py-0.5 bg-[#141a29] text-[#f97316] border border-[#f97316]/40">
+                          <span className="text-[8px] sm:text-[10px] font-black px-1 sm:px-1.5 py-0.2 sm:py-0.5 bg-[#141a29] text-[#f97316] border border-[#f97316]/40">
                             Lv.{card.level} · {getElementKr(card.element)}
                           </span>
                         </div>
-                        <div className="text-[10px] text-slate-200 line-clamp-3 leading-snug">
+                        <div className="text-[8px] sm:text-[10px] text-slate-200 line-clamp-2 leading-snug">
                           {formatEffectText(card.description, 'sm')}
                         </div>
                       </>
                     ) : (
                       <>
-                        <div className="flex items-center justify-between text-xs mb-1">
+                        <div className="flex items-center justify-between text-[10px] sm:text-xs mb-0.5 sm:mb-1">
                           <span className="font-black text-white truncate">{card.nameKr}</span>
                           <span
-                            className={`text-[10px] font-black px-1.5 py-0.2 ${
+                            className={`text-[8px] sm:text-[10px] font-black px-1 sm:px-1.5 py-0.2 ${
                               card.color === 'RED'
                                 ? 'bg-red-950 text-red-300 border border-red-500/40'
                                 : card.color === 'GREEN'
@@ -582,7 +582,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                             {card.color}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px] font-mono text-slate-300">
+                        <div className="flex items-center justify-between text-[9px] sm:text-[11px] font-mono text-slate-300">
                           <span>비용: {card.cost}</span>
                           <span>피해: {card.damage}</span>
                         </div>
@@ -598,25 +598,25 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
 
         {/* 하단 확인 버튼들 */}
         {/* 하단 확정 / 스킵 액션 바 (sticky 배치로 모바일에서도 상시 노출) */}
-        <div className="sticky bottom-0 z-20 bg-[#0c101b]/95 backdrop-blur-md pt-2 pb-1 flex items-center justify-between border-t border-white/10 flex-wrap gap-2 sm:gap-3">
+        <div className="sticky bottom-0 z-20 bg-[#0c101b]/95 backdrop-blur-md pt-1.5 pb-0.5 flex items-center justify-between border-t border-white/10 flex-wrap gap-1.5 sm:gap-2.5">
           {choice.onResolveType === 'VIEW_ONLY' ? (
             <div className="w-full flex justify-end">
               <button
                 disabled={isSubmitting}
                 onClick={handleConfirm}
-                className="flex items-center gap-2.5 px-7 py-3 text-sm sm:text-base font-black bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 hover:brightness-110 shadow-lg shadow-cyan-500/25 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+                className="flex items-center gap-2 px-5 sm:px-7 py-2 sm:py-2.5 text-xs sm:text-base font-black bg-gradient-to-r from-cyan-500 to-blue-500 text-slate-950 hover:brightness-110 shadow-lg shadow-cyan-500/25 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
               >
-                <CheckCircle2 className="w-5 h-5" />
+                <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>확인 완료 (계속 진행)</span>
-                <ChevronRight className="w-5 h-5" />
+                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           ) : choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ? (
-            <div className="w-full flex items-center justify-between flex-wrap gap-2">
+            <div className="w-full flex items-center justify-between flex-wrap gap-1.5 sm:gap-2">
               <button
                 disabled={isSubmitting}
                 onClick={handleSkip}
-                className="px-5 py-3 text-xs sm:text-sm font-bold text-slate-300 hover:text-white bg-[#111520] hover:bg-[#1a2234] border border-white/15 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+                className="px-3.5 sm:px-5 py-2 sm:py-2.5 text-[11px] sm:text-sm font-bold text-slate-300 hover:text-white bg-[#111520] hover:bg-[#1a2234] border border-white/15 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
               >
                 발동하지 않음 (0장)
               </button>
@@ -631,9 +631,9 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                 <button
                   disabled={isSubmitting || choice.maxSelect < 2}
                   onClick={() => handleRoverSelect(2)}
-                  className="flex items-center gap-2 px-6 py-3 text-sm sm:text-base font-black bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:brightness-110 shadow-lg shadow-emerald-600/30 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+                  className="flex items-center gap-1.5 sm:gap-2 px-4 sm:px-6 py-2 sm:py-2.5 text-xs sm:text-base font-black bg-gradient-to-r from-emerald-600 to-teal-500 text-white hover:brightness-110 shadow-lg shadow-emerald-600/30 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
                 >
-                  <CheckCircle2 className="w-5 h-5" />
+                  <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
                   <span>2장 공개 후 패 추가</span>
                 </button>
               </div>
@@ -644,7 +644,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                 <button
                   disabled={isSubmitting}
                   onClick={handleSkip}
-                  className="px-5 py-3 text-xs sm:text-sm font-bold text-slate-300 hover:text-white bg-[#111520] hover:bg-[#1a2234] border border-white/15 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+                  className="px-3.5 sm:px-5 py-2 sm:py-2.5 text-[11px] sm:text-sm font-bold text-slate-300 hover:text-white bg-[#111520] hover:bg-[#1a2234] border border-white/15 transition cursor-pointer [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
                 >
                   {choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' || choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' || choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT'
                     ? '뽑지 않음'
@@ -667,7 +667,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                     : '패에 추가하지 않고 넘어가기 (0장)'}
                 </button>
               ) : (
-                <div className="text-xs sm:text-sm font-bold text-[#f97316]">
+                <div className="text-[10px] sm:text-xs font-bold text-[#f97316]">
                   {selectedIds.length < requiredConfirmCount
                     ? `⚠️ 위 목록에서 카드를 클릭하여 ${requiredConfirmCount}장 이상 선택해주세요. (발동하지 않으려면 좌측 넘어가기 버튼 클릭)`
                     : '✓ 대상 카드가 선택되었습니다. 우측 버튼을 눌러 확정하세요.'}
@@ -683,7 +683,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                     selectedIds.length < requiredConfirmCount)
                 }
                 onClick={handleConfirm}
-                className={`flex items-center gap-2.5 px-7 py-3 text-sm sm:text-base font-black transition [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)] ${
+                className={`flex items-center gap-2 px-5 sm:px-7 py-2 sm:py-2.5 text-xs sm:text-base font-black transition [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)] ${
                   choice.onResolveType !== 'SHOREKEEPER_SWITCH_PROMPT' &&
                   choice.onResolveType !== 'SHOREKEEPER_0_DRAW_PROMPT' &&
                   choice.onResolveType !== 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' &&
@@ -692,7 +692,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
                     : 'bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] text-white hover:brightness-110 shadow-lg shadow-[#f97316]/25 cursor-pointer'
                 }`}
               >
-                <CheckCircle2 className="w-5 h-5" />
+                <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
                 <span>
                   {choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' || choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' || choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT'
                     ? '카드 1장 뽑기'

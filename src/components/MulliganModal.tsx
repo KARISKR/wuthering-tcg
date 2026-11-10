@@ -95,7 +95,7 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 lg:p-6 animate-in fade-in duration-200">
-      <div className="relative mobile-modal-scaled bg-[#0c101b]/95 border border-[#f97316]/60 max-w-5xl xl:max-w-7xl w-full p-2.5 sm:p-4 lg:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center gap-1.5 sm:gap-2.5 lg:gap-3.5 text-slate-100 text-center max-h-[94dvh] overflow-y-auto custom-scrollbar">
+      <div className="relative mobile-modal-scaled bg-[#0c101b]/95 border border-[#f97316]/60 max-w-5xl xl:max-w-7xl w-full p-2 sm:p-3.5 lg:p-6 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center gap-1 sm:gap-2 lg:gap-3 text-slate-100 text-center max-h-[94dvh] overflow-y-auto custom-scrollbar">
         {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -110,20 +110,20 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
 
         {/* 타이틀 및 가이드 */}
         <div>
-          <h2 className="text-lg sm:text-xl lg:text-4xl font-black text-white tracking-wide flex items-center justify-center gap-2">
+          <h2 className="text-base sm:text-xl lg:text-3xl font-black text-white tracking-wide flex items-center justify-center gap-2">
             <span>초기 패 교체 (멀리건)</span>
             {mulliganPhase === 'entering' && (
               <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 text-[#f97316] animate-spin" />
             )}
           </h2>
-          <p className="text-[11px] lg:text-base text-slate-300 max-w-2xl leading-relaxed font-medium mt-0.5 lg:mt-1.5 hidden lg:block">
+          <p className="text-[11px] lg:text-sm text-slate-300 max-w-2xl leading-relaxed font-medium mt-0.5 hidden lg:block">
             시작 패 5장 중 교체할 카드를 클릭하여 선택하세요.<br />
             선택된 카드는 덱 맨 아래로 돌아가고 새 카드를 뽑습니다 (1회 한정).
           </p>
         </div>
 
         {/* 5장 대형 카드 선택 영역 (모바일에서도 5열로 한 화면 배치) */}
-        <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5 lg:gap-5 w-full my-0.5 lg:my-2">
+        <div className="grid grid-cols-5 gap-1 sm:gap-2 lg:gap-4 w-full my-0.5 sm:my-1 lg:my-2">
           {displayedHand.map((card, idx) => {
             const isSelected = selectedIds.includes(card.id);
             const isNewCard = newCardIds.has(card.id);
@@ -156,7 +156,7 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
                 key={`${card.id}-${idx}`}
                 onClick={() => toggleSelect(card.id)}
                 style={animStyle}
-                className={`relative flex flex-col justify-between rounded-lg sm:rounded-xl lg:rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border lg:border-2 p-1 sm:p-1.5 lg:p-2.5 transition-all duration-200 select-none group shadow-xl ${animClass} ${
+                className={`relative flex flex-col justify-between rounded-lg sm:rounded-xl lg:rounded-2xl bg-gradient-to-b from-slate-900 to-slate-950 border lg:border-2 p-1 sm:p-1.5 lg:p-2 transition-all duration-200 select-none group shadow-xl ${animClass} ${
                   mulliganPhase !== 'idle' ? 'cursor-default pointer-events-none' : 'cursor-pointer'
                 } ${
                   isSelected && mulliganPhase === 'idle'
@@ -175,7 +175,7 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
                 )}
 
                 {/* 1. 실물 카드 일러스트 */}
-                <div className="relative w-full aspect-[5/7] rounded-md sm:rounded-lg lg:rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner group-hover:scale-[1.02] transition-transform duration-200">
+                <div className="relative w-full aspect-[5/7] rounded-md sm:rounded-lg lg:rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner group-hover:scale-[1.02] transition-transform duration-200 mx-auto">
                   <CardArt
                     artUrl={card.artUrl}
                     sizes="(max-width: 640px) 30vw, 200px"
@@ -198,14 +198,14 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
                 </div>
 
                 {/* 2. 하단 상세 정보 영역 */}
-                <div className="w-full mt-1 lg:mt-2.5 px-0.5 lg:px-1 flex flex-col gap-0.5 lg:gap-1.5 text-left pointer-events-none">
+                <div className="w-full mt-0.5 sm:mt-1 lg:mt-2 px-0.5 lg:px-1 flex flex-col gap-0.5 lg:gap-1 text-left pointer-events-none">
                   {/* 카드명 & 속성 배지 */}
                   <div className="flex items-center justify-between gap-1">
-                    <span className="font-black text-[10px] sm:text-xs lg:text-base text-white truncate" title={card.nameKr}>
+                    <span className="font-black text-[9px] sm:text-xs lg:text-sm text-white truncate" title={card.nameKr}>
                       {card.nameKr}
                     </span>
                     <span
-                      className={`text-[8px] lg:text-xs font-black px-1 lg:px-2 py-0.2 lg:py-0.5 rounded shrink-0 hidden sm:inline-block ${
+                      className={`text-[8px] lg:text-[10px] font-black px-1 lg:px-1.5 py-0.2 lg:py-0.5 rounded shrink-0 hidden sm:inline-block ${
                         card.color === 'RED'
                           ? 'bg-red-950 text-red-300 border border-red-500/50'
                           : card.color === 'GREEN'
@@ -218,7 +218,7 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
                   </div>
 
                   {/* 모바일/태블릿용 초슬림 1줄 스탯 요약 */}
-                  <div className="flex lg:hidden items-center justify-between text-[9px] sm:text-[10px] font-mono text-slate-300 bg-slate-950/90 px-1.5 py-0.5 rounded border border-slate-800/80">
+                  <div className="flex lg:hidden items-center justify-between text-[8px] sm:text-[9px] font-mono text-slate-300 bg-slate-950/90 px-1 py-0.5 rounded border border-slate-800/80">
                     <span>비용 <strong className="text-amber-300">{card.cost}</strong></span>
                     <span>속도 <strong className="text-amber-200">{card.speed ?? '-'}</strong></span>
                     <span>피해 <strong className="text-red-400">{card.damage}</strong></span>
@@ -253,7 +253,7 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
         </div>
 
         {/* 조작 가이드 안내문 */}
-        <div className="text-[10px] sm:text-xs lg:text-sm font-semibold text-slate-400">
+        <div className="text-[9px] sm:text-xs lg:text-sm font-semibold text-slate-400">
           {mulliganPhase === 'exiting' ? (
             <span className="text-amber-400 font-bold animate-pulse">선택한 카드를 덱으로 반환하는 중...</span>
           ) : mulliganPhase === 'entering' ? (
@@ -268,18 +268,18 @@ export const MulliganModal: React.FC<MulliganModalProps> = ({ hand, deck = [], o
         </div>
 
         {/* 하단 버튼 영역 */}
-        <div className="pt-1 pb-0.5 flex flex-row items-center justify-center gap-2 sm:gap-4 lg:gap-5 w-full">
+        <div className="pt-0.5 pb-0 flex flex-row items-center justify-center gap-1.5 sm:gap-3 lg:gap-5 w-full">
           <button
             onClick={() => onConfirm([])}
             disabled={mulliganPhase !== 'idle'}
-            className="flex-1 sm:flex-none px-3 sm:px-6 lg:px-8 py-2 lg:py-3.5 border border-white/15 bg-[#111520] hover:bg-[#1a2234] font-extrabold text-xs sm:text-sm lg:text-base text-slate-200 transition cursor-pointer shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
+            className="flex-1 sm:flex-none px-3 sm:px-6 lg:px-8 py-1.5 sm:py-2.5 lg:py-3.5 border border-white/15 bg-[#111520] hover:bg-[#1a2234] font-extrabold text-xs sm:text-sm lg:text-base text-slate-200 transition cursor-pointer shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)]"
           >
             패 유지 (교체 안함)
           </button>
           <button
             onClick={handleExecuteMulligan}
             disabled={selectedIds.length === 0 || mulliganPhase !== 'idle'}
-            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-8 lg:px-10 py-2 lg:py-3.5 font-black text-xs sm:text-sm lg:text-base shadow-2xl transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-6 lg:px-10 py-1.5 sm:py-2.5 lg:py-3.5 font-black text-xs sm:text-sm lg:text-base shadow-2xl transition cursor-pointer [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)] ${
               selectedIds.length > 0 && mulliganPhase === 'idle'
                 ? 'bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white shadow-[0_0_20px_rgba(249,115,22,0.4)] animate-pulse'
                 : 'bg-slate-800/80 text-slate-500 border border-white/10 cursor-not-allowed'

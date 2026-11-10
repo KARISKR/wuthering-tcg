@@ -55,7 +55,7 @@ const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 animate-fade-in select-none">
-      <div className="mobile-modal-scaled relative w-full max-w-4xl bg-[#0c101b]/95 border border-[#f97316]/60 p-3 sm:p-4 lg:p-8 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center max-h-[94dvh] overflow-y-auto custom-scrollbar">
+      <div className="mobile-modal-scaled relative w-full max-w-4xl bg-[#0c101b]/95 border border-[#f97316]/60 p-2.5 sm:p-4 lg:p-6 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center max-h-[94dvh] overflow-y-auto custom-scrollbar">
         {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -70,8 +70,8 @@ const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = 
         </div>
 
         {/* 헤더 안내 */}
-        <div className="text-center mt-4 lg:mt-4 mb-2 lg:mb-5 space-y-1 max-w-xl">
-          <h2 className="text-lg sm:text-xl lg:text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+        <div className="text-center mt-2 sm:mt-4 mb-1.5 sm:mb-3 lg:mb-5 space-y-1 max-w-xl">
+          <h2 className="text-base sm:text-xl lg:text-3xl font-black text-white tracking-tight flex items-center justify-center gap-2">
             <span>{titlePrefix ? `${titlePrefix} - ` : ''}시작 리더(LEADER) 출격 선택</span>
           </h2>
           <p className="text-[11px] lg:text-sm text-slate-300 font-medium leading-snug hidden lg:block">
@@ -79,7 +79,7 @@ const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = 
             남은 2명의 캐릭터는 좌우 후방(서포터)으로 자동 배치됩니다.
           </p>
 
-          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-0.5 sm:py-1 bg-[#111520] border border-white/10 text-[11px] sm:text-xs font-bold text-[#f97316] shadow">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-0.5 sm:py-1 bg-[#111520] border border-white/10 text-[10px] sm:text-xs font-bold text-[#f97316] shadow">
             <span className={`w-2 h-2 rounded-full ${isFirstTurnPlayer ? 'bg-[#f97316] animate-ping' : 'bg-[#22d3ee] animate-ping'}`} />
             <span>
               {player.name}님은 <strong className="text-white">{isFirstTurnPlayer ? '선공 (1턴)' : '후공 (2턴)'}</strong>으로 시작합니다.
@@ -88,7 +88,7 @@ const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = 
         </div>
 
         {/* 3명의 캐릭터 선택 카드 그리드 */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 lg:gap-6 w-full max-w-3xl my-1 lg:my-2">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-3 lg:gap-6 w-full max-w-3xl my-1 lg:my-2">
           {candidates.map((char) => {
             const charIdentifier = char.characterName || char.nameKr;
             const isSelected = selectedCharName === charIdentifier;
@@ -97,7 +97,7 @@ const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = 
               <div
                 key={char.id || char.code}
                 onClick={() => handleCardClick(char)}
-                className={`group relative p-2 lg:p-3 border transition-all duration-200 cursor-pointer flex flex-col items-center text-center ${
+                className={`group relative p-1.5 sm:p-2 lg:p-3 border transition-all duration-200 cursor-pointer flex flex-col items-center text-center ${
                   isSelected
                     ? 'bg-[#f97316]/10 border-[#f97316] shadow-[0_0_25px_rgba(249,115,22,0.35)] scale-[1.02] lg:scale-105 ring-1 ring-[#f97316]'
                     : 'bg-[#090d16] border-white/10 hover:border-[#f97316]/50 hover:bg-[#111520] hover:scale-[1.01]'
@@ -105,46 +105,46 @@ const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = 
               >
                 {/* 선택 상태 뱃지 */}
                 {isSelected && (
-                  <div className="absolute -top-2.5 px-2 sm:px-3 py-0.5 bg-gradient-to-r from-[#ea580c] to-[#fb923c] text-white font-black text-[10px] lg:text-[11px] shadow-lg flex items-center gap-1 z-10 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]">
+                  <div className="absolute -top-2.5 px-2 sm:px-3 py-0.5 bg-gradient-to-r from-[#ea580c] to-[#fb923c] text-white font-black text-[9px] sm:text-[10px] lg:text-[11px] shadow-lg flex items-center gap-1 z-10 [clip-path:polygon(4px_0,100%_0,100%_calc(100%-4px),calc(100%-4px)_100%,0_100%,0_4px)]">
                     <CheckCircle2 className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
                     <span>선택됨</span>
                   </div>
                 )}
 
                 {/* 캐릭터 카드 비주얼 */}
-                <div className="w-full flex justify-center py-0.5 lg:py-1">
+                <div className="w-full flex justify-center py-0.5 lg:py-1 max-w-[120px] sm:max-w-[160px] lg:max-w-none mx-auto">
                   <CardView card={char} size="md" />
                 </div>
 
                 {/* 캐릭터 이름 및 정보 */}
-                <div className="mt-1.5 lg:mt-3 w-full">
+                <div className="mt-1 sm:mt-1.5 lg:mt-3 w-full">
                   <div className="flex items-center justify-center gap-1 mb-0.5 lg:mb-1">
-                    <span className="px-1.5 lg:px-2 py-0.5 bg-[#111520] text-slate-300 text-[9px] lg:text-[10px] font-bold border border-white/10">
+                    <span className="px-1.5 lg:px-2 py-0.5 bg-[#111520] text-slate-300 text-[8px] sm:text-[9px] lg:text-[10px] font-bold border border-white/10">
                       {getElementKr(char.element)}
                     </span>
-                    <span className="px-1.5 lg:px-2 py-0.5 bg-[#f97316]/15 text-[#f97316] text-[9px] lg:text-[10px] font-bold border border-[#f97316]/30">
+                    <span className="px-1.5 lg:px-2 py-0.5 bg-[#f97316]/15 text-[#f97316] text-[8px] sm:text-[9px] lg:text-[10px] font-bold border border-[#f97316]/30">
                       Lv.{char.level}
                     </span>
                   </div>
                   <h3 className="text-xs sm:text-sm lg:text-base font-black text-white truncate">{char.nameKr}</h3>
 
                   {char.description && (
-                    <p className="text-[10px] lg:text-[11px] text-slate-400 line-clamp-1 lg:line-clamp-2 mt-1 leading-tight px-0.5 hidden sm:block">
+                    <p className="text-[10px] lg:text-[11px] text-slate-400 line-clamp-1 lg:line-clamp-2 mt-0.5 sm:mt-1 leading-tight px-0.5 hidden sm:block">
                       {char.description}
                     </p>
                   )}
 
                   {/* 출격 오프닝 대사 멘트 */}
-                  <div className={`mt-1.5 lg:mt-2.5 p-1.5 lg:p-2 text-left border transition-all ${
+                  <div className={`mt-1 sm:mt-1.5 lg:mt-2.5 p-1 sm:p-1.5 lg:p-2 text-left border transition-all ${
                     isSelected
                       ? 'bg-[#111520] border-[#f97316]/40 text-[#f97316]'
                       : 'bg-[#06080e] border-white/5 text-slate-400'
                   }`}>
-                    <div className="flex items-center gap-1 text-[9px] lg:text-[10px] font-black text-[#f97316] uppercase tracking-wider mb-0.5">
+                    <div className="flex items-center gap-1 text-[8px] sm:text-[9px] lg:text-[10px] font-black text-[#f97316] uppercase tracking-wider mb-0.5">
                       <MessageSquareQuote className="w-2.5 h-2.5 lg:w-3 lg:h-3 text-[#f97316]" />
                       <span>출격 대사</span>
                     </div>
-                    <p className="text-[10px] lg:text-[11px] font-medium leading-tight italic line-clamp-1 lg:line-clamp-2">
+                    <p className="text-[9px] sm:text-[10px] lg:text-[11px] font-medium leading-tight italic line-clamp-1 lg:line-clamp-2">
                       "{getCharacterOpeningQuote(charIdentifier)}"
                     </p>
                   </div>
@@ -155,16 +155,16 @@ const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = 
         </div>
 
         {/* 하단 확정 버튼 영역 */}
-        <div className="mt-2.5 lg:mt-5 flex flex-col items-center gap-1.5 lg:gap-2.5 w-full max-w-md">
+        <div className="mt-2 lg:mt-4 flex flex-col items-center gap-1 sm:gap-1.5 lg:gap-2.5 w-full max-w-md">
           <button
             onClick={handleConfirmClick}
-            className="w-full py-2.5 lg:py-3.5 px-4 lg:px-6 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs sm:text-sm lg:text-base shadow-xl shadow-[0_0_20px_rgba(249,115,22,0.3)] transition cursor-pointer flex items-center justify-center gap-2 [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
+            className="w-full py-2 sm:py-2.5 lg:py-3.5 px-4 lg:px-6 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs sm:text-sm lg:text-base shadow-xl shadow-[0_0_20px_rgba(249,115,22,0.3)] transition cursor-pointer flex items-center justify-center gap-2 [clip-path:polygon(8px_0,100%_0,100%_calc(100%-8px),calc(100%-8px)_100%,0_100%,0_8px)]"
           >
             <Swords className="w-4 h-4 lg:w-5 lg:h-5 fill-white" />
             <span>[{selectedChar?.nameKr}] 시작 리더 출격 확정</span>
             <ArrowRight className="w-4 h-4 lg:w-5 lg:h-5" />
           </button>
-          <span className="text-[10px] lg:text-xs text-slate-400 hidden sm:inline">
+          <span className="text-[9px] sm:text-[10px] lg:text-xs text-slate-400 hidden sm:inline">
             출격 확정 후 패 5장 멀리건(패 교체) 단계로 이어집니다.
           </span>
         </div>

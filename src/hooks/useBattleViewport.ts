@@ -111,25 +111,38 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
     return (localStorage.getItem('wuthering_left_panel_size') as LeftPanelSize) || 'normal';
   });
 
-  // 모바일 전용 배틀 모드 상태
-  const [isMobileBattle, setIsMobileBattle] = useState<boolean>(() => {
+  // 모바일 전용 배틀 모드 판정 헬퍼
+  const checkIsMobileBattle = (): boolean => {
     if (typeof window === 'undefined') return false;
     const isMobileHash = window.location.hash.includes('m-battle');
     const isMobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isSmallScreen = window.innerWidth < 1024 || window.innerHeight < 580;
+    const isSmallScreen = window.innerWidth < 1024 || window.innerHeight < 640;
     return isMobileHash || isMobileUa || isSmallScreen;
-  });
+  };
+
+  // 모바일 팝업/모달 자동 다운스케일 줌 계산 헬퍼
+  const calcModalZoomScale = (): number => {
+    if (typeof window === 'undefined') return 0.52;
+    const vw = window.visualViewport?.width || window.innerWidth;
+    const vh = window.visualViewport?.height || window.innerHeight;
+    const sW = vw / 1060;
+    const sH = vh / 720;
+    const zoom = Math.min(1, Math.max(0.36, Math.min(sW, sH)));
+    if (typeof document !== 'undefined') {
+      document.documentElement.style.setProperty('--modal-zoom', String(zoom));
+      document.documentElement.style.setProperty('--viewport-h', `${vh}px`);
+    }
+    return zoom;
+  };
+
+  // 모바일 전용 배틀 모드 상태
+  const [isMobileBattle, setIsMobileBattle] = useState<boolean>(() => checkIsMobileBattle());
 
   const [showMobileCardModal, setShowMobileCardModal] = useState<boolean>(false);
   const [showMobileLogModal, setShowMobileLogModal] = useState<boolean>(false);
 
   // 모바일 팝업/모달 자동 다운스케일 줌 계산
-  const [modalZoomScale, setModalZoomScale] = useState<number>(() => {
-    if (typeof window === 'undefined') return 0.52;
-    const sW = window.innerWidth / 1140;
-    const sH = window.innerHeight / 780;
-    return Math.min(1, Math.max(0.38, Math.min(sW, sH)));
-  });
+  const [modalZoomScale, setModalZoomScale] = useState<number>(() => calcModalZoomScale());
 
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
     if (typeof window !== 'undefined' && (window.innerWidth < 1180 || window.innerHeight < 600)) {
@@ -185,8 +198,11 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
 
   useEffect(() => {
     const updateViewportScale = () => {
+      const isMobile = checkIsMobileBattle();
+      setIsMobileBattle(isMobile);
+
       const availH = Math.max(280, window.innerHeight - 38);
-      const leftW = isMobileBattle
+      const leftW = isMobile
         ? 0
         : isLeftPanelCollapsed
         ? 48
@@ -195,7 +211,7 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
         : window.innerWidth >= 1280
         ? 370
         : 310;
-      const rightW = isMobileBattle
+      const rightW = isMobile
         ? 0
         : isRightPanelCollapsed
         ? 48
@@ -209,14 +225,19 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
       const scaleW = availW / 1080;
       setViewportScale(Math.min(1.15, Math.max(0.32, Math.min(scaleH, scaleW))));
 
-      const sW = window.innerWidth / 1140;
-      const sH = window.innerHeight / 780;
-      setModalZoomScale(Math.min(1, Math.max(0.38, Math.min(sW, sH))));
+      setModalZoomScale(calcModalZoomScale());
     };
+
     updateViewportScale();
     window.addEventListener('resize', updateViewportScale);
-    return () => window.removeEventListener('resize', updateViewportScale);
-  }, [isLeftPanelCollapsed, isRightPanelCollapsed, isMobileBattle]);
+    window.visualViewport?.addEventListener('resize', updateViewportScale);
+    window.visualViewport?.addEventListener('scroll', updateViewportScale);
+    return () => {
+      window.removeEventListener('resize', updateViewportScale);
+      window.visualViewport?.removeEventListener('resize', updateViewportScale);
+      window.visualViewport?.removeEventListener('scroll', updateViewportScale);
+    };
+  }, [isLeftPanelCollapsed, isRightPanelCollapsed]);
 
   const changeLeftPanelSize = (size: LeftPanelSize) => {
     setLeftPanelSize(size);

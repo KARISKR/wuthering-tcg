@@ -98,7 +98,9 @@ export const BattleLayout: React.FC<BattleLayoutProps> = memo(({
 }) => {
   return (
     <div
-      className="flex flex-col h-[100dvh] w-screen bg-[#070913] text-slate-100 font-sans select-none overflow-hidden relative"
+      className={`flex flex-col h-[100dvh] w-screen bg-[#070913] text-slate-100 font-sans select-none overflow-hidden relative ${
+        isMobileBattle ? 'mobile-battle-mode' : ''
+      }`}
       style={
         {
           '--modal-zoom': `${modalZoomScale}`,
