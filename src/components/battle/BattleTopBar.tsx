@@ -1,6 +1,6 @@
 // src/components/battle/BattleTopBar.tsx
 // [WP8-2] 상단 네비게이션 헤더 바 (GameBoard 분해 컴포넌트)
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import {
   Home,
   Swords,
@@ -76,6 +76,7 @@ export const BattleTopBar: React.FC<BattleTopBarProps> = memo(({
   setIsInitiativeRolling,
   restartGame,
 }) => {
+  const [isConfirmingRestart, setIsConfirmingRestart] = useState(false);
   return (
     <header className="h-10 sm:h-12 border-b border-white/10 bg-[#090d16]/95 backdrop-blur-md px-2 sm:px-4 flex items-center justify-between z-30 shrink-0">
       <div className="flex items-center gap-1.5 sm:gap-2.5">
@@ -251,7 +252,7 @@ export const BattleTopBar: React.FC<BattleTopBarProps> = memo(({
       </div>
 
       {/* 우측 퀵 컨트롤 버튼 */}
-      <div className="flex items-center gap-1.5">
+      <div className={`flex items-center ${isMobileBattle ? '' : 'gap-1.5'}`}>
         {/* 전장 배율 줌 컨트롤러 */}
         <div data-arena-zoom-controls className="flex items-center gap-0.5 bg-[#0c101b] px-1.5 py-0.5 border border-white/10">
           <button
@@ -310,25 +311,60 @@ export const BattleTopBar: React.FC<BattleTopBarProps> = memo(({
               </button>
             )}
 
-            <button
-              onClick={() => setGameMode(gameState.gameMode === 'AI' ? 'SOLO_DUAL' : 'AI')}
-              className="flex items-center gap-1 px-2 py-1 bg-[#111520] hover:bg-[#1c2334] text-slate-300 text-[11px] font-bold transition cursor-pointer border border-white/10"
-              title="게임 모드 전환"
-            >
-              {gameState.gameMode === 'AI' ? <Bot className="w-3.5 h-3.5 text-[#22d3ee]" /> : <User className="w-3.5 h-3.5 text-[#f97316]" />}
-              <span className="hidden xl:inline">{gameState.gameMode === 'AI' ? 'AI 모드' : '1인 2역'}</span>
-            </button>
+            {/* 게임 중 모드 전환은 모바일에서 오조작 위험이 커서 숨김 */}
+            {!isMobileBattle && (
+              <button
+                onClick={() => setGameMode(gameState.gameMode === 'AI' ? 'SOLO_DUAL' : 'AI')}
+                className="flex items-center gap-1 px-2 py-1 bg-[#111520] hover:bg-[#1c2334] text-slate-300 text-[11px] font-bold transition cursor-pointer border border-white/10"
+                title="게임 모드 전환"
+              >
+                {gameState.gameMode === 'AI' ? <Bot className="w-3.5 h-3.5 text-[#22d3ee]" /> : <User className="w-3.5 h-3.5 text-[#f97316]" />}
+                <span className="hidden xl:inline">{gameState.gameMode === 'AI' ? 'AI 모드' : '1인 2역'}</span>
+              </button>
+            )}
 
-            <button
-              onClick={() => {
-                setIsInitiativeRolling(true);
-                restartGame();
-              }}
-              className="p-1 bg-[#111520] hover:bg-red-950/60 text-rose-400 border border-white/10 transition cursor-pointer"
-              title="게임 재시작"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
+            {/* 재시작은 확인 팝업에서 한 번 더 눌러야 실행 (오조작 방지) */}
+            <div className="relative">
+              <button
+                onClick={() => setIsConfirmingRestart((prev) => !prev)}
+                className="p-1 bg-[#111520] hover:bg-red-950/60 text-rose-400 border border-white/10 transition cursor-pointer"
+                title="게임 재시작"
+                aria-expanded={isConfirmingRestart}
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              {isConfirmingRestart && (
+                <div
+                  role="alertdialog"
+                  aria-label="게임 재시작 확인"
+                  className="absolute right-0 top-full mt-1 z-50 w-60 p-3 bg-[#0c101b] border-2 border-rose-500/80 shadow-[0_0_30px_rgba(0,0,0,0.9)] flex flex-col gap-2"
+                >
+                  <p className="text-xs font-bold text-slate-100 leading-snug break-keep">
+                    게임을 처음부터 다시 시작할까요?
+                    <br />
+                    <span className="text-rose-300">진행 중인 판은 사라집니다.</span>
+                  </p>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => setIsConfirmingRestart(false)}
+                      className="flex-1 py-1.5 bg-[#111520] text-slate-300 text-xs font-bold border border-white/15 cursor-pointer"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsConfirmingRestart(false);
+                        setIsInitiativeRolling(true);
+                        restartGame();
+                      }}
+                      className="flex-1 py-1.5 bg-rose-600 hover:bg-rose-500 text-white text-xs font-black cursor-pointer"
+                    >
+                      재시작
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
