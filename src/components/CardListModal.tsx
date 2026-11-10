@@ -120,6 +120,7 @@ export const CardListModal: React.FC<CardListModalProps> = ({
     <>
       <div
         onClick={onClose}
+        data-phone-touch
         className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-150 select-none"
       >
         <div

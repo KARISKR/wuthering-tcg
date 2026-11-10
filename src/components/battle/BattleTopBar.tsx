@@ -253,7 +253,7 @@ export const BattleTopBar: React.FC<BattleTopBarProps> = memo(({
       {/* 우측 퀵 컨트롤 버튼 */}
       <div className="flex items-center gap-1.5">
         {/* 전장 배율 줌 컨트롤러 */}
-        <div className="flex items-center gap-0.5 bg-[#0c101b] px-1.5 py-0.5 border border-white/10">
+        <div data-arena-zoom-controls className="flex items-center gap-0.5 bg-[#0c101b] px-1.5 py-0.5 border border-white/10">
           <button
             onClick={() => changeArenaZoom(-0.1)}
             disabled={arenaZoom <= 0.5}

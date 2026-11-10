@@ -100,6 +100,7 @@ export const EvolutionTreeModal: React.FC<EvolutionTreeModalProps> = ({
   return (
     <div
       onClick={onClose}
+      data-phone-touch
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
     >
       <div

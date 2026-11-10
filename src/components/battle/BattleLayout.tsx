@@ -9,6 +9,8 @@ import { CenterClashArena, CenterClashArenaProps } from './CenterClashArena';
 import { PlayerFieldArea, PlayerFieldAreaProps } from './PlayerFieldArea';
 import { PlayerHandDock, PlayerHandDockProps } from './PlayerHandDock';
 import { TacticalConsoleSidebar, TacticalConsoleSidebarProps } from './TacticalConsoleSidebar';
+import { PhoneBattleBoard } from './phone/PhoneBattleBoard';
+import type { BattleLayoutMode } from '../../battle/layoutMode';
 
 export interface BattleLayoutProps {
   // 줌 및 반응형
@@ -29,6 +31,8 @@ export interface BattleLayoutProps {
 
   // 모바일 플로팅 컨트롤 바 관련 상태 및 액션
   isMobileBattle: boolean;
+  /** 레이아웃 모드 (설계서 2-1). phone-landscape + 모바일 뷰일 때 3열 전장 */
+  battleLayoutMode?: BattleLayoutMode;
   isRightPanelCollapsed: boolean;
   isSpectator: boolean;
   isCurrentControlledTurn: boolean;
@@ -71,6 +75,7 @@ export const BattleLayout: React.FC<BattleLayoutProps> = memo(({
   playerHandProps,
   tacticalConsoleProps,
   isMobileBattle,
+  battleLayoutMode,
   isRightPanelCollapsed,
   isSpectator,
   isCurrentControlledTurn,
@@ -96,11 +101,118 @@ export const BattleLayout: React.FC<BattleLayoutProps> = memo(({
   setSelectedOverflowIds,
   customTopBar,
 }) => {
+  // 가로 폰 + 모바일 뷰(상단 📱 토글이 켜진 상태)일 때만 3열 전장. 🖥️로 바꾸면 기존 전장.
+  const isPhoneLayout = isMobileBattle && battleLayoutMode === 'phone-landscape';
+
+  // 퀵 액션 버튼 (카드·로그·드로우·배틀 선언·턴 종료·패스·연격 종료·버리기). 떠 있는 바와 가로 폰 손패 옆에서 같이 쓴다.
+  const quickActionButtons = (
+    <>
+      {/* 모바일 퀵 도구 버튼: 카드 상세 & 배틀 로그 */}
+      {isMobileBattle && (
+        <>
+          <button
+            onClick={() => setShowMobileCardModal(true)}
+            className="px-2.5 py-2 bg-[#111520] hover:bg-[#1a2234] text-cyan-300 border border-cyan-500/40 text-xs font-black rounded transition cursor-pointer flex items-center gap-1"
+            title="선택된 카드 상세 정보"
+          >
+            <Eye className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="qa-label">카드</span>
+          </button>
+          <button
+            onClick={() => setShowMobileLogModal(true)}
+            className="px-2.5 py-2 bg-[#111520] hover:bg-[#1a2234] text-amber-300 border border-amber-500/40 text-xs font-black rounded transition cursor-pointer flex items-center gap-1"
+            title="배틀 로그 보기"
+          >
+            <ScrollText className="w-3.5 h-3.5 text-amber-400" />
+            <span className="qa-label">로그</span>
+          </button>
+        </>
+      )}
+
+      {/* 드로우 단계 */}
+      {phase === 'DRAW_PHASE' && (canP0Draw || canP1Draw) && isCurrentControlledTurn && (
+        <button
+          onClick={() => handleDrawCards(controlledPlayerIndex)}
+          className="px-3.5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1.5 animate-pulse"
+        >
+          <span>🎴 드로우 ({currentTurnDrawCount}장)</span>
+        </button>
+      )}
+
+      {/* 메인 액션 페이즈 */}
+      {phase === 'ACTION_PHASE' && isCurrentControlledTurn && (
+        <>
+          <button
+            disabled={isActionLockedByModal}
+            onClick={() => {
+              setIsConfirmingEndTurn(false);
+              handleDecideClash(true);
+            }}
+            className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1"
+          >
+            <Swords className="w-3.5 h-3.5" />
+            <span>배틀 선언</span>
+          </button>
+          <button
+            disabled={isActionLockedByModal}
+            onClick={() => setIsConfirmingEndTurn(true)}
+            className="px-3 py-2 bg-[#111520] hover:bg-slate-800 text-slate-300 font-bold text-xs sm:text-sm rounded border border-white/20 transition cursor-pointer"
+          >
+            턴 종료
+          </button>
+        </>
+      )}
+
+      {/* 대결 세트 단계 카드 없이 패스 */}
+      {phase === 'CLASH_SET' && !clashCardReady && (
+        <button
+          disabled={isActionLockedByModal}
+          onClick={() => handleSetClashCard(controlledPlayerIndex, null)}
+          className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs sm:text-sm rounded border border-amber-500/40 transition cursor-pointer"
+        >
+          카드 없이 패스
+        </button>
+      )}
+
+      {/* 연격 단계 연격 종료 */}
+      {phase === 'COMBO_STEP' && isPlayerComboPhase && (
+        <button
+          onClick={() => {
+            setNoComboCountdown(null);
+            handleFinishCombo(controlledPlayerIndex);
+          }}
+          className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] to-[#fb923c] text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1 animate-pulse"
+        >
+          <span>연격 종료</span>
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
+      )}
+
+      {/* 패 초과 버리기 단계 */}
+      {phase === 'DISCARD_OVERFLOW' && handLength > 8 && (
+        <button
+          disabled={selectedOverflowIds.length !== handLength - 8}
+          onClick={() => {
+            handleDiscardOverflow(controlledPlayerIndex, selectedOverflowIds);
+            setSelectedOverflowIds([]);
+          }}
+          className={`px-3 py-2 rounded text-xs sm:text-sm font-black transition ${
+            selectedOverflowIds.length === handLength - 8
+              ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer animate-pulse'
+              : 'bg-slate-800 text-slate-500 cursor-not-allowed'
+          }`}
+        >
+          버리기 ({selectedOverflowIds.length}/{handLength - 8})
+        </button>
+      )}
+    </>
+  );
+
   return (
     <div
       className={`flex flex-col h-[100dvh] w-screen bg-[#070913] text-slate-100 font-sans select-none overflow-hidden relative ${
         isMobileBattle ? 'mobile-battle-mode' : ''
-      }`}
+      } ${isPhoneLayout ? 'phone-battle-layout' : ''}`}
       style={
         {
           '--modal-zoom': `${modalZoomScale}`,
@@ -115,7 +227,18 @@ export const BattleLayout: React.FC<BattleLayoutProps> = memo(({
         {/* [WP8-1] 좌측 패널: 카드 상세 단말기 */}
         <CardDetailSidebar {...cardDetailProps} />
 
-        {/* [중앙 메인 보드] 100vh 원스크린 4단 수직 분할 (전체 스크롤 없음) */}
+        {/* [가로 폰] 상대 | 대결 | 나 3열 전장 (zoom 없음) */}
+        {isPhoneLayout ? (
+          <PhoneBattleBoard
+            opponentFieldProps={opponentFieldProps}
+            centerClashProps={centerClashProps}
+            playerFieldProps={playerFieldProps}
+            playerHandProps={playerHandProps}
+            setShowMobileCardModal={setShowMobileCardModal}
+            quickActions={isSpectator ? null : quickActionButtons}
+          />
+        ) : (
+        /* [중앙 메인 보드] 100vh 원스크린 4단 수직 분할 (전체 스크롤 없음) */
         <div
           ref={centerArenaRef}
           onScroll={handleArenaScroll}
@@ -137,116 +260,21 @@ export const BattleLayout: React.FC<BattleLayoutProps> = memo(({
           {/* [WP8-2 Tier 4] 4단: 플레이어 손패 도크 */}
           <PlayerHandDock {...playerHandProps} />
         </div>
+        )}
 
         {/* [WP8-1 Part 2] 우측 패널: 택티컬 콘솔 및 실시간 배틀 로그 */}
         <TacticalConsoleSidebar {...tacticalConsoleProps} />
       </div>
 
-      {/* 우측 패널 접힘 시 또는 모바일 배틀 모드일 때 엄지용 플로팅 퀵 액션 컨트롤 바 */}
-      {(isMobileBattle || isRightPanelCollapsed) && !isSpectator && (
+      {/* 우측 패널 접힘 시 또는 모바일 배틀 모드일 때 엄지용 플로팅 퀵 액션 컨트롤 바
+          (가로 폰 3열 전장에서는 떠 있지 않고 손패 띠 오른쪽에 붙는다 — 모바일 6단계) */}
+      {(isMobileBattle || isRightPanelCollapsed) && !isSpectator && !isPhoneLayout && (
         <div
           className={`fixed z-40 flex items-center gap-1.5 bg-[#0c101b]/95 border border-[#f97316]/70 p-1.5 shadow-[0_0_25px_rgba(0,0,0,0.9)] backdrop-blur-md animate-in fade-in slide-in-from-right-3 ${
             isMobileBattle ? 'bottom-2.5 right-2 rounded-lg' : 'bottom-3 right-14'
           }`}
         >
-          {/* 모바일 퀵 도구 버튼: 카드 상세 & 배틀 로그 */}
-          {isMobileBattle && (
-            <>
-              <button
-                onClick={() => setShowMobileCardModal(true)}
-                className="px-2.5 py-2 bg-[#111520] hover:bg-[#1a2234] text-cyan-300 border border-cyan-500/40 text-xs font-black rounded transition cursor-pointer flex items-center gap-1"
-                title="선택된 카드 상세 정보"
-              >
-                <Eye className="w-3.5 h-3.5 text-cyan-400" />
-                <span>카드</span>
-              </button>
-              <button
-                onClick={() => setShowMobileLogModal(true)}
-                className="px-2.5 py-2 bg-[#111520] hover:bg-[#1a2234] text-amber-300 border border-amber-500/40 text-xs font-black rounded transition cursor-pointer flex items-center gap-1"
-                title="배틀 로그 보기"
-              >
-                <ScrollText className="w-3.5 h-3.5 text-amber-400" />
-                <span>로그</span>
-              </button>
-            </>
-          )}
-
-          {/* 드로우 단계 */}
-          {phase === 'DRAW_PHASE' && (canP0Draw || canP1Draw) && isCurrentControlledTurn && (
-            <button
-              onClick={() => handleDrawCards(controlledPlayerIndex)}
-              className="px-3.5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1.5 animate-pulse"
-            >
-              <span>🎴 드로우 ({currentTurnDrawCount}장)</span>
-            </button>
-          )}
-
-          {/* 메인 액션 페이즈 */}
-          {phase === 'ACTION_PHASE' && isCurrentControlledTurn && (
-            <>
-              <button
-                disabled={isActionLockedByModal}
-                onClick={() => {
-                  setIsConfirmingEndTurn(false);
-                  handleDecideClash(true);
-                }}
-                className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] hover:brightness-110 text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1"
-              >
-                <Swords className="w-3.5 h-3.5" />
-                <span>배틀 선언</span>
-              </button>
-              <button
-                disabled={isActionLockedByModal}
-                onClick={() => setIsConfirmingEndTurn(true)}
-                className="px-3 py-2 bg-[#111520] hover:bg-slate-800 text-slate-300 font-bold text-xs sm:text-sm rounded border border-white/20 transition cursor-pointer"
-              >
-                턴 종료
-              </button>
-            </>
-          )}
-
-          {/* 대결 세트 단계 카드 없이 패스 */}
-          {phase === 'CLASH_SET' && !clashCardReady && (
-            <button
-              disabled={isActionLockedByModal}
-              onClick={() => handleSetClashCard(controlledPlayerIndex, null)}
-              className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs sm:text-sm rounded border border-amber-500/40 transition cursor-pointer"
-            >
-              카드 없이 패스
-            </button>
-          )}
-
-          {/* 연격 단계 연격 종료 */}
-          {phase === 'COMBO_STEP' && isPlayerComboPhase && (
-            <button
-              onClick={() => {
-                setNoComboCountdown(null);
-                handleFinishCombo(controlledPlayerIndex);
-              }}
-              className="px-3.5 py-2 bg-gradient-to-r from-[#ea580c] to-[#fb923c] text-white font-black text-xs sm:text-sm rounded shadow transition cursor-pointer flex items-center gap-1 animate-pulse"
-            >
-              <span>연격 종료</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          {/* 패 초과 버리기 단계 */}
-          {phase === 'DISCARD_OVERFLOW' && handLength > 8 && (
-            <button
-              disabled={selectedOverflowIds.length !== handLength - 8}
-              onClick={() => {
-                handleDiscardOverflow(controlledPlayerIndex, selectedOverflowIds);
-                setSelectedOverflowIds([]);
-              }}
-              className={`px-3 py-2 rounded text-xs sm:text-sm font-black transition ${
-                selectedOverflowIds.length === handLength - 8
-                  ? 'bg-rose-600 hover:bg-rose-500 text-white cursor-pointer animate-pulse'
-                  : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-              }`}
-            >
-              버리기 ({selectedOverflowIds.length}/{handLength - 8})
-            </button>
-          )}
+          {quickActionButtons}
         </div>
       )}
     </div>

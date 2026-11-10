@@ -5,6 +5,7 @@ import type { BattleLayoutProps } from '../components/battle/BattleLayout';
 import type { GameState, PlayerState, CharacterCard, AnyCard, ElementType, ActionCard } from '../types/tcg';
 import type { MultiplayerRole, TimeLimitConfig } from '../types/multiplayer';
 import type { ConcertoModalState, IntroSwapModalState } from '../battle/store';
+import type { BattleLayoutMode } from '../battle/layoutMode';
 
 export interface UseBattleLayoutPropsParams {
   gameState: GameState;
@@ -40,6 +41,7 @@ export interface UseBattleLayoutPropsParams {
   onExitToLobby?: () => void;
   isMobileBattle: boolean;
   setIsMobileBattle: (val: boolean | ((prev: boolean) => boolean)) => void;
+  battleLayoutMode?: BattleLayoutMode;
   isCurrentControlledTurn: boolean;
   isAiThinking: boolean;
   setControlledPlayerIndex: React.Dispatch<React.SetStateAction<0 | 1>>;
@@ -310,6 +312,7 @@ export function useBattleLayoutProps(p: UseBattleLayoutPropsParams): BattleLayou
       getDisplayLogText: p.getDisplayLogText,
     },
     isMobileBattle: p.isMobileBattle,
+    battleLayoutMode: p.battleLayoutMode,
     isRightPanelCollapsed: p.isRightPanelCollapsed,
     isSpectator: p.isSpectator,
     isCurrentControlledTurn: p.isCurrentControlledTurn,

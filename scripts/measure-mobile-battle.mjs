@@ -76,10 +76,23 @@ function measureInPage() {
     const z = parseFloat(getComputedStyle(e).zoom);
     return z && Math.abs(z - 1) > 0.001 && e.getBoundingClientRect().width > 0;
   });
-  const arenaZoom = zoomHost ? +parseFloat(getComputedStyle(zoomHost).zoom).toFixed(4) : 1;
+  // 가로 폰 3열 전장(4단계~)은 zoom 없이 [data-phone-board]로 그려진다. 그 안의 손패만 임시 zoom.
+  const phoneBoard = document.querySelector('[data-phone-board]');
+  const arenaZoom = !phoneBoard && zoomHost ? +parseFloat(getComputedStyle(zoomHost).zoom).toFixed(4) : 1;
 
   // 2) 보드 카드 이미지 영역 (손패 포함) — 폭 비율, 하단 넘침
-  const boardRoot = zoomHost || document.body;
+  const boardRoot = phoneBoard || zoomHost || document.body;
+  // 가로 폰 전장(5단계~): 보드 안쪽의 overflow 상자(예: 카드 효과문 칸)가 잘라 화면에 안 보이는 부분은 넘침에서 뺀다.
+  // 보드 바깥 틀(화면 전체 틀)이 자르는 것은 실제 화면 잘림이므로 그대로 센다. 기존 전장은 이전 기준 유지.
+  const visibleBottom = (e) => {
+    let b = e.getBoundingClientRect().bottom;
+    if (!phoneBoard) return b;
+    for (let a = e.parentElement; a && a !== phoneBoard; a = a.parentElement) {
+      const cs = getComputedStyle(a);
+      if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') b = Math.min(b, a.getBoundingClientRect().bottom);
+    }
+    return b;
+  };
   let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, imgCount = 0, minImgW = Infinity;
   boardRoot.querySelectorAll('img').forEach((img) => {
     const r = img.getBoundingClientRect();
@@ -87,7 +100,7 @@ function measureInPage() {
     imgCount++;
     minImgW = Math.min(minImgW, r.width);
     x0 = Math.min(x0, r.left); x1 = Math.max(x1, r.right);
-    y0 = Math.min(y0, r.top); y1 = Math.max(y1, r.bottom);
+    y0 = Math.min(y0, r.top); y1 = Math.max(y1, visibleBottom(img));
   });
   // 넘침은 이미지 + 글씨 요소 기준 (손패 카드 이름 등 이미지 아래 글씨까지 포함 — 1단계 측정과 같은 기준)
   let contentBottom = y1;
@@ -95,8 +108,30 @@ function measureInPage() {
     if (![...e.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim())) return;
     const r = e.getBoundingClientRect();
     if (r.width < 1 || r.height < 1 || isHidden(e)) return;
-    contentBottom = Math.max(contentBottom, r.bottom);
+    contentBottom = Math.max(contentBottom, visibleBottom(e));
   });
+  // 넘침 원인 추적용: 화면 아래로 나간 이미지·글씨 요소 (최대 5개)
+  const overflowSamples = [...boardRoot.querySelectorAll('img,span,p,div,button')]
+    .filter((e) => {
+      const r = e.getBoundingClientRect();
+      const hasText = [...e.childNodes].some((c) => c.nodeType === 3 && c.textContent.trim());
+      return (e.tagName === 'IMG' || hasText) && r.height >= 1 && visibleBottom(e) > vh + 0.5 && !isHidden(e);
+    })
+    .slice(0, 5)
+    .map((e) => {
+      const r = e.getBoundingClientRect();
+      return `${e.tagName} bottom=${Math.round(r.bottom)} "${(e.alt || e.textContent || '').trim().slice(0, 16)}" .${(typeof e.className === 'string' ? e.className : '').slice(0, 50)}`;
+    });
+  // 손패([data-phone-hand])를 뺀 가로 폰 전장의 하단 넘침 (4단계 기준)
+  let boardBottom = -Infinity;
+  if (phoneBoard) {
+    phoneBoard.querySelectorAll('*').forEach((e) => {
+      if (e.closest('[data-phone-hand]')) return;
+      const r = e.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1 || isHidden(e)) return;
+      boardBottom = Math.max(boardBottom, visibleBottom(e));
+    });
+  }
   const cardArea = imgCount
     ? {
         imgCount,
@@ -107,6 +142,8 @@ function measureInPage() {
         bottom: Math.round(y1),
         imgBottomOverflowPx: Math.round(Math.max(0, y1 - vh)),
         bottomOverflowPx: Math.round(Math.max(0, contentBottom - vh)),
+        overflowSamples,
+        boardBottomOverflowPx: phoneBoard ? Math.round(Math.max(0, boardBottom - vh)) : null,
         smallestImgW: Math.round(minImgW),
       }
     : null;
@@ -119,6 +156,8 @@ function measureInPage() {
   const newStat = () => ({ chars: 0, under10: 0, min: null, buckets: Object.fromEntries(BUCKETS.map((b) => [b, 0])) });
   const all = newStat();
   const readable = newStat();
+  // 손패([data-phone-hand])를 뺀 가로 폰 전장 글씨 (4단계 완료 기준용)
+  const board = newStat();
   const smallSamples = [];
   const seen = new Set();
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -135,7 +174,8 @@ function measureInPage() {
     const t = transformScaleOf(el);
     const eff = +(cssPx * z * t).toFixed(2);
     const decorative = !!el.closest('[aria-hidden="true"]');
-    for (const s of decorative ? [all] : [all, readable]) {
+    const inBoard = !!phoneBoard && phoneBoard.contains(el) && !el.closest('[data-phone-hand]');
+    for (const s of decorative ? [all] : inBoard ? [all, readable, board] : [all, readable]) {
       s.chars += txt.length;
       s.buckets[bucketOf(eff)] += txt.length;
       if (eff < 10) s.under10 += txt.length;
@@ -154,6 +194,18 @@ function measureInPage() {
     .map((b) => b.getBoundingClientRect())
     .filter(inViewport);
   const buttonsUnder44 = btnRects.filter((r) => r.width < 44 || r.height < 44).length;
+  // 44px 미만 버튼 추적용 (최대 6개)
+  const smallButtons = [...document.querySelectorAll('button, [role="button"]')]
+    .filter((b) => !isHidden(b))
+    .filter((b) => {
+      const r = b.getBoundingClientRect();
+      return inViewport(r) && (r.width < 44 || r.height < 44);
+    })
+    .slice(0, 6)
+    .map((b) => {
+      const r = b.getBoundingClientRect();
+      return `${Math.round(r.width)}x${Math.round(r.height)} "${(b.innerText || b.title || b.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim().slice(0, 20)}"`;
+    });
 
   // 5) 화면을 덮는 고정 요소 (2%~95% 면적)
   const fixedEls = [...document.querySelectorAll('body *')]
@@ -192,9 +244,10 @@ function measureInPage() {
     text: {
       all: { ...all, under10Pct: pct(all) },
       readable: { ...readable, under10Pct: pct(readable) },
+      board: { ...board, under10Pct: pct(board) },
       smallSamples,
     },
-    buttons: { visible: btnRects.length, under44: buttonsUnder44 },
+    buttons: { visible: btnRects.length, under44: buttonsUnder44, smallButtons },
     fixedEls,
     orientationGuardVisible,
     orientationGuardButtons,
@@ -338,8 +391,11 @@ for (const [W, H] of SIZES) {
       modalZoom: b.modalZoom ? +(+b.modalZoom).toFixed(4) : null,
       cardWidthPct: b.cardArea ? +(b.cardArea.widthRatio * 100).toFixed(1) : null,
       bottomOverflowPx: b.cardArea ? b.cardArea.bottomOverflowPx : null,
+      boardOverflowPx: b.cardArea && b.cardArea.boardBottomOverflowPx !== null ? b.cardArea.boardBottomOverflowPx : '-',
       readableUnder10Pct: b.text.readable.under10Pct,
       readableMinPx: b.text.readable.min ? b.text.readable.min.px : null,
+      boardUnder10Pct: b.text.board && b.text.board.chars ? b.text.board.under10Pct : '-',
+      boardMinPx: b.text.board && b.text.board.min ? b.text.board.min.px : '-',
       allUnder10Pct: b.text.all.under10Pct,
       buttonsUnder44: `${b.buttons.under44}/${b.buttons.visible}`,
       fixedOverlays: b.fixedEls.length,
@@ -356,7 +412,7 @@ await browser.close();
 fs.writeFileSync(path.join(OUT, 'summary.json'), JSON.stringify({ url: BASE_URL, at: new Date().toISOString(), summary }, null, 1));
 
 // 보고서에 그대로 붙일 수 있는 마크다운 표
-const cols = ['size', 'layoutMode', 'mobileClass', 'arenaZoom', 'modalZoom', 'cardWidthPct', 'bottomOverflowPx', 'readableUnder10Pct', 'readableMinPx', 'buttonsUnder44', 'fixedOverlays', 'orientationGuard', 'guardButtons', 'consoleErrors'];
+const cols = ['size', 'layoutMode', 'mobileClass', 'arenaZoom', 'modalZoom', 'cardWidthPct', 'bottomOverflowPx', 'boardOverflowPx', 'readableUnder10Pct', 'readableMinPx', 'boardUnder10Pct', 'boardMinPx', 'buttonsUnder44', 'fixedOverlays', 'orientationGuard', 'guardButtons', 'consoleErrors'];
 console.log(`\n측정 대상: ${BASE_URL} (flow: ${FLOW}${DESKTOP ? ', desktop' : ''})\n결과 폴더: ${OUT}\n`);
 console.log(`| ${cols.join(' | ')} |`);
 console.log(`|${cols.map(() => '---').join('|')}|`);

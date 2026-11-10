@@ -29,6 +29,14 @@ interface HandViewProps {
   comboCount?: number;
   comboUnlimited?: boolean;
   onHover?: (card: ActionCard | null) => void;
+  /**
+   * 가로 폰 전용 표시 (모바일 5단계). 규칙·동작은 그대로, 배치만 바뀐다.
+   * - peek: 카드 윗부분만 보이는 띠 (띠 전체가 하나의 탭 영역 → onPhoneExpand)
+   * - expanded: 커진 카드 가로 목록 + 선택 시 하단 행동 버튼
+   */
+  phoneMode?: 'peek' | 'expanded';
+  onPhoneExpand?: () => void;
+  onPhoneCollapse?: () => void;
 }
 
 export const HandView: React.FC<HandViewProps> = ({
@@ -53,7 +61,11 @@ export const HandView: React.FC<HandViewProps> = ({
   comboCount = 0,
   comboUnlimited = false,
   onHover,
+  phoneMode,
+  onPhoneExpand,
+  onPhoneCollapse,
 }) => {
+  const isPhone = phoneMode !== undefined;
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [isHandCollapsed, setIsHandCollapsed] = useState<boolean>(false);
@@ -142,10 +154,59 @@ export const HandView: React.FC<HandViewProps> = ({
 
   const isOverflowPhase = phase === 'DISCARD_OVERFLOW';
 
+  // [가로 폰 · 살짝 보임] 카드 윗부분(코스트·이름)만 보이는 띠. 개별 카드는 고를 수 없고 띠를 누르면 펼쳐진다.
+  if (phoneMode === 'peek') {
+    return (
+      <button
+        type="button"
+        data-phone-hand-peek
+        onClick={onPhoneExpand}
+        aria-label={`손패 ${hand.length}장 펼치기`}
+        className="relative w-full h-14 flex items-center gap-1.5 px-1.5 bg-gradient-to-t from-[#05070e] to-[#080c17]/95 border-t border-[#f97316]/40 overflow-hidden select-none"
+      >
+        <span className="shrink-0 flex flex-col items-center justify-center w-12 text-[#f97316]">
+          <span className="text-[11px] font-black leading-tight">▲ 손패</span>
+          <span className={`text-[12px] font-mono font-black leading-tight ${hand.length > 8 ? 'text-red-400' : ''}`}>{hand.length}/8</span>
+        </span>
+        <span className="flex-1 min-w-0 flex items-start gap-1 overflow-hidden h-full pt-1">
+          {hand.length === 0 ? (
+            <span className="self-center text-[11px] text-slate-400">패에 카드가 없습니다</span>
+          ) : (
+            hand.map((card, idx) => {
+              const { canPlayClash, canCombo } = checkCardUsable(card);
+              const isHighlighted = (canSetClashCard && canPlayClash) || (isComboStep && canCombo);
+              const colorBorder = card.color === 'RED' ? 'border-red-500' : card.color === 'GREEN' ? 'border-emerald-400' : 'border-cyan-400';
+              return (
+                <span
+                  key={`${card.id}-${idx}`}
+                  className={`shrink-0 w-[76px] h-[48px] flex flex-col rounded-md border-2 bg-[#0c101b] overflow-hidden ${colorBorder} ${
+                    isHighlighted ? 'ring-2 ring-[#f97316] animate-pulse' : ''
+                  }`}
+                >
+                  <span className="flex items-center justify-between gap-0.5 px-1 bg-black/80">
+                    <span className="text-[11px] font-mono font-black text-amber-300 leading-[15px]">⚡{card.cost}</span>
+                    <span className="text-[10px] font-black text-white truncate leading-[15px]">{card.nameKr}</span>
+                  </span>
+                  <CardArt artUrl={card.artUrl} sizes="80px" alt="" fallbackName={card.nameKr} className="w-full flex-1 min-h-0 object-cover object-top" />
+                </span>
+              );
+            })
+          )}
+        </span>
+      </button>
+    );
+  }
+
   return (
-    <div className="relative w-full px-3 pt-1 pb-1.5 flex flex-col items-center bg-gradient-to-t from-[#05070e] via-[#080c17]/90 to-transparent select-none">
+    <div
+      data-phone-hand-expanded={isPhone ? '' : undefined}
+      className={`relative w-full flex flex-col items-center select-none ${
+        isPhone ? 'h-full px-1.5 pt-1 pb-1 bg-[#070a13]/98 border-t-2 border-[#f97316]/70' : 'px-3 pt-1 pb-1.5 bg-gradient-to-t from-[#05070e] via-[#080c17]/90 to-transparent'
+      }`}
+    >
       {/* 슬림 상단 HUD 안내 바 */}
-      <div className="w-full max-w-5xl flex items-center justify-between text-[11px] text-slate-400 mb-1 px-2">
+      {/* 가로 폰: 카드를 고르면 이 안내 줄 자리에 행동 버튼 줄이 올라온다 (카드 줄 높이 유지) */}
+      <div className={`w-full max-w-5xl flex items-center justify-between text-[11px] text-slate-400 mb-1 px-2 ${isPhone && selectedCard && !isOverflowPhase ? 'hidden' : ''}`}>
         <div className="flex items-center gap-2">
           <span className="font-mono font-black text-[#f97316] tracking-wider uppercase flex items-center gap-1">
             <span>✦ HAND DOCK</span>
@@ -159,6 +220,15 @@ export const HandView: React.FC<HandViewProps> = ({
           >
             {hand.length} / 8
           </span>
+          {isPhone ? (
+            <button
+              type="button"
+              onClick={onPhoneCollapse}
+              className="min-h-[44px] min-w-[44px] px-2.5 text-[11px] font-bold bg-[#111624] text-cyan-300 border border-cyan-500/40 rounded flex items-center justify-center gap-1"
+            >
+              ▼ 접기
+            </button>
+          ) : (
           <button
             type="button"
             onClick={() => setIsHandCollapsed((prev) => !prev)}
@@ -166,6 +236,7 @@ export const HandView: React.FC<HandViewProps> = ({
           >
             {isHandCollapsed ? `▲ 펼치기 (${hand.length}장)` : '▼ 손패 접기'}
           </button>
+          )}
           {isOverflowPhase && (
             <span className="text-red-400 text-[11px] font-bold animate-pulse">
               ⚠️ 상한 초과: 버릴 카드 {hand.length - 8}장 선택
@@ -176,7 +247,7 @@ export const HandView: React.FC<HandViewProps> = ({
         <div className="text-[11px] text-slate-300 font-bold flex items-center gap-2">
           {phase === 'CLASH_SET' && (
             <span className="text-[#f97316] font-black animate-pulse">
-              ⚔️ 대결에 출전할 카드를 선택/더블클릭하세요
+              {isPhone ? '⚔️ 대결에 낼 카드를 고르세요' : '⚔️ 대결에 출전할 카드를 선택/더블클릭하세요'}
             </span>
           )}
           {phase === 'ACTION_PHASE' && (
@@ -197,10 +268,12 @@ export const HandView: React.FC<HandViewProps> = ({
 
       {/* 하단 플로팅 & 도킹 손패 카드 리스트 (-space-x-2 겹침 + 부채꼴 아치 + 호버 시 위로 솟구침) */}
       <div
-        className={`relative flex items-end justify-center -space-x-2 sm:-space-x-3 max-w-full px-6 pt-3 pb-0.5 transition-all duration-300 ${
-          isHandCollapsed
+        className={`relative flex ${isPhone ? 'items-center' : 'items-end'} max-w-full transition-all duration-300 ${
+          isPhone
+            ? 'w-full flex-1 min-h-0 gap-1.5 overflow-x-auto overflow-y-hidden px-1 pt-2 pb-0.5 justify-start'
+            : `justify-center -space-x-2 sm:-space-x-3 px-6 pt-3 pb-0.5 ${isHandCollapsed
             ? 'h-8 min-h-[32px] overflow-hidden opacity-60 cursor-pointer hover:opacity-90'
-            : 'overflow-visible min-h-[170px] sm:min-h-[188px]'
+            : 'overflow-visible min-h-[170px] sm:min-h-[188px]'}`
         }`}
         onClick={() => {
           if (isHandCollapsed) setIsHandCollapsed(false);
@@ -236,7 +309,11 @@ export const HandView: React.FC<HandViewProps> = ({
             const isHovered = hoveredCardId === card.id;
 
             // 카드 변형 스타일: isSelected > isHovered > 기본 부채꼴 (CSS :hover 클래스 대신 제어하여 지터 현상 완벽 방지)
-            const cardTransform = isSelected
+            const cardTransform = isPhone
+              ? isSelected
+                ? 'translateY(-6px)'
+                : 'none'
+              : isSelected
               ? 'translateY(-28px) scale(1.08)'
               : isHovered
               ? 'translateY(-22px) scale(1.08)'
@@ -284,7 +361,7 @@ export const HandView: React.FC<HandViewProps> = ({
                   zIndex: cardZIndex,
                   ...(isNewlyDrawn ? { animationDelay: drawDelay } : {}),
                 }}
-                className={`relative w-[122px] sm:w-[134px] md:w-[146px] h-[172px] sm:h-[188px] shrink-0 flex flex-col justify-between rounded-xl bg-[#0c101b]/95 p-1.5 transition-[transform,box-shadow,border-color] duration-200 ease-out cursor-pointer select-none group ${
+                className={`relative ${isPhone ? 'w-[100px] h-[140px] overflow-hidden' : 'w-[122px] sm:w-[134px] md:w-[146px] h-[172px] sm:h-[188px]'} shrink-0 flex flex-col justify-between rounded-xl bg-[#0c101b]/95 p-1.5 transition-[transform,box-shadow,border-color] duration-200 ease-out cursor-pointer select-none group ${
                   isNewlyDrawn ? 'animate-card-draw' : ''
                 } ${
                   isSelected
@@ -311,7 +388,7 @@ export const HandView: React.FC<HandViewProps> = ({
                 )}
 
                 {/* 호버 시 손패 바로 위 플로팅 홀로그램 상세 팝업 (단, 카드를 클릭하여 액션 바가 열려있을 때는 팝업이 버튼을 가리지 않도록 숨김 처리) */}
-                {isHovered && !selectedCardId && (
+                {isHovered && !selectedCardId && !isPhone && (
                   <div
                     className={`absolute bottom-[calc(100%+12px)] ${popupAlignClass} z-[65] pointer-events-auto w-[290px] sm:w-[330px] max-w-[88vw] bg-[#0c101b]/98 border border-[#f97316] p-3 shadow-[0_0_40px_rgba(0,0,0,0.98),0_0_20px_rgba(249,115,22,0.4)] backdrop-blur-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-2 before:absolute before:-bottom-3 before:left-0 before:right-0 before:h-3 before:content-['']`}
                   >
@@ -356,7 +433,8 @@ export const HandView: React.FC<HandViewProps> = ({
                 )}
 
                 {/* 1. 일러스트 영역 */}
-                <div className="w-full h-[88px] sm:h-[96px] rounded-lg overflow-hidden bg-slate-950 border border-white/10 relative shrink-0">
+                {/* 가로 폰: 효과문을 빼고 그 자리를 일러스트에 줌 (효과는 카드 선택 → 🔍 상세) */}
+                <div className={`w-full ${isPhone ? 'h-[88px]' : 'h-[88px] sm:h-[96px]'} rounded-lg overflow-hidden bg-slate-950 border border-white/10 relative shrink-0`}>
                   <CardArt
                     artUrl={card.artUrl}
                     sizes="160px"
@@ -366,7 +444,7 @@ export const HandView: React.FC<HandViewProps> = ({
                   />
                   {card.isRevealed && (
                     <span
-                      className="absolute top-1 right-1 px-1.5 py-0.2 bg-amber-950/90 border border-amber-400/60 text-amber-200 text-[9px] font-black rounded shadow"
+                      className="absolute top-1 right-1 px-1.5 py-0.2 bg-amber-950/90 border border-amber-400/60 text-amber-200 text-[10px] font-black rounded shadow"
                       title="효과로 상대에게 공개된 카드입니다"
                     >
                       👁️ 공개됨
@@ -381,14 +459,14 @@ export const HandView: React.FC<HandViewProps> = ({
                       {card.nameKr}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[10px] sm:text-xs font-mono text-slate-300 bg-[#080b13] px-2 py-0.5 rounded border border-white/5">
+                  <div className={`flex items-center justify-between text-[10px] font-mono text-slate-300 bg-[#080b13] ${isPhone ? 'px-1 whitespace-nowrap' : 'sm:text-xs px-2'} py-0.5 rounded border border-white/5`}>
                     <span title="비용">⚡<strong className="text-amber-300 font-black ml-0.5">{card.cost}</strong></span>
                     <span title="속도">⏱<strong className="text-cyan-300 font-black ml-0.5">{card.speed ?? '-'}</strong></span>
                     <span title="피해">⚔<strong className="text-red-400 font-black ml-0.5">{card.damage}</strong></span>
                   </div>
 
                   {/* 카드 효과 설명 텍스트 (호버하지 않아도 패에서 즉시 확인 가능) */}
-                  {card.description && (
+                  {card.description && !isPhone && (
                     <div className="w-full text-[9px] sm:text-[10px] text-slate-300 bg-[#080b13]/90 px-1.5 py-0.5 rounded leading-tight line-clamp-2 border border-white/5 font-medium">
                       {formatEffectText(card.description, 'sm')}
                     </div>
@@ -402,7 +480,7 @@ export const HandView: React.FC<HandViewProps> = ({
                           ⚡ 연격 가능
                         </div>
                       ) : (
-                        <div className="w-full py-0.5 bg-black/85 text-red-300 font-bold text-[8px] text-center truncate px-1">
+                        <div className="w-full py-0.5 bg-black/85 text-red-300 font-bold text-[10px] text-center truncate px-1">
                           {reason || '불가'}
                         </div>
                       )}
@@ -419,27 +497,31 @@ export const HandView: React.FC<HandViewProps> = ({
       {selectedCard && !isOverflowPhase && (() => {
         const usability = checkCardUsable(selectedCard);
         return (
-          <div className="absolute bottom-40 sm:bottom-44 z-[120] bg-[#0c101b]/98 border-2 border-[#f97316] p-2.5 shadow-[0_0_35px_rgba(0,0,0,0.98),0_0_25px_rgba(249,115,22,0.5)] flex flex-col gap-2 backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-2">
+          <div className={`${isPhone ? 'relative w-full mb-1 p-1.5 order-first' : 'absolute bottom-40 sm:bottom-44 p-2.5'} z-[120] bg-[#0c101b]/98 border-2 border-[#f97316] shadow-[0_0_35px_rgba(0,0,0,0.98),0_0_25px_rgba(249,115,22,0.5)] flex flex-col gap-2 backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-2`}>
             <span className="pointer-events-none absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[#f97316]" />
             <span className="pointer-events-none absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-[#f97316]" />
             <span className="pointer-events-none absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-cyan-400" />
             <span className="pointer-events-none absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-cyan-400" />
 
             {/* 세트/사용 불가능 사유 상단 안내 배너 */}
-            {usability.reason && (
+            {usability.reason && !isPhone && (
               <div className="w-full px-2.5 py-1.5 bg-red-950/90 border border-red-500/70 text-red-200 text-xs font-bold flex items-center gap-1.5 shadow-[0_0_12px_rgba(239,68,68,0.25)]">
                 <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
                 <span>{usability.reason}</span>
               </div>
             )}
 
-            <div className="flex items-center gap-2.5">
+            <div className={`flex items-center ${isPhone ? 'gap-1.5 [&>button]:min-h-[44px] [&>button]:min-w-[44px] [&>button]:justify-center overflow-x-auto' : 'gap-2.5'}`}>
               <div className="flex flex-col pr-2.5 border-r border-white/15">
                 <span className="text-xs font-black text-[#f97316]">{selectedCard.nameKr}</span>
                 <span className="text-[10px] font-mono text-slate-400">
                   COST {selectedCard.cost} | DMG {selectedCard.damage}
                   {selectedCard.speed !== undefined ? ` | SPD ${selectedCard.speed}` : ''}
                 </span>
+                {/* 가로 폰: 사용 불가 사유를 별도 줄 대신 이름 아래 한 줄로 (카드 줄 높이 유지) */}
+                {isPhone && usability.reason && (
+                  <span className="text-[10px] font-bold text-red-300 truncate max-w-[180px]">⚠ {usability.reason}</span>
+                )}
               </div>
 
               {/* 1. 대결 카드로 세트 */}

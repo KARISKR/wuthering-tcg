@@ -55,7 +55,7 @@ const LeaderSelectModalBody: React.FC<Omit<LeaderSelectModalProps, 'isOpen'>> = 
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-1.5 sm:p-3 animate-fade-in select-none">
-      <div className="relative w-full max-w-4xl bg-[#0c101b]/95 border border-[#f97316]/60 p-2 sm:p-3.5 lg:p-6 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center justify-between max-h-[96dvh] overflow-y-auto custom-scrollbar">
+      <div data-prebattle-modal className="relative w-full max-w-4xl bg-[#0c101b]/95 border border-[#f97316]/60 p-2 sm:p-3.5 lg:p-6 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col items-center justify-between max-h-[96dvh] overflow-y-auto custom-scrollbar">
         {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />

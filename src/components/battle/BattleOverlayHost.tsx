@@ -473,7 +473,7 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
       {/* 턴 종료 재확인 중앙 경고 모달 */}
       {isConfirmingEndTurn && gameState.phase === 'ACTION_PHASE' && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in duration-150">
-          <div className="mobile-modal-scaled relative bg-[#0c101b] border-2 border-[#f97316] max-w-md w-full p-6 shadow-[0_0_50px_rgba(0,0,0,0.95),0_0_25px_rgba(249,115,22,0.35)] flex flex-col gap-4 text-center">
+          <div className="mobile-modal-scaled modal-readable relative bg-[#0c101b] border-2 border-[#f97316] max-w-md w-full p-6 shadow-[0_0_50px_rgba(0,0,0,0.95),0_0_25px_rgba(249,115,22,0.35)] flex flex-col gap-4 text-center">
             <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
             <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
             <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
@@ -605,7 +605,7 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
       {/* 게임 진행 중 나가기 확인 팝업 모달 */}
       {showExitConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200 select-none">
-          <div className="mobile-modal-scaled relative w-full max-w-md bg-[#0c101b]/95 backdrop-blur-md border border-[#f97316]/60 p-6 shadow-[0_0_50px_rgba(0,0,0,0.95)] text-slate-100 flex flex-col items-center text-center overflow-hidden">
+          <div className="mobile-modal-scaled modal-readable relative w-full max-w-md bg-[#0c101b]/95 backdrop-blur-md border border-[#f97316]/60 p-6 shadow-[0_0_50px_rgba(0,0,0,0.95)] text-slate-100 flex flex-col items-center text-center overflow-hidden">
             {/* 네 모서리 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
             <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
             <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -669,7 +669,7 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
       {/* 항복(기권) 확인 모달 */}
       {showSurrenderConfirm && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150 select-none">
-          <div className="mobile-modal-scaled relative w-full max-w-md bg-[#0c101b]/95 backdrop-blur-md border border-rose-500/70 p-6 shadow-[0_0_50px_rgba(0,0,0,0.95)] text-slate-100 flex flex-col items-center text-center overflow-hidden">
+          <div className="mobile-modal-scaled modal-readable relative w-full max-w-md bg-[#0c101b]/95 backdrop-blur-md border border-rose-500/70 p-6 shadow-[0_0_50px_rgba(0,0,0,0.95)] text-slate-100 flex flex-col items-center text-center overflow-hidden">
             <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-rose-500" />
             <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-rose-500" />
             <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
@@ -783,7 +783,7 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
-            <div className="mobile-modal-scaled relative w-full max-w-2xl bg-[#0c101b]/95 border border-[#f97316]/70 p-6 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-4 overflow-hidden">
+            <div className="mobile-modal-scaled modal-readable relative w-full max-w-2xl bg-[#0c101b]/95 border border-[#f97316]/70 p-6 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-4 overflow-hidden">
               {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
               <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
               <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -916,7 +916,7 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
         isPlayerComboPhase &&
         !canPlayerExecuteCombo(activeControlledPlayer) && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200 select-none">
-            <div className="mobile-modal-scaled relative max-w-md w-full bg-[#0c101b]/95 border border-[#f97316]/80 p-6 shadow-[0_0_60px_rgba(249,115,22,0.3)] text-center flex flex-col items-center gap-4 overflow-hidden">
+            <div className="mobile-modal-scaled modal-readable relative max-w-md w-full bg-[#0c101b]/95 border border-[#f97316]/80 p-6 shadow-[0_0_60px_rgba(249,115,22,0.3)] text-center flex flex-col items-center gap-4 overflow-hidden">
               {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
               <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
               <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -1052,7 +1052,7 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
       {/* [모바일 전용] 선택 카드 상세 정보 팝업 모달 */}
       {showMobileCardModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
-          <div className="relative mobile-modal-scaled w-full max-w-sm max-h-[92dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/98 border border-[#f97316]/70 p-4 shadow-[0_0_50px_rgba(0,0,0,0.95)] flex flex-col gap-3">
+          <div className="relative mobile-modal-scaled modal-readable w-full max-w-sm max-h-[92dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/98 border border-[#f97316]/70 p-4 shadow-[0_0_50px_rgba(0,0,0,0.95)] flex flex-col gap-3">
             <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
             <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
             <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#22d3ee]" />
@@ -1115,7 +1115,7 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
       {/* [모바일 전용] 배틀 로그 팝업 모달 */}
       {showMobileLogModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
-          <div className="relative mobile-modal-scaled w-full max-w-md h-[80dvh] bg-[#0c101b]/98 border border-[#22d3ee]/70 p-4 shadow-[0_0_50px_rgba(0,0,0,0.95)] flex flex-col gap-2">
+          <div className="relative mobile-modal-scaled modal-readable w-full max-w-md h-[80dvh] bg-[#0c101b]/98 border border-[#22d3ee]/70 p-4 shadow-[0_0_50px_rgba(0,0,0,0.95)] flex flex-col gap-2">
             <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#22d3ee]" />
             <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#22d3ee]" />
             <span className="pointer-events-none absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-[#f97316]" />

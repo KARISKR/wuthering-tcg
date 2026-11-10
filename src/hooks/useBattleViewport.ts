@@ -112,16 +112,9 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
     return (localStorage.getItem('wuthering_left_panel_size') as LeftPanelSize) || 'normal';
   });
 
-  // 모바일 전용 배틀 모드 판정 헬퍼
-  const checkIsMobileBattle = (): boolean => {
-    if (typeof window === 'undefined') return false;
-    const isMobileHash = window.location.hash.includes('m-battle');
-    const isMobileUa = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const isSmallScreen = window.innerWidth < 1024 || window.innerHeight < 640;
-    return isMobileHash || isMobileUa || isSmallScreen;
-  };
-
-  // 레이아웃 모드 판정 (설계서 2-1절). 3단계에서는 값만 계산하고 화면 배치에는 아직 쓰지 않는다.
+  // 레이아웃 모드 판정 (설계서 2-1절).
+  // 4단계부터 모바일 모드(isMobileBattle)는 이 판정에서 파생한다: 가로 폰·세로 차단 = 모바일, 그 외(PC·태블릿·작은 PC 창) = PC 레이아웃.
+  // (이전: UA·#m-battle 해시·폭 1024 미만·높이 640 미만이면 모바일)
   const calcBattleLayoutMode = (): BattleLayoutMode => {
     if (typeof window === 'undefined') return 'standard';
     return decideBattleLayoutMode({
@@ -148,8 +141,9 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
   };
 
   // 모바일 전용 배틀 모드 상태
-  const [isMobileBattle, setIsMobileBattle] = useState<boolean>(() => checkIsMobileBattle());
   const [battleLayoutMode, setBattleLayoutMode] = useState<BattleLayoutMode>(() => calcBattleLayoutMode());
+  // 상단 바의 📱/🖥️ 토글로 수동 전환 가능 (다음 화면 크기 변화 때 판정값으로 되돌아감 — 기존 동작과 동일)
+  const [isMobileBattle, setIsMobileBattle] = useState<boolean>(() => calcBattleLayoutMode() !== 'standard');
 
   const [showMobileCardModal, setShowMobileCardModal] = useState<boolean>(false);
   const [showMobileLogModal, setShowMobileLogModal] = useState<boolean>(false);
@@ -157,14 +151,19 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
   // 모바일 팝업/모달 자동 다운스케일 줌 계산
   const [modalZoomScale, setModalZoomScale] = useState<number>(() => calcModalZoomScale());
 
+  // 좌우 패널을 접은 채 시작하는 조건: 좁거나 낮은 화면, 또는 터치 기기(태블릿 — 보드를 최대한 크게)
+  const shouldStartPanelsCollapsed = (): boolean =>
+    typeof window !== 'undefined' &&
+    (window.innerWidth < 1180 || window.innerHeight < 600 || (window.matchMedia?.('(pointer: coarse)').matches ?? false));
+
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && (window.innerWidth < 1180 || window.innerHeight < 600)) {
+    if (shouldStartPanelsCollapsed()) {
       return true;
     }
     return localStorage.getItem('wuthering_left_panel_collapsed') === 'true';
   });
   const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && (window.innerWidth < 1180 || window.innerHeight < 600)) {
+    if (shouldStartPanelsCollapsed()) {
       return true;
     }
     return false;
@@ -211,9 +210,10 @@ export function useBattleViewport({ initialPreviewCard }: UseBattleViewportOptio
 
   useEffect(() => {
     const updateViewportScale = () => {
-      const isMobile = checkIsMobileBattle();
+      const mode = calcBattleLayoutMode();
+      const isMobile = mode !== 'standard';
       setIsMobileBattle(isMobile);
-      setBattleLayoutMode(calcBattleLayoutMode());
+      setBattleLayoutMode(mode);
 
       const availH = Math.max(280, window.innerHeight - 38);
       const leftW = isMobile

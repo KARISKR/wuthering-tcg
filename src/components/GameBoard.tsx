@@ -534,6 +534,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     onExitToLobby,
     isMobileBattle,
     setIsMobileBattle,
+    battleLayoutMode,
     isCurrentControlledTurn,
     isAiThinking,
     setControlledPlayerIndex,

@@ -78,8 +78,8 @@ export const HpHistoryModal: React.FC<HpHistoryModalProps> = ({
     .reduce((sum, e) => sum + e.amount, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
-      <div className="relative w-full max-w-2xl max-h-[90vh] bg-[#0c101b]/95 border border-[#f97316]/70 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden [clip-path:polygon(10px_0,100%_0,100%_calc(100%-10px),calc(100%-10px)_100%,0_100%,0_10px)]">
+    <div data-phone-touch className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md animate-in fade-in select-none">
+      <div className="relative w-full max-w-2xl max-h-[90vh] [@media(max-height:500px)]:max-h-[calc(100dvh-24px)] [@media(max-height:500px)]:!overflow-y-auto bg-[#0c101b]/95 border border-[#f97316]/70 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col overflow-hidden [clip-path:polygon(10px_0,100%_0,100%_calc(100%-10px),calc(100%-10px)_100%,0_100%,0_10px)]">
         {/* 네 모서리 명조 택티컬 오렌지/시안 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
         <span className="pointer-events-none absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-[#f97316]" />
@@ -216,7 +216,7 @@ export const HpHistoryModal: React.FC<HpHistoryModalProps> = ({
         </div>
 
         {/* 로그 목록 스크롤 뷰 */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar min-h-[260px] max-h-[50vh]">
+        <div className="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar min-h-[260px] max-h-[50vh] [@media(max-height:500px)]:min-h-0 [@media(max-height:500px)]:max-h-none [@media(max-height:500px)]:flex-none [@media(max-height:500px)]:overflow-visible">
           {filteredHistory.length === 0 ? (
             <div className="h-44 flex flex-col items-center justify-center text-slate-500 gap-2">
               <Clock className="w-8 h-8 opacity-40" />

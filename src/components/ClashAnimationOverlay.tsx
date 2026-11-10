@@ -270,6 +270,8 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
   return (
     <div
       onClick={handleFastForwardOrDismiss}
+      data-clash-overlay-root
+      data-stage={stage}
       className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200 p-4 select-none overflow-y-auto custom-scrollbar cursor-pointer"
     >
       {/* 배경 충돌 비네트 효과 */}
@@ -289,12 +291,13 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
             e.stopPropagation();
           }
         }}
+        data-clash-overlay
         className={`mobile-modal-scaled relative w-full max-w-6xl xl:max-w-7xl flex flex-col items-center justify-center my-auto py-2 lg:py-4 ${
           stage === 'COLLIDE' || stage === 'SLASH' ? 'animate-screen-shake' : ''
         }`}
       >
         {/* 상단 타이틀 배너 */}
-        <div className="text-center mb-5 sm:mb-6">
+        <div data-clash-title className="text-center mb-5 sm:mb-6">
           <div className="inline-flex items-center gap-2 px-5 py-1.5 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-300 font-extrabold text-xs uppercase tracking-widest mb-1.5 shadow-xl shadow-amber-500/20">
             <Swords className="w-4 h-4 text-amber-400" />
             <span>CLASH & JUDGMENT BATTLE</span>
@@ -311,7 +314,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
         </div>
 
         {/* 중앙 카드 대치 구도 */}
-        <div className="relative flex items-center justify-center gap-6 sm:gap-14 md:gap-20 w-full my-2">
+        <div data-clash-cards className="relative flex items-center justify-center gap-6 sm:gap-14 md:gap-20 w-full my-2">
           {/* ========================================================= */}
           {/* [좌측] 플레이어 카드 (P0) */}
           {/* ========================================================= */}
@@ -491,7 +494,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
             </div>
 
             {/* 상성 가이드 미니 다이어그램 */}
-            <div className="flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-1.5 rounded-xl bg-slate-900/95 border border-slate-700/80 shadow-md mt-3.5">
+            <div data-clash-cycle className="flex items-center gap-1.5 text-xs font-extrabold px-3.5 py-1.5 rounded-xl bg-slate-900/95 border border-slate-700/80 shadow-md mt-3.5">
               <span className="text-red-400 flex items-center"><Flame className="w-3.5 h-3.5 inline mr-0.5" />RED</span>
               <span className="text-slate-500 font-bold">&gt;</span>
               <span className="text-emerald-400 flex items-center"><Wind className="w-3.5 h-3.5 inline mr-0.5" />GREEN</span>
@@ -663,7 +666,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
         {/* ========================================================= */}
         {/* 결과 배너 설명 (RESULT 스테이지) */}
         {/* ========================================================= */}
-        <div className="mt-4 w-full max-w-3xl lg:max-w-4xl text-center">
+        <div data-clash-result className="mt-4 w-full max-w-3xl lg:max-w-4xl text-center">
           {stage === 'RESULT' ? (
             <div className="relative bg-[#0c101b]/95 border border-[#f97316]/70 rounded-xl p-5 sm:p-7 shadow-[0_0_80px_rgba(0,0,0,0.95)] animate-victory-banner overflow-hidden">
               {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
@@ -808,6 +811,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
                 return (
                   <button
                     onClick={onDismiss}
+                    data-clash-next
                     className={`mt-4 px-10 py-3.5 rounded-xl font-black text-sm sm:text-base shadow-2xl transition-all duration-200 transform hover:scale-[1.03] active:scale-95 cursor-pointer flex items-center justify-center gap-3 mx-auto [clip-path:polygon(6px_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%,0_6px)] ${
                       isMatchEnding
                         ? 'bg-gradient-to-r from-red-600 via-rose-500 to-amber-500 text-white shadow-red-500/50 animate-pulse border border-red-400'
@@ -836,7 +840,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
 
         {/* 하단 스킵 안내 툴팁 (멀티플레이에서는 스킵 불가) */}
         {!isMultiplayer && stage !== 'RESULT' && (
-          <div className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 animate-pulse">
+          <div data-clash-skip className="mt-4 flex items-center gap-1.5 text-xs font-bold text-slate-400 bg-slate-900/80 px-3 py-1 rounded-full border border-slate-800 animate-pulse">
             <Zap className="w-3.5 h-3.5 text-amber-400" />
             <span>클릭 또는 스페이스바를 누르면 즉시 결과로 스킵합니다</span>
           </div>
