@@ -194,7 +194,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
+    <div data-phone-touch className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in select-none">
       <div className="relative w-full max-w-3xl max-h-[96dvh] overflow-y-auto custom-scrollbar bg-[#0c101b]/95 border border-[#f97316]/70 p-2.5 sm:p-4 lg:p-6 shadow-[0_0_80px_rgba(0,0,0,0.95)] flex flex-col gap-1.5 sm:gap-2.5">
         {/* 네 모서리 명조 택티컬 오렌지/시안 'ㄱ'자 코너 브라켓 장식 */}
         <span className="pointer-events-none absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-[#f97316]" />
@@ -268,7 +268,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             방랑자 Lv.0 녹색 배틀 효과 카드 장수 선택 프롬프트 (ROVER_0_DRAW_PROMPT)
            ============================================================ */}
         {choice.onResolveType === 'ROVER_0_DRAW_PROMPT' ? (
-          <div className="flex flex-col items-center gap-2 sm:gap-3 py-1 my-0.5">
+          <div data-effect-split className="flex flex-col items-center gap-2 sm:gap-3 py-1 my-0.5">
             {/* 1. 중앙: 캐릭터 카드 풀 프레임 */}
             <div className="relative w-36 sm:w-48 md:w-56 aspect-[5/7] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-emerald-500 ring-2 sm:ring-4 ring-emerald-500/30 shadow-[0_0_35px_rgba(16,185,129,0.45)] select-none">
               <img
@@ -301,7 +301,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             </div>
           </div>
         ) : choice.onResolveType === 'SHOREKEEPER_SWITCH_PROMPT' || choice.onResolveType === 'SHOREKEEPER_0_DRAW_PROMPT' || choice.onResolveType === 'SHOREKEEPER_LV2_HEAL_DRAW_PROMPT' ? (
-          <div className="flex flex-col items-center gap-2 sm:gap-3 py-1 my-0.5">
+          <div data-effect-split className="flex flex-col items-center gap-2 sm:gap-3 py-1 my-0.5">
             {/* 1. 중앙: 캐릭터 카드 풀 프레임 */}
             <div className="relative w-36 sm:w-48 md:w-56 aspect-[5/7] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-[#f97316] ring-2 sm:ring-4 ring-[#f97316]/30 shadow-[0_0_35px_rgba(249,115,22,0.45)] select-none">
               <img
@@ -337,7 +337,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
           /* ============================================================
               대상/공개 카드 없는 단순 효과 발동 안내 뷰 (중복 텍스트 완전 제거, 풀사이즈 카드 & 대형 네모칸)
              ============================================================ */
-          <div className="flex flex-col md:flex-row items-center justify-center gap-3 sm:gap-5 py-2 my-1">
+          <div data-effect-split className="flex flex-col md:flex-row items-center justify-center gap-3 sm:gap-5 py-2 my-1">
             {/* 대형 캐릭터 카드 풀 프레임 */}
             <div className="relative w-36 sm:w-48 md:w-56 aspect-[5/7] rounded-xl sm:rounded-2xl overflow-hidden border-2 border-[#f97316] ring-2 sm:ring-4 ring-[#f97316]/30 shadow-[0_0_35px_rgba(249,115,22,0.45)] shrink-0 select-none">
               {choice.sourceCardArt ? (
@@ -383,7 +383,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             </div>
           </div>
         ) : (
-          <>
+          <div data-effect-body className="contents">
             {/* 효과 설명 */}
             <div className="bg-[#111520]/90 border border-[#f97316]/40 p-2.5 sm:p-4 text-xs sm:text-sm text-slate-100 leading-relaxed shadow-inner">
               <div className="flex items-center gap-1.5 sm:gap-2 text-[#f97316] font-extrabold text-xs sm:text-sm mb-1">
@@ -499,7 +499,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             )}
 
             {/* 공개된 카드 리스트 (모바일에서도 한 화면에 쏙 들어오도록 반응형 카드 크기) */}
-            <div className="w-full flex-1 min-h-0 flex items-center justify-center gap-1.5 sm:gap-3 py-1.5 flex-wrap overflow-y-auto custom-scrollbar">
+            <div data-effect-cards className="w-full flex-1 min-h-0 flex items-center justify-center gap-1.5 sm:gap-3 py-1.5 flex-wrap overflow-y-auto custom-scrollbar">
               {displayCards.map((card, idx) => {
                   const isSelected = selectedIds.includes(card.id);
                   const isViewOnly = choice.onResolveType === 'VIEW_ONLY';
@@ -593,7 +593,7 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
               );
             })}
           </div>
-        </>
+        </div>
         )}
 
         {/* 하단 확인 버튼들 */}

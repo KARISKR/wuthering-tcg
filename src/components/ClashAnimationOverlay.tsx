@@ -680,7 +680,7 @@ export const ClashAnimationOverlay: React.FC<ClashAnimationOverlayProps> = ({
               </div>
 
               {/* 피해량, 회복량 및 연격권 뱃지 */}
-              <div className="flex flex-wrap items-center justify-center gap-3 text-sm sm:text-base font-black my-3.5">
+              <div data-clash-badges className="flex flex-wrap items-center justify-center gap-3 text-sm sm:text-base font-black my-3.5">
                 {clashResult.damageDealt > 0 && (
                   <span className="text-rose-300 bg-gradient-to-r from-rose-950/90 to-red-950/90 px-4 py-2 rounded-xl border border-rose-500/60 shadow-lg shadow-rose-950/40 flex items-center gap-2">
                     <span className="text-base sm:text-lg">💥</span>

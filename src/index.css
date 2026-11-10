@@ -896,8 +896,8 @@
   overscroll-behavior: contain;
 }
 
-/* 가로 폰 (모바일 8단계): 시작 전 창(리더 선택·멀리건)의 7~9px 글씨를 10px로, 읽고 누르는 창의 버튼은 44px 이상 */
-.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-prebattle-modal] :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
+/* 가로 폰 (모바일 8·10단계): 시작 전 창·읽고 누르는 창의 7~9px 글씨(효과문 태그 포함)를 10px로, 버튼은 44px 이상 */
+.mobile-battle-mode[data-battle-layout='phone-landscape'] :is([data-prebattle-modal], .modal-readable, [data-phone-touch]) :is(.text-\[7px\], .text-\[8px\], .text-\[9px\]) {
   font-size: 10px;
 }
 .mobile-battle-mode[data-battle-layout='phone-landscape'] :is(.modal-readable, [data-prebattle-modal], [data-phone-touch]) button {
@@ -1006,3 +1006,57 @@
   justify-self: center;
   margin-top: 4px !important;
 }
+
+/* =====================================================================
+   가로 폰 (모바일 10단계 · 사용자 제안 반영)
+   1) 대결 결과: 피해·추격 배지를 작게, 한 줄로
+   2) 효과 확인 팝업: 카드 왼쪽 / 설명 오른쪽
+   3) 팝업 속 카드 그림 크기를 화면 높이 기준으로 제한 (스크롤 없이 한눈에)
+   ===================================================================== */
+.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-clash-badges] {
+  gap: 6px !important;
+  margin: 6px 0 !important;
+}
+.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-clash-badges] > span {
+  padding: 3px 8px !important;
+  border-radius: 8px !important;
+  gap: 4px !important;
+  font-size: 12px !important;
+}
+.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-clash-badges] > span * {
+  font-size: 12px !important;
+}
+.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-clash-badges] strong {
+  font-size: 13px !important;
+}
+
+.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-effect-body] {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-auto-rows: min-content;
+  column-gap: 10px;
+  row-gap: 6px;
+  align-items: start;
+}
+.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-effect-body] > [data-effect-cards] {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  width: auto;
+  max-width: 46vw;
+  align-content: flex-start;
+  justify-content: flex-start;
+}
+.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-effect-body] > :not([data-effect-cards]) {
+  grid-column: 2;
+}
+.mobile-battle-mode[data-battle-layout='phone-landscape'] [data-effect-split] {
+  flex-direction: row !important;
+  align-items: center !important;
+}
+
+.mobile-battle-mode[data-battle-layout='phone-landscape'] :is(.modal-readable, [data-phone-touch]) .aspect-\[5\/7\] {
+  max-width: calc(38dvh * 5 / 7);
+  margin-left: auto;
+  margin-right: auto;
+}
+
