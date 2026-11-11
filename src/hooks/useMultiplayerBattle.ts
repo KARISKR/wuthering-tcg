@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { multiplayerService } from '../services/multiplayerService';
+import { mergeSyncedLogs } from '../services/syncLogs';
 import type { GameState } from '../types/tcg';
 import type { GameEvent } from '../engine/events';
 import type { TimeLimitConfig } from '../types/multiplayer';
@@ -140,6 +141,7 @@ export function useMultiplayerBattle({
     if (initialMode === 'MULTIPLAYER') {
       const saved = multiplayerService.getSavedSession();
       if (saved?.lastGameState) {
+        syncedLogsRef.current = saved.lastGameState.logs;
         setGameState(saved.lastGameState);
         if (saved.timeLimitConfig) setTimeLimitConfig(saved.timeLimitConfig);
         if (saved.p0TotalTime !== undefined) setP0TotalTime(saved.p0TotalTime);
@@ -211,17 +213,25 @@ export function useMultiplayerBattle({
   }, [gameState, isHost]);
 
   // 2. [멀티플레이] 게스트 및 관전자: 상태 동기화 및 기권 수신
+  // 호스트는 새 로그만 보내므로(logsAnchorId), 받은 로그를 지금까지 받은 로그에 이어 붙인다
+  const syncedLogsRef = useRef(gameState.logs);
   useEffect(() => {
     if (gameState.gameMode !== 'MULTIPLAYER' || (!isGuest && !isSpectator)) return;
 
     const unsub = multiplayerService.onMessage((msg) => {
+      if (msg.type === 'SPECTATOR_INIT' || msg.type === 'RECONNECT_ACCEPT') {
+        syncedLogsRef.current = msg.gameState.logs; // 전체 상태 → 기준 갱신
+      }
       if (msg.type === 'SYNC_GAME_STATE') {
+        const logs = mergeSyncedLogs(msg.gameState.logs, syncedLogsRef.current, msg.logsAnchorId);
+        syncedLogsRef.current = logs;
+        const full = { ...msg.gameState, logs };
         if (peerSource && battleSource) {
-          peerSource.receiveState(msg.gameState, msg.fxEvents || []);
+          peerSource.receiveState(full, msg.fxEvents || []);
         } else {
-          setGameState(msg.gameState);
+          setGameState(full);
         }
-        multiplayerService.saveSession(msg.gameState);
+        multiplayerService.saveSession(full);
       } else if (msg.type === 'SPECTATOR_INIT') {
         setIsInitiativeRolling(false);
         if (peerSource && battleSource) {
@@ -289,12 +299,23 @@ export function useMultiplayerBattle({
   ]);
 
   // 3. [멀티플레이] 호스트: 게스트의 액션 수신 및 실행
+  // 게스트는 항상 1번 플레이어. 차례가 필요한 행동은 게스트 차례일 때만, 선택은 게스트의 선택일 때만 받는다
+  // (조작된 게스트가 호스트의 턴을 넘기거나 호스트의 선택을 대신 고르지 못하게)
+  const latestStateRef = useRef(gameState);
+  useEffect(() => {
+    latestStateRef.current = gameState;
+  }, [gameState]);
+
   useEffect(() => {
     if (gameState.gameMode !== 'MULTIPLAYER' || !isHost) return;
 
+    const GUEST_TURN_ONLY = new Set(['DRAW_CARDS', 'UPGRADE', 'SWITCH_LEADER', 'CHARGE_CONCERTO', 'DECIDE_CLASH']);
     const unsub = multiplayerService.onMessage((msg) => {
       if (msg.type === 'DISPATCH_ACTION') {
         const { actionType, payload } = msg;
+        const st = latestStateRef.current;
+        if (GUEST_TURN_ONLY.has(actionType) && st.activePlayerIndex !== 1) return;
+        if (actionType === 'PENDING_CHOICE' && st.pendingChoice?.playerIndex !== 1) return;
         switch (actionType) {
           case 'DRAW_CARDS':
             engineDrawCards(1);
@@ -371,9 +392,9 @@ export function useMultiplayerBattle({
             break;
         }
       } else if (msg.type === 'SURRENDER') {
-        const surrenderIdx: 0 | 1 = msg.playerIndex !== undefined ? msg.playerIndex : 1;
+        // 게스트가 보낸 항복은 항상 게스트(1번)의 항복 (playerIndex 값은 믿지 않음)
         setIsInitiativeRolling(false);
-        engineSurrender(surrenderIdx);
+        engineSurrender(1);
       }
     });
 

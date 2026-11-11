@@ -110,6 +110,8 @@ export type MultiplayerMessage =
       actionDesc?: string;
       /** [WP8 버그 수정] 호스트 엔진이 낸 연출 이벤트(레벨업·효과 알림). 상태 비교로는 알 수 없어 함께 보냄. 구버전은 무시 */
       fxEvents?: GameEvent[];
+      /** 있으면 gameState.logs는 이 id 앞의 새 로그만 담는다. 받는 쪽이 가진 로그에 이어 붙인다 (2026-11-12) */
+      logsAnchorId?: string;
     }
   | {
       type: 'TIME_SYNC';

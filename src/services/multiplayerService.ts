@@ -10,6 +10,7 @@ import {
 } from '../types/multiplayer';
 import { GameState } from '../types/tcg';
 import type { GameEvent } from '../engine/events';
+import { logsSince } from './syncLogs';
 
 const SESSION_STORAGE_KEY = 'wuthering_multiplayer_session';
 const PEER_ID_PREFIX = 'wuthering-tcg-room';
@@ -598,10 +599,14 @@ class MultiplayerService {
     if (this.connection && this.connection.open && this.connection.peer !== conn.peer) {
       const tempListener = (data: any) => {
         const msg = data as MultiplayerMessage;
-        if (msg?.type === 'RECONNECT_REQUEST') {
+        // 진행 중인 게스트를 끊고 받아 주는 건 그 게스트 본인(같은 sessionId)의 재접속일 때만 (방 코드만 아는 제3자 차단)
+        const knownSession = this.opponentProfile?.sessionId;
+        if (msg?.type === 'RECONNECT_REQUEST' && (!knownSession || msg.sessionId === knownSession)) {
           console.log('[Multiplayer] Authorized guest reconnection accepted');
           try { this.connection?.close(); } catch {}
           this.setupConnectionListeners(conn);
+          // 이 메시지는 위 리스너가 붙기 전에 받았으므로 직접 처리해야 RECONNECT_ACCEPT(게임 상태)가 나간다
+          this.handleReceivedData(msg);
         } else {
           console.warn('[Multiplayer] Rejected duplicate guest connection while battle in progress');
           try {
@@ -770,12 +775,15 @@ class MultiplayerService {
       this.handleReceivedData(data as MultiplayerMessage);
     });
 
+    // 재접속으로 교체된 옛 연결이 닫힐 때는 무시 (새 연결까지 끊긴 것으로 처리하지 않게)
     conn.on('close', () => {
+      if (this.connection !== conn) return;
       console.warn('[Multiplayer] Connection closed');
       this.handleConnectionLost('상대방과의 연결이 끊어졌습니다.');
     });
 
     conn.on('error', (err) => {
+      if (this.connection !== conn) return;
       console.error('[Multiplayer] Connection error:', err);
       this.handleConnectionLost('네트워크 오류가 발생했습니다.');
     });
@@ -847,6 +855,7 @@ class MultiplayerService {
       const saved = this.getSavedSession();
       const stateToSend = this.latestGameState || saved?.lastGameState;
       if (stateToSend) {
+        this.lastSentLogId = stateToSend.logs?.[0]?.id ?? null; // 전체 상태를 보내므로 기준도 맞춘다
         this.send({
           type: 'RECONNECT_ACCEPT',
           gameState: stateToSend,
@@ -916,16 +925,23 @@ class MultiplayerService {
     });
   }
 
+  /** 상대에게 마지막으로 전달된 상태의 맨 앞 로그 id (다음 동기화 때 그 뒤 새 로그만 보낸다) */
+  private lastSentLogId: string | null = null;
+
   public sendGameState(gameState: GameState, actionDesc?: string, fxEvents?: GameEvent[]) {
     this.latestGameState = gameState;
     this.saveSession(gameState);
+    const anchorId = this.lastSentLogId;
+    const newLogs = logsSince(gameState.logs, anchorId);
     const msg: MultiplayerMessage = {
       type: 'SYNC_GAME_STATE',
-      gameState,
+      gameState: newLogs ? { ...gameState, logs: newLogs } : gameState,
+      ...(newLogs && anchorId ? { logsAnchorId: anchorId } : {}),
       actionDesc,
       ...(fxEvents && fxEvents.length > 0 ? { fxEvents } : {}),
     };
-    this.send(msg);
+    // 전달에 실패하면 기준을 옮기지 않는다 → 다음 메시지가 빠진 로그까지 함께 보낸다
+    if (this.send(msg)) this.lastSentLogId = gameState.logs[0]?.id ?? null;
     this.broadcastToSpectators(msg);
   }
 
@@ -1010,6 +1026,7 @@ class MultiplayerService {
   }
 
   public cleanUp() {
+    this.lastSentLogId = null;
     this.stopHeartbeat();
     this.stopDisconnectTimer();
     this.spectatorConnections.forEach((conn) => {
