@@ -9,6 +9,7 @@ import {
 } from '../src/engine/gameEngine';
 import { getHighestRarityActionCard, ALL_CHARACTERS } from '../src/data/cards';
 import { OFFICIAL_CARDS } from '../src/data/officialCards';
+import { encodeDeckCode, decodeDeckCode } from '../src/utils/deckCode';
 import type { ActionCard, GameState, PlayerState } from '../src/types/tcg';
 
 let uid = 0;
@@ -63,14 +64,37 @@ describe('카드 데이터', () => {
     expect(el('TP01-004')).toBeNull();
     expect(new Set(actions.map((c) => c.element)).size).toBeGreaterThan(2); // 전부 같은 값으로 뭉개지지 않았는지
   });
+
+  it('덱 코드 V2 인코딩/디코딩 시 TP01-001~005가 손실 없이 복원된다', () => {
+    const s = base();
+    const p0 = s.players[0];
+    const tpCards = ['TP01-001', 'TP01-002', 'TP01-003', 'TP01-004', 'TP01-005'].map(card);
+    const actionCards = [...tpCards, ...p0.actionDeck.slice(0, 30 - tpCards.length)];
+    const codeStr = encodeDeckCode({
+      name: 'TP01 테스트 덱',
+      leader: p0.slots.leader,
+      leftSupport: p0.slots.leftSupport,
+      rightSupport: p0.slots.rightSupport,
+      characterDeck: p0.characterDeck,
+      actionCards,
+    });
+    const decoded = decodeDeckCode(codeStr);
+    expect(decoded).not.toBeNull();
+    const decodedCodes = decoded!.actionCards.map((c) => c.code.split('_')[0]);
+    for (const c of ['TP01-001', 'TP01-002', 'TP01-003', 'TP01-004', 'TP01-005']) {
+      expect(decodedCodes, `${c} 복원`).toContain(c);
+    }
+  });
 });
 
 describe('TP01-001 연역', () => {
-  it('【우세】면 스피드 14 → 스피드 12 상대(같은 적색)에게 승리, 우세가 아니면 8로 패배', () => {
+  it('【우세】면 스피드 14 → 스피드 12 상대(같은 적색)에게 승리 및 clashResult.p0Card.speed=14 반영, 우세가 아니면 8로 패배', () => {
     const win = judge(card('TP01-001'), card('SD01-011'), (p0) => (p0.hasDominance = true));
     expect(win.clashResult!.winnerIndex).toBe(0);
+    expect(win.clashResult!.p0Card!.speed).toBe(14);
     const lose = judge(card('TP01-001'), card('SD01-011'));
     expect(lose.clashResult!.winnerIndex).toBe(1);
+    expect(lose.clashResult!.p0Card!.speed).toBe(8);
   });
 
   it('승리 시 트래시의 「연역」 이외 【파수인】 카드 1장을 패에 (AI 자동)', () => {
@@ -97,12 +121,13 @@ describe('TP01-001 연역', () => {
 });
 
 describe('TP01-003 그늘이와 구름이 출격·공중 공격', () => {
-  it('우세 + 리더 앙코 + 상대 스피드 11 이상이면 스피드 20으로 승리', () => {
+  it('우세 + 리더 앙코 + 상대 스피드 11 이상이면 스피드 20으로 승리 (clashResult.p0Card.speed=20 반영)', () => {
     const s = judge(card('TP01-003'), card('SD01-011'), (p0) => {
       p0.hasDominance = true;
       p0.slots = { ...p0.slots, leader: anko };
     });
     expect(s.clashResult!.winnerIndex).toBe(0);
+    expect(s.clashResult!.p0Card!.speed).toBe(20);
   });
 
   it('조건 하나라도 빠지면 그대로 스피드 5', () => {
@@ -232,15 +257,23 @@ describe('TP01-002 타오르는 넝쿨의 춤', () => {
     expect(onlySelf.players[0].hand.some((c) => c.id === self.id)).toBe(false);
   });
 
-  it('사람은 0~1장 선택창', () => {
+  it('사람은 0~1장 선택창 (트래시 내 모든 BP01-050 노출 및 선택 해결 시 END_PHASE/DISCARD_OVERFLOW로 전환)', () => {
+    const v1 = card('BP01-050');
+    const v2 = card('BP01-050');
     const s = endStep((p0) => {
       p0.actionArea = [card('TP01-002')];
-      p0.dropZone = [card('BP01-050')];
+      p0.dropZone = [v1, v2];
     });
     const queued = [s.pendingChoice, ...(s.pendingChoiceQueue || [])].filter(Boolean);
     const c = queued.find((q) => q!.sourceCardName.includes('TP01-002'));
     expect(c).toBeDefined();
     expect(c!.minSelect).toBe(0);
+    expect(c!.revealedCards.length).toBe(2);
     expect(c!.onResolveType).toBe('RECOVER_FROM_DROP');
+    expect(c!.endTurnAfterResolve).toBe(true);
+
+    const afterResolve = resolvePendingChoice(s, [v1.id]);
+    expect(afterResolve.players[0].hand.some((h) => h.id === v1.id)).toBe(true);
+    expect(['END_PHASE', 'DISCARD_OVERFLOW']).toContain(afterResolve.phase);
   });
 });

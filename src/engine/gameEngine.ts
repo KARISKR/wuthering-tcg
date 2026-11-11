@@ -3637,6 +3637,16 @@ export function applyTp01JudgmentEffects(
       player.characterDeck = player.characterDeck.filter((c) => c.id !== next.id);
       const { underlyingCards: prevStack, ...cleanCurrent } = current;
       player.slots[slot] = { ...next, underlyingCards: [...(prevStack || []), cleanCurrent] };
+      triggeredEffects.push({
+        id: `eff-${engineTick()}-tp01-004`,
+        sourceCardName: card.nameKr,
+        sourceCardArt: card.artUrl,
+        effectType: 'BUFF',
+        title: `${current.nameKr} 각성 레벨업! (Lv.${next.level})`,
+        description: `${when}로 [${current.nameKr}]이(가) [${next.nameKr}](Lv.${next.level})(으)로 레벨업했습니다!`,
+        playerIndex: idx,
+        timestamp: logTimestamp(),
+      });
       emitUpgradeFx({
         id: `upgrade-${engineTick()}-${engineTag()}`,
         playerIndex: idx,
@@ -3822,8 +3832,14 @@ export function finishClashJudgment(state: GameState): GameState {
         }
 
         // TP01-001 연역: 【우세】【배틀】 이 카드의 스피드가 14로 변한다
-        if (c0.code === 'TP01-001' && p0.hasDominance) speed0 = 14;
-        if (c1.code === 'TP01-001' && p1.hasDominance) speed1 = 14;
+        if (c0.code === 'TP01-001' && p0.hasDominance) {
+          speed0 = 14;
+          c0.speed = 14;
+        }
+        if (c1.code === 'TP01-001' && p1.hasDominance) {
+          speed1 = 14;
+          c1.speed = 14;
+        }
 
         // TP01-003 그늘이와 구름이 출격·공중 공격: 【우세】【배틀】 리더가 「앙코」이고 상대 카드 스피드 11 이상이면 20
         // (상대 스피드는 위에서 반영된 변경값 기준 — 예: 상대 연역이 우세로 14가 된 경우)
@@ -3831,8 +3847,14 @@ export function finishClashJudgment(state: GameState): GameState {
           getAllCardsInSlot(p.slots.leader).some((c) => c.characterName === '앙코' || c.nameKr.includes('앙코'));
         const tp003Speed0 = c0.code === 'TP01-003' && p0.hasDominance && isAnkoLeader(p0) && speed1 >= 11;
         const tp003Speed1 = c1.code === 'TP01-003' && p1.hasDominance && isAnkoLeader(p1) && speed0 >= 11;
-        if (tp003Speed0) speed0 = 20;
-        if (tp003Speed1) speed1 = 20;
+        if (tp003Speed0) {
+          speed0 = 20;
+          c0.speed = 20;
+        }
+        if (tp003Speed1) {
+          speed1 = 20;
+          c1.speed = 20;
+        }
 
         if (speed0 > speed1) {
           winnerIndex = 0;
@@ -6197,11 +6219,12 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
           sourceCardName: '타오르는 넝쿨의 춤 [TP01-002]',
           sourceCardArt: burningVine.artUrl,
           description: '【배틀 페이즈 종료 효과】 트래시 에리어의 「넝쿨의 춤」 1장을 패에 추가할 수 있습니다.\n(원치 않으시면 0장 선택 상태로 넘어가기를 누르세요.)',
-          revealedCards: [vines[0]],
+          revealedCards: vines,
           minSelect: 0,
           maxSelect: 1,
           onResolveType: 'RECOVER_FROM_DROP',
           sourceZone: 'DROP',
+          endTurnAfterResolve: true,
         },
         false
       );

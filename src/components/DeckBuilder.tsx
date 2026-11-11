@@ -926,7 +926,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
     setScreen('LIST');
   };
 
-  const charOptions = ['ALL', '방랑자(남)', '방랑자(여)', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
+  const charOptions = ['ALL', '일반', '방랑자(남)', '방랑자(여)', '양양', '치샤', '산화', '금희', '카멜리아', '파수인', '앙코'];
 
   return (
     <div className="h-screen w-full bg-[#05070d] text-slate-100 flex flex-col overflow-hidden select-none">

@@ -32,7 +32,7 @@ function base64ToUtf8(b64: string): string {
 }
 
 // Base64URL 헬퍼 (짧고 URL 및 복사 친화적인 무패딩 Base64)
-const PREFIX_LIST = ['BP01', 'SD01', 'SD02', 'BP02', 'SD03', 'PR', 'OTHER'];
+const PREFIX_LIST = ['BP01', 'SD01', 'SD02', 'BP02', 'SD03', 'PR', 'OTHER', 'TP01'];
 
 function cardCodeToId(code: string): number {
   if (!code) return 0;
@@ -45,7 +45,7 @@ function cardCodeToId(code: string): number {
     prefix = rawPre;
   }
   let pIdx = PREFIX_LIST.indexOf(prefix);
-  if (pIdx === -1) pIdx = PREFIX_LIST.length - 1;
+  if (pIdx === -1) pIdx = PREFIX_LIST.indexOf('OTHER');
   return ((pIdx & 0x0f) << 10) | (num & 0x03ff);
 }
 

@@ -204,6 +204,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
   // 캐릭터 목록 추출 (방랑자 남/여 완벽 분리 지원)
   const characterFilterOptions = [
     'ALL',
+    '일반',
     '방랑자(남)',
     '방랑자(여)',
     '양양',
