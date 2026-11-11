@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MAINTENANCE_CONFIG } from '../config/maintenanceConfig';
+import { verifyBoardPassword, isUserAdmin } from '../utils/feedbackManager';
 import { Sparkles, Clock, ShieldCheck, KeyRound, ArrowRight, ExternalLink } from 'lucide-react';
 
 interface MaintenanceScreenProps {
@@ -43,9 +44,10 @@ export const MaintenanceScreen: React.FC<MaintenanceScreenProps> = ({ onBypass }
     return () => clearInterval(interval);
   }, []);
 
-  const handleAdminSubmit = (e: React.FormEvent) => {
+  // 관리자 키는 서버(ADMIN_KEY)가 확인한다 (예전: 키가 배포된 JS에 문자열로 들어 있었다)
+  const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (adminKey.trim() === 'admin15928282') {
+    if ((await verifyBoardPassword(adminKey)) && isUserAdmin()) {
       onBypass();
     } else {
       setAdminError(true);

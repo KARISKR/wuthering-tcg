@@ -76,23 +76,11 @@ export function App() {
     }
   }, []);
 
-  // 점검 모드 관리자 우회 상태
-  const [isMaintenanceBypassed, setIsMaintenanceBypassed] = useState<boolean>(() => {
-    if (sessionStorage.getItem('wuthering_maintenance_bypass') === 'true') {
-      return true;
-    }
-    const searchParams = new URLSearchParams(window.location.search);
-    const adminParam = searchParams.get('admin') || searchParams.get('key') || searchParams.get('pass') || searchParams.get('password');
-    const hasAdminParam =
-      adminParam === 'admin15928282' ||
-      window.location.hash === '#admin15928282';
-
-    if (hasAdminParam) {
-      sessionStorage.setItem('wuthering_maintenance_bypass', 'true');
-      return true;
-    }
-    return false;
-  });
+  // 점검 모드 관리자 우회 상태 (우회는 점검 화면의 관리자 키 입력 → 서버 ADMIN_KEY 확인으로만)
+  // (예전: 주소에 붙이는 우회 키가 배포된 JS에 문자열로 들어 있었다)
+  const [isMaintenanceBypassed, setIsMaintenanceBypassed] = useState<boolean>(
+    () => sessionStorage.getItem('wuthering_maintenance_bypass') === 'true'
+  );
 
   const isMaintenanceActive =
     MAINTENANCE_CONFIG.enabled &&

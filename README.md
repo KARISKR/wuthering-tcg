@@ -18,7 +18,7 @@
 2. **게임 모드**
    - 🤖 **스마트 AI 봇 대전**: 상성과 패를 계산하여 레벨업, 협주 충전, 대결 심리전을 구사하는 AI 대전
    - 👥 **1인 2역 연습 듀얼**: 양측의 패와 전술을 직접 테스트할 수 있는 솔로 시뮬레이션 모드
-   - 🌐 **온라인 웹 대전 확장 준비 완료**: 순수 상태 머신 기반이므로 `server/socketServer.js`를 통해 즉시 웹소켓 멀티 연동 가능
+   - 🌐 **온라인 1:1 대전**: PeerJS로 브라우저끼리 직접 연결. 방을 만든 쪽(호스트)이 엔진을 돌리고 상대에게 상태를 보냄
 
 3. **부가 기능**
    - 📖 **인게임 공식 룰북 모달**: 언제든지 전체 규칙과 상성 확인 가능
@@ -42,15 +42,9 @@ npm run dev
 
 ---
 
-## 🌐 2단계: 다른 사람과의 온라인 웹 대전 확장 방법
+## 🌐 온라인 대전 · 서버 구성
 
-프로젝트의 `server/socketServer.js`에 실시간 멀티플레이 방 생성 및 동기화 서버 코드가 마련되어 있습니다.
-
-```bash
-# 서버 의존성 설치
-npm install express socket.io cors
-
-# 멀티플레이 서버 실행
-node server/socketServer.js
-```
-클라이언트에서는 `socket.io-client`를 통해 `roomId`로 접속하면 1:1 대전이 실시간으로 동기화됩니다.
+- 1:1 대전: PeerJS(브라우저 간 직접 연결, `src/services/multiplayerService.ts`). 별도 게임 서버 없음.
+- 게시판·공유 덱·공개 방 목록·통계: Cloudflare Pages Functions(`functions/api/`) + D1(`schema.sql`).
+- 배포 전 Cloudflare Pages 환경 변수 `ADMIN_KEY`(비밀)를 설정해야 공지 작성·관리가 된다.
+- 함수까지 포함한 로컬 실행: `npm run build` 후 `npx wrangler pages dev dist`.
