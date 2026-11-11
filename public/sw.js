@@ -13,9 +13,9 @@
  */
 
 // 앱 코드 캐시 버전: 배포 때 올려도 STATIC_CACHE는 지워지지 않음
-const APP_CACHE = 'wtcg-app-v2.3.0';
+const APP_CACHE = 'wtcg-app-v2.3.1';
 // 정적 에셋 캐시: 파일명이 같은 에셋을 강제로 교체해야 할 때만 이름을 바꿈
-const STATIC_CACHE = 'wtcg-static-v1';
+const STATIC_CACHE = 'wtcg-static-v2';
 
 // 캐시 우선 서빙 대상 정적 자산 경로 패턴
 const STATIC_ASSET_PATTERNS = [
@@ -71,7 +71,7 @@ self.addEventListener('fetch', (event) => {
   if (isStaticAsset) {
     event.respondWith(
       caches.match(req).then((cachedResp) => {
-        if (cachedResp) return cachedResp;
+        if (cachedResp && isCacheable(cachedResp)) return cachedResp;
         // 네트워크 오류는 그대로 전달 → <img onError>가 정상적으로 재시도/대체 처리
         return fetch(req).then((netResp) => {
           if (isCacheable(netResp)) {

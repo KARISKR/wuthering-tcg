@@ -323,15 +323,15 @@ export const Lobby: React.FC<LobbyProps> = ({
     setIsAppInstallOpen(true);
   };
 
-  const menuItems: { key: string; label: string; icon: string; onClick: () => void; badge?: boolean }[] = [
-    { key: 'deck', label: '내 덱', icon: '/images/menu_icons/deck-builder.webp', onClick: () => onOpenDeckBuilder() },
-    { key: 'gallery', label: '카드 도감', icon: '/images/menu_icons/card-gallery.webp', onClick: () => setHash('#card-gallery') },
-    { key: 'board', label: '자유게시판', icon: '/images/menu_icons/board.webp', onClick: () => onOpenBoard && onOpenBoard(), badge: hasNewBoardPosts },
-    { key: 'shared', label: '공유 덱', icon: '/images/menu_icons/shared-decks.webp', onClick: () => setHash('#shared-decks') },
-    { key: 'replay', label: '리플레이', icon: '/images/menu_icons/replay.webp', onClick: () => setHash('#replay') },
-    { key: 'rulebook', label: '룰북 & FAQ', icon: '/images/menu_icons/rulebook.webp', onClick: () => setHash('#rulebook') },
-    { key: 'video', label: '영상 가이드', icon: '/images/menu_icons/video-guide.webp', onClick: () => setHash('#guide') },
-    { key: 'tutorial', label: '튜토리얼', icon: '/images/menu_icons/tutorial.webp', onClick: startTutorial },
+  const menuItems: { key: string; label: string; icon: string; fallbackIcon?: string; onClick: () => void; badge?: boolean }[] = [
+    { key: 'deck', label: '내 덱', icon: '/images/menu_icons/deck-builder.webp?v=2', onClick: () => onOpenDeckBuilder() },
+    { key: 'gallery', label: '카드 도감', icon: '/images/menu_icons/card-gallery.webp?v=2', fallbackIcon: '/images/menu_icons/deck-preset.webp', onClick: () => setHash('#card-gallery') },
+    { key: 'board', label: '자유게시판', icon: '/images/menu_icons/board.webp?v=2', onClick: () => onOpenBoard && onOpenBoard(), badge: hasNewBoardPosts },
+    { key: 'shared', label: '공유 덱', icon: '/images/menu_icons/shared-decks.webp?v=2', onClick: () => setHash('#shared-decks') },
+    { key: 'replay', label: '리플레이', icon: '/images/menu_icons/replay.webp?v=2', onClick: () => setHash('#replay') },
+    { key: 'rulebook', label: '룰북 & FAQ', icon: '/images/menu_icons/rulebook.webp?v=2', onClick: () => setHash('#rulebook') },
+    { key: 'video', label: '영상 가이드', icon: '/images/menu_icons/video-guide.webp?v=2', onClick: () => setHash('#guide') },
+    { key: 'tutorial', label: '튜토리얼', icon: '/images/menu_icons/tutorial.webp?v=2', fallbackIcon: '/images/tutorial/abby_guide.webp', onClick: startTutorial },
   ];
 
   type CardVariant = 'desktop' | 'mobile' | 'short';
@@ -564,7 +564,22 @@ export const Lobby: React.FC<LobbyProps> = ({
                 className="relative h-20 rounded-xl border border-amber-400/25 bg-[#0c111d]/88 flex flex-col items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition"
               >
                 {m.badge && <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500" aria-label="새 글" />}
-                <img src={m.icon} alt="" className="w-[30px] h-[30px] object-contain" />
+                <img
+                  src={m.icon}
+                  alt=""
+                  className="w-[30px] h-[30px] object-contain"
+                  onError={
+                    m.fallbackIcon
+                      ? (e) => {
+                          const img = e.currentTarget;
+                          if (!img.dataset.fallbackApplied) {
+                            img.dataset.fallbackApplied = '1';
+                            img.src = m.fallbackIcon!;
+                          }
+                        }
+                      : undefined
+                  }
+                />
                 <span className="text-[11px] font-bold text-slate-100">{m.label}</span>
               </button>
             ))}
@@ -608,7 +623,22 @@ export const Lobby: React.FC<LobbyProps> = ({
                   className="relative h-12 px-2.5 rounded-xl border border-amber-400/25 bg-[#0c111d]/88 flex items-center gap-2 cursor-pointer active:scale-95 transition"
                 >
                   {m.badge && <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-500" aria-label="새 글" />}
-                  <img src={m.icon} alt="" className="w-[26px] h-[26px] object-contain shrink-0" />
+                  <img
+                    src={m.icon}
+                    alt=""
+                    className="w-[26px] h-[26px] object-contain shrink-0"
+                    onError={
+                      m.fallbackIcon
+                        ? (e) => {
+                            const img = e.currentTarget;
+                            if (!img.dataset.fallbackApplied) {
+                              img.dataset.fallbackApplied = '1';
+                              img.src = m.fallbackIcon!;
+                            }
+                          }
+                        : undefined
+                    }
+                  />
                   <span className="text-xs font-bold text-slate-100 truncate">{m.label}</span>
                 </button>
               ))}
@@ -686,7 +716,22 @@ export const Lobby: React.FC<LobbyProps> = ({
                 {m.badge && (
                   <span className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[9px] font-black">NEW</span>
                 )}
-                <img src={m.icon} alt="" className="w-[38px] h-[38px] object-contain" />
+                <img
+                  src={m.icon}
+                  alt=""
+                  className="w-[38px] h-[38px] object-contain"
+                  onError={
+                    m.fallbackIcon
+                      ? (e) => {
+                          const img = e.currentTarget;
+                          if (!img.dataset.fallbackApplied) {
+                            img.dataset.fallbackApplied = '1';
+                            img.src = m.fallbackIcon!;
+                          }
+                        }
+                      : undefined
+                  }
+                />
                 <span className="text-[13px] font-bold text-slate-100">{m.label}</span>
               </button>
             ))}
