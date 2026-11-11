@@ -21,6 +21,52 @@ interface D1Database {
 
 interface Env {
   DB?: D1Database;
+  /** 관리자 키 (Cloudflare Pages 환경 변수). 없으면 공지 작성·남의 글 관리가 모두 막힌다 */
+  ADMIN_KEY?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 권한: 글·댓글을 고치거나 지우려면 그 글/댓글의 비밀번호 또는 관리자 키가 필요하다.
+// 비밀번호는 응답에 절대 싣지 않는다(hasPassword 로만 알린다). 비밀글 본문은 비밀번호가 맞을 때만 보낸다.
+// ─────────────────────────────────────────────────────────────────────────────
+interface Auth {
+  password: string;
+  isAdmin: boolean;
+}
+
+function readAuth(env: Env, password: unknown, adminKey: unknown): Auth {
+  return {
+    password: typeof password === 'string' ? password.trim() : '',
+    isAdmin: Boolean(env.ADMIN_KEY) && typeof adminKey === 'string' && adminKey.trim() === env.ADMIN_KEY,
+  };
+}
+
+/** 비밀번호가 없는 글/댓글은 예전처럼 누구나 고칠 수 있다 (화면 동작과 같음) */
+function canModify(stored: { password?: unknown } | null | undefined, auth: Auth): boolean {
+  if (auth.isAdmin) return true;
+  const pw = typeof stored?.password === 'string' ? stored.password : '';
+  return !pw || auth.password === pw;
+}
+
+function publicComment(c: any) {
+  if (!c || typeof c !== 'object') return c;
+  const { password, ...rest } = c;
+  return { ...rest, hasPassword: Boolean(password) };
+}
+
+function publicPost(p: any, unlocked = false) {
+  if (!p || typeof p !== 'object') return p;
+  const { password, ...rest } = p;
+  const out: any = { ...rest, hasPassword: Boolean(password) };
+  if (Array.isArray(out.comments)) out.comments = out.comments.map(publicComment);
+  if (p.isSecret && !unlocked) {
+    out.content = '';
+    out.images = [];
+    out.locked = true;
+    delete out.imageUrl;
+    delete out.deckCode;
+  }
+  return out;
 }
 
 const POINTER_IDS = {
@@ -65,11 +111,11 @@ function buildSummaryResponse(rawJsonText: string): string {
         deckName: p.deckName,
         isNotice: p.isNotice,
         isSecret: p.isSecret,
-        password: p.password,
+        hasPassword: Boolean(p.hasPassword || p.password),
         likes: p.likes,
         dislikes: p.dislikes,
         views: p.views,
-        comments: Array.isArray(p.comments) ? p.comments : [],
+        comments: Array.isArray(p.comments) ? p.comments.map(publicComment) : [],
         hasImage: Boolean(
           p.imageUrl ||
           (Array.isArray(p.images) && p.images.length > 0) ||
@@ -421,7 +467,8 @@ async function kindVersion(db: D1Database, kind: Kind): Promise<string> {
 /** 요약 게시글(isSummaryOnly)로 저장 요청이 오면 본문·이미지는 기존 값을 유지 */
 function mergePost(existing: any | null, incoming: any) {
   // 댓글은 community_comments 에 따로 저장하므로 게시글 JSON에는 넣지 않는다
-  const { isSummaryOnly, likedByMe, dislikedByMe, comments: _comments, ...clean } = incoming || {};
+  // hasPassword·locked 는 응답 전용 표시라 저장하지 않는다
+  const { isSummaryOnly, likedByMe, dislikedByMe, hasPassword: _hp, locked: _lk, comments: _comments, ...clean } = incoming || {};
   if (existing && isSummaryOnly) {
     const { comments: _old, ...base } = existing;
     return { ...base, ...clean, content: existing.content, imageUrl: existing.imageUrl, images: existing.images };
@@ -440,6 +487,54 @@ function legacyCommentStmts(db: D1Database, postId: string, comments: unknown, n
   return out;
 }
 
+/**
+ * 게시글 1건 저장 (upsertPost와 예전 목록 저장이 같이 쓴다).
+ * - 새 글: 누구나 (새 글 빈도 제한 적용)
+ * - 기존 글: 비밀번호·관리자 키가 맞으면 전체 수정, 아니면 추천·비추천·조회수만 +1까지 반영
+ * - 공지(isNotice / NOTICE 말머리)는 관리자만 켤 수 있다
+ * 빈도 제한에 걸리면 남은 초를, 아니면 0을 돌려준다.
+ */
+async function savePost(db: D1Database, incoming: any, auth: Auth, who: string, nowTs: number): Promise<number> {
+  const id = String(incoming.id);
+  const existing = await getItem(db, 'post', id);
+  let post: any;
+  if (!existing) {
+    const wait = await hitRateLimit(db, 'post', who, nowTs);
+    if (wait) return wait;
+    post = mergePost(null, incoming);
+  } else if (canModify(existing, auth)) {
+    post = mergePost(incoming.isSummaryOnly ? existing : null, incoming);
+    // 화면은 더 이상 비밀번호를 받지 않으므로, 새 값이 없으면 기존 비밀번호를 유지한다
+    if (!post.password && existing.password) post.password = existing.password;
+  } else {
+    // shortcut: 권한 없는 요청은 추천·조회수를 1씩만 올린다(내리지 못함). 정확히 하려면 추천/취소 전용 요청으로 바꾼다
+    const bump = (cur: unknown, next: unknown) => {
+      const c = Number(cur) || 0;
+      return (Number(next) || 0) > c ? c + 1 : c;
+    };
+    const { comments: _old, ...base } = existing;
+    post = {
+      ...base,
+      likes: bump(existing.likes, incoming.likes),
+      dislikes: bump(existing.dislikes, incoming.dislikes),
+      views: bump(existing.views, incoming.views),
+    };
+  }
+  if (!auth.isAdmin) {
+    post.isNotice = Boolean(existing?.isNotice);
+    if (post.category === 'NOTICE' && !post.isNotice) post.category = existing?.category === 'NOTICE' ? 'NOTICE' : 'GENERAL';
+  }
+  await db.batch([
+    upsertStmt(db, 'post', id, toTs(post.createdAt, nowTs), nowTs, post),
+    ...legacyCommentStmts(db, id, incoming.comments, nowTs),
+  ]);
+  return 0;
+}
+
+function forbidden(headers: Headers) {
+  return new Response(JSON.stringify({ ok: false, error: 'forbidden' }), { status: 403, headers });
+}
+
 const KIND_OF = { board: 'post', decks: 'deck', replays: 'replay' } as const;
 
 export const onRequest: PagesFunction<Env> = async (context) => {
@@ -451,7 +546,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     'Access-Control-Expose-Headers': 'Retry-After, ETag',
-    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept, X-Board-Password, X-Admin-Key',
     'Cache-Control': 'no-store, no-cache, must-revalidate',
   });
 
@@ -494,7 +589,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           if (postId) {
             const post = await getItem(env.DB, 'post', postId);
             const [withComments] = post ? await attachComments(env.DB, [post], postId) : [null];
-            return new Response(JSON.stringify({ post: withComments ? { ...withComments, isSummaryOnly: false } : null }), { headers });
+            // 비밀글 본문은 비밀번호(또는 관리자 키) 헤더가 맞을 때만
+            const auth = readAuth(env, request.headers.get('X-Board-Password'), request.headers.get('X-Admin-Key'));
+            const unlocked = Boolean(post) && (auth.isAdmin || (Boolean(post.password) && auth.password === post.password));
+            return new Response(
+              JSON.stringify({ post: withComments ? { ...publicPost(withComments, unlocked), isSummaryOnly: false } : null }),
+              { headers }
+            );
           }
 
           const version = await kindVersion(env.DB, kind);
@@ -507,7 +608,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
           const items = await listItems(env.DB, kind);
           if (type === 'board') {
-            const raw = JSON.stringify({ posts: await attachComments(env.DB, items) });
+            const raw = JSON.stringify({ posts: (await attachComments(env.DB, items)).map((p) => publicPost(p)) });
             if (isLobby) return new Response(buildLobbyNoticeResponse(raw), { headers });
             if (isSummary) return new Response(buildSummaryResponse(raw), { headers });
             return new Response(raw, { headers });
@@ -630,20 +731,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       // (B) 게시판
       if (type === 'board') {
-        if (incoming?.action === 'upsertPost' && incoming?.post?.id) {
-          const id = String(incoming.post.id);
-          const existing = await getItem(env.DB, 'post', id);
-          if (!existing) {
-            const postWait = await hitRateLimit(env.DB, 'post', who, nowTs);
-            if (postWait) return rateLimitedResponse(headers, postWait, 'post');
+        const auth = readAuth(env, incoming?.auth?.password, incoming?.auth?.adminKey);
+        const commentRow = async (pid: string, cid: string) => {
+          const row = await env.DB!
+            .prepare('SELECT data FROM community_comments WHERE post_id = ? AND id = ? AND deleted = 0')
+            .bind(pid, cid)
+            .first<{ data: string }>();
+          if (!row) return null;
+          try {
+            return JSON.parse(row.data);
+          } catch {
+            return {};
           }
-          const post = mergePost(incoming.post.isSummaryOnly ? existing : null, incoming.post);
-          await env.DB.batch([
-            upsertStmt(env.DB, 'post', id, toTs(post.createdAt, nowTs), nowTs, post),
-            ...legacyCommentStmts(env.DB, id, incoming.post.comments, nowTs),
-          ]);
+        };
+
+        if (incoming?.action === 'verify') {
+          // 화면이 비밀번호·관리자 키를 미리 확인할 때 쓴다 (값 자체는 돌려주지 않음)
+          let ok = auth.isAdmin;
+          if (!ok && incoming.postId && incoming.commentId) {
+            const c = await commentRow(String(incoming.postId), String(incoming.commentId));
+            ok = Boolean(c) && canModify(c, auth);
+          } else if (!ok && incoming.postId) {
+            const p = await getItem(env.DB, 'post', String(incoming.postId));
+            ok = Boolean(p) && canModify(p, auth);
+          }
+          return new Response(JSON.stringify({ ok, isAdmin: auth.isAdmin }), { headers });
+        } else if (incoming?.action === 'upsertPost' && incoming?.post?.id) {
+          const wait = await savePost(env.DB, incoming.post, auth, who, nowTs);
+          if (wait) return rateLimitedResponse(headers, wait, 'post');
         } else if (incoming?.action === 'deletePost' && incoming?.postId) {
           const pid = String(incoming.postId);
+          if (!canModify(await getItem(env.DB, 'post', pid), auth)) return forbidden(headers);
           await env.DB.batch([
             env.DB.prepare('DELETE FROM community_items WHERE kind = ? AND id = ?').bind('post', pid),
             env.DB.prepare('DELETE FROM community_comments WHERE post_id = ?').bind(pid),
@@ -666,18 +784,18 @@ export const onRequest: PagesFunction<Env> = async (context) => {
           const cid = String(incoming.commentId);
           const text = typeof incoming.text === 'string' ? incoming.text.trim().slice(0, 1000) : '';
           if (!text) return new Response(JSON.stringify({ ok: false, error: 'invalid comment' }), { status: 400, headers });
-          const row = await env.DB
-            .prepare('SELECT data FROM community_comments WHERE post_id = ? AND id = ? AND deleted = 0')
-            .bind(pid, cid)
-            .first<{ data: string }>();
-          if (!row) return new Response(JSON.stringify({ ok: false, error: 'comment not found' }), { status: 404, headers });
-          const next = { ...JSON.parse(row.data), text };
+          const current = await commentRow(pid, cid);
+          if (!current) return new Response(JSON.stringify({ ok: false, error: 'comment not found' }), { status: 404, headers });
+          if (!canModify(current, auth)) return forbidden(headers);
+          const next = { ...current, text };
           await env.DB
             .prepare('UPDATE community_comments SET data = ?, updated_at = ? WHERE post_id = ? AND id = ? AND deleted = 0')
             .bind(JSON.stringify(next), nowTs, pid, cid)
             .run();
-          return new Response(JSON.stringify({ ok: true, comment: next, updatedAt: nowTs }), { headers });
+          return new Response(JSON.stringify({ ok: true, comment: publicComment(next), updatedAt: nowTs }), { headers });
         } else if (incoming?.action === 'deleteComment' && incoming?.postId && incoming?.commentId) {
+          const current = await commentRow(String(incoming.postId), String(incoming.commentId));
+          if (current && !canModify(current, auth)) return forbidden(headers);
           // 행을 지우지 않고 묘비로 남긴다 (옛 클라이언트의 댓글 배열로 되살아나지 않게)
           await env.DB
             .prepare(
@@ -687,20 +805,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
             .bind(String(incoming.postId), String(incoming.commentId), nowTs, nowTs)
             .run();
         } else if (Array.isArray(incoming?.posts)) {
-          // 이전 방식(목록 전체 저장): 들어온 글만 upsert. 목록에 없다고 지우지 않음(다른 사람이 방금 쓴 글 보호).
-          // 삭제는 deletePost 요청으로만 처리된다.
-          const posts = incoming.posts.filter((p: any) => p && p.id);
-          const summaryIds = posts.filter((p: any) => p.isSummaryOnly).map((p: any) => String(p.id));
-          const existingMap = new Map<string, any>();
-          for (const id of summaryIds) existingMap.set(id, await getItem(env.DB, 'post', id));
-          const stmts = posts.flatMap((p: any) => {
-            const merged = mergePost(existingMap.get(String(p.id)) ?? null, p);
-            return [
-              upsertStmt(env.DB!, 'post', String(p.id), toTs(merged.createdAt, nowTs), nowTs, merged),
-              ...legacyCommentStmts(env.DB!, String(p.id), p.comments, nowTs),
-            ];
-          });
-          for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
+          // 이전 방식(목록 전체 저장): 글마다 upsertPost와 같은 권한 규칙으로 저장. 목록에 없다고 지우지 않음.
+          for (const p of incoming.posts.filter((x: any) => x && x.id)) {
+            const wait = await savePost(env.DB, p, auth, who, nowTs);
+            if (wait) return rateLimitedResponse(headers, wait, 'post');
+          }
         }
         return new Response(JSON.stringify({ ok: true, updatedAt: nowTs }), { headers });
       }

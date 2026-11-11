@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import {
   ArrowLeft,
   Search,
@@ -60,9 +61,10 @@ import {
   compressImageFile,
   updateCommentInFeedback,
   deleteCommentFromFeedback,
-  ADMIN_MASTER_PASSWORDS,
   isUserAdmin,
-  setAdminVerified,
+  verifyBoardPassword,
+  getRememberedBoardPassword,
+  rememberBoardPassword,
   isPostNew,
 } from '../utils/feedbackManager';
 import {
@@ -183,14 +185,8 @@ export const resolveCardByQuery = (
 
 export function renderFormattedContent(rawContent: string, postImages: string[] = []): string {
   if (!rawContent) return '';
-  // 줄바꿈 정규화 (CRLF -> LF) 및 악성 스크립트/이벤트 차단
-  let safe = rawContent
-    .replace(/\r\n/g, '\n')
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/on\w+='[^']*'/gi, '')
-    .replace(/javascript:[^"']*/gi, '');
+  // 줄바꿈 정규화 (CRLF -> LF). 위험한 태그·속성 제거는 마지막에 DOMPurify가 맡는다
+  let safe = rawContent.replace(/\r\n/g, '\n');
 
   // 0. 기존 HTML <img> 태그가 있는 경우 data-shortcode 또는 마크다운 형태로 먼저 정규화 (이중 래핑 방지)
   safe = safe.replace(/<img\s+([^>]*?)>/gi, (match, attrs) => {
@@ -269,7 +265,7 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
 
   // 5. 마크다운 볼드 변환
   safe = safe.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
-  return safe;
+  return DOMPurify.sanitize(safe);
 }
 
 const BOARD_TABS: { id: FilterTab; label: string; icon?: string }[] = [
@@ -417,7 +413,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     // 5. 마크다운 볼드 및 줄바꿈 처리
     html = html.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
     html = html.replace(/\n/g, '<br>');
-    return html;
+    return DOMPurify.sanitize(html);
   };
 
   // 위지윅 에디터 DOM을 단축 태그([사진1], [카드:코드|140px]) + 서식 문자열로 직렬화 (가로 나란히 배치 보존!)
@@ -888,18 +884,40 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     }
   };
 
+  // 관리자 확인: 서버의 관리자 키(ADMIN_KEY)와 맞는지 서버에 묻는다
+  const ensureAdmin = async (promptText: string, candidate?: string): Promise<boolean> => {
+    if (isUserAdmin()) return true;
+    if (candidate && (await verifyBoardPassword(candidate)) && isUserAdmin()) return true;
+    const input = window.prompt(promptText);
+    if (input && (await verifyBoardPassword(input)) && isUserAdmin()) {
+      showToast('🔓 관리자 권한이 확인되었습니다.');
+      return true;
+    }
+    showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
+    return false;
+  };
+
+  // 글/댓글 비밀번호 확인: 저장된 비밀번호를 먼저 서버에 확인하고, 틀리면 물어본다 (관리자 키도 통과)
+  const ensureBoardAuth = async (
+    hasPassword: boolean | undefined,
+    promptText: string,
+    postId: string,
+    commentId?: string
+  ): Promise<boolean> => {
+    if (!hasPassword || isUserAdmin()) return true;
+    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
+    if (savedPw && (await verifyBoardPassword(savedPw, postId, commentId))) return true;
+    const input = window.prompt(promptText);
+    if (input === null) return false;
+    if (await verifyBoardPassword(input, postId, commentId)) return true;
+    showToast('❌ 비밀번호가 일치하지 않습니다.');
+    return false;
+  };
+
   // 말머리 변경 핸들러 (덱 공유 선택 시 내 보유 덱 자동 연동 / 공지 선택 시 관리자 인증)
-  const handleCategoryChange = (newCat: FeedbackCategory) => {
+  const handleCategoryChange = async (newCat: FeedbackCategory) => {
     if (newCat === 'NOTICE') {
-      if (!isUserAdmin()) {
-        const input = window.prompt('📢 공지사항은 운영자만 작성할 수 있습니다.\n관리자 마스터 암호를 입력해주세요:');
-        if (!input || !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
-          showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
-          return;
-        }
-        setAdminVerified(true);
-        showToast('🔓 관리자 권한이 확인되었습니다.');
-      }
+      if (!(await ensureAdmin('📢 공지사항은 운영자만 작성할 수 있습니다.\n관리자 마스터 암호를 입력해주세요:'))) return;
       if (!contact.trim() || contact === '방랑자') {
         setContact('운영진');
       }
@@ -1000,19 +1018,27 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  // 비밀글 본문은 서버가 비밀번호를 확인한 뒤에만 보낸다
+  const unlockSecretPost = async (postId: string, pw: string): Promise<boolean> => {
+    const full = await fetchFeedbackPostDetail(postId, pw.trim());
+    if (!full || full.locked) return false;
+    rememberBoardPassword(postId, pw.trim());
+    setItems((prev) => prev.map((p) => (p.id === postId ? full : p)));
+    setUnlockedPostIds((prev) => new Set(prev).add(postId));
+    return true;
+  };
+
   // 모달 팝업에서 비밀번호 검증
-  const handleVerifyPassword = (e?: React.FormEvent) => {
+  const handleVerifyPassword = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!passwordPromptPost) return;
-    if ((passwordPromptPost.password || '') === inputPassword.trim()) {
+    if (await unlockSecretPost(passwordPromptPost.id, inputPassword)) {
       const postId = passwordPromptPost.id;
-      setUnlockedPostIds((prev) => new Set(prev).add(postId));
       setPasswordPromptPost(null);
       setInputPassword('');
       setPasswordError(false);
       incrementViewCount(postId);
       setSelectedPostId(postId);
-      syncLocalList();
       showToast('🔓 비밀글 잠금이 해제되었습니다.');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
@@ -1022,12 +1048,10 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   };
 
   // 본문 상세 인라인 뷰에서 비밀번호 검증
-  const handleVerifyInlinePassword = (e?: React.FormEvent) => {
+  const handleVerifyInlinePassword = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!selectedPost) return;
-    if ((selectedPost.password || '') === inlinePassword.trim()) {
-      const postId = selectedPost.id;
-      setUnlockedPostIds((prev) => new Set(prev).add(postId));
+    if (await unlockSecretPost(selectedPost.id, inlinePassword)) {
       setInlinePassword('');
       setInlinePasswordError(false);
       showToast('🔓 비밀글 잠금이 해제되었습니다.');
@@ -1075,28 +1099,13 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   const handleEdit = async (post: FeedbackItem) => {
     if (post.isNotice || post.category === 'NOTICE') {
-      if (!isUserAdmin()) {
-        const input = window.prompt('🔒 공지사항 수정을 위해 관리자 마스터 암호를 입력해주세요:');
-        if (!input || !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
-          showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
-          return;
-        }
-        setAdminVerified(true);
-      }
-    } else {
-      const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
-      if (post.password && post.password !== savedPw && !ADMIN_MASTER_PASSWORDS.includes(savedPw)) {
-        const input = window.prompt('🔒 게시글을 수정하려면 설정된 비밀번호를 입력해주세요:');
-        if (input === null) return;
-        if (input.trim() !== post.password && !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
-          showToast('❌ 비밀번호가 일치하지 않아 수정할 수 없습니다.');
-          return;
-        }
-      }
+      if (!(await ensureAdmin('🔒 공지사항 수정을 위해 관리자 마스터 암호를 입력해주세요:'))) return;
+    } else if (!(await ensureBoardAuth(post.hasPassword || Boolean(post.password), '🔒 게시글을 수정하려면 설정된 비밀번호를 입력해주세요:', post.id))) {
+      return;
     }
     let fullPost = post;
-    if (post.isSummaryOnly) {
-      const fetched = await fetchFeedbackPostDetail(post.id);
+    if (post.isSummaryOnly || post.locked) {
+      const fetched = await fetchFeedbackPostDetail(post.id, getRememberedBoardPassword(post.id) || undefined);
       if (fetched) fullPost = fetched;
     }
     const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
@@ -1116,7 +1125,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     setDeckCode(fullPost.deckCode || '');
     setDeckName(fullPost.deckName || '');
     setIsSecret(Boolean(fullPost.isSecret));
-    setPassword(fullPost.password || savedPw);
+    setPassword(getRememberedBoardPassword(fullPost.id) || savedPw);
     setImageUrl(postImages[0] || '');
     setImages(postImages);
     setIsPreviewMode(false);
@@ -1124,32 +1133,16 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     setIsWriteModalOpen(true);
   };
 
-  const handleDelete = (id: string, e?: React.MouseEvent) => {
+  const handleDelete = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     const post = items.find((i) => i.id === id);
-    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
     if (post?.isNotice || post?.category === 'NOTICE') {
-      if (!isUserAdmin()) {
-        const input = window.prompt('🔒 공지사항 삭제를 위해 관리자 마스터 암호를 입력해주세요:');
-        if (!input || !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
-          showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
-          return;
-        }
-        setAdminVerified(true);
-      } else if (!window.confirm('정말로 이 공지사항을 삭제하시겠습니까?')) {
-        return;
-      }
-    } else if (post?.password && post.password !== savedPw && !ADMIN_MASTER_PASSWORDS.includes(savedPw)) {
-      const input = window.prompt('🔒 게시글을 삭제하려면 설정된 비밀번호를 입력해주세요:');
-      if (input === null) return;
-      if (input.trim() !== (post.password || '') && !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
-        showToast('❌ 비밀번호가 일치하지 않아 삭제할 수 없습니다.');
-        return;
-      }
-    } else {
-      if (!window.confirm('정말로 이 게시글을 삭제하시겠습니까?')) {
-        return;
-      }
+      if (!(await ensureAdmin('🔒 공지사항 삭제를 위해 관리자 마스터 암호를 입력해주세요:'))) return;
+      if (!window.confirm('정말로 이 공지사항을 삭제하시겠습니까?')) return;
+    } else if (post?.hasPassword || post?.password) {
+      if (!(await ensureBoardAuth(true, '🔒 게시글을 삭제하려면 설정된 비밀번호를 입력해주세요:', id))) return;
+    } else if (!window.confirm('정말로 이 게시글을 삭제하시겠습니까?')) {
+      return;
     }
     deleteFeedback(id);
     if (selectedPostId === id) {
@@ -1187,16 +1180,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     showToast('💬 댓글이 등록되었습니다.');
   };
 
-  const handleStartEditComment = (comment: CommentItem) => {
-    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
-    if (comment.password && comment.password !== savedPw) {
-      const input = window.prompt('🔒 댓글 수정을 위해 비밀번호를 입력해주세요:');
-      if (input === null) return;
-      if (input.trim() !== comment.password) {
-        showToast('❌ 비밀번호가 일치하지 않습니다.');
-        return;
-      }
-    }
+  const handleStartEditComment = async (postId: string, comment: CommentItem) => {
+    if (!(await ensureBoardAuth(comment.hasPassword || Boolean(comment.password), '🔒 댓글 수정을 위해 비밀번호를 입력해주세요:', postId, comment.id))) return;
     setEditingCommentId(comment.id);
     setEditingCommentText(comment.text);
   };
@@ -1213,17 +1198,11 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     showToast('✨ 댓글이 수정되었습니다.');
   };
 
-  const handleDeleteComment = (postId: string, comment: CommentItem) => {
-    const savedPw = typeof window !== 'undefined' ? localStorage.getItem('wuthering_board_password') || '' : '';
-    if (comment.password && comment.password !== savedPw) {
-      const input = window.prompt('🔒 댓글 삭제를 위해 비밀번호를 입력해주세요:');
-      if (input === null) return;
-      if (input.trim() !== comment.password) {
-        showToast('❌ 비밀번호가 일치하지 않습니다.');
-        return;
-      }
-    } else {
-      if (!window.confirm('정말로 이 댓글을 삭제하시겠습니까?')) return;
+  const handleDeleteComment = async (postId: string, comment: CommentItem) => {
+    if (comment.hasPassword || comment.password) {
+      if (!(await ensureBoardAuth(true, '🔒 댓글 삭제를 위해 비밀번호를 입력해주세요:', postId, comment.id))) return;
+    } else if (!window.confirm('정말로 이 댓글을 삭제하시겠습니까?')) {
+      return;
     }
     deleteCommentFromFeedback(postId, comment.id);
     syncLocalList();
@@ -1359,7 +1338,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (wysiwygSyncTimerRef.current) {
       window.clearTimeout(wysiwygSyncTimerRef.current);
@@ -1402,19 +1381,8 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
       return;
     }
 
-    if (category === 'NOTICE') {
-      if (!isUserAdmin()) {
-        if (ADMIN_MASTER_PASSWORDS.includes(password.trim())) {
-          setAdminVerified(true);
-        } else {
-          const input = window.prompt('📢 공지사항 등록을 위해 관리자 마스터 암호를 입력해주세요:');
-          if (!input || !ADMIN_MASTER_PASSWORDS.includes(input.trim())) {
-            showToast('❌ 관리자 마스터 암호가 일치하지 않습니다.');
-            return;
-          }
-          setAdminVerified(true);
-        }
-      }
+    if (category === 'NOTICE' && !(await ensureAdmin('📢 공지사항 등록을 위해 관리자 마스터 암호를 입력해주세요:', password.trim()))) {
+      return;
     }
 
     const authorToUse = contact.trim() || (category === 'NOTICE' ? '운영진' : '방랑자');
@@ -2135,7 +2103,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                 <span className="text-cyan-400 font-bold text-xs">↳ @{c.replyToAuthor || '익명'}</span>
                               )}
                               <span className="font-bold text-slate-200">{c.author}</span>
-                              {c.password && (
+                              {(c.hasPassword || c.password) && (
                                 <span title="비밀번호 설정됨"><Lock className="w-2.5 h-2.5 text-slate-500" /></span>
                               )}
                             </div>
@@ -2150,7 +2118,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                 답글
                               </button>
                               <button
-                                onClick={() => handleStartEditComment(c)}
+                                onClick={() => handleStartEditComment(selectedPost.id, c)}
                                 className="text-[11px] text-slate-400 hover:text-amber-300 font-bold transition cursor-pointer"
                               >
                                 수정

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, Suspense, lazy } from 'react';
+import DOMPurify from 'dompurify';
 import { BgmPlayer } from './BgmPlayer';
 import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 import type { CustomDeckConfig } from '../types/tcg';
@@ -52,16 +53,14 @@ const LOBBY_NOTICE_CACHE_KEY = 'wuthering_lobby_notice_cache_v1';
 const TUTORIAL_SEEN_KEY = 'wtcg_tutorial_seen';
 
 // 공지 본문 간단 정리 (기존 로비 패널과 같은 규칙)
-const sanitizeNotice = (raw: string) =>
-  raw
-    .replace(/\r\n/g, '\n')
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/on\w+='[^']*'/gi, '')
-    .replace(/javascript:[^"']*/gi, '')
-    .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="my-1.5 rounded-lg max-h-24 object-contain" />')
-    .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+// 위험한 태그·속성 제거는 DOMPurify가 맡는다 (예전 정규식은 따옴표 없는 onerror= 를 통과시켰다)
+export const sanitizeNotice = (raw: string) =>
+  DOMPurify.sanitize(
+    raw
+      .replace(/\r\n/g, '\n')
+      .replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" class="my-1.5 rounded-lg max-h-24 object-contain" />')
+      .replace(/\*\*(.*?)\*\*/g, '<b>$1</b>')
+  );
 
 interface LobbyProps {
   onStartGame: (mode: 'AI' | 'SOLO_DUAL', myDeck?: CustomDeckConfig, opponentDeck?: CustomDeckConfig) => void;

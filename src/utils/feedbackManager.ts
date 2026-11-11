@@ -9,7 +9,8 @@ export interface CommentItem {
   createdAt: string;
   replyToId?: string;
   replyToAuthor?: string;
-  password?: string;
+  password?: string; // 작성할 때만 보낸다 (서버 응답에는 없음)
+  hasPassword?: boolean; // 서버 응답: 비밀번호가 걸린 댓글인지
 }
 
 export interface FeedbackItem {
@@ -34,7 +35,9 @@ export interface FeedbackItem {
   isNotice?: boolean; // 상단 공지 고정 여부
   comments?: CommentItem[];
   isSecret?: boolean; // 비밀글 여부 (개인 덱 저장용)
-  password?: string; // 비밀글 열람 및 수정/삭제용 비밀번호
+  password?: string; // 작성·수정할 때만 보낸다 (서버 응답에는 없음)
+  hasPassword?: boolean; // 서버 응답: 비밀번호가 걸린 글인지
+  locked?: boolean; // 서버 응답: 비밀글 본문이 비밀번호 없이 가려진 상태
   hasImage?: boolean; // 요약 목록에서 이미지 포함 여부 표시용
   isSummaryOnly?: boolean; // 목록 조회 시 본문/이미지가 아직 로드되지 않은 요약 상태 여부
 }
@@ -68,6 +71,68 @@ export function rateLimitMessage(d: RateLimitedDetail): string {
   const what = d.bucket === 'post' ? '새 글' : d.bucket === 'comment' ? '댓글' : '작성';
   const min = Math.max(1, Math.ceil(d.retryAfter / 60));
   return `⏳ ${what}을 너무 자주 올렸어요. 약 ${min}분 뒤에 다시 시도해주세요.`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 게시판 권한 (2026-11-12): 비밀번호 비교는 서버가 한다. 화면은 사용자가 입력한 값을 기억했다가 요청에 실어 보낸다.
+// ─────────────────────────────────────────────────────────────────────────────
+const ADMIN_KEY_STORAGE = 'wuthering_admin_key';
+/** 이 탭에서 확인된 비밀번호: 글은 postId, 댓글은 `postId:commentId` */
+const boardPasswords = new Map<string, string>();
+
+export function getAdminKey(): string {
+  try {
+    return localStorage.getItem(ADMIN_KEY_STORAGE) || '';
+  } catch {
+    return '';
+  }
+}
+
+function savedBoardPassword(): string {
+  try {
+    return localStorage.getItem('wuthering_board_password') || '';
+  } catch {
+    return '';
+  }
+}
+
+export function rememberBoardPassword(key: string, password: string): void {
+  if (password) boardPasswords.set(key, password);
+}
+
+export function getRememberedBoardPassword(key: string): string {
+  return boardPasswords.get(key) || '';
+}
+
+function authFor(key: string) {
+  return { password: boardPasswords.get(key) || savedBoardPassword(), adminKey: getAdminKey() || undefined };
+}
+
+/**
+ * 서버에 비밀번호를 확인한다. 같은 값이 관리자 키여도 통과하며, 그 경우 관리자 키로 저장한다.
+ * postId 없이 부르면 관리자 키 확인만 한다.
+ */
+export async function verifyBoardPassword(password: string, postId?: string, commentId?: string): Promise<boolean> {
+  const pw = password.trim();
+  if (!pw) return false;
+  try {
+    const res = await fetch('/api/community?type=board', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'verify', postId, commentId, auth: { password: pw, adminKey: pw } }),
+    });
+    if (await notifyIfRateLimited(res)) return false;
+    const data = await res.json();
+    if (data?.isAdmin) {
+      try {
+        localStorage.setItem(ADMIN_KEY_STORAGE, pw);
+      } catch {}
+    }
+    if (data?.ok && postId) rememberBoardPassword(commentId ? `${postId}:${commentId}` : postId, pw);
+    return Boolean(data?.ok);
+  } catch {
+    return false;
+  }
 }
 
 /** 댓글 1건 추가·수정·삭제만 서버에 보낸다 (글 전체를 다시 저장하지 않음) */
@@ -288,16 +353,23 @@ export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
 /**
  * 게시글 클릭 시 해당 게시글 1건의 본문 + 첨부 이미지를 온디맨드로 다운로드합니다.
  */
-export async function fetchFeedbackPostDetail(postId: string): Promise<FeedbackItem | null> {
+export async function fetchFeedbackPostDetail(postId: string, password?: string): Promise<FeedbackItem | null> {
   if (!postId) return null;
   const cached = postDetailCache.get(postId);
-  if (cached && !cached.isSummaryOnly) {
+  if (cached && !cached.isSummaryOnly && !cached.locked && password === undefined) {
     return cached;
   }
 
   try {
+    // 비밀글 본문은 비밀번호(또는 관리자 키) 헤더가 맞을 때만 서버가 보낸다
+    const pw = password ?? boardPasswords.get(postId);
+    const adminKey = getAdminKey();
     const res = await fetch(`/api/community?type=board&postId=${encodeURIComponent(postId)}`, {
-      headers: { Accept: 'application/json' },
+      headers: {
+        Accept: 'application/json',
+        ...(pw ? { 'X-Board-Password': pw } : {}),
+        ...(adminKey ? { 'X-Admin-Key': adminKey } : {}),
+      },
     });
     if (res.ok) {
       const data = await res.json();
@@ -312,6 +384,7 @@ export async function fetchFeedbackPostDetail(postId: string): Promise<FeedbackI
           dislikes: Math.max(data.post.dislikes || 0, existing?.dislikes || 0),
           likedByMe: Boolean(existing?.likedByMe),
           dislikedByMe: Boolean(existing?.dislikedByMe),
+          locked: Boolean(data.post.locked),
           isSummaryOnly: false,
         };
         postDetailCache.set(postId, fullPost);
@@ -438,6 +511,7 @@ export async function syncSinglePostToCloud(post: FeedbackItem): Promise<void> {
       body: JSON.stringify({
         action: 'upsertPost',
         post: postWithoutComments,
+        auth: authFor(post.id),
         updatedAt: Date.now(),
       }),
     });
@@ -458,29 +532,12 @@ export async function syncDeletePostToCloud(postId: string): Promise<void> {
       body: JSON.stringify({
         action: 'deletePost',
         postId,
+        auth: authFor(postId),
         updatedAt: Date.now(),
       }),
     });
   } catch (err) {
     console.warn('[feedbackManager] 게시글 삭제 동기화 실패:', err);
-  }
-}
-
-export async function syncFeedbackListToCloud(postsToSync?: FeedbackItem[]): Promise<void> {
-  try {
-    const mergedPosts = postsToSync || getFeedbackList();
-    const payload = JSON.stringify({
-      posts: mergedPosts.map(({ likedByMe, dislikedByMe, ...rest }) => rest),
-      updatedAt: Date.now(),
-    });
-
-    await fetch('/api/community?type=board', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-    });
-  } catch (err) {
-    console.warn('[feedbackManager] 클라우드 동기화 실패:', err);
   }
 }
 
@@ -509,6 +566,7 @@ export function saveFeedback(
   persistLocalPosts(updated);
 
   // 전체 목록 재다운로드 없이 단일 게시글만 즉시 비동기 업로드
+  if (newItem.password) rememberBoardPassword(newItem.id, newItem.password);
   syncSinglePostToCloud(newItem);
 
   return newItem;
@@ -590,6 +648,7 @@ export function addCommentToFeedback(
     ...(replyToId ? { replyToId, replyToAuthor } : {}),
     ...(password ? { password: password.trim() } : {}),
   };
+  if (password?.trim()) rememberBoardPassword(`${id}:${newComment.id}`, password.trim());
 
   let targetPost: FeedbackItem | null = null;
   const updated = list.map((item) => {
@@ -775,24 +834,9 @@ export function clearDraft(): void {
   }
 }
 
-export const ADMIN_MASTER_PASSWORDS = ['wuwatcg2026'];
-
+/** 서버가 확인한 관리자 키가 이 브라우저에 저장돼 있는지 (실제 권한은 서버가 요청마다 다시 확인) */
 export function isUserAdmin(): boolean {
-  try {
-    return localStorage.getItem('wuthering_is_admin_verified') === 'true';
-  } catch {
-    return false;
-  }
-}
-
-export function setAdminVerified(verified: boolean): void {
-  try {
-    if (verified) {
-      localStorage.setItem('wuthering_is_admin_verified', 'true');
-    } else {
-      localStorage.removeItem('wuthering_is_admin_verified');
-    }
-  } catch {}
+  return Boolean(getAdminKey());
 }
 
 export function getLatestNotice(posts?: FeedbackItem[]): FeedbackItem | null {
@@ -838,7 +882,7 @@ export function updateCommentInFeedback(
   });
   persistLocalPosts(updated);
   if (targetPost) {
-    void syncCommentAction({ action: 'updateComment', postId, commentId, text: newText.trim() });
+    void syncCommentAction({ action: 'updateComment', postId, commentId, text: newText.trim(), auth: authFor(`${postId}:${commentId}`) });
   }
   return true;
 }
@@ -859,7 +903,7 @@ export function deleteCommentFromFeedback(postId: string, commentId: string): bo
   });
   persistLocalPosts(updated);
   if (targetPost) {
-    void syncCommentAction({ action: 'deleteComment', postId, commentId });
+    void syncCommentAction({ action: 'deleteComment', postId, commentId, auth: authFor(`${postId}:${commentId}`) });
   }
   return true;
 }

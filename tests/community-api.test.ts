@@ -26,6 +26,7 @@ function fakeD1() {
 }
 
 let DB: ReturnType<typeof fakeD1>;
+const ADMIN_KEY = 'test-admin-key';
 let mod: typeof import('../functions/api/community');
 
 async function call(method: string, query: string, body?: unknown, headers: Record<string, string> = {}) {
@@ -34,7 +35,7 @@ async function call(method: string, query: string, body?: unknown, headers: Reco
     headers: { 'Content-Type': 'application/json', ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const res: Response = await (mod.onRequest as any)({ request, env: { DB } });
+  const res: Response = await (mod.onRequest as any)({ request, env: { DB, ADMIN_KEY } });
   const text = await res.text();
   return { status: res.status, etag: res.headers.get('ETag'), json: text ? JSON.parse(text) : null };
 }
@@ -325,5 +326,92 @@ describe('community API row storage', () => {
     expect(res.status).toBe(200);
     const detail = await call('GET', 'type=replays&id=rep-big-logs');
     expect(detail.json.v2).toEqual(v2);
+  });
+});
+
+// 2026-11-12 게시판 권한: 비밀번호는 응답에 싣지 않고, 수정·삭제·공지는 서버가 확인한다
+describe('community API board permissions', () => {
+  const owned = { id: 'own', title: 'T', content: '본문', password: 'pw1', createdAt: '2026-11-05T00:00:00Z' };
+
+  it('never returns post or comment passwords (list, summary, single)', async () => {
+    await call('POST', 'type=board', { action: 'upsertPost', post: owned });
+    await call('POST', 'type=board', { action: 'addComment', postId: 'own', comment: { id: 'c1', text: 'hi', password: 'cpw' } });
+    for (const q of ['type=board', 'type=board&summary=1', 'type=board&postId=own']) {
+      const r = await call('GET', q);
+      const text = JSON.stringify(r.json);
+      expect(text).not.toContain('pw1');
+      expect(text).not.toContain('cpw');
+    }
+    const one = await call('GET', 'type=board&postId=own');
+    expect(one.json.post.hasPassword).toBe(true);
+    expect(one.json.post.comments[0].hasPassword).toBe(true);
+  });
+
+  it('secret post body is sent only with the right password header', async () => {
+    await call('POST', 'type=board', { action: 'upsertPost', post: { ...owned, isSecret: true, deckCode: 'D' } });
+    const list = await call('GET', 'type=board');
+    expect(list.json.posts[0]).toMatchObject({ content: '', locked: true });
+    expect(list.json.posts[0].deckCode).toBeUndefined();
+    const wrong = await call('GET', 'type=board&postId=own', undefined, { 'X-Board-Password': 'nope' });
+    expect(wrong.json.post.locked).toBe(true);
+    const right = await call('GET', 'type=board&postId=own', undefined, { 'X-Board-Password': 'pw1' });
+    expect(right.json.post).toMatchObject({ content: '본문', deckCode: 'D' });
+    expect(right.json.post.locked).toBeUndefined();
+  });
+
+  it('edit/delete need the password or the admin key', async () => {
+    await call('POST', 'type=board', { action: 'upsertPost', post: owned });
+
+    // 다른 사람: 본문을 바꾸려 해도 그대로, 삭제는 403
+    await call('POST', 'type=board', { action: 'upsertPost', post: { ...owned, password: undefined, content: '변조' } });
+    expect((await call('GET', 'type=board&postId=own')).json.post.content).toBe('본문');
+    expect((await call('POST', 'type=board', { action: 'deletePost', postId: 'own' })).status).toBe(403);
+    expect((await call('POST', 'type=board', { action: 'deletePost', postId: 'own', auth: { password: 'x' } })).status).toBe(403);
+
+    // 주인: 비밀번호를 보내면 수정되고, 비밀번호 필드를 안 보내도 기존 비밀번호가 유지된다
+    await call('POST', 'type=board', { action: 'upsertPost', post: { ...owned, password: undefined, content: '수정' }, auth: { password: 'pw1' } });
+    expect((await call('GET', 'type=board&postId=own')).json.post).toMatchObject({ content: '수정', hasPassword: true });
+
+    // 관리자 키로 삭제
+    expect((await call('POST', 'type=board', { action: 'deletePost', postId: 'own', auth: { adminKey: ADMIN_KEY } })).status).toBe(200);
+    expect((await call('GET', 'type=board&postId=own')).json.post).toBeNull();
+  });
+
+  it('only the admin key can publish a notice', async () => {
+    await call('POST', 'type=board', { action: 'upsertPost', post: { id: 'fake', title: '가짜 공지', content: 'x', isNotice: true, category: 'NOTICE' } });
+    expect((await call('GET', 'type=board&postId=fake')).json.post).toMatchObject({ isNotice: false, category: 'GENERAL' });
+    expect((await call('GET', 'type=board&lobby=1')).json.latestNotice).toBeNull();
+
+    await call('POST', 'type=board', {
+      action: 'upsertPost',
+      post: { id: 'real', title: '공지', content: 'y', isNotice: true, category: 'NOTICE' },
+      auth: { adminKey: ADMIN_KEY },
+    });
+    expect((await call('GET', 'type=board&lobby=1')).json.latestNotice.id).toBe('real');
+  });
+
+  it('without permission only likes/views move, by at most +1', async () => {
+    await call('POST', 'type=board', { action: 'upsertPost', post: { ...owned, likes: 2, views: 5 } });
+    await call('POST', 'type=board', { action: 'upsertPost', post: { ...owned, password: undefined, likes: 999, views: 0, title: '변조' } });
+    expect((await call('GET', 'type=board&postId=own')).json.post).toMatchObject({ likes: 3, views: 5, title: 'T' });
+  });
+
+  it('comment edit/delete need the comment password; verify answers without leaking it', async () => {
+    await call('POST', 'type=board', { action: 'upsertPost', post: { id: 'p', content: 'x' } });
+    await call('POST', 'type=board', { action: 'addComment', postId: 'p', comment: { id: 'c1', text: 'hi', password: 'cpw' } });
+
+    expect((await call('POST', 'type=board', { action: 'updateComment', postId: 'p', commentId: 'c1', text: '변조' })).status).toBe(403);
+    expect((await call('POST', 'type=board', { action: 'deleteComment', postId: 'p', commentId: 'c1' })).status).toBe(403);
+    const upd = await call('POST', 'type=board', { action: 'updateComment', postId: 'p', commentId: 'c1', text: '수정', auth: { password: 'cpw' } });
+    expect(upd.json.comment).toMatchObject({ text: '수정', hasPassword: true });
+    expect(upd.json.comment.password).toBeUndefined();
+
+    expect((await call('POST', 'type=board', { action: 'verify', postId: 'p', commentId: 'c1', auth: { password: 'no' } })).json.ok).toBe(false);
+    expect((await call('POST', 'type=board', { action: 'verify', postId: 'p', commentId: 'c1', auth: { password: 'cpw' } })).json.ok).toBe(true);
+    expect((await call('POST', 'type=board', { action: 'verify', auth: { adminKey: 'wrong' } })).json.ok).toBe(false);
+    expect((await call('POST', 'type=board', { action: 'verify', auth: { adminKey: ADMIN_KEY } })).json.isAdmin).toBe(true);
+
+    await call('POST', 'type=board', { action: 'deleteComment', postId: 'p', commentId: 'c1', auth: { password: 'cpw' } });
+    expect((await call('GET', 'type=board&postId=p')).json.post.comments).toEqual([]);
   });
 });
