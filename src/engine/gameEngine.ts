@@ -824,6 +824,8 @@ export function createBoardSnapshot(state: {
       handCount: p0.hand.length,
       deckCount: p0.actionDeck.length,
       dropCount: p0.dropZone.length,
+      // 카드 설명(description)은 싣지 않는다: 로그마다 반복돼 2인 대전 동기화 크기의 대부분을 차지했다.
+      // 리플레이 화면은 code로 공식 설명을 찾아 쓴다 (BattleReplayStage toActionCard)
       handCards: p0.hand.map((c) => ({
         code: c.code,
         nameKr: c.nameKr,
@@ -832,7 +834,6 @@ export function createBoardSnapshot(state: {
         speed: c.speed,
         damage: c.damage,
         artUrl: c.artUrl,
-        description: c.description,
       })),
     },
     p1: {
@@ -875,7 +876,6 @@ export function createBoardSnapshot(state: {
         speed: c.speed,
         damage: c.damage,
         artUrl: c.artUrl,
-        description: c.description,
       })),
     },
     p0ClashCard: p0.clashCard
@@ -1642,275 +1642,98 @@ export function applyCharacterEvolutionSkills(
 
   const stackCards = getAllCardsInSlot(currentSlotCard);
 
-  // 1. BP01-003 카멜리아 Lv.1: 【등장】/【레벨업】트래시에서 <일반 공격> 1장 패에 추가 가능
-  const isCamellya1 = (c: CharacterCard | undefined) =>
-    Boolean(c && c.code?.startsWith('BP01-003'));
-
-  const cam1 = isCamellya1(upgradeCard) ? upgradeCard : stackCards.find(isCamellya1) || null;
-  if (cam1) {
-    const isEntry = isCamellya1(upgradeCard);
-    const normalAttacks = player.dropZone.filter(isNormalAttackCard) as ActionCard[];
-    if (normalAttacks.length > 0) {
+  // 1~4. Lv.1 【등장】/【레벨업】 "트래시에서 카드 1장을 패에 추가 가능" (2026-11-12: 같은 코드 4벌 → 표 하나)
+  //   이 캐릭터 카드가 새로 올라왔으면 【등장】, 아래에 깔려 있으면 【레벨업】으로 발동한다
+  const TRASH_RECOVERY_SKILLS: {
+    code: string;
+    name: string;
+    key: string;
+    what: string;
+    emptyWhat: string;
+    pick: (c: ActionCard | CharacterCard) => boolean;
+    emptyFx?: boolean;
+  }[] = [
+    { code: 'BP01-003', name: '카멜리아', key: 'cam1', what: '<일반 공격>', emptyWhat: '<일반 공격>', pick: isNormalAttackCard, emptyFx: true },
+    { code: 'BP01-009', name: '파수인', key: 'sh1', what: '<변주 스킬>', emptyWhat: '<변주 스킬>', pick: (c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard) },
+    { code: 'BP01-013', name: '앙코', key: 'anke1', what: '【앙코】의 적색', emptyWhat: '【앙코】 적색', pick: (c) => c.kind === 'ACTION' && (c as ActionCard).color === 'RED' && Boolean(c.characterExclusive?.includes('앙코')) },
+    { code: 'BP01-026', name: '치샤', key: 'chixia1', what: '<기본 공격>', emptyWhat: '<기본 공격>', pick: isNormalAttackCard },
+  ];
+  for (const skill of TRASH_RECOVERY_SKILLS) {
+    const isThis = (c: CharacterCard | null | undefined) => Boolean(c && c.code?.startsWith(skill.code));
+    const src = isThis(upgradeCard) ? upgradeCard : stackCards.find(isThis) || null;
+    if (!src) continue;
+    const when = src === upgradeCard ? '등장' : '레벨업';
+    const sourceCardName = `${skill.name} [${skill.code}]`;
+    const candidates = player.dropZone.filter(skill.pick) as ActionCard[];
+    if (candidates.length > 0) {
       if (player.isAi) {
-        const dropIdx = player.dropZone.findIndex(isNormalAttackCard);
-        if (dropIdx !== -1) {
-          const [reclaimed] = player.dropZone.splice(dropIdx, 1);
-          addCardsToHand(player, [reclaimed as ActionCard]);
-          newState.players[playerIndex] = player;
-          newState = addLog(
-            newState,
-            `[트래시 회수] [카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${reclaimed.nameKr}] 카드를 패에 회수했습니다.`,
-            'ACTION',
-            playerIndex,
-            { cardArt: reclaimed.artUrl, cardName: reclaimed.nameKr, effectTag: '트래시 회수' }
-          );
-        }
-      } else {
-        const choice: PendingChoice = {
-          id: `choice-${engineTick()}-${engineTag()}`,
-          playerIndex,
-          title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (트래시 회수)`,
-          sourceCardName: '카멜리아 [BP01-003]',
-          sourceCardArt: cam1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'} 효과 발동】 트래시 에리어에서 <일반 공격> 카드 1장을 패에 추가할 수 있습니다.`,
-          revealedCards: normalAttacks,
-          minSelect: 0,
-          maxSelect: 1,
-          onResolveType: 'RECOVER_FROM_DROP',
-          sourceZone: 'DROP',
-        };
-        newState = queueChoice(newState, choice, isDeferred);
+        const dropIdx = player.dropZone.findIndex(skill.pick);
+        const [reclaimed] = player.dropZone.splice(dropIdx, 1);
+        addCardsToHand(player, [reclaimed as ActionCard]);
         newState.players[playerIndex] = player;
-      }
-    } else {
-      // 트래시에 일반 공격 카드가 없음을 명확한 안내 로그 및 팝업창으로 유저에게 피드백
-      newState = addLog(
-        newState,
-        `[카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시 에리어에 회수 가능한 <일반 공격> 카드가 없어 효과가 종료되었습니다.`,
-        'ACTION',
-        playerIndex,
-        { cardArt: cam1.artUrl, cardName: cam1.nameKr, effectTag: '효과 대상 없음' }
-      );
-      emitEffectFx({
-        id: `eff-${engineTick()}-cam1-empty`,
-        sourceCardName: '카멜리아 [BP01-003]',
-        sourceCardArt: cam1.artUrl,
-        effectType: 'DRAW',
-        title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과`,
-        description: '트래시 에리어에 회수할 수 있는 <일반 공격> 카드가 없습니다.',
-        playerIndex,
-        timestamp: logTimestamp(),
-      });
-      if (!player.isAi) {
-        const infoChoice: PendingChoice = {
-          id: `choice-${engineTick()}-cam1-empty`,
+        newState = addLog(
+          newState,
+          `[트래시 회수] [${skill.name} Lv.1 ${when} 효과] 트래시에서 [${reclaimed.nameKr}] 카드를 패에 회수했습니다.`,
+          'ACTION',
           playerIndex,
-          title: `카멜리아 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
-          sourceCardName: '카멜리아 [BP01-003]',
-          sourceCardArt: cam1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'} 효과 발동】 트래시 에리어에 회수 가능한 <일반 공격> 카드가 없어 효과가 종료되었습니다.`,
-          revealedCards: [],
-          minSelect: 0,
-          maxSelect: 0,
-          onResolveType: 'VIEW_ONLY',
-        };
-        newState = queueChoice(newState, infoChoice, isDeferred);
-      }
-    }
-  }
-
-  // 2. BP01-009 파수인 Lv.1: 트래시에서 <변주 스킬> 카드 1장 패에 추가 가능
-  const sh1 = upgradeCard.code?.startsWith('BP01-009')
-    ? upgradeCard
-    : stackCards.find((c) => c.code?.startsWith('BP01-009')) || null;
-  if (sh1) {
-    const isEntry = sh1 === upgradeCard;
-    const introSkills = player.dropZone.filter((c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard)) as ActionCard[];
-    if (introSkills.length > 0) {
-      if (player.isAi) {
-        const dropIdx = player.dropZone.findIndex((c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard));
-        if (dropIdx !== -1) {
-          const [reclaimed] = player.dropZone.splice(dropIdx, 1);
-          addCardsToHand(player, [reclaimed as ActionCard]);
-          newState.players[playerIndex] = player;
-          newState = addLog(
-            newState,
-            `[트래시 회수] [파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${reclaimed.nameKr}] 카드를 패에 회수했습니다.`,
-            'ACTION',
-            playerIndex
-          );
-        }
-      } else {
-        const choice: PendingChoice = {
-          id: `choice-${engineTick()}-${engineTag()}`,
-          playerIndex,
-          title: `파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (트래시 회수)`,
-          sourceCardName: '파수인 [BP01-009]',
-          sourceCardArt: sh1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'} 효과 발동】 트래시 에리어에서 <변주 스킬> 카드 1장을 패에 추가할 수 있습니다.`,
-          revealedCards: introSkills,
-          minSelect: 0,
-          maxSelect: 1,
-          onResolveType: 'RECOVER_FROM_DROP',
-          sourceZone: 'DROP',
-        };
-        newState = queueChoice(newState, choice, isDeferred);
-        newState.players[playerIndex] = player;
-      }
-    } else {
-      newState = addLog(
-        newState,
-        `[파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시 에리어에 회수 가능한 <변주 스킬> 카드가 없어 효과가 종료되었습니다.`,
-        'ACTION',
-        playerIndex,
-        { cardArt: sh1.artUrl, cardName: sh1.nameKr, effectTag: '효과 대상 없음' }
-      );
-      if (!player.isAi) {
-        const infoChoice: PendingChoice = {
-          id: `choice-${engineTick()}-sh1-empty`,
-          playerIndex,
-          title: `파수인 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
-          sourceCardName: '파수인 [BP01-009]',
-          sourceCardArt: sh1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'} 효과 발동】 트래시 에리어에 회수 가능한 <변주 스킬> 카드가 없어 효과가 종료되었습니다.`,
-          revealedCards: [],
-          minSelect: 0,
-          maxSelect: 0,
-          onResolveType: 'VIEW_ONLY',
-        };
-        newState = queueChoice(newState, infoChoice, isDeferred);
-      }
-    }
-  }
-
-  // 3. BP01-013 앙코 Lv.1: 트래시에서 【앙코】의 적색 카드 1장 패에 추가 가능
-  const anke1 = upgradeCard.code?.startsWith('BP01-013')
-    ? upgradeCard
-    : stackCards.find((c) => c.code?.startsWith('BP01-013')) || null;
-  if (anke1) {
-    const isEntry = anke1 === upgradeCard;
-    const ankeRed = player.dropZone.filter(
-      (c) => c.kind === 'ACTION' && (c as ActionCard).color === 'RED' && c.characterExclusive?.includes('앙코')
-    ) as ActionCard[];
-    if (ankeRed.length > 0) {
-      if (player.isAi) {
-        const dropIdx = player.dropZone.findIndex(
-          (c) => c.kind === 'ACTION' && (c as ActionCard).color === 'RED' && c.characterExclusive?.includes('앙코')
+          { cardArt: reclaimed.artUrl, cardName: reclaimed.nameKr, effectTag: '트래시 회수' }
         );
-        if (dropIdx !== -1) {
-          const [reclaimed] = player.dropZone.splice(dropIdx, 1);
-          addCardsToHand(player, [reclaimed as ActionCard]);
-          newState.players[playerIndex] = player;
-          newState = addLog(
-            newState,
-            `[트래시 회수] [앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${reclaimed.nameKr}] 카드를 패에 회수했습니다.`,
-            'ACTION',
-            playerIndex
-          );
-        }
       } else {
-        const choice: PendingChoice = {
-          id: `choice-${engineTick()}-${engineTag()}`,
-          playerIndex,
-          title: `앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (트래시 회수)`,
-          sourceCardName: '앙코 [BP01-013]',
-          sourceCardArt: anke1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'} 효과 발동】 트래시 에리어에서 【앙코】의 적색 카드 1장을 패에 추가할 수 있습니다.`,
-          revealedCards: ankeRed,
-          minSelect: 0,
-          maxSelect: 1,
-          onResolveType: 'RECOVER_FROM_DROP',
-          sourceZone: 'DROP',
-        };
-        newState = queueChoice(newState, choice, isDeferred);
+        newState = queueChoice(
+          newState,
+          {
+            id: `choice-${engineTick()}-${engineTag()}`,
+            playerIndex,
+            title: `${skill.name} Lv.1 ${when} 효과 발동 (트래시 회수)`,
+            sourceCardName,
+            sourceCardArt: src.artUrl,
+            description: `【${when} 효과 발동】 트래시 에리어에서 ${skill.what} 카드 1장을 패에 추가할 수 있습니다.`,
+            revealedCards: candidates,
+            minSelect: 0,
+            maxSelect: 1,
+            onResolveType: 'RECOVER_FROM_DROP',
+            sourceZone: 'DROP',
+          },
+          isDeferred
+        );
         newState.players[playerIndex] = player;
       }
     } else {
-      newState = addLog(
-        newState,
-        `[앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시 에리어에 회수 가능한 【앙코】 적색 카드가 없어 효과가 종료되었습니다.`,
-        'ACTION',
-        playerIndex,
-        { cardArt: anke1.artUrl, cardName: anke1.nameKr, effectTag: '효과 대상 없음' }
-      );
-      if (!player.isAi) {
-        const infoChoice: PendingChoice = {
-          id: `choice-${engineTick()}-anke1-empty`,
+      const emptyText = `트래시 에리어에 회수 가능한 ${skill.emptyWhat} 카드가 없어 효과가 종료되었습니다.`;
+      newState = addLog(newState, `[${skill.name} Lv.1 ${when} 효과] ${emptyText}`, 'ACTION', playerIndex, {
+        cardArt: src.artUrl,
+        cardName: src.nameKr,
+        effectTag: '효과 대상 없음',
+      });
+      if (skill.emptyFx) {
+        emitEffectFx({
+          id: `eff-${engineTick()}-${skill.key}-empty`,
+          sourceCardName,
+          sourceCardArt: src.artUrl,
+          effectType: 'DRAW',
+          title: `${skill.name} Lv.1 ${when} 효과`,
+          description: `트래시 에리어에 회수할 수 있는 ${skill.emptyWhat} 카드가 없습니다.`,
           playerIndex,
-          title: `앙코 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
-          sourceCardName: '앙코 [BP01-013]',
-          sourceCardArt: anke1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'} 효과 발동】 트래시 에리어에 회수 가능한 【앙코】 적색 카드가 없어 효과가 종료되었습니다.`,
-          revealedCards: [],
-          minSelect: 0,
-          maxSelect: 0,
-          onResolveType: 'VIEW_ONLY',
-        };
-        newState = queueChoice(newState, infoChoice, isDeferred);
+          timestamp: logTimestamp(),
+        });
       }
-    }
-  }
-
-  // 4. BP01-026 치샤 Lv.1: 트래시에서 <기본 공격> 카드 1장 패에 추가 가능
-  const chixia1 = upgradeCard.code?.startsWith('BP01-026')
-    ? upgradeCard
-    : stackCards.find((c) => c.code?.startsWith('BP01-026')) || null;
-  if (chixia1) {
-    const isEntry = chixia1 === upgradeCard;
-    const normalAttacks = player.dropZone.filter(isNormalAttackCard) as ActionCard[];
-    if (normalAttacks.length > 0) {
-      if (player.isAi) {
-        const dropIdx = player.dropZone.findIndex(isNormalAttackCard);
-        if (dropIdx !== -1) {
-          const [reclaimed] = player.dropZone.splice(dropIdx, 1);
-          addCardsToHand(player, [reclaimed as ActionCard]);
-          newState.players[playerIndex] = player;
-          newState = addLog(
-            newState,
-            `[트래시 회수] [치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시에서 [${reclaimed.nameKr}] 카드를 패에 회수했습니다.`,
-            'ACTION',
-            playerIndex
-          );
-        }
-      } else {
-        const choice: PendingChoice = {
-          id: `choice-${engineTick()}-${engineTag()}`,
-          playerIndex,
-          title: `치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동 (트래시 회수)`,
-          sourceCardName: '치샤 [BP01-026]',
-          sourceCardArt: chixia1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'} 효과 발동】 트래시 에리어에서 <기본 공격> 카드 1장을 패에 추가할 수 있습니다.`,
-          revealedCards: normalAttacks,
-          minSelect: 0,
-          maxSelect: 1,
-          onResolveType: 'RECOVER_FROM_DROP',
-          sourceZone: 'DROP',
-        };
-        newState = queueChoice(newState, choice, isDeferred);
-        newState.players[playerIndex] = player;
-      }
-    } else {
-      newState = addLog(
-        newState,
-        `[치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과] 트래시 에리어에 회수 가능한 <기본 공격> 카드가 없어 효과가 종료되었습니다.`,
-        'ACTION',
-        playerIndex,
-        { cardArt: chixia1.artUrl, cardName: chixia1.nameKr, effectTag: '효과 대상 없음' }
-      );
       if (!player.isAi) {
-        const infoChoice: PendingChoice = {
-          id: `choice-${engineTick()}-chixia1-empty`,
-          playerIndex,
-          title: `치샤 Lv.1 ${isEntry ? '등장' : '레벨업'} 효과 발동`,
-          sourceCardName: '치샤 [BP01-026]',
-          sourceCardArt: chixia1.artUrl,
-          description: `【${isEntry ? '등장' : '레벨업'} 효과 발동】 트래시 에리어에 회수 가능한 <기본 공격> 카드가 없어 효과가 종료되었습니다.`,
-          revealedCards: [],
-          minSelect: 0,
-          maxSelect: 0,
-          onResolveType: 'VIEW_ONLY',
-        };
-        newState = queueChoice(newState, infoChoice, isDeferred);
+        newState = queueChoice(
+          newState,
+          {
+            id: `choice-${engineTick()}-${skill.key}-empty`,
+            playerIndex,
+            title: `${skill.name} Lv.1 ${when} 효과 발동`,
+            sourceCardName,
+            sourceCardArt: src.artUrl,
+            description: `【${when} 효과 발동】 ${emptyText}`,
+            revealedCards: [],
+            minSelect: 0,
+            maxSelect: 0,
+            onResolveType: 'VIEW_ONLY',
+          },
+          isDeferred
+        );
       }
     }
   }
@@ -2716,6 +2539,10 @@ export function setClashCard(
   if (state.pendingChoice) {
     return { success: false, newState: state, error: '발동 중인 카드 효과 선택을 먼저 완료해야 합니다.' };
   }
+  // 대결 세트 단계에서 아직 세트하지 않은 플레이어만 (두 번 세트하면 먼저 낸 카드가 사라지던 문제 방지)
+  if (state.phase !== 'CLASH_SET' || state.players[playerIndex].clashCardReady) {
+    return { success: false, newState: state, error: '지금은 대결 카드를 세트할 수 없습니다.' };
+  }
   const p0 = clonePlayer(state.players[0]);
   const p1 = clonePlayer(state.players[1]);
   const player = playerIndex === 0 ? p0 : p1;
@@ -3273,6 +3100,8 @@ export function applyBattleStepSkills(state: GameState): GameState {
           player.slots[ankeSlotKey] = prevLeader;
           newState.players = players;
           newState = triggerShorekeeperSwitchSkill(newState, playerIndex, player, prevLeader, nextLeader);
+          // 위 함수는 플레이어를 복제해 결과를 newState에 넣는다. 이 함수 끝에서 지역 변수로 덮어쓰므로 결과를 지역 변수에 되돌려 놓는다
+          Object.assign(player, newState.players[playerIndex]);
         }
         const currentAnke = player.slots.leader;
         const lv2AnkeCards = findAllLv2Cards(player.characterDeck, currentAnke);
@@ -3355,6 +3184,8 @@ export function applyBattleStepSkills(state: GameState): GameState {
           player.slots[sanhuaSlotKey] = prevLeader;
           newState.players = players;
           newState = triggerShorekeeperSwitchSkill(newState, playerIndex, player, prevLeader, sanhuaChar);
+          // 위 함수는 플레이어를 복제해 결과를 newState에 넣는다. 이 함수 끝에서 지역 변수로 덮어쓰므로 결과를 지역 변수에 되돌려 놓는다
+          Object.assign(player, newState.players[playerIndex]);
           newState = addLog(
             newState,
             `[매서운 가시 BP01-076 배틀 효과] 리더를 [${player.slots.leader.nameKr}](으)로 교체했습니다!`,
@@ -4156,6 +3987,8 @@ export function finishClashJudgment(state: GameState): GameState {
         newState = queueChoice(newState, healNotice, true);
       }
       newState = triggerShorekeeperHealPassive(newState, winnerIndex, winnerPlayer, true);
+      // 위 함수는 플레이어를 복제해 결과를 newState에 넣는다. 이 함수 끝에서 지역 변수로 덮어쓰므로 결과를 지역 변수에 되돌려 놓는다
+      Object.assign(winnerPlayer, newState.players[winnerIndex]);
     }
 
     // 혼돈의 이론 [BP01-056] 승리 효과: 파수인 레벨업!
@@ -4685,6 +4518,8 @@ export function finishClashJudgment(state: GameState): GameState {
         }
       );
       newState = triggerShorekeeperHealPassive(newState, winnerIndex, winnerPlayer, true);
+      // 위 함수는 플레이어를 복제해 결과를 newState에 넣는다. 이 함수 끝에서 지역 변수로 덮어쓰므로 결과를 지역 변수에 되돌려 놓는다
+      Object.assign(winnerPlayer, newState.players[winnerIndex]);
     }
 
     // I. CHARGE 기본 효과
@@ -4789,6 +4624,8 @@ export function finishClashJudgment(state: GameState): GameState {
           winnerPlayer.slots[supportKey] = prevLeader;
           newState.players[winnerIndex] = winnerPlayer;
           newState = triggerShorekeeperSwitchSkill(newState, winnerIndex, winnerPlayer, prevLeader, nextLeader, true);
+          // 위 함수는 플레이어를 복제해 결과를 newState에 넣는다. 이 함수 끝에서 지역 변수로 덮어쓰므로 결과를 지역 변수에 되돌려 놓는다
+          Object.assign(winnerPlayer, newState.players[winnerIndex]);
           newState = addLog(
             newState,
             `[${isSanhuaLv2Leader ? '산화 Lv.2 BP01-031' : '얼음 파편 BP01-077'} 판정 효과] ${winnerPlayer.name}이(가) 리더를 [${prevLeader.nameKr}]에서 [${winnerPlayer.slots.leader.nameKr}](으)로 교체했습니다!`,
@@ -5143,18 +4980,17 @@ export function finishClashJudgment(state: GameState): GameState {
 export function canPlayerExecuteCombo(player: PlayerState): boolean {
   if (player.comboBlockedNextTurn) return false;
   if (!player.comboUnlimited && player.comboCount <= 0) return false;
-  return player.hand.some((c) => {
-    if (c.color !== 'RED') return false;
-    let effectiveCost = getAllCardsInSlot(player.slots.leader).some(
-      (ch) => ch.characterName === '금희' && ch.level >= 1
-    )
-      ? Math.max(0, c.cost - 1)
-      : c.cost;
-    if (player.tempCostPenaltyRed && player.tempCostPenaltyRed > 0) {
-      effectiveCost += player.tempCostPenaltyRed;
-    }
-    return player.concertoZone.length >= effectiveCost && canPlayerUseActionCard(player.slots, c).canUse;
-  });
+  return player.hand.some((c) => canComboWithCard(player, c));
+}
+
+// 연격에 낼 수 있는 카드인지: executeComboAttack 과 같은 규칙 (적색, 유효 코스트, 전용·에코 조건)
+// (예전: 화면용 판정만 카드 텍스트에 없는 "금희 리더 코스트 -1"을 적용하고 우세 할인·에코 검사를 빼서 엔진과 어긋났다)
+function canComboWithCard(player: PlayerState, c: ActionCard): boolean {
+  return (
+    c.color === 'RED' &&
+    player.concertoZone.length >= getEffectiveCardCost(player, c) &&
+    canPlayerUseActionCard(player.slots, c, player.actionArea).canUse
+  );
 }
 
 // 대결 공개 후 연격 단계 또는 턴 종료 단계로 이동
@@ -5996,12 +5832,7 @@ export function executeComboAttack(
   // 남은 콤보 가능 여부 확인
   // 연격 가능 횟수가 남아있거나(무제한 포함), 패에 비용을 지불하고 낼 수 있는 적색 카드가 남아있다면 연격 단계 유지!
   const canStillCombo =
-    (player.comboUnlimited || player.comboCount > 0) &&
-    player.hand.some((c) => {
-      if (c.color !== 'RED') return false;
-      const cCost = getEffectiveCardCost(player, c);
-      return player.concertoZone.length >= cCost && canPlayerUseActionCard(player.slots, c, player.actionArea).canUse;
-    });
+    (player.comboUnlimited || player.comboCount > 0) && player.hand.some((c) => canComboWithCard(player, c));
 
   if (!canStillCombo) {
     if (player.isAi) {
@@ -6436,6 +6267,8 @@ export function executeEndPhase(state: GameState, skipEndTurnSkills: boolean = f
                 pl.slots[yangyangSupportKey] = prevLeader;
                 newState.players = [p0, p1];
                 newState = triggerShorekeeperSwitchSkill(newState, i as 0 | 1, pl, prevLeader, yangyangCard);
+                // 위 함수는 플레이어를 복제해 결과를 newState에 넣는다. 이 함수 끝에서 지역 변수로 덮어쓰므로 결과를 지역 변수에 되돌려 놓는다
+                Object.assign(pl, newState.players[i]);
                 newState = addLog(
                   newState,
                   `[양양 Lv.2 BP01-022 턴 종료 효과] [트래시 이동] 패 [${discarded.nameKr}]을(를) 버리고 리더를 [양양]으로 교체했습니다!`,
@@ -6640,6 +6473,10 @@ export function resolvePendingChoice(
       const [card] = remainingRevealed.splice(idx, 1);
       chosenCards.push(card);
     }
+  }
+  // 필수 선택 장수(minSelect)를 못 채운 요청은 무시 (예: 버려야 하는 카드를 0장 보내 효과만 받는 경우)
+  if (chosenCards.length < Math.min(state.pendingChoice.minSelect ?? 0, revealedCards.length)) {
+    return state;
   }
   const unchosenCards = remainingRevealed as ActionCard[];
   const chosenActionCards = chosenCards as ActionCard[];
