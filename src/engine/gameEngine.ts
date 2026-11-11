@@ -16,6 +16,7 @@ import {
   PendingChoice,
   HpHistoryEntry,
   EffectDrawAnimation,
+  ElementType,
 } from '../types/tcg';
 import {
   generateStarterActionDeck,
@@ -757,7 +758,7 @@ function buildSideFromCustomDeck(custom: CustomDeckConfig): { deck: ActionCard[]
         characterName: charName,
         nameKr: c.nameKr,
         level: (c.level ?? 1) as 1 | 2,
-        element: c.element,
+        element: c.element as ElementType, // 캐릭터는 항상 속성이 있음 (null은 액션 카드만)
         artUrl: c.artUrl,
         description: c.description,
         leaderSkill: c.description,
@@ -3549,6 +3550,192 @@ export function resolveClash(state: GameState): GameState {
 }
 
 // 판정 스텝 (Clash Judgment Step): 배틀 스텝 효과 해결 후 최종 상성/속도 비교 및 데미지 적용
+// TP01 카드 판정 효과 (finishClashJudgment 끝, 【우세】가 이번 판 결과로 갱신되기 전에 호출)
+//  - TP01-004 공명 촉진제 / TP01-005 심장의 선택: 승리했거나, 【우세】 상태에서 패배했을 때
+//  - TP01-001 연역: 승리했을 때 트래시에서 「연역」 이외의 【파수인】 카드 1장을 패에
+export function applyTp01JudgmentEffects(
+  state: GameState,
+  idx: 0 | 1,
+  card: ActionCard | null | undefined,
+  didWin: boolean,
+  triggeredEffects: TriggeredEffectEvent[]
+): GameState {
+  if (!card) return state;
+  const code = (card.code || '').split('_')[0];
+  let newState = state;
+  const player = newState.players[idx];
+  const triggers = didWin || player.hasDominance;
+  const when = didWin ? '판정 승리' : '【우세】 판정 패배';
+
+  // TP01-005 심장의 선택: 덱 위 2장을 협주 에리어에 배치 (만년적설 SD02-015와 같은 처리)
+  if (code === 'TP01-005' && triggers) {
+    const charged: ActionCard[] = [];
+    for (let i = 0; i < 2; i++) {
+      const c = drawSingleCardFromDeck(player);
+      if (c) charged.push(c);
+    }
+    if (charged.length > 0) {
+      addCardsToConcertoZone(player, charged);
+      triggeredEffects.push({
+        id: `eff-${engineTick()}-tp01-005`,
+        sourceCardName: card.nameKr,
+        sourceCardArt: card.artUrl,
+        effectType: 'CHARGE',
+        title: `협주 에리어 +${charged.length}장 배치`,
+        description: `${when}로 덱 위 카드 ${charged.length}장을 협주 에리어에 배치했습니다!`,
+        playerIndex: idx,
+        timestamp: logTimestamp(),
+      });
+      newState = addLog(
+        newState,
+        `[협주 충전] [심장의 선택 TP01-005 효과] ${when}로 덱에서 ${charged.map((c) => `[${c.nameKr}]`).join(', ')}을(를) 협주 에리어에 배치했습니다! (현재 협주: ${player.concertoZone.length}/10)`,
+        'ACTION',
+        idx,
+        { cardArt: card.artUrl, cardName: card.nameKr, effectTag: '협주 2장 충전' }
+      );
+      if (!player.isAi) {
+        newState = queueChoice(
+          newState,
+          {
+            id: `choice-${engineTick()}-tp01-005-concerto`,
+            playerIndex: idx,
+            title: '심장의 선택 — 협주 에리어 배치 확인',
+            sourceCardName: '심장의 선택 [TP01-005]',
+            sourceCardArt: card.artUrl,
+            description: `【${when} 효과】 덱 위의 ${charged.map((c) => `[${c.nameKr}]`).join(', ')} 카드가 협주 에리어에 배치되었습니다! (현재 협주 에리어: ${player.concertoZone.length}/10)`,
+            revealedCards: charged,
+            minSelect: 0,
+            maxSelect: 0,
+            onResolveType: 'VIEW_ONLY',
+            sourceZone: 'DECK',
+          },
+          true
+        );
+      }
+    }
+  }
+
+  // TP01-004 공명 촉진제: 자신의 캐릭터 카드 1장을 레벨업 (리더·서포트 중 진화 카드가 있는 캐릭터)
+  if (code === 'TP01-004' && triggers) {
+    const options = (['leader', 'leftSupport', 'rightSupport'] as const)
+      .map((slot) => {
+        const current = player.slots[slot];
+        return current ? { slot, current, cards: findAllUpgradableCards(player.characterDeck, current) } : null;
+      })
+      .filter((o): o is NonNullable<typeof o> => !!o && o.cards.length > 0);
+
+    if (options.length === 0) {
+      newState = addLog(
+        newState,
+        `[공명 촉진제 TP01-004 효과] 캐릭터 덱에 리더·서포트 위에 겹칠 수 있는 진화 카드가 없어 레벨업이 불발되었습니다.`,
+        'ACTION',
+        idx
+      );
+    } else if (player.isAi) {
+      const { slot, current, cards } = options[0];
+      const next = findEvolutionCard(player.characterDeck, current) || cards[0];
+      player.characterDeck = player.characterDeck.filter((c) => c.id !== next.id);
+      const { underlyingCards: prevStack, ...cleanCurrent } = current;
+      player.slots[slot] = { ...next, underlyingCards: [...(prevStack || []), cleanCurrent] };
+      emitUpgradeFx({
+        id: `upgrade-${engineTick()}-${engineTag()}`,
+        playerIndex: idx,
+        playerName: player.name,
+        character: { ...next },
+        previousLevel: current.level as 0 | 1,
+        newLevel: next.level as 1 | 2,
+        slotName: slot,
+      });
+      newState = addLog(
+        newState,
+        `[공명 촉진제 TP01-004 효과] ${when}로 [${current.nameKr}]이(가) [${next.nameKr}](Lv.${next.level})(으)로 레벨업했습니다!`,
+        'ACTION',
+        idx,
+        { cardArt: next.artUrl, cardName: next.nameKr, effectTag: '판정 레벨업' }
+      );
+      newState = applyCharacterEvolutionSkills(newState, idx, slot, next, current, true);
+    } else {
+      newState = queueChoice(
+        newState,
+        {
+          id: `choice-${engineTick()}-${engineTag()}`,
+          playerIndex: idx,
+          title: '공명 촉진제 — 레벨업할 캐릭터 선택',
+          sourceCardName: '공명 촉진제 [TP01-004]',
+          sourceCardArt: card.artUrl,
+          description:
+            options.length === 1
+              ? `캐릭터 덱에서 [${options[0].current.nameKr}](현재 Lv.${options[0].current.level}) 위에 겹쳐 레벨업할 카드를 선택하세요.`
+              : '레벨업할 캐릭터의 진화 카드를 선택하세요. (리더·서포트 중 1장, 고른 카드와 같은 캐릭터가 레벨업합니다)',
+          revealedCards: options.flatMap((o) => o.cards),
+          minSelect: 1,
+          maxSelect: 1,
+          onResolveType: 'SELECT_EFFECT_UPGRADE',
+          // 대상이 1명뿐이면 슬롯 고정, 여럿이면 고른 카드의 캐릭터로 슬롯을 정한다 (resolvePendingChoice)
+          targetSlot: options.length === 1 ? options[0].slot : undefined,
+        },
+        true
+      );
+    }
+  }
+
+  // TP01-001 연역: 승리 시 트래시에서 「연역」 이외의 【파수인】 카드 1장을 패에 추가 (의무)
+  if (code === 'TP01-001' && didWin) {
+    const candidates = player.dropZone.filter(
+      (c) =>
+        c.kind === 'ACTION' &&
+        (c.code || '').split('_')[0] !== 'TP01-001' &&
+        c.nameKr !== '연역' &&
+        (c.characterExclusive?.includes('파수인'))
+    ) as ActionCard[];
+
+    if (candidates.length === 0) {
+      newState = addLog(newState, `[연역 TP01-001 효과] 트래시 에리어에 회수할 【파수인】 카드가 없습니다.`, 'ACTION', idx);
+    } else if (player.isAi || candidates.length === 1) {
+      const target = candidates[0];
+      player.dropZone = player.dropZone.filter((c) => c.id !== target.id);
+      addCardsToHand(player, [target]);
+      triggeredEffects.push({
+        id: `eff-${engineTick()}-tp01-001`,
+        sourceCardName: card.nameKr,
+        sourceCardArt: card.artUrl,
+        effectType: 'DRAW',
+        title: '트래시 회수',
+        description: `판정 승리로 트래시의 [${target.nameKr}]을(를) 패에 추가했습니다!`,
+        playerIndex: idx,
+        timestamp: logTimestamp(),
+      });
+      newState = addLog(
+        newState,
+        `[트래시 회수] [연역 TP01-001 효과] 판정 승리로 트래시에서 [${target.nameKr}]을(를) 패에 추가했습니다!`,
+        'ACTION',
+        idx,
+        { cardArt: target.artUrl, cardName: target.nameKr, effectTag: '패 회수' }
+      );
+    } else {
+      newState = queueChoice(
+        newState,
+        {
+          id: `choice-${engineTick()}-tp01-001-recover`,
+          playerIndex: idx,
+          title: '연역 — 트래시에서 【파수인】 카드 회수',
+          sourceCardName: '연역 [TP01-001]',
+          sourceCardArt: card.artUrl,
+          description: '【판정 승리 효과】 트래시 에리어에서 「연역」 이외의 【파수인】 카드 1장을 골라 패에 추가하세요.',
+          revealedCards: candidates,
+          minSelect: 1,
+          maxSelect: 1,
+          onResolveType: 'RECOVER_FROM_DROP',
+          sourceZone: 'DROP',
+        },
+        true
+      );
+    }
+  }
+
+  return newState;
+}
+
 export function finishClashJudgment(state: GameState): GameState {
   let p0 = clonePlayer(state.players[0]);
   let p1 = clonePlayer(state.players[1]);
@@ -3633,6 +3820,19 @@ export function finishClashJudgment(state: GameState): GameState {
         ) {
           speed1 = 10;
         }
+
+        // TP01-001 연역: 【우세】【배틀】 이 카드의 스피드가 14로 변한다
+        if (c0.code === 'TP01-001' && p0.hasDominance) speed0 = 14;
+        if (c1.code === 'TP01-001' && p1.hasDominance) speed1 = 14;
+
+        // TP01-003 그늘이와 구름이 출격·공중 공격: 【우세】【배틀】 리더가 「앙코」이고 상대 카드 스피드 11 이상이면 20
+        // (상대 스피드는 위에서 반영된 변경값 기준 — 예: 상대 연역이 우세로 14가 된 경우)
+        const isAnkoLeader = (p: PlayerState) =>
+          getAllCardsInSlot(p.slots.leader).some((c) => c.characterName === '앙코' || c.nameKr.includes('앙코'));
+        const tp003Speed0 = c0.code === 'TP01-003' && p0.hasDominance && isAnkoLeader(p0) && speed1 >= 11;
+        const tp003Speed1 = c1.code === 'TP01-003' && p1.hasDominance && isAnkoLeader(p1) && speed0 >= 11;
+        if (tp003Speed0) speed0 = 20;
+        if (tp003Speed1) speed1 = 20;
 
         if (speed0 > speed1) {
           winnerIndex = 0;
@@ -4857,6 +5057,16 @@ export function finishClashJudgment(state: GameState): GameState {
     }
   }
 
+  // TP01 카드 판정 효과 (다른 판정 효과가 끝난 뒤, 아래 【우세】 갱신 전)
+  if (winnerIndex === 0 || winnerIndex === 1) {
+    const loserIdx = (winnerIndex === 0 ? 1 : 0) as 0 | 1;
+    newState.players = [p0, p1];
+    newState = applyTp01JudgmentEffects(newState, winnerIndex, winnerIndex === 0 ? c0 : c1, true, triggeredEffects);
+    newState = applyTp01JudgmentEffects(newState, loserIdx, loserIdx === 0 ? c0 : c1, false, triggeredEffects);
+    p0 = newState.players[0];
+    p1 = newState.players[1];
+  }
+
   const clashResult: ClashResult = {
     p0Card: c0,
     p1Card: c1,
@@ -5955,6 +6165,49 @@ export function executeBattlePhaseEndStep(state: GameState): GameState {
     }
   }
 
+  // 3. 타오르는 넝쿨의 춤 [TP01-002]: 【각 배틀 페이즈 종료 시】 이 카드가 액션 에리어에 있으면
+  //    트래시의 「넝쿨의 춤」(BP01-050) 1장을 패에 추가할 수 있다 (선택)
+  for (let i = 0; i < 2; i++) {
+    const pIdx = i as 0 | 1;
+    const p = newState.players[pIdx];
+    const burningVine = (p.actionArea || []).find((c) => (c.code || '').split('_')[0] === 'TP01-002');
+    const vines = p.dropZone.filter((c) => c.kind === 'ACTION' && (c.code || '').split('_')[0] === 'BP01-050') as ActionCard[];
+    if (!burningVine || vines.length === 0) continue;
+
+    if (p.isAi) {
+      if (p.hand.length < 8) {
+        const [vine] = vines;
+        p.dropZone = p.dropZone.filter((c) => c.id !== vine.id);
+        addCardsToHand(p, [vine]);
+        newState = addLog(
+          newState,
+          `[타오르는 넝쿨의 춤 TP01-002 배틀 페이즈 종료 효과] 트래시에서 [넝쿨의 춤]을 패에 추가했습니다!`,
+          'ACTION',
+          pIdx,
+          { cardName: vine.nameKr, cardArt: vine.artUrl, effectTag: '패 회수' }
+        );
+      }
+    } else {
+      newState = queueChoice(
+        newState,
+        {
+          id: `choice-${engineTick()}-tp01-002-${pIdx}`,
+          playerIndex: pIdx,
+          title: '타오르는 넝쿨의 춤 — 「넝쿨의 춤」 회수',
+          sourceCardName: '타오르는 넝쿨의 춤 [TP01-002]',
+          sourceCardArt: burningVine.artUrl,
+          description: '【배틀 페이즈 종료 효과】 트래시 에리어의 「넝쿨의 춤」 1장을 패에 추가할 수 있습니다.\n(원치 않으시면 0장 선택 상태로 넘어가기를 누르세요.)',
+          revealedCards: [vines[0]],
+          minSelect: 0,
+          maxSelect: 1,
+          onResolveType: 'RECOVER_FROM_DROP',
+          sourceZone: 'DROP',
+        },
+        false
+      );
+    }
+  }
+
   // 공식 룰 【우세】 갱신: 이번 턴 배틀 페이즈가 종료될 때 다음 턴을 위한 우세 상태를 판정 결과에 따라 갱신
   if (newState.lastClashWinnerIndex !== undefined && newState.lastClashWinnerIndex !== null) {
     const wIdx = newState.lastClashWinnerIndex;
@@ -6401,9 +6654,15 @@ export function resolvePendingChoice(
     }
   } else if (onResolveType === 'SELECT_EFFECT_UPGRADE') {
     // 0-B. 효과에 의한 캐릭터 중첩 레벨업 대상 수동 선택 (그늘이의 대폭주, 피어난 동백꽃, 팔천의 춘추 등)
-    const targetSlot = state.pendingChoice.targetSlot ?? 'leader';
-    const prevSlotChar = player.slots[targetSlot];
     const chosenChar = (chosenCards[0] || revealedCards[0]) as CharacterCard | undefined;
+    // targetSlot이 없는 선택(공명 촉진제: 레벨업할 캐릭터를 고름)은 고른 진화 카드와 같은 캐릭터의 슬롯
+    const targetSlot =
+      state.pendingChoice.targetSlot ??
+      (['leader', 'leftSupport', 'rightSupport'] as const).find(
+        (s) => !!chosenChar && player.slots[s]?.characterName === chosenChar.characterName
+      ) ??
+      'leader';
+    const prevSlotChar = player.slots[targetSlot];
 
     if (prevSlotChar && chosenChar) {
       let deckIdx = player.characterDeck.findIndex((c) => c.id === chosenChar.id);

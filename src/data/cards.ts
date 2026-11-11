@@ -1,5 +1,5 @@
 import { engineRandom } from '../engine/rng';
-import { CharacterCard, ActionCard } from '../types/tcg';
+import { CharacterCard, ActionCard, ElementType } from '../types/tcg';
 import { OFFICIAL_CARDS, OfficialCardData } from './officialCards';
 
 export function getRarityScore(rarity?: string): number {
@@ -30,7 +30,7 @@ export const ALL_CHARACTERS: CharacterCard[] = OFFICIAL_CARDS.filter(
     characterName,
     nameKr: c.nameKr,
     level: (c.level ?? 0) as 0 | 1 | 2,
-    element: c.element,
+    element: c.element as ElementType, // 캐릭터는 항상 속성이 있음 (null은 속성 없는 액션 카드만, tests/tp01-cards.test.ts에서 확인)
     artUrl: c.artUrl,
     description: c.description,
     leaderSkill: c.description,

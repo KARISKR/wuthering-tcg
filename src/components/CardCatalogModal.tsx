@@ -351,7 +351,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                 </span>
               </div>
               <p className="text-xs text-slate-400 hidden lg:block truncate">
-                『명조: 대결』 공식 데이터베이스 192종 전체 카드 및 성급별(★ ~ ★★★★★, PR) / 팩별 일러스트 열람
+                『명조: 대결』 공식 데이터베이스 {OFFICIAL_CARDS.length}종 전체 카드 및 성급별(★ ~ ★★★★★, PR) / 팩별 일러스트 열람
               </p>
             </div>
           </div>

@@ -698,7 +698,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       <footer className="relative z-20 mt-auto shrink-0 short:hidden h-10 sm:h-11 px-4 sm:px-8 border-t border-white/[0.06] bg-[#090b11]/80 flex items-center justify-between gap-3 text-[11px] sm:text-xs text-slate-400">
         {renderStatsLine('')}
         <div className="flex items-center gap-2 min-w-0">
-          <span className="hidden lg:inline truncate">Wuthering Waves: Battle TCG Simulator · 공식 카드 192종 ·</span>
+          <span className="hidden lg:inline truncate">Wuthering Waves: Battle TCG Simulator · 공식 카드 197종 ·</span>
           <button onClick={openPatchNotes} className="text-amber-400 hover:text-amber-300 font-bold cursor-pointer shrink-0">
             {CURRENT_GAME_VERSION} 패치노트
           </button>
