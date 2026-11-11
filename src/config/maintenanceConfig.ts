@@ -9,11 +9,10 @@ export interface MaintenanceConfig {
 }
 
 export const MAINTENANCE_CONFIG: MaintenanceConfig = {
-  enabled: true,
+  enabled: false,
   version: 'v2.2',
-  title: '서버 정기 점검 안내',
-  subtitle: '명조 TCG 웹 시뮬레이터 서버 점검 및 안정화 작업이 진행 중입니다.',
-  // 2026년 11월 12일 01:40:00 (KST) 점검 종료 목표 (약 1시간)
+  title: '서버 정기 점검 및 업데이트 완료',
+  subtitle: '모바일 전투 UI 개편 및 TP01 신규 카드 업데이트 적용이 완료되었습니다.',
   targetEndTime: '2026-11-12T01:40:00+09:00',
-  notice: '점검 시간 동안에는 서비스 이용이 일시적으로 제한됩니다. 점검 완료 후 더욱 안정된 서비스를 제공해 드리겠습니다.',
+  notice: '점검이 성공적으로 완료되었습니다. 더욱 쾌적하고 빠른 명조 TCG를 즐겨보세요!',
 };
