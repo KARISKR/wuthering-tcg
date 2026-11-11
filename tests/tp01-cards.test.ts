@@ -130,6 +130,22 @@ describe('TP01-003 그늘이와 구름이 출격·공중 공격', () => {
     expect(s.clashResult!.p0Card!.speed).toBe(20);
   });
 
+  it('바뀐 스피드는 결과 표시에만: 카드 자체는 원래 스피드로 남아 다시 써도 조건 없이는 5', () => {
+    const s1 = judge(card('TP01-003'), card('SD01-011'), (p0) => {
+      p0.hasDominance = true;
+      p0.slots = { ...p0.slots, leader: anko };
+    });
+    expect(s1.clashResult!.p0Card!.speed).toBe(20);
+    const used = s1.players[0].actionArea!.find((c) => c.code === 'TP01-003')!;
+    expect(used.speed).toBe(5);
+    // 같은 카드가 트래시→덱/패로 돌아와 우세 없이 다시 나간 경우 (덱 리필, 앙코 Lv.1 회수 등)
+    const s2 = judge({ ...used }, card('SD01-011'));
+    expect(s2.clashResult!.winnerIndex).toBe(1);
+
+    const d1 = judge(card('TP01-001'), card('SD01-011'), (p0) => (p0.hasDominance = true));
+    expect(d1.players[0].actionArea!.find((c) => c.code === 'TP01-001')!.speed).toBe(8);
+  });
+
   it('조건 하나라도 빠지면 그대로 스피드 5', () => {
     const noDominance = judge(card('TP01-003'), card('SD01-011'), (p0) => (p0.slots = { ...p0.slots, leader: anko }));
     expect(noDominance.clashResult!.winnerIndex).toBe(1);

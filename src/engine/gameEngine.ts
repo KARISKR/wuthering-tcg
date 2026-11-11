@@ -3762,6 +3762,10 @@ export function finishClashJudgment(state: GameState): GameState {
   let comboGranted = 0;
   let comboBlockedReason: string | undefined = undefined;
   let logText = '';
+  // 결과 화면에 보여 줄 판정 스피드 (효과로 바뀐 값). 카드 객체 자체는 바꾸지 않는다 —
+  // 바꾸면 그 카드가 트래시를 거쳐 다시 쓰일 때 바뀐 스피드가 남는다.
+  let shownSpeed0 = c0?.speed;
+  let shownSpeed1 = c1?.speed;
 
   // 1. 둘 다 카드를 안 낸 경우
   if (!c0 && !c1) {
@@ -3832,14 +3836,8 @@ export function finishClashJudgment(state: GameState): GameState {
         }
 
         // TP01-001 연역: 【우세】【배틀】 이 카드의 스피드가 14로 변한다
-        if (c0.code === 'TP01-001' && p0.hasDominance) {
-          speed0 = 14;
-          c0.speed = 14;
-        }
-        if (c1.code === 'TP01-001' && p1.hasDominance) {
-          speed1 = 14;
-          c1.speed = 14;
-        }
+        if (c0.code === 'TP01-001' && p0.hasDominance) speed0 = 14;
+        if (c1.code === 'TP01-001' && p1.hasDominance) speed1 = 14;
 
         // TP01-003 그늘이와 구름이 출격·공중 공격: 【우세】【배틀】 리더가 「앙코」이고 상대 카드 스피드 11 이상이면 20
         // (상대 스피드는 위에서 반영된 변경값 기준 — 예: 상대 연역이 우세로 14가 된 경우)
@@ -3847,14 +3845,10 @@ export function finishClashJudgment(state: GameState): GameState {
           getAllCardsInSlot(p.slots.leader).some((c) => c.characterName === '앙코' || c.nameKr.includes('앙코'));
         const tp003Speed0 = c0.code === 'TP01-003' && p0.hasDominance && isAnkoLeader(p0) && speed1 >= 11;
         const tp003Speed1 = c1.code === 'TP01-003' && p1.hasDominance && isAnkoLeader(p1) && speed0 >= 11;
-        if (tp003Speed0) {
-          speed0 = 20;
-          c0.speed = 20;
-        }
-        if (tp003Speed1) {
-          speed1 = 20;
-          c1.speed = 20;
-        }
+        if (tp003Speed0) speed0 = 20;
+        if (tp003Speed1) speed1 = 20;
+        shownSpeed0 = speed0;
+        shownSpeed1 = speed1;
 
         if (speed0 > speed1) {
           winnerIndex = 0;
@@ -5090,8 +5084,9 @@ export function finishClashJudgment(state: GameState): GameState {
   }
 
   const clashResult: ClashResult = {
-    p0Card: c0,
-    p1Card: c1,
+    // 결과 화면용 복사본에만 판정 스피드를 담는다 (clashResult.p*Card는 화면 표시 전용)
+    p0Card: c0 && shownSpeed0 !== c0.speed ? { ...c0, speed: shownSpeed0 } : c0,
+    p1Card: c1 && shownSpeed1 !== c1.speed ? { ...c1, speed: shownSpeed1 } : c1,
     winnerIndex,
     reason,
     winnerColor,
