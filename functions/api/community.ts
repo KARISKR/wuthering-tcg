@@ -69,18 +69,6 @@ function publicPost(p: any, unlocked = false) {
   return out;
 }
 
-const POINTER_IDS = {
-  decks: 'ff808181a09d98f701a173ca3379092e',
-  board: 'ff808181a09d98f701a173ca355e092f',
-  replays: 'ff808181a09d98f701a173ca399e0930',
-} as const;
-
-const POINTER_NAMES = {
-  decks: 'wuthering-tcg-shared-decks-v2',
-  board: 'wuthering-tcg-community-board-v2',
-  replays: 'wuthering-tcg-public-replays-v1',
-} as const;
-
 function buildSummaryResponse(rawJsonText: string): string {
   try {
     const parsed = JSON.parse(rawJsonText);
@@ -116,6 +104,7 @@ function buildSummaryResponse(rawJsonText: string): string {
         dislikes: p.dislikes,
         views: p.views,
         comments: Array.isArray(p.comments) ? p.comments.map(publicComment) : [],
+        commentCount: typeof p.commentCount === 'number' ? p.commentCount : Array.isArray(p.comments) ? p.comments.length : 0,
         hasImage: Boolean(
           p.imageUrl ||
           (Array.isArray(p.images) && p.images.length > 0) ||
@@ -152,7 +141,7 @@ function buildLobbyNoticeResponse(rawJsonText: string): string {
           title: latest.title || '',
           contact: latest.contact || '운영진',
           createdAt: latest.createdAt,
-          commentCount: Array.isArray(latest.comments) ? latest.comments.length : 0,
+          commentCount: typeof latest.commentCount === 'number' ? latest.commentCount : Array.isArray(latest.comments) ? latest.comments.length : 0,
           content:
             typeof latest.content === 'string'
               ? latest.content.replace(/!\[.*?\]\(data:image\/[^)]+\)/g, '').slice(0, 600)
@@ -169,19 +158,6 @@ function buildLobbyNoticeResponse(rawJsonText: string): string {
   }
 }
 
-function buildSinglePostResponse(rawJsonText: string, postId: string): string {
-  try {
-    const parsed = JSON.parse(rawJsonText);
-    const posts: any[] = Array.isArray(parsed?.posts) ? parsed.posts : [];
-    const found = posts.find((p) => p && p.id === postId) || null;
-    return JSON.stringify({
-      post: found ? { ...found, isSummaryOnly: false } : null,
-    });
-  } catch {
-    return JSON.stringify({ post: null });
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // [WP9] 행 단위 저장소
 // 이전: community_data 테이블에 type(board/decks/replays)마다 JSON 한 행. 글 하나를 써도 전체를 읽고 → 고치고 → 통째로 다시 씀.
@@ -195,7 +171,7 @@ type Kind = 'post' | 'deck' | 'replay' | 'replay_detail' | 'meta';
 let schemaReady = false;
 const migrated = new Set<string>();
 
-async function ensureSchema(db: D1Database) {
+export async function ensureSchema(db: D1Database) {
   if (schemaReady) return;
   await db.batch([
     db.prepare(
@@ -297,6 +273,14 @@ async function migrateComments(db: D1Database) {
   commentsMigrated = true;
 }
 
+/** 글별 댓글 수 (삭제된 댓글 제외) */
+async function commentCounts(db: D1Database): Promise<Map<string, number>> {
+  const res = await db
+    .prepare('SELECT post_id, COUNT(*) AS n FROM community_comments WHERE deleted = 0 GROUP BY post_id')
+    .all<{ post_id: string; n: number }>();
+  return new Map((res.results || []).map((r) => [String(r.post_id), Number(r.n)]));
+}
+
 /** 게시글들에 댓글 행을 붙인다 (게시글 JSON에 남은 옛 comments 배열은 무시) */
 async function attachComments(db: D1Database, posts: any[], onlyPostId?: string): Promise<any[]> {
   const res = onlyPostId
@@ -333,11 +317,13 @@ export const RATE_LIMITS = {
   post: { limit: 5, windowMs: 10 * 60_000 }, // 새 글
   comment: { limit: 20, windowMs: 10 * 60_000 }, // 새 댓글
   replay: { limit: 10, windowMs: 10 * 60_000 }, // 공개 리플레이 업로드
+  deck: { limit: 5, windowMs: 10 * 60_000 }, // 새 공유 덱
+  telemetry: { limit: 30, windowMs: 10 * 60_000 }, // 대전 결과 기록 (telemetry.ts)
   write: { limit: 300, windowMs: 10 * 60_000 }, // 모든 저장 요청 합계
 } as const;
 type RateBucket = keyof typeof RATE_LIMITS;
 
-async function clientKey(request: Request): Promise<string> {
+export async function clientKey(request: Request): Promise<string> {
   const ip =
     request.headers.get('CF-Connecting-IP') ||
     (request.headers.get('X-Forwarded-For') || '').split(',')[0].trim() ||
@@ -351,7 +337,7 @@ async function clientKey(request: Request): Promise<string> {
 }
 
 /** 한도를 넘으면 다시 시도할 수 있을 때까지 남은 초를, 아니면 0을 돌려준다 */
-async function hitRateLimit(db: D1Database, bucket: RateBucket, who: string, nowTs: number): Promise<number> {
+export async function hitRateLimit(db: D1Database, bucket: RateBucket, who: string, nowTs: number): Promise<number> {
   const { limit, windowMs } = RATE_LIMITS[bucket];
   const windowStart = Math.floor(nowTs / windowMs) * windowMs;
   const key = `${bucket}:${who}`;
@@ -556,7 +542,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const rawType = url.searchParams.get('type');
   const type = (rawType === 'board' ? 'board' : rawType === 'replays' ? 'replays' : 'decks') as 'decks' | 'board' | 'replays';
-  const pointerId = POINTER_IDS[type];
   const kind = KIND_OF[type];
 
   try {
@@ -608,48 +593,20 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
           const items = await listItems(env.DB, kind);
           if (type === 'board') {
-            const raw = JSON.stringify({ posts: (await attachComments(env.DB, items)).map((p) => publicPost(p)) });
-            if (isLobby) return new Response(buildLobbyNoticeResponse(raw), { headers });
-            if (isSummary) return new Response(buildSummaryResponse(raw), { headers });
-            return new Response(raw, { headers });
+            if (isLobby || isSummary) {
+              // 목록·로비는 댓글 본문 대신 개수만 (댓글이 쌓여도 목록 응답이 커지지 않게). 본문은 글 단건 조회에서
+              const counts = await commentCounts(env.DB);
+              const raw = JSON.stringify({
+                posts: items.map((p) => publicPost({ ...p, comments: [], commentCount: counts.get(String(p.id)) || 0 })),
+              });
+              return new Response(isLobby ? buildLobbyNoticeResponse(raw) : buildSummaryResponse(raw), { headers });
+            }
+            return new Response(JSON.stringify({ posts: (await attachComments(env.DB, items)).map((p) => publicPost(p)) }), { headers });
           }
           if (type === 'replays') return new Response(JSON.stringify({ replays: items.slice(0, 40) }), { headers });
           return new Response(JSON.stringify({ decks: items }), { headers });
         } catch (d1Err) {
           console.warn('[Community D1 GET Error]:', d1Err);
-        }
-      }
-
-      // (B) 글로벌 클라우드 스토어 (Pointer + Bytebin) 백업 조회 (D1 미설정 시에만 폴백)
-      if (!env.DB) {
-        try {
-          const ptrRes = await fetch(`https://api.restful-api.dev/objects/${pointerId}`, {
-            headers: { Accept: 'application/json' },
-          });
-          if (ptrRes.ok) {
-            const ptrJson: any = await ptrRes.json();
-            const blobKey = ptrJson?.data?.key;
-            if (blobKey) {
-              const blobRes = await fetch(`https://bytebin.lucko.me/${blobKey}`, {
-                headers: { Accept: 'application/json' },
-              });
-              if (blobRes.ok) {
-                const blobText = await blobRes.text();
-                if (isLobby) {
-                  return new Response(buildLobbyNoticeResponse(blobText), { headers });
-                }
-                if (postId) {
-                  return new Response(buildSinglePostResponse(blobText, postId), { headers });
-                }
-                if (isSummary && type === 'board') {
-                  return new Response(buildSummaryResponse(blobText), { headers });
-                }
-                return new Response(blobText, { headers });
-              }
-            }
-          }
-        } catch (cloudErr) {
-          console.warn('[Community Cloud GET Error]:', cloudErr);
         }
       }
 
@@ -814,28 +771,37 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         return new Response(JSON.stringify({ ok: true, updatedAt: nowTs }), { headers });
       }
 
-      // (C) 공유 덱: 클라이언트가 (최신 목록 + 변경)을 통째로 보냄
-      //     들어온 덱은 upsert, 목록에 없는 덱은 삭제로 간주. 단 최근 2분 안에 올라온 덱은
-      //     다른 사람이 방금 올린 것일 수 있으므로 지우지 않는다(동시 업로드 유실 방지).
-      const decks: any[] = Array.isArray(incoming?.decks) ? incoming.decks.filter((d: any) => d && d.id) : [];
-      const stmts = decks.map((d: any) => upsertStmt(env.DB!, 'deck', String(d.id), toTs(d.createdAt, nowTs), nowTs, d));
-      for (let i = 0; i < stmts.length; i += 50) await env.DB.batch(stmts.slice(i, i + 50));
-      // 빈 목록(예: 클라이언트의 조회 실패)으로 전체가 지워지는 사고 방지
-      if (decks.length > 0) {
-        const keep = new Set(decks.map((d: any) => String(d.id)));
-        const cutoff = nowTs - 120_000;
-        const rows = await env.DB
-          .prepare(`SELECT id FROM community_items WHERE kind = 'deck' AND created_at < ? AND updated_at < ?`)
-          .bind(cutoff, cutoff)
-          .all<{ id: string }>();
-        const toDelete = (rows.results || []).map((r) => r.id).filter((id) => !keep.has(id));
-        // D1은 쿼리당 바인딩 변수 100개 제한 → 90개씩 나눠 삭제
-        for (let i = 0; i < toDelete.length; i += 90) {
-          const chunk = toDelete.slice(i, i + 90);
-          await env.DB
-            .prepare(`DELETE FROM community_items WHERE kind = 'deck' AND id IN (${chunk.map(() => '?').join(',')})`)
-            .bind(...chunk)
-            .run();
+      // (C) 공유 덱: 건 단위 요청 (2026-11-12)
+      //     예전에는 클라이언트가 덱 목록 전체를 보내고 서버가 "목록에 없는 덱"을 지웠다 →
+      //     오래된 목록을 가진 사람이 좋아요만 눌러도 남이 올린 덱이 사라졌다. 이제 목록에 없다고 지우지 않는다.
+      const auth = readAuth(env, undefined, incoming?.auth?.adminKey);
+      const createDeck = async (d: any): Promise<number> => {
+        const id = String(d.id);
+        if (await getItem(env.DB!, 'deck', id)) return 0; // 이미 있는 덱은 덮어쓰지 않음
+        const wait = await hitRateLimit(env.DB!, 'deck', who, nowTs);
+        if (wait) return wait;
+        const { likedByMe: _l, ...clean } = d;
+        await upsertStmt(env.DB!, 'deck', id, toTs(d.createdAt, nowTs), nowTs, { ...clean, likes: 0 }).run();
+        return 0;
+      };
+      if (incoming?.action === 'upsertDeck' && incoming?.deck?.id) {
+        const wait = await createDeck(incoming.deck);
+        if (wait) return rateLimitedResponse(headers, wait, 'deck');
+      } else if (incoming?.action === 'likeDeck' && incoming?.id) {
+        const id = String(incoming.id);
+        const deck = await getItem(env.DB, 'deck', id);
+        if (deck) {
+          const likes = Math.max(0, (Number(deck.likes) || 0) + (Number(incoming.delta) < 0 ? -1 : 1));
+          await upsertStmt(env.DB, 'deck', id, toTs(deck.createdAt, nowTs), nowTs, { ...deck, likes }).run();
+        }
+      } else if (incoming?.action === 'deleteDeck' && incoming?.id) {
+        if (!auth.isAdmin) return forbidden(headers);
+        await env.DB.prepare("DELETE FROM community_items WHERE kind = 'deck' AND id = ?").bind(String(incoming.id)).run();
+      } else if (Array.isArray(incoming?.decks)) {
+        // 예전 클라이언트의 목록 저장: 새 덱만 만든다 (덮어쓰기·삭제 없음)
+        for (const d of incoming.decks.filter((x: any) => x && x.id)) {
+          const wait = await createDeck(d);
+          if (wait) return rateLimitedResponse(headers, wait, 'deck');
         }
       }
       return new Response(JSON.stringify({ ok: true, updatedAt: nowTs }), { headers });

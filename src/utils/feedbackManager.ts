@@ -38,6 +38,7 @@ export interface FeedbackItem {
   password?: string; // 작성·수정할 때만 보낸다 (서버 응답에는 없음)
   hasPassword?: boolean; // 서버 응답: 비밀번호가 걸린 글인지
   locked?: boolean; // 서버 응답: 비밀글 본문이 비밀번호 없이 가려진 상태
+  commentCount?: number; // 서버 목록 응답: 댓글 수 (목록에는 댓글 본문이 오지 않음)
   hasImage?: boolean; // 요약 목록에서 이미지 포함 여부 표시용
   isSummaryOnly?: boolean; // 목록 조회 시 본문/이미지가 아직 로드되지 않은 요약 상태 여부
 }
@@ -45,9 +46,6 @@ export interface FeedbackItem {
 const STORAGE_KEY = 'wuthering_tcg_feedbacks_v3';
 const DRAFT_KEY = 'wuthering_tcg_feedback_draft_v3';
 const DELETED_KEY = 'wuthering_deleted_feedback_ids_v1';
-
-const BOARD_POINTER_ID = 'ff808181a09d98f701a173ca355e092f';
-const BOARD_POINTER_NAME = 'wuthering-tcg-community-board-v2';
 
 // [WP9 잔여] 서버가 작성 빈도 제한(429)으로 거절하면 화면에 알린다. CommunityBoard·FeedbackModal이 구독.
 export const RATE_LIMITED_EVENT = 'wtcg:community-rate-limited';
@@ -334,6 +332,9 @@ export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
               dislikes: Math.max(summaryItem.dislikes || 0, localItem?.dislikes || 0),
               likedByMe: Boolean(localItem?.likedByMe),
               dislikedByMe: Boolean(localItem?.dislikedByMe),
+              // 요약에는 댓글 개수만 온다. 댓글 본문은 글을 열 때 받은 것(또는 로컬)을 유지
+              comments: (cachedFull && !cachedFull.isSummaryOnly ? cachedFull.comments : localItem?.comments) || [],
+              commentCount: summaryItem.commentCount,
             };
           });
 
@@ -353,10 +354,10 @@ export async function fetchBoardSummaryForLobby(): Promise<FeedbackItem[]> {
 /**
  * 게시글 클릭 시 해당 게시글 1건의 본문 + 첨부 이미지를 온디맨드로 다운로드합니다.
  */
-export async function fetchFeedbackPostDetail(postId: string, password?: string): Promise<FeedbackItem | null> {
+export async function fetchFeedbackPostDetail(postId: string, password?: string, force = false): Promise<FeedbackItem | null> {
   if (!postId) return null;
   const cached = postDetailCache.get(postId);
-  if (cached && !cached.isSummaryOnly && !cached.locked && password === undefined) {
+  if (!force && cached && !cached.isSummaryOnly && !cached.locked && password === undefined) {
     return cached;
   }
 
@@ -423,26 +424,6 @@ export async function fetchGlobalFeedbackList(): Promise<FeedbackItem[]> {
       }
     }
   } catch {}
-
-  // 2순위 폴백: 직접 클라우드 스토어 조회
-  if (!remotePosts) {
-    try {
-      const ptrRes = await fetch(`https://api.restful-api.dev/objects/${BOARD_POINTER_ID}`);
-      if (ptrRes.ok) {
-        const ptrJson = await ptrRes.json();
-        const blobKey = ptrJson?.data?.key;
-        if (blobKey) {
-          const blobRes = await fetch(`https://bytebin.lucko.me/${blobKey}`);
-          if (blobRes.ok) {
-            const blobData = await blobRes.json();
-            if (Array.isArray(blobData?.posts)) {
-              remotePosts = blobData.posts;
-            }
-          }
-        }
-      }
-    } catch {}
-  }
 
   const localPosts = getFeedbackList();
   const allPosts = remotePosts ? [...remotePosts, ...localPosts] : localPosts;

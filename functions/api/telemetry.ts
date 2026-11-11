@@ -1,3 +1,4 @@
+import { ensureSchema, hitRateLimit, clientKey } from './community';
 // functions/api/telemetry.ts
 // 멀티플레이 실전 배틀 데이터 수집 및 AI 학습용 텔레메트리 API (Cloudflare D1)
 
@@ -90,6 +91,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     // 1. POST: 배틀 텔레메트리 데이터 저장
     // ==========================================
     if (request.method === 'POST') {
+      // 작성 빈도 제한 (IP당 10분 30건) — 통계·AI 학습 데이터 오염 방지
+      await ensureSchema(db);
+      const wait = await hitRateLimit(db, 'telemetry', await clientKey(request), Date.now());
+      if (wait) {
+        return new Response(JSON.stringify({ success: false, error: 'rate_limited', retryAfter: wait }), {
+          status: 429,
+          headers: { ...CORS_HEADERS, 'Retry-After': String(wait) },
+        });
+      }
+
       const body: any = await request.json();
 
       if (!body.id || body.winnerIndex === undefined || !body.p0Leader || !body.p1Leader) {
@@ -99,14 +110,19 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         );
       }
 
-      const id = String(body.id).trim();
+      const id = String(body.id).trim().slice(0, 100);
       const timestamp = Number(body.timestamp) || Date.now();
       const durationSec = Math.max(0, Math.round(Number(body.durationSec) || 0));
       const winnerIndex = body.winnerIndex === 0 ? 0 : 1;
       const p0Leader = String(body.p0Leader).slice(0, 50);
       const p1Leader = String(body.p1Leader).slice(0, 50);
-      const p0DeckSummary = body.p0DeckSummary ? JSON.stringify(body.p0DeckSummary) : null;
-      const p1DeckSummary = body.p1DeckSummary ? JSON.stringify(body.p1DeckSummary) : null;
+      // 덱 요약은 4KB까지만 (넘으면 저장하지 않음 — 잘라 내면 JSON이 깨진다)
+      const summary = (v: unknown) => {
+        const t = v ? JSON.stringify(v) : '';
+        return t && t.length <= 4096 ? t : null;
+      };
+      const p0DeckSummary = summary(body.p0DeckSummary);
+      const p1DeckSummary = summary(body.p1DeckSummary);
       const totalTurns = Math.max(1, Math.round(Number(body.totalTurns) || 1));
       
       // 로그 데이터는 유의미한 행동 로그 위주로 보존 (최대 100KB 제한)
@@ -118,10 +134,10 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
       const createdAt = Date.now();
 
-      // INSERT OR REPLACE로 동일 matchId 중복 방어
+      // 같은 id는 처음 기록만 남긴다 (다른 사람이 id를 알아도 덮어쓰지 못하게)
       await db
         .prepare(`
-          INSERT OR REPLACE INTO battle_telemetry (
+          INSERT OR IGNORE INTO battle_telemetry (
             id, timestamp, duration_sec, winner_index,
             p0_leader, p1_leader, p0_deck_summary, p1_deck_summary,
             total_turns, logs_json, created_at

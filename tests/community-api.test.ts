@@ -113,25 +113,32 @@ describe('community API row storage', () => {
     expect(r3.status).toBe(200);
   });
 
-  it('decks: migrate legacy, delete decks missing from list, but keep just-uploaded ones and never wipe on empty list', async () => {
-    const legacy = { decks: [{ id: 'd1', name: 'old1', createdAt: 1 }, { id: 'd2', name: 'old2', createdAt: 2 }] };
+  it('decks: migrate legacy; a stale full list never deletes or overwrites other decks', async () => {
+    const legacy = { decks: [{ id: 'd1', name: 'old1', createdAt: 1, likes: 4 }, { id: 'd2', name: 'old2', createdAt: 2 }] };
     DB.raw.prepare('INSERT INTO community_data VALUES (?,?,?)').run('decks', JSON.stringify(legacy), 1);
     let r = await call('GET', 'type=decks');
     expect(r.json.decks.map((d: any) => d.id).sort()).toEqual(['d1', 'd2']);
 
-    // 이전 데이터의 updated_at을 과거로 돌려 "오래된 덱"으로 만든다
-    DB.raw.prepare("UPDATE community_items SET updated_at = 1 WHERE kind='deck'").run();
-    // 다른 사람이 방금 올린 덱 (목록에는 없음)
-    await call('POST', 'type=decks', { decks: [{ id: 'd1' }, { id: 'd2' }, { id: 'fresh', createdAt: Date.now() }] });
-    DB.raw.prepare("UPDATE community_items SET updated_at = 1 WHERE kind='deck' AND id IN ('d1','d2')").run();
-    // 사용자가 d2를 지운 목록을 보냄 (fresh는 모름)
-    await call('POST', 'type=decks', { decks: [{ id: 'd1' }] });
+    // 예전 클라이언트가 d1만 든 목록(좋아요 999로 조작)을 보냄 → d2 유지, d1 덮어쓰기 없음
+    await call('POST', 'type=decks', { decks: [{ id: 'd1', name: 'hacked', likes: 999 }] });
     r = await call('GET', 'type=decks');
-    expect(r.json.decks.map((d: any) => d.id).sort()).toEqual(['d1', 'fresh']);
+    expect(r.json.decks.map((d: any) => d.id).sort()).toEqual(['d1', 'd2']);
+    expect(r.json.decks.find((d: any) => d.id === 'd1')).toMatchObject({ name: 'old1', likes: 4 });
+  });
 
-    await call('POST', 'type=decks', { decks: [] });
-    r = await call('GET', 'type=decks');
-    expect(r.json.decks.length).toBe(2);
+  it('decks: share, like/unlike by one, delete only with the admin key', async () => {
+    await call('POST', 'type=decks', { action: 'upsertDeck', deck: { id: 'n1', deckName: 'mine', likes: 50 } });
+    let deck = (await call('GET', 'type=decks')).json.decks.find((d: any) => d.id === 'n1');
+    expect(deck.likes).toBe(0);
+    await call('POST', 'type=decks', { action: 'likeDeck', id: 'n1', delta: 1 });
+    await call('POST', 'type=decks', { action: 'likeDeck', id: 'n1', delta: 1 });
+    await call('POST', 'type=decks', { action: 'likeDeck', id: 'n1', delta: -1 });
+    deck = (await call('GET', 'type=decks')).json.decks.find((d: any) => d.id === 'n1');
+    expect(deck.likes).toBe(1);
+
+    expect((await call('POST', 'type=decks', { action: 'deleteDeck', id: 'n1' })).status).toBe(403);
+    expect((await call('POST', 'type=decks', { action: 'deleteDeck', id: 'n1', auth: { adminKey: ADMIN_KEY } })).status).toBe(200);
+    expect((await call('GET', 'type=decks')).json.decks.some((d: any) => d.id === 'n1')).toBe(false);
   });
 
   it('replays: keep latest 40 summaries, details fetchable, legacy detail fallback', async () => {
@@ -149,13 +156,13 @@ describe('community API row storage', () => {
     expect(old.json.id).toBe('old');
   });
 
-  it('handles more than 100 decks (D1 bind-variable limit)', async () => {
-    const decks = Array.from({ length: 150 }, (_, i) => ({ id: `x${i}` }));
-    await call('POST', 'type=decks', { decks });
-    DB.raw.prepare("UPDATE community_items SET created_at = 1, updated_at = 1 WHERE kind='deck'").run();
-    await call('POST', 'type=decks', { decks: decks.slice(0, 5) });
-    const r = await call('GET', 'type=decks');
-    expect(r.json.decks.length).toBe(5);
+  it('new deck uploads are rate limited per IP', async () => {
+    for (let i = 0; i < 5; i++) {
+      expect((await call('POST', 'type=decks', { action: 'upsertDeck', deck: { id: 'r' + i } })).status).toBe(200);
+    }
+    const r = await call('POST', 'type=decks', { action: 'upsertDeck', deck: { id: 'r5' } });
+    expect(r.status).toBe(429);
+    expect(r.json.bucket).toBe('deck');
   });
 
   it('[WP9 잔여] comments: concurrent comments both survive, edit/delete, legacy array cannot resurrect', async () => {
@@ -171,7 +178,8 @@ describe('community API row storage', () => {
 
     // 요약 목록·로비에도 같은 댓글이 붙는다
     const sum = await call('GET', 'type=board&summary=1');
-    expect(sum.json.posts[0].comments.length).toBe(2);
+    expect(sum.json.posts[0].commentCount).toBe(2); // 목록에는 개수만 (2026-11-12)
+    expect(sum.json.posts[0].comments).toEqual([]);
 
     // 수정
     await call('POST', 'type=board', { action: 'updateComment', postId: 'p', commentId: 'c1', text: 'edited' });
@@ -413,5 +421,35 @@ describe('community API board permissions', () => {
 
     await call('POST', 'type=board', { action: 'deleteComment', postId: 'p', commentId: 'c1', auth: { password: 'cpw' } });
     expect((await call('GET', 'type=board&postId=p')).json.post.comments).toEqual([]);
+  });
+});
+
+// 2026-11-12 점검 11번: 텔레메트리 기록은 빈도 제한, 같은 id 덮어쓰기 금지, 큰 덱 요약은 저장하지 않음
+describe('telemetry API limits', () => {
+  async function postTelemetry(body: unknown, ip = '1.1.1.1') {
+    const tele = await import('../functions/api/telemetry');
+    const request = new Request('https://x.test/api/telemetry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': ip },
+      body: JSON.stringify(body),
+    });
+    const res: Response = await (tele.onRequest as any)({ request, env: { DB } });
+    return res.status;
+  }
+  const rec = (id: string, extra: object = {}) => ({ id, winnerIndex: 0, p0Leader: 'a', p1Leader: 'b', totalTurns: 3, ...extra });
+
+  it('keeps the first record for an id and drops oversized deck summaries', async () => {
+    expect(await postTelemetry(rec('m1', { p0Leader: 'first' }))).toBe(200);
+    expect(await postTelemetry(rec('m1', { p0Leader: 'forged' }))).toBe(200);
+    await postTelemetry(rec('m2', { p0DeckSummary: { big: 'x'.repeat(5000) } }));
+    const rows = DB.raw.prepare('SELECT id, p0_leader, p0_deck_summary FROM battle_telemetry ORDER BY id').all() as any[];
+    expect(rows.find((r) => r.id === 'm1').p0_leader).toBe('first');
+    expect(rows.find((r) => r.id === 'm2').p0_deck_summary).toBeNull();
+  });
+
+  it('rate limits one IP after 30 records per 10 minutes', async () => {
+    for (let i = 0; i < 30; i++) expect(await postTelemetry(rec('r' + i), '9.9.9.9')).toBe(200);
+    expect(await postTelemetry(rec('r30'), '9.9.9.9')).toBe(429);
+    expect(await postTelemetry(rec('other'), '8.8.8.8')).toBe(200);
   });
 });

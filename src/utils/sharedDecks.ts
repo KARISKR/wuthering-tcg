@@ -10,8 +10,6 @@ import { INITIAL_COMMUNITY_SHARED_DECKS } from '../data/communityDecks';
 const SHARED_DECKS_STORAGE_KEY = 'wuthering_shared_decks';
 const LIKED_DECKS_STORAGE_KEY = 'wuthering_liked_shared_decks';
 
-const DECKS_POINTER_ID = 'ff808181a09d98f701a173ca3379092e';
-const DECKS_POINTER_NAME = 'wuthering-tcg-shared-decks-v2';
 
 // 기본 추천 커뮤니티 덱 시드 데이터 생성 (mc.sldark.com 실전 공유 덱 4종)
 function generateInitialSharedDecks(): SharedDeck[] {
@@ -120,45 +118,17 @@ export async function fetchGlobalSharedDecks(): Promise<SharedDeck[]> {
     }
   } catch {}
 
-  // 2순위 폴백: 직접 클라우드 스토어 조회 (로컬 개발 환경 등)
-  if (!remoteDecks) {
-    try {
-      const ptrRes = await fetch(`https://api.restful-api.dev/objects/${DECKS_POINTER_ID}`);
-      if (ptrRes.ok) {
-        const ptrJson = await ptrRes.json();
-        const blobKey = ptrJson?.data?.key;
-        if (blobKey) {
-          const blobRes = await fetch(`https://bytebin.lucko.me/${blobKey}`);
-          if (blobRes.ok) {
-            const blobData = await blobRes.json();
-            if (Array.isArray(blobData?.decks)) {
-              remoteDecks = blobData.decks;
-            }
-          }
-        }
-      }
-    } catch {}
-  }
-
   const localDecks = getSharedDecks();
   if (!remoteDecks) {
     return localDecks;
   }
 
-  // 원격 덱과 로컬 덱을 ID 기준으로 병합 (좋아요 수 최댓값 반영, 신규 등록 덱 보존)
+  // 서버 목록이 기준 (좋아요 수 포함). 서버에 아직 반영되지 않았을 수 있는 내 새 덱(2분 이내)만 덧붙인다
+  const remoteIds = new Set(remoteDecks.map((d) => d.id));
+  const pendingSince = Date.now() - 120_000;
+  const pendingLocal = localDecks.filter((d) => d && d.id && !remoteIds.has(d.id) && (d.createdAt || 0) > pendingSince);
   const mergedMap = new Map<string, SharedDeck>();
-  for (const d of [...remoteDecks, ...localDecks]) {
-    if (!d || !d.id) continue;
-    const existing = mergedMap.get(d.id);
-    if (!existing) {
-      mergedMap.set(d.id, d);
-    } else {
-      mergedMap.set(d.id, {
-        ...existing,
-        likes: Math.max(existing.likes || 0, d.likes || 0),
-      });
-    }
-  }
+  for (const d of [...remoteDecks, ...pendingLocal]) if (d && d.id) mergedMap.set(d.id, d);
 
   const merged = sanitizeDecks(Array.from(mergedMap.values()));
   localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(merged));
@@ -170,50 +140,16 @@ export async function fetchGlobalSharedDecks(): Promise<SharedDeck[]> {
   }));
 }
 
-// 클라우드 서버에 공유 덱 리스트 저장 (비동기 백그라운드 동기화)
-export async function syncSharedDecksToCloud(decksToSync?: SharedDeck[]): Promise<void> {
+// 공유 덱 1건 요청 (등록 upsertDeck / 좋아요 likeDeck). 목록 전체를 보내지 않는다
+async function postDeckAction(body: Record<string, unknown>): Promise<void> {
   try {
-    // 최신 원격 데이터와 먼저 병합하여 다른 유저가 올린 덱이 덮어써지지 않도록 보장
-    const mergedDecks = decksToSync ? sanitizeDecks(decksToSync) : await fetchGlobalSharedDecks();
-    const payload = JSON.stringify({
-      decks: mergedDecks.map(({ likedByMe, ...rest }) => rest),
-      updatedAt: Date.now(),
+    await fetch('/api/community?type=decks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
     });
-
-    // 1순위: Cloudflare Pages Function
-    let savedViaApi = false;
-    try {
-      const res = await fetch('/api/community?type=decks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      });
-      if (res.ok) savedViaApi = true;
-    } catch {}
-
-    // 2순위 폴백: 직접 클라우드 스토어에 기록
-    if (!savedViaApi) {
-      const blobRes = await fetch('https://bytebin.lucko.me/post', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      });
-      if (blobRes.ok) {
-        const { key } = await blobRes.json();
-        if (key) {
-          await fetch(`https://api.restful-api.dev/objects/${DECKS_POINTER_ID}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: DECKS_POINTER_NAME,
-              data: { key, updatedAt: Date.now() },
-            }),
-          });
-        }
-      }
-    }
   } catch (err) {
-    console.warn('[sharedDecks] 클라우드 동기화 실패:', err);
+    console.warn('[sharedDecks] 서버 반영 실패:', err);
   }
 }
 
@@ -270,13 +206,9 @@ export function shareNewDeck(params: ShareDeckParams): SharedDeck {
   const updated = [newSharedDeck, ...currentDecks];
   localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(updated));
 
-  // 글로벌 클라우드에 비동기 병합 및 업로드
-  fetchGlobalSharedDecks().then((latestDecks) => {
-    const exists = latestDecks.some((d) => d.id === newSharedDeck.id);
-    const finalDecks = exists ? latestDecks : [newSharedDeck, ...latestDecks];
-    localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(finalDecks));
-    syncSharedDecksToCloud(finalDecks);
-  });
+  // 서버에는 이 덱 1건만 올린다
+  const { likedByMe: _liked, ...deckForServer } = newSharedDeck;
+  void postDeckAction({ action: 'upsertDeck', deck: deckForServer });
 
   return newSharedDeck;
 }
@@ -309,8 +241,8 @@ export function toggleLikeSharedDeck(id: string): { likes: number; liked: boolea
     : likedIds.filter((likedId) => likedId !== id);
   localStorage.setItem(LIKED_DECKS_STORAGE_KEY, JSON.stringify(updatedLikedIds));
 
-  // 글로벌 클라우드 동기화
-  syncSharedDecksToCloud(updatedDecks);
+  // 서버에는 +1/-1만 보낸다 (내 화면의 오래된 숫자로 덮어쓰지 않게)
+  void postDeckAction({ action: 'likeDeck', id, delta: newLikedState ? 1 : -1 });
 
   return { likes: newLikes, liked: newLikedState };
 }
@@ -328,12 +260,4 @@ export function importSharedDeckToPreset(sharedDeck: SharedDeck): DeckPreset {
 
   savePreset(newPreset);
   return newPreset;
-}
-
-// 공유된 덱 삭제 (내가 등록한 덱 또는 관리용)
-export function deleteSharedDeck(id: string): void {
-  const decks = getSharedDecks();
-  const filtered = decks.filter((d) => d.id !== id);
-  localStorage.setItem(SHARED_DECKS_STORAGE_KEY, JSON.stringify(filtered));
-  syncSharedDecksToCloud(filtered);
 }

@@ -268,6 +268,9 @@ export function renderFormattedContent(rawContent: string, postImages: string[] 
   return DOMPurify.sanitize(safe);
 }
 
+// 목록 응답에는 댓글 개수만 온다. 방금 단 내 댓글(로컬)이 더 많으면 그 수를 쓴다
+const commentCountOf = (p: FeedbackItem) => Math.max(p.commentCount ?? 0, p.comments?.length ?? 0);
+
 const BOARD_TABS: { id: FilterTab; label: string; icon?: string }[] = [
   { id: 'ALL', label: '전체' },
   { id: 'NOTICE', label: '공지', icon: '📢' },
@@ -960,8 +963,10 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
 
   const refreshList = () => {
     setItems([...getFeedbackList()]);
-    fetchBoardSummaryForLobby().then((summaryList) => {
-      setItems([...summaryList]);
+    fetchBoardSummaryForLobby().then(async (summaryList) => {
+      // 목록에는 댓글 본문이 없으므로, 열어 둔 글은 다시 받아 새 댓글을 보여 준다
+      const open = selectedPostId ? await fetchFeedbackPostDetail(selectedPostId, undefined, true) : null;
+      setItems(open ? summaryList.map((p) => (p.id === open.id ? open : p)) : [...summaryList]);
     });
   };
 
@@ -2295,9 +2300,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                       NEW
                     </span>
                   )}
-                  {notice.comments && notice.comments.length > 0 && (
+                  {commentCountOf(notice) > 0 && (
                     <span className="text-cyan-400 font-mono font-bold text-xs shrink-0">
-                      [{notice.comments.length}]
+                      [{commentCountOf(notice)}]
                     </span>
                   )}
                 </div>
@@ -2384,9 +2389,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                           NEW
                         </span>
                       )}
-                      {item.comments && item.comments.length > 0 && (
+                      {commentCountOf(item) > 0 && (
                         <span className="text-cyan-400 font-mono font-bold text-xs shrink-0">
-                          [{item.comments.length}]
+                          [{commentCountOf(item)}]
                         </span>
                       )}
                     </div>
@@ -2458,9 +2463,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                             NEW
                           </span>
                         )}
-                        {notice.comments && notice.comments.length > 0 && (
+                        {commentCountOf(notice) > 0 && (
                           <span className="text-cyan-400 font-mono text-xs sm:text-sm shrink-0">
-                            [{notice.comments.length}]
+                            [{commentCountOf(notice)}]
                           </span>
                         )}
                       </div>
@@ -2563,9 +2568,9 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                                 NEW
                               </span>
                             )}
-                            {item.comments && item.comments.length > 0 && (
+                            {commentCountOf(item) > 0 && (
                               <span className="text-cyan-400 font-mono font-bold text-xs sm:text-sm shrink-0">
-                                [{item.comments.length}]
+                                [{commentCountOf(item)}]
                               </span>
                             )}
                           </div>
