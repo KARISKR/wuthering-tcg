@@ -69,7 +69,7 @@ export function getDeduplicatedCatalogCards(cards: OfficialCardData[]): Official
 
 export const CATALOG_CARDS = getDeduplicatedCatalogCards(OFFICIAL_CARDS);
 
-const packOrder: Record<string, number> = { SD01: 1, SD02: 2, BP01: 3 };
+const packOrder: Record<string, number> = { SD01: 1, SD02: 2, BP01: 3, TP01: 4 };
 const rarOrder: Record<string, number> = {
   '★': 1,
   '★★': 1,
@@ -193,7 +193,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
   const [cardSize, setCardSize] = useState<'LARGE' | 'MEDIUM'>('LARGE');
   const [isCinemaZoomOpen, setIsCinemaZoomOpen] = useState(false);
   const [selectedRarity, setSelectedRarity] = useState<RarityFilterType>('ALL');
-  const [selectedPack, setSelectedPack] = useState<'ALL' | 'SD01' | 'SD02' | 'BP01'>('ALL');
+  const [selectedPack, setSelectedPack] = useState<'ALL' | 'SD01' | 'SD02' | 'BP01' | 'TP01'>('ALL');
   const [selectedColor, setSelectedColor] = useState<'ALL' | 'RED' | 'GREEN' | 'BLUE'>('ALL');
   const [selectedChar, setSelectedChar] = useState<string>('ALL');
   const [sortBy, setSortBy] = useState<SortOptionType>('CODE_ASC');
@@ -553,7 +553,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
               {/* 수록 팩 필터 */}
               <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
                 <span className="text-[11px] text-slate-400 font-bold px-1.5 whitespace-nowrap">팩:</span>
-                {(['ALL', 'SD01', 'SD02', 'BP01'] as const).map((p) => (
+                {(['ALL', 'SD01', 'SD02', 'BP01', 'TP01'] as const).map((p) => (
                   <button
                     key={p}
                     onClick={() => setSelectedPack(p)}
@@ -626,7 +626,7 @@ export const CardCatalogModal: React.FC<CardCatalogModalProps> = ({ isOpen, onCl
                   onChange={(e) => setSortBy(e.target.value as SortOptionType)}
                   className="bg-slate-950 text-amber-300 border border-slate-700 rounded-lg px-2 py-0.5 text-xs font-bold focus:outline-none focus:border-amber-400 cursor-pointer"
                 >
-                  <option value="CODE_ASC">팩/코드 번호순 (SD01 → SD02 → BP01)</option>
+                  <option value="CODE_ASC">팩/코드 번호순 (SD01 → SD02 → BP01 → TP01)</option>
                   <option value="RARITY_DESC">성급 높은순 (★★★★★ → ★)</option>
                   <option value="RARITY_ASC">성급 낮은순 (★ → ★★★★★)</option>
                   <option value="LEVEL_DESC">캐릭터 레벨순 (Lv.2 → Lv.0)</option>
