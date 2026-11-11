@@ -1,6 +1,10 @@
 import { GameState, CustomDeckConfig } from './tcg';
 import type { GameEvent } from '../engine/events';
 
+/** 대전 복구용 저장 키. 저장(multiplayerService)과 새로고침 복구(App)가 반드시 같은 값을 써야 한다
+ *  (2026-11-12: App만 '_v1'을 읽어 새로고침하면 복구 대신 새 AI 게임이 시작되던 버그) */
+export const MULTIPLAYER_SESSION_STORAGE_KEY = 'wuthering_multiplayer_session';
+
 export type MultiplayerRole = 'HOST' | 'GUEST' | 'SPECTATOR';
 
 export type MultiplayerConnectionStatus =

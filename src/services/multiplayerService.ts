@@ -7,12 +7,13 @@ import {
   MultiplayerSessionData,
   MultiplayerActionType,
   TimeLimitConfig,
+  MULTIPLAYER_SESSION_STORAGE_KEY,
 } from '../types/multiplayer';
 import { GameState } from '../types/tcg';
 import type { GameEvent } from '../engine/events';
 import { logsSince } from './syncLogs';
 
-const SESSION_STORAGE_KEY = 'wuthering_multiplayer_session';
+const SESSION_STORAGE_KEY = MULTIPLAYER_SESSION_STORAGE_KEY;
 const PEER_ID_PREFIX = 'wuthering-tcg-room';
 const HEARTBEAT_INTERVAL_MS = 3000;
 const HEARTBEAT_TIMEOUT_MS = 8000;

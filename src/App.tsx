@@ -6,10 +6,10 @@ import { bgmManager } from './utils/bgmManager';
 import { MAINTENANCE_CONFIG } from './config/maintenanceConfig';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import type { MultiplayerRole, MultiplayerSessionData } from './types/multiplayer';
+import { MULTIPLAYER_SESSION_STORAGE_KEY } from './types/multiplayer';
 import { Wifi, RotateCcw, X } from 'lucide-react';
 import { MobileOrientationGuard } from './components/MobileOrientationGuard';
 
-const MULTIPLAYER_SESSION_STORAGE_KEY = 'wuthering_multiplayer_session_v1';
 
 function getSavedMultiplayerSession(): MultiplayerSessionData | null {
   try {
