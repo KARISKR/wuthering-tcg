@@ -17,6 +17,7 @@ const BattleReplayModal = lazy(() => import('./BattleReplayModal').then((m) => (
 const InteractiveTutorialModal = lazy(() => import('./InteractiveTutorialModal').then((m) => ({ default: m.InteractiveTutorialModal })));
 const MultiplayerLobbyModal = lazy(() => import('./MultiplayerLobbyModal').then((m) => ({ default: m.MultiplayerLobbyModal })));
 const AppInstallModal = lazy(() => import('./AppInstallModal').then((m) => ({ default: m.AppInstallModal })));
+const OfflinePackModal = lazy(() => import('./OfflinePackSection').then((m) => ({ default: m.OfflinePackModal })));
 const AttackFxStudioModal = lazy(() => import('./attackMotions/AttackFxStudioModal').then((m) => ({ default: m.AttackFxStudioModal })));
 import type { MultiplayerRole } from '../types/multiplayer';
 import {
@@ -27,6 +28,7 @@ import {
   Sliders,
   Sparkles,
   Download,
+  HardDriveDownload,
   X,
 } from 'lucide-react';
 
@@ -88,6 +90,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isInteractiveTutorialOpen, setIsInteractiveTutorialOpen] = useState(false);
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
   const [isAppInstallOpen, setIsAppInstallOpen] = useState(false);
+  const [isDataPackOpen, setIsDataPackOpen] = useState(false);
   const [isCommunityDeckOpen, setIsCommunityDeckOpen] = useState(false);
   const [isMultiplayerModalOpen, setIsMultiplayerModalOpen] = useState(false);
   const [latestNotice, setLatestNotice] = useState<LobbyNoticeSummary | null>(() => {
@@ -247,7 +250,8 @@ export const Lobby: React.FC<LobbyProps> = ({
       hash === '#fx' ||
       hash === '#fx-studio' ||
       hash === '#install' ||
-      hash === '#app-install'
+      hash === '#app-install' ||
+      hash === '#data'
     ) {
       history.pushState('', document.title, window.location.pathname + window.location.search);
     }
@@ -268,6 +272,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       setIsSfxGuideOpen(hash === '#sfx');
       setIsFxStudioOpen(hash === '#fx' || hash === '#fx-studio');
       setIsAppInstallOpen(hash === '#install' || hash === '#app-install');
+      setIsDataPackOpen(hash === '#data');
     };
 
     syncHashToModals();
@@ -503,6 +508,15 @@ export const Lobby: React.FC<LobbyProps> = ({
             <BgmPlayer compact />
           </div>
 
+          <button
+            onClick={() => setHash('#data')}
+            className="shrink-0 h-9 sm:h-10 px-2.5 sm:px-3.5 flex items-center gap-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 text-xs sm:text-[13px] font-bold transition cursor-pointer"
+            title="카드 그림·효과음·대사를 미리 받아 두기 (약 46MB)"
+            aria-label="데이터 받기"
+          >
+            <HardDriveDownload className="w-4 h-4" />
+            <span className="hidden md:inline short:hidden">데이터 받기</span>
+          </button>
           <button
             onClick={openInstall}
             className="shrink-0 h-9 sm:h-10 px-2.5 sm:px-3.5 flex items-center gap-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-400/40 text-xs sm:text-[13px] font-bold transition cursor-pointer"
@@ -1017,6 +1031,16 @@ export const Lobby: React.FC<LobbyProps> = ({
             onClose={() => {
               clearHash();
               setIsSfxGuideOpen(false);
+            }}
+          />
+        )}
+
+        {/* 게임 데이터 미리 받기 (웹·앱 공통) */}
+        {isDataPackOpen && (
+          <OfflinePackModal
+            onClose={() => {
+              clearHash();
+              setIsDataPackOpen(false);
             }}
           />
         )}

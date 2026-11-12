@@ -395,7 +395,8 @@ class BgmManager {
       this.warmAudio.muted = true;
     }
     if (!this.warmAudio.src.endsWith(track.src)) {
-      this.warmAudio.preload = 'auto';
+      // 곡 전체를 미리 받지 않고 앞부분 정보만 (전체를 받으면 카드·효과음 다운로드와 대역폭을 다툰다). 재생은 스트리밍
+      this.warmAudio.preload = 'metadata';
       this.warmAudio.src = track.src;
       this.warmAudio.load();
     }

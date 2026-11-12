@@ -7,6 +7,7 @@
 import { GameState, ActionCard, CharacterCard, CustomDeckConfig } from '../types/tcg';
 import { BattleReplayData } from './replayManager';
 import { pickLodUrl } from '../components/CardArt';
+import { soundEffects } from './soundEffects';
 
 const preloadedUrls = new Set<string>();
 const inFlightUrls = new Set<string>();
@@ -147,6 +148,10 @@ export function preloadDeckCards(decks: (CustomDeckConfig | null | undefined)[])
   const urls = collectDeckCardUrls(decks).filter((u) => !preloadedUrls.has(u));
   deckPreloadQueue = urls;
   pumpDeckPreload();
+  // 출전 캐릭터 보이스·전투 효과음도 지금 받기 시작한다. 전투 화면이 열린 뒤에 받으면 첫 대사가 늦게 나온다.
+  const chars = decks.flatMap((d) => (d ? [d.leader, d.leftSupport, d.rightSupport] : []));
+  soundEffects.preloadCharacters(chars.map((c) => c?.characterName || c?.nameKr));
+  soundEffects.preloadAllCustomSounds();
 }
 
 /** 리플레이 시작 시 타임라인 상의 모든 카드 프리로드 */

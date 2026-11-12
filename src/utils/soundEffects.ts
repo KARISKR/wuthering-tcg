@@ -81,6 +81,21 @@ export const SUPPORTED_CHARACTERS: CharacterSfxInfo[] = [
   { id: 'shorekeeper', nameKr: '파수인', weapon: '증폭기', folderPath: '/audio/sfx/characters/shorekeeper/' },
 ];
 
+/** 효과음 요청 주소. 캐시 무효화 파라미터를 붙여 브라우저/CDN 디스크 캐시의 구버전 음원 잔류를 막는다 (앱 데이터 미리 받기도 같은 주소를 쓴다) */
+export function sfxRequestUrl(url: string): string {
+  return encodeURI(`${url}?v=20261029`);
+}
+
+/** 재생 때 실제로 받는 효과음 주소 전부 (키마다 앞의 3개 변형까지만 쓴다) */
+export function listAllSfxRequestUrls(): string[] {
+  const urls: string[] = [];
+  for (const list of Object.values(systemAudioManifest as Record<string, string[]>)) urls.push(...list.slice(0, 3));
+  for (const cats of Object.values(characterAudioManifest as Record<string, Record<string, string[]>>)) {
+    for (const list of Object.values(cats)) urls.push(...list.slice(0, 3));
+  }
+  return [...new Set(urls)].map(sfxRequestUrl);
+}
+
 export function getCharacterKey(nameOrCharacter?: string): string | null {
   if (!nameOrCharacter) return null;
   const name = nameOrCharacter.replace(/\s+/g, '');
@@ -572,6 +587,14 @@ class SoundEffectsEngine {
     }
   }
 
+  /** 대기 중인 키들을 큐 맨 앞으로 (덱을 바꿔 고르면 마지막에 고른 덱의 소리를 먼저 받는다) */
+  private moveQueuedToFront(keys: string[]) {
+    const want = new Set(keys);
+    const front = this.lowQueue.filter((e) => want.has(e.key));
+    if (front.length === 0) return;
+    this.lowQueue = [...front, ...this.lowQueue.filter((e) => !want.has(e.key))];
+  }
+
   /** 큐에서 대기 중인 특정 키의 다운로드를 즉시 시작 (재생 요청이 들어왔을 때) */
   private promoteQueued(key: string) {
     const mine = this.lowQueue.filter((e) => e.key === key);
@@ -685,6 +708,7 @@ class SoundEffectsEngine {
     [...low, ...tail].forEach((cat) => {
       this.loadCustomServerFile(cat, 'low').catch(() => {});
     });
+    this.moveQueuedToFront([...low, ...tail]);
     try {
       await Promise.allSettled(high.map((cat) => this.loadCustomServerFile(cat, 'high')));
     } catch {
@@ -1037,9 +1061,8 @@ class SoundEffectsEngine {
         uniqueUrls.map(async (url) => {
           try {
             // 캐시 무효화 파라미터를 추가하여 브라우저/CDN 디스크 캐시로 인한 구버전/무음 음원 잔류 방지
-            const cacheBustUrl = `${url}?v=20261029`;
             // [WP2] 미리 받기(low)는 다운로드 큐를 거쳐 동시 2개·낮은 우선순위로
-            const resp = await this.queuedFetch(encodeURI(cacheBustUrl), key, priority);
+            const resp = await this.queuedFetch(sfxRequestUrl(url), key, priority);
             if (resp.ok) {
               const contentType = resp.headers.get('content-type') || '';
               if (contentType.includes('text/html')) return;

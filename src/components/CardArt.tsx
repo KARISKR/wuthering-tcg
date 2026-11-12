@@ -20,7 +20,7 @@ function baseName(artUrl: string): string | null {
   return (dot > -1 ? file.slice(0, dot) : file).normalize('NFC');
 }
 
-function lodUrl(artUrl: string, width: number): string {
+export function lodUrl(artUrl: string, width: number): string {
   const dot = artUrl.lastIndexOf('.');
   const base = dot > -1 ? artUrl.slice(0, dot) : artUrl;
   return base.replace(ORIG_PREFIX, `${LOD_PREFIX}${width}/`) + '.webp';
