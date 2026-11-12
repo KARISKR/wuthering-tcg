@@ -68,7 +68,7 @@ import {
   isPostNew,
 } from '../utils/feedbackManager';
 import {
-  getStoredPresets,
+  getDefaultPresets,
   getUserDecks,
   getAllAvailableUserDecks,
   saveUserDeck,
@@ -824,7 +824,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
   // User presets for quick picking deck code
   const storedPresets = useMemo(() => {
     try {
-      return getStoredPresets();
+      return getDefaultPresets();
     } catch {
       return [];
     }
@@ -2822,7 +2822,7 @@ export const CommunityBoard: React.FC<CommunityBoardProps> = ({
                         className="px-2.5 py-1 rounded bg-purple-900/40 border border-purple-500/40 text-purple-200 text-xs focus:outline-none cursor-pointer"
                       >
                         <option value="" disabled>
-                          추천 프리셋 불러오기...
+                          공식·추천 덱 불러오기...
                         </option>
                         {storedPresets.map((p) => (
                           <option key={p.id} value={p.id}>

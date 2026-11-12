@@ -3,7 +3,6 @@ import {
   encodeDeckCode,
   customDeckToPreset,
   presetToCustomDeck,
-  savePreset,
 } from './deckCode';
 import { INITIAL_COMMUNITY_SHARED_DECKS } from '../data/communityDecks';
 
@@ -249,17 +248,7 @@ export function toggleLikeSharedDeck(id: string): { likes: number; liked: boolea
   return { likes: newLikes, liked: newLikedState };
 }
 
-// 공유된 덱을 내 로컬 프리셋으로 가져오기(복사)
-export function importSharedDeckToPreset(sharedDeck: SharedDeck): DeckPreset {
-  const newPreset: DeckPreset = {
-    ...sharedDeck.deckPreset,
-    id: `preset-imported-${Date.now()}`,
-    name: `[공유] ${sharedDeck.deckName}`,
-    isOfficial: false,
-    createdAt: new Date().toISOString().split('T')[0],
-    description: `공유자: ${sharedDeck.authorName} | ${sharedDeck.description}`,
-  };
-
-  savePreset(newPreset);
-  return newPreset;
+// 전투 덱 선택(1:1·멀티)에서 공유 덱을 고를 수 있게 프리셋 형태로 바꾼다. id는 공유 덱 id 그대로('shared-deck-…')
+export function sharedDeckToBattlePreset(d: SharedDeck): DeckPreset {
+  return { ...d.deckPreset, id: d.id, name: `[공유] ${d.deckName}`, authorName: d.authorName, isOfficial: false };
 }

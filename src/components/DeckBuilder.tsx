@@ -41,7 +41,6 @@ import {
   getActiveCustomDeck,
   setActiveCustomDeck,
   customDeckToPreset,
-  savePreset,
 } from '../utils/deckCode';
 import { soundEffects } from '../utils/soundEffects';
 import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
@@ -988,10 +987,10 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           <button
             onClick={() => setIsPresetModalOpen(true)}
             className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-bold transition cursor-pointer shadow whitespace-nowrap shrink-0"
-            title="덱 프리셋 보관함 열기 및 덱 코드 복사/가져오기"
+            title="공식·추천 덱 보기 및 덱 코드 복사/가져오기"
           >
             <BookmarkCheck className="w-4 h-4 text-purple-400 shrink-0" />
-            <span>프리셋 &amp; 코드</span>
+            <span>추천 덱 &amp; 코드</span>
           </button>
           <button
             onClick={() => setIsExportModalOpen(true)}
@@ -1686,7 +1685,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              스타터 덱 프리셋 불러오기
+              스타터 덱 불러오기
             </button>
             <button
               onClick={() => setActionDeck([])}
@@ -2255,7 +2254,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       </>
       )}
 
-      {/* 덱 프리셋 & 코드 보관함 모달 */}
+      {/* 추천 덱 & 덱 코드 모달 */}
       <DeckPresetModal
         isOpen={isPresetModalOpen}
         onClose={() => setIsPresetModalOpen(false)}
@@ -2263,7 +2262,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           setIsPresetModalOpen(false);
           if (t === 'shared') setIsCommunityModalOpen(true);
         }}
-        currentEditingDeck={currentDeckConfig}
         onApplyActiveDeck={(deck) => {
           saveUserDeck(deck);
           const list = getUserDecks();

@@ -37,11 +37,12 @@ import {
   MultiplayerRoomInfo,
   TimeLimitConfig,
 } from '../types/multiplayer';
-import type { CustomDeckConfig } from '../types/tcg';
+import type { CustomDeckConfig, SharedDeck } from '../types/tcg';
+import { getSharedDecks, fetchGlobalSharedDecks, sharedDeckToBattlePreset } from '../utils/sharedDecks';
 import {
   getUserDecks,
   getActiveCustomDeck,
-  getStoredPresets,
+  getDefaultPresets,
   presetToCustomDeck,
 } from '../utils/deckCode';
 import { ALL_CHARACTERS } from '../data/cards';
@@ -146,7 +147,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   // AI 추천 & 공식 프리셋 덱 목록
   const recDecks: CustomDeckConfig[] = useMemo(() => {
     try {
-      const presets = getStoredPresets();
+      const presets = getDefaultPresets();
       return presets
         .filter((p) => !p.id.startsWith('user-deck-'))
         .map((p) => presetToCustomDeck(p));
@@ -155,8 +156,27 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     }
   }, [isOpen]);
 
-  // 덱 탭 ('MY_DECKS': 마이 덱 | 'REC_DECKS': 추천/프리셋) 및 페이지네이션
-  const [deckTab, setDeckTab] = useState<'MY_DECKS' | 'REC_DECKS'>('MY_DECKS');
+  // 커뮤니티 공유 덱 (저장된 목록을 먼저 보여주고 서버 목록으로 갱신)
+  const [sharedDecks, setSharedDecks] = useState<CustomDeckConfig[]>([]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const toConfigs = (list: SharedDeck[]) =>
+      list.filter((d) => d?.deckPreset).map((d) => presetToCustomDeck(sharedDeckToBattlePreset(d))).filter((d) => d.actionCards.length >= 40);
+    let alive = true;
+    try {
+      setSharedDecks(toConfigs(getSharedDecks()));
+    } catch {}
+    fetchGlobalSharedDecks().then((list) => {
+      if (alive) setSharedDecks(toConfigs(list));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [isOpen]);
+
+  // 덱 탭 ('MY_DECKS': 마이 덱 | 'REC_DECKS': 추천/프리셋 | 'SHARED_DECKS': 공유 덱) 및 페이지네이션
+  type DeckTab = 'MY_DECKS' | 'REC_DECKS' | 'SHARED_DECKS';
+  const [deckTab, setDeckTab] = useState<DeckTab>('MY_DECKS');
   const [deckPage, setDeckPage] = useState<number>(1);
   const DECK_ITEMS_PER_PAGE = 8;
 
@@ -176,8 +196,10 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
     if (foundMy) return foundMy;
     const foundRec = recDecks.find((d) => d.id === selectedDeckId);
     if (foundRec) return foundRec;
+    const foundShared = sharedDecks.find((d) => d.id === selectedDeckId);
+    if (foundShared) return foundShared;
     return myDecks[0] || recDecks[0] || null;
-  }, [myDecks, recDecks, selectedDeckId]);
+  }, [myDecks, recDecks, sharedDecks, selectedDeckId]);
 
   // [WP3 잔여] 멀티 대기실에서 고른 내 덱 카드를 미리 받는다 (0.5초 디바운스)
   useEffect(() => {
@@ -188,8 +210,8 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
 
   // 현재 탭에 따른 덱 목록 및 페이지네이션
   const currentDeckList = useMemo(() => {
-    return deckTab === 'MY_DECKS' ? myDecks : recDecks;
-  }, [deckTab, myDecks, recDecks]);
+    return deckTab === 'MY_DECKS' ? myDecks : deckTab === 'REC_DECKS' ? recDecks : sharedDecks;
+  }, [deckTab, myDecks, recDecks, sharedDecks]);
 
   const totalDeckPages = Math.max(1, Math.ceil(currentDeckList.length / DECK_ITEMS_PER_PAGE));
 
@@ -207,11 +229,11 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
 
   // 보유 덱 목록 변경 시 유효한 선택 ID 유지
   useEffect(() => {
-    const all = [...myDecks, ...recDecks];
+    const all = [...myDecks, ...recDecks, ...sharedDecks];
     if (all.length > 0 && !all.some((d) => d.id === selectedDeckId)) {
       setSelectedDeckId(all[0].id);
     }
-  }, [myDecks, recDecks, selectedDeckId]);
+  }, [myDecks, recDecks, sharedDecks, selectedDeckId]);
 
   // 네트워크 상태
   const [connectionStatus, setConnectionStatus] = useState<MultiplayerConnectionStatus>(
@@ -621,7 +643,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   };
 
   // 덱 탭 변경 핸들러
-  const handleTabChange = (tab: 'MY_DECKS' | 'REC_DECKS') => {
+  const handleTabChange = (tab: DeckTab) => {
     setDeckTab(tab);
     setDeckPage(1);
     soundEffects.playCardPlace();
@@ -1421,7 +1443,9 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                       <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
                         {deckTab === 'MY_DECKS'
                           ? `덱 빌더에서 구성한 마이 덱 중 출전할 덱을 선택하세요. (총 ${myDecks.length}개 보유)`
-                          : `시스템에서 제공하는 강력한 추천 덱 및 프리셋입니다. (총 ${recDecks.length}개 제공)`}
+                          : deckTab === 'REC_DECKS'
+                          ? `기본 제공되는 공식 스타터·추천 덱입니다. (총 ${recDecks.length}개 제공)`
+                          : `다른 플레이어가 공유한 덱입니다. (총 ${sharedDecks.length}개)`}
                       </p>
                     </div>
                   </div>
@@ -1440,11 +1464,11 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                       </button>
                     )}
 
-                    <div className="flex items-center gap-2 bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800">
+                    <div className="flex flex-wrap items-center gap-2 bg-slate-950/80 p-1.5 rounded-2xl border border-slate-800">
                       <button
                         type="button"
                         onClick={() => handleTabChange('MY_DECKS')}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
                           deckTab === 'MY_DECKS'
                             ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow-[0_0_15px_rgba(245,158,11,0.35)]'
                             : 'text-slate-400 hover:text-white hover:bg-slate-900'
@@ -1461,17 +1485,34 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleTabChange('REC_DECKS')}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
                           deckTab === 'REC_DECKS'
                             ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-slate-950 shadow-[0_0_15px_rgba(6,182,212,0.35)]'
                             : 'text-slate-400 hover:text-white hover:bg-slate-900'
                         }`}
                       >
-                        <span>📜 공식 & 프리셋</span>
+                        <span>📜 공식 & 추천</span>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                           deckTab === 'REC_DECKS' ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-300'
                         }`}>
                           {recDecks.length}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleTabChange('SHARED_DECKS')}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 ${
+                          deckTab === 'SHARED_DECKS'
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-[0_0_15px_rgba(16,185,129,0.35)]'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <span>🌐 공유 덱</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                          deckTab === 'SHARED_DECKS' ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-300'
+                        }`}>
+                          {sharedDecks.length}
                         </span>
                       </button>
                     </div>
@@ -1483,12 +1524,14 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                   <div className="py-14 px-4 text-center text-slate-400 flex flex-col items-center justify-center gap-2.5">
                     <Layers className="w-12 h-12 text-slate-600 mb-1" />
                     <p className="font-bold text-base text-slate-300">
-                      {deckTab === 'MY_DECKS' ? '저장된 마이 덱이 없습니다.' : '프리셋 덱이 없습니다.'}
+                      {deckTab === 'MY_DECKS' ? '저장된 마이 덱이 없습니다.' : deckTab === 'REC_DECKS' ? '추천 덱이 없습니다.' : '공유된 덱이 없습니다.'}
                     </p>
                     <p className="text-xs sm:text-sm text-slate-500">
                       {deckTab === 'MY_DECKS'
-                        ? '메인 화면의 [덱 빌더]에서 나만의 덱을 생성하고 저장하거나 상단의 [공식 & 프리셋] 탭을 이용해 보세요.'
-                        : '기본 프리셋 데이터를 불러오는 중입니다.'}
+                        ? '메인 화면의 [덱 빌더]에서 나만의 덱을 생성하고 저장하거나 상단의 [공식 & 추천] 탭을 이용해 보세요.'
+                        : deckTab === 'REC_DECKS'
+                        ? '기본 제공 덱을 불러오는 중입니다.'
+                        : '메인 화면의 [공유 덱]에서 덱을 공유하면 여기에 나타납니다.'}
                     </p>
                     {deckTab === 'MY_DECKS' && onOpenDeckBuilder && (
                       <button

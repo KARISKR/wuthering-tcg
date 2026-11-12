@@ -456,84 +456,39 @@ export function getDefaultPresets(): DeckPreset[] {
   ];
 }
 
-// 저장된 모든 덱 프리셋 가져오기 (로컬스토리지 + 기본 공식 프리셋)
-export function getStoredPresets(): DeckPreset[] {
-  const defaults = getDefaultPresets();
-  const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
-  const deletedIds: string[] = JSON.parse(localStorage.getItem('wuthering_deleted_presets') || '[]');
-  const activeDefaults = defaults.filter((d) => !deletedIds.includes(d.id));
+const PRESET_MIGRATION_FLAG = 'wuthering_presets_migrated_v1';
 
-  if (!raw) {
-    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(activeDefaults));
-    return activeDefaults;
-  }
-
+/**
+ * 프리셋 보관함 폐지 (2026-11-13). 공식·추천 덱은 getDefaultPresets()로 늘 기본 제공하고,
+ * 예전에 사용자가 저장한 프리셋은 '내 덱'으로 한 번만 옮긴다.
+ * 기본 제공 덱·예전 시드(preset-sld-*)·이미 같은 이름의 내 덱은 건너뛴다. 원본 저장값(PRESETS_STORAGE_KEY)은 지우지 않는다.
+ */
+function migrateSavedPresetsToUserDecks(userDecks: CustomDeckConfig[]): CustomDeckConfig[] {
+  if (localStorage.getItem(PRESET_MIGRATION_FLAG)) return userDecks;
+  let parsed: unknown;
   try {
-    const parsed: DeckPreset[] = JSON.parse(raw);
-    const activeDefaultIds = new Set(activeDefaults.map((d) => d.id));
-    // 삭제된 ID 및 임의 생성 프리셋 제외, 기본 프리셋과의 중복 방지
-    // (SLDark 라이브러리 프리셋 ID 중 기본 4종 이외의 것은 로컬스토리지에서 자동 소거)
-    const customOnly = parsed.filter(
-      (p) =>
-        !p.isOfficial &&
-        !deletedIds.includes(p.id) &&
-        p.id !== 'preset-official-camellya' &&
-        !activeDefaultIds.has(p.id) &&
-        !(
-          p.id.startsWith('preset-sld-') &&
-          !['preset-sld-rin', 'preset-sld-nv-yang-chun', 'preset-sld-anke-loop', 'preset-sld-an-san-shou'].includes(p.id)
-        )
-    );
-    const updatedList = [...activeDefaults, ...customOnly];
-    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(updatedList));
-    return updatedList;
+    parsed = JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) || '[]');
   } catch (e) {
-    console.error('프리셋 로드 에러:', e);
-    return activeDefaults;
+    console.error('예전 프리셋 읽기 실패 (옮기지 않음):', e);
+    return userDecks;
   }
-}
-
-// 새 덱 프리셋 저장 또는 업데이트
-export function savePreset(preset: DeckPreset): void {
-  // 만약 삭제 기록에 있던 ID라면 삭제 기록에서 복구
-  const deletedIds: string[] = JSON.parse(localStorage.getItem('wuthering_deleted_presets') || '[]');
-  if (deletedIds.includes(preset.id)) {
-    const updatedDeleted = deletedIds.filter((id) => id !== preset.id);
-    localStorage.setItem('wuthering_deleted_presets', JSON.stringify(updatedDeleted));
-  }
-
-  const presets = getStoredPresets();
-  const index = presets.findIndex((p) => p.id === preset.id);
-  if (index !== -1) {
-    presets[index] = preset;
-  } else {
-    presets.unshift(preset);
-  }
-  localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(presets));
-}
-
-// 덱 프리셋 삭제 (공식/커스텀 무관하게 완전 삭제)
-export function deletePreset(id: string): void {
-  const deletedIds: string[] = JSON.parse(localStorage.getItem('wuthering_deleted_presets') || '[]');
-  if (!deletedIds.includes(id)) {
-    deletedIds.push(id);
-    localStorage.setItem('wuthering_deleted_presets', JSON.stringify(deletedIds));
-  }
-  const raw = localStorage.getItem(PRESETS_STORAGE_KEY);
-  if (raw) {
+  const builtInIds = new Set(getDefaultPresets().map((p) => p.id));
+  const names = new Set(userDecks.map((d) => (d.name || '').trim()));
+  const moved: CustomDeckConfig[] = [];
+  for (const p of Array.isArray(parsed) ? (parsed as DeckPreset[]) : []) {
+    const name = (p?.name || '').trim();
+    if (!p?.id || !p.leaderCode || p.isOfficial || builtInIds.has(p.id) || p.id.startsWith('preset-sld-') || names.has(name)) continue;
     try {
-      const parsed: DeckPreset[] = JSON.parse(raw);
-      const filtered = parsed.filter((p) => p.id !== id);
-      localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(filtered));
-    } catch {}
+      moved.push({ ...presetToCustomDeck(p), id: `user-deck-preset-${p.id}` });
+      names.add(name);
+    } catch (e) {
+      console.error('예전 프리셋 변환 실패:', p.id, e);
+    }
   }
-}
-
-// 기본 공식 스타터덱(SD01, SD02) 초기 상태로 전체 복원
-export function restoreDefaultPresets(): void {
-  localStorage.removeItem('wuthering_deleted_presets');
-  localStorage.removeItem(PRESETS_STORAGE_KEY);
-  getStoredPresets();
+  const next = [...userDecks, ...moved];
+  if (moved.length > 0) saveAllUserDecks(next);
+  localStorage.setItem(PRESET_MIGRATION_FLAG, '1');
+  return next;
 }
 
 // DeckPreset을 플레이 가능한 CustomDeckConfig로 변환
@@ -627,8 +582,12 @@ export function customDeckToPreset(deck: CustomDeckConfig, customName?: string):
 
 const USER_DECKS_STORAGE_KEY = 'wuthering_user_decks';
 
-// 보유 중인 내 덱 리스트 조회
+// 보유 중인 내 덱 리스트 조회 (처음 한 번은 예전 프리셋을 내 덱으로 옮긴다)
 export function getUserDecks(): CustomDeckConfig[] {
+  return migrateSavedPresetsToUserDecks(loadUserDecks());
+}
+
+function loadUserDecks(): CustomDeckConfig[] {
   const raw = localStorage.getItem(USER_DECKS_STORAGE_KEY);
   if (raw) {
     try {
@@ -714,9 +673,9 @@ export function getAllAvailableUserDecks(): CustomDeckConfig[] {
     console.error('Failed to get userDecks:', e);
   }
 
-  // 2. 사용자가 저장한 덱 프리셋 (커스텀 및 추천 프리셋 포함)
+  // 2. 기본 제공 덱 (공식 스타터·추천 덱)
   try {
-    const presets = getStoredPresets();
+    const presets = getDefaultPresets();
     presets.forEach((p) => {
       if (p && p.name && !seenNames.has(p.name.trim())) {
         seenNames.add(p.name.trim());

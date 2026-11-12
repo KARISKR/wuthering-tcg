@@ -4,14 +4,9 @@ import {
   encodeDeckCode,
   decodeDeckCode,
   fetchSldarkDeck,
-  getStoredPresets,
-  savePreset,
-  deletePreset,
+  getDefaultPresets,
   presetToCustomDeck,
-  customDeckToPreset,
-  getActiveCustomDeck,
   setActiveCustomDeck,
-  restoreDefaultPresets,
   saveUserDeck,
   getUserDecks,
   generateCharacterDeckFor3,
@@ -28,10 +23,7 @@ import {
   Check,
   Download,
   Upload,
-  Bookmark,
   BookmarkCheck,
-  Trash2,
-  RotateCcw,
   Swords,
   Edit3,
   Sparkles,
@@ -57,7 +49,6 @@ interface DeckPresetModalProps {
   onSelectAndBattle?: (deck: CustomDeckConfig) => void;
   onSelectAndEdit?: (deck: CustomDeckConfig) => void;
   onApplyActiveDeck?: (deck: CustomDeckConfig) => void;
-  currentEditingDeck?: CustomDeckConfig | null;
   /** [메뉴 최적화 2026-11] 덱 공통 탭 전환. 없으면 공유 덱은 내부 팝업, 내 덱은 닫기로 처리 */
   onSwitchHub?: (tab: DeckHubTab) => void;
 }
@@ -69,10 +60,9 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   onSelectAndEdit,
   onApplyActiveDeck,
   onSwitchHub,
-  currentEditingDeck,
 }) => {
   const [presets, setPresets] = useState<DeckPreset[]>([]);
-  const [activeTab, setActiveTab] = useState<'ALL' | 'CUSTOM' | 'OFFICIAL'>('ALL');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'RECOMMENDED' | 'OFFICIAL'>('ALL');
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [presetSearch, setPresetSearch] = useState('');
 
@@ -92,19 +82,15 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   // 커뮤니티 덱 라운지 모달 상태
   const [isCommunityOpen, setIsCommunityOpen] = useState(false);
 
-  // 새 프리셋 이름 입력 모달/다이얼로그 상태
-  const [isSavingCurrent, setIsSavingCurrent] = useState(false);
-  const [newPresetName, setNewPresetName] = useState('');
-
   // 카드 상세 인스펙터 (카드 클릭 시 고해상도 상세 뷰)
   const [inspectingCard, setInspectingCard] = useState<OfficialCardData | null>(null);
 
   // 모바일 전용 화면 전환 탭 ('LIST': 프리셋 목록 | 'DETAIL': 선택한 덱 구성 보기)
   const [mobilePresetView, setMobilePresetView] = useState<'LIST' | 'DETAIL'>('LIST');
 
-  // 프리셋 로드
+  // 기본 제공 덱(공식 스타터·추천 덱) 로드. 프리셋 보관함은 없앴다 (2026-11-13)
   const reloadPresets = () => {
-    const list = getStoredPresets();
+    const list = getDefaultPresets();
     setPresets(list);
     if (list.length > 0 && !selectedPresetId) {
       setSelectedPresetId(list[0].id);
@@ -119,7 +105,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       setImportError(null);
       setParsedPreviewDeck(null);
       setIsFetchingOnline(false);
-      setIsSavingCurrent(false);
       setPresetSearch('');
       setInspectingCard(null);
     }
@@ -129,9 +114,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
   const filteredPresets = useMemo(() => {
     let result = presets;
     if (activeTab === 'OFFICIAL') result = result.filter((p) => p.isOfficial);
-    if (activeTab === 'CUSTOM') {
-      result = result.filter((p) => !p.isOfficial);
-    }
+    if (activeTab === 'RECOMMENDED') result = result.filter((p) => !p.isOfficial);
 
     if (presetSearch.trim()) {
       const q = presetSearch.toLowerCase().trim();
@@ -283,29 +266,13 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // 프리셋 삭제
-  const handleDeletePreset = (id: string, name: string) => {
-    if (window.confirm(`'${name}' 프리셋을 정말 보관함에서 삭제하시겠습니까?`)) {
-      deletePreset(id);
-      const remaining = getStoredPresets();
-      setPresets(remaining);
-      if (selectedPresetId === id) {
-        setSelectedPresetId(remaining.length > 0 ? remaining[0].id : null);
-      }
-    }
-  };
-
-  // 덱 코드로 가져와서 프리셋 저장 및 적용
+  // 덱 코드로 가져와서 내 덱에 저장 및 적용
   const handleConfirmImport = (action: 'SAVE_AND_APPLY' | 'EDIT' | 'BATTLE') => {
     if (!parsedPreviewDeck) return;
 
-    // 1. 프리셋으로 저장 및 내 덱 리스트에 등록
-    const newPreset = customDeckToPreset(parsedPreviewDeck, parsedPreviewDeck.name);
-    savePreset(newPreset);
+    // 1. 내 덱 리스트에 등록
     saveUserDeck(parsedPreviewDeck);
     setActiveCustomDeck(parsedPreviewDeck);
-    reloadPresets();
-    setSelectedPresetId(newPreset.id);
     setIsImportOpen(false);
     setInputCode('');
 
@@ -320,21 +287,8 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       onApplyActiveDeck(parsedPreviewDeck);
       alert(`'${parsedPreviewDeck.name}' 덱이 내 덱 리스트에 등록되고 적용되었습니다!`);
     } else {
-      alert(`'${parsedPreviewDeck.name}' 덱이 프리셋 및 내 덱 리스트에 추가되었습니다!`);
+      alert(`'${parsedPreviewDeck.name}' 덱이 내 덱 리스트에 추가되었습니다!`);
     }
-  };
-
-  // 현재 덱을 새 프리셋으로 저장
-  const handleSaveCurrentDeckAsPreset = () => {
-    const targetDeck = currentEditingDeck || getActiveCustomDeck();
-    const nameToSave = newPresetName.trim() || targetDeck.name || '나만의 덱 프리셋';
-    const newPreset = customDeckToPreset(targetDeck, nameToSave);
-    savePreset(newPreset);
-    reloadPresets();
-    setSelectedPresetId(newPreset.id);
-    setIsSavingCurrent(false);
-    setNewPresetName('');
-    alert(`'${nameToSave}' 프리셋이 성공적으로 저장되었습니다!`);
   };
 
   // 카드 상세 인스펙터 열기 헬퍼
@@ -356,7 +310,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
         <div className="flex items-center justify-between lg:justify-start gap-2.5 sm:gap-3.5 min-w-0 w-full lg:w-auto">
           <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
             <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-400/20 to-yellow-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
-              <img src="/images/menu_icons/deck-preset.webp" alt="덱 프리셋" className="w-7 h-7 sm:w-9 sm:h-9 object-contain drop-shadow" />
+              <img src="/images/menu_icons/deck-preset.webp" alt="추천 덱" className="w-7 h-7 sm:w-9 sm:h-9 object-contain drop-shadow" />
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
@@ -368,7 +322,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-400 hidden lg:block truncate">
-                저장된 레시피를 일괄 불러오고, 덱 코드를 공유하거나 덱 빌더에서 즉시 수정하여 출격할 수 있습니다.
+                기본 제공 공식 스타터·추천 덱을 보고, 덱 코드로 덱을 가져오거나 덱 빌더에서 수정해 출격할 수 있습니다.
               </p>
             </div>
           </div>
@@ -395,7 +349,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 }
               }}
               className="hidden md:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black transition cursor-pointer shadow-md shadow-indigo-600/20 whitespace-nowrap shrink-0"
-              title="이 프리셋을 바탕으로 덱 빌더에서 새롭게 수정합니다"
+              title="이 덱을 바탕으로 덱 빌더에서 새롭게 수정합니다"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-300 shrink-0" />
               <span>덱 빌더에서 편집</span>
@@ -414,19 +368,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
           >
             <Download className="w-3.5 h-3.5 text-amber-400 shrink-0" />
             <span>덱 코드 입력 / 가져오기</span>
-          </button>
-
-          {/* 현재 덱을 프리셋으로 저장 버튼 */}
-          <button
-            onClick={() => {
-              const targetDeck = currentEditingDeck || getActiveCustomDeck();
-              setNewPresetName(targetDeck.name || '나만의 덱 1');
-              setIsSavingCurrent(true);
-            }}
-            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-black transition cursor-pointer shadow-md shadow-amber-500/20 whitespace-nowrap shrink-0"
-          >
-            <Bookmark className="w-3.5 h-3.5 shrink-0" />
-            <span>현재 덱 저장</span>
           </button>
 
           {/* 닫기 버튼 */}
@@ -547,7 +488,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                     onClick={() => handleConfirmImport('SAVE_AND_APPLY')}
                     className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition cursor-pointer shadow"
                   >
-                    프리셋 저장 및 적용
+                    내 덱에 저장 및 적용
                   </button>
                   {onSelectAndEdit && (
                     <button
@@ -573,35 +514,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
       )}
 
       {/* ========================================================= */}
-      {/* [상단 슬라이드 팝업] 현재 덱을 새 프리셋으로 저장 입력창 */}
-      {/* ========================================================= */}
-      {isSavingCurrent && (
-        <div className="bg-slate-900 border-b border-amber-500/50 p-4 shrink-0 shadow-xl z-20 animate-in slide-in-from-top-2">
-          <div className="max-w-md mx-auto flex items-center gap-2">
-            <input
-              type="text"
-              value={newPresetName}
-              onChange={(e) => setNewPresetName(e.target.value)}
-              placeholder="저장할 프리셋 이름 입력 (예: 금희 메인 공명 덱)"
-              className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2 text-xs text-white font-bold focus:outline-none focus:border-amber-400"
-            />
-            <button
-              onClick={handleSaveCurrentDeckAsPreset}
-              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition cursor-pointer shadow"
-            >
-              저장하기
-            </button>
-            <button
-              onClick={() => setIsSavingCurrent(false)}
-              className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition cursor-pointer"
-            >
-              취소
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================= */}
       {/* [모바일 전용 2단 탭 전환 바 (< md)] — 목록과 40장 덱 구성 화면 전환 */}
       {/* ========================================================= */}
       <div className="md:hidden flex border-b border-slate-800 bg-slate-950 shrink-0 z-20">
@@ -613,7 +525,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               : 'border-transparent text-slate-400 hover:text-white'
           }`}
         >
-          📂 프리셋 목록 ({filteredPresets.length})
+          📂 덱 목록 ({filteredPresets.length})
         </button>
         <button
           onClick={() => setMobilePresetView('DETAIL')}
@@ -652,14 +564,14 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
               전체 ({presets.length})
             </button>
             <button
-              onClick={() => setActiveTab('CUSTOM')}
+              onClick={() => setActiveTab('RECOMMENDED')}
               className={`px-3 py-2 rounded-xl text-xs font-black transition cursor-pointer ${
-                activeTab === 'CUSTOM'
+                activeTab === 'RECOMMENDED'
                   ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
                   : 'text-slate-400 hover:text-white bg-slate-900/60'
               }`}
             >
-              내 프리셋 ({presets.filter((p) => !p.isOfficial).length})
+              추천 덱 ({presets.filter((p) => !p.isOfficial).length})
             </button>
             <button
               onClick={() => setActiveTab('OFFICIAL')}
@@ -681,7 +593,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 type="text"
                 value={presetSearch}
                 onChange={(e) => setPresetSearch(e.target.value)}
-                placeholder="프리셋 이름, 설명 검색..."
+                placeholder="덱 이름, 설명 검색..."
                 className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-amber-400 font-medium"
               />
             </div>
@@ -691,7 +603,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
           <div className="flex-1 overflow-y-auto p-3.5 space-y-2.5 custom-scrollbar min-h-0">
             {filteredPresets.length === 0 ? (
               <div className="py-24 text-center text-slate-500 text-xs">
-                조건에 맞는 프리셋이 없습니다.
+                조건에 맞는 덱이 없습니다.
               </div>
             ) : (
               filteredPresets.map((preset) => {
@@ -724,7 +636,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold text-indigo-300 bg-indigo-500/20 border border-indigo-500/40 px-2 py-0.5 rounded-md">
-                              커스텀 덱
+                              추천 덱
                             </span>
                           )}
                           <span className="text-[10px] font-mono text-slate-500">
@@ -736,7 +648,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                         </h4>
                       </div>
 
-                      {/* 우측 상단 액션 버튼 (코드 복사 & 삭제) */}
+                      {/* 우측 상단 액션 버튼 (코드 복사) */}
                       <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <button
                           onClick={() => handleCopyCode(preset)}
@@ -760,14 +672,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                           )}
                         </button>
 
-                        <button
-                          onClick={() => handleDeletePreset(preset.id, preset.name)}
-                          className="p-1.5 rounded-lg bg-slate-800 hover:bg-red-600/30 text-slate-400 hover:text-red-300 border border-slate-700 hover:border-red-500/40 transition cursor-pointer flex items-center gap-1"
-                          title={`${preset.name} 프리셋 삭제`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                          <span className="text-[10px] hidden sm:inline text-red-300">삭제</span>
-                        </button>
                       </div>
                     </div>
 
@@ -819,23 +723,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
             )}
           </div>
 
-          {/* 하단 프리셋 카운트 및 복원 버튼 */}
-          <div className="p-3 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 bg-slate-950 shrink-0">
-            <span className="font-mono text-slate-400">총 {presets.length}개 프리셋</span>
-            <button
-              onClick={() => {
-                if (window.confirm('기본 공식 스타터덱(SD01, SD02)을 초기 상태로 복원하시겠습니까?')) {
-                  restoreDefaultPresets();
-                  reloadPresets();
-                }
-              }}
-              className="text-xs text-amber-400 hover:text-amber-300 font-bold cursor-pointer flex items-center gap-1 transition"
-              title="삭제된 공식 스타터덱을 기본값으로 복원합니다"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              공식 프리셋 복원
-            </button>
-          </div>
         </aside>
 
         {/* ------------------------------------------------------- */}
@@ -855,7 +742,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                 <div className="space-y-1.5 min-w-0 max-w-2xl">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black text-amber-400 bg-amber-400/10 border border-amber-400/30 px-2.5 py-0.5 rounded-full">
-                      {currentPreviewPreset?.isOfficial ? '공식 추천 마스터 레시피' : '저장된 커스텀 레시피'}
+                      {currentPreviewPreset?.isOfficial ? '공식 스타터 덱' : '추천 덱'}
                     </span>
                     <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
                       총 {deckStats.total}/40장 완비
@@ -905,20 +792,6 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                     <span>덱 코드 복사</span>
                   </button>
 
-                  {/* 프리셋 삭제 버튼 (메인 액션 바에 명확하게 배치!) */}
-                  <button
-                    onClick={() => {
-                      if (currentPreviewPreset) {
-                        handleDeletePreset(currentPreviewPreset.id, currentPreviewPreset.name);
-                      }
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-red-950/40 hover:bg-red-600/80 text-red-300 hover:text-white text-xs font-bold transition cursor-pointer border border-red-500/40 flex items-center gap-1.5 shadow"
-                    title="이 덱 프리셋을 보관함에서 삭제합니다"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-400" />
-                    <span>프리셋 삭제</span>
-                  </button>
-
                   {/* 내 덱 리스트에 추가 */}
                   <button
                     onClick={() => {
@@ -928,7 +801,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
                       alert(`'${currentPreviewDeck.name}' 덱이 내 덱 리스트에 성공적으로 추가되었습니다!`);
                     }}
                     className="px-4 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-black transition cursor-pointer border border-amber-500/50 flex items-center gap-1.5 shadow"
-                    title="이 프리셋을 내 덱 리스트에 추가하여 덱 빌더에서 즉시 수정하고 사용할 수 있습니다"
+                    title="이 덱을 내 덱 리스트에 추가하여 덱 빌더에서 즉시 수정하고 사용할 수 있습니다"
                   >
                     <Plus className="w-4 h-4 text-amber-400" />
                     <span>내 덱 리스트에 추가</span>
@@ -1205,7 +1078,7 @@ export const DeckPresetModal: React.FC<DeckPresetModalProps> = ({
           ) : (
             <div className="m-auto text-center text-slate-500 py-32 space-y-3">
               <Layers className="w-12 h-12 mx-auto text-slate-600" />
-              <p className="text-sm font-bold">프리셋을 선택하면 40장 전체 카드 구성이 여기에 표시됩니다.</p>
+              <p className="text-sm font-bold">덱을 선택하면 40장 전체 카드 구성이 여기에 표시됩니다.</p>
             </div>
           )}
         </main>

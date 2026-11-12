@@ -41,7 +41,7 @@ import {
   saveDraft,
   clearDraft,
 } from '../utils/feedbackManager';
-import { getStoredPresets, encodeDeckCode, presetToCustomDeck } from '../utils/deckCode';
+import { getDefaultPresets, encodeDeckCode, presetToCustomDeck } from '../utils/deckCode';
 import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 
 interface FeedbackModalProps {
@@ -81,7 +81,7 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
   // User presets for quick picking deck code
   const storedPresets = useMemo(() => {
     try {
-      return getStoredPresets();
+      return getDefaultPresets();
     } catch {
       return [];
     }
@@ -656,14 +656,14 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({
                           } catch {
                             setDeckCode(selectedPreset.externalCode || '');
                           }
-                          showToast(`✨ '${selectedPreset.name}' 프리셋을 불러왔습니다.`);
+                          showToast(`✨ '${selectedPreset.name}' 덱을 불러왔습니다.`);
                         }
                       }}
                       defaultValue=""
                       className="text-xs bg-slate-900 border border-purple-500/50 rounded-lg px-2 py-1 text-purple-200 cursor-pointer"
                     >
                       <option value="" disabled>
-                        내 프리셋에서 덱 가져오기...
+                        공식·추천 덱 가져오기...
                       </option>
                       {storedPresets.map((p) => (
                         <option key={p.id} value={p.id}>

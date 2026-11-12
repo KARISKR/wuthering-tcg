@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, Swords, Bot, Users, Shuffle, Crown, Check, Layers, ArrowLeft, Sparkles, Bookmark, ShieldAlert } from 'lucide-react';
 import type { CustomDeckConfig, DeckPreset } from '../types/tcg';
-import { getStoredPresets, presetToCustomDeck, getUserDecks, customDeckToPreset } from '../utils/deckCode';
+import { getDefaultPresets, presetToCustomDeck, getUserDecks, customDeckToPreset } from '../utils/deckCode';
 
 import { CardArt } from './CardArt'; // [메뉴 최적화 2026-11] 카드 썸네일 축소본
 import { preloadDeckCards } from '../utils/cardImagePreloader';
+import { getSharedDecks, fetchGlobalSharedDecks, sharedDeckToBattlePreset } from '../utils/sharedDecks';
 interface DeckSelectModalProps {
   isOpen: boolean;
   mode: 'AI' | 'SOLO_DUAL';
@@ -16,7 +17,7 @@ const LAST_MY_KEY = 'wuthering_last_my_deck_preset';
 const LAST_OPP_KEY = 'wuthering_last_opp_deck_preset';
 const RANDOM_ID = '__RANDOM__';
 
-export type DeckCategoryTab = 'USER' | 'OFFICIAL' | 'PRESET' | 'ALL';
+export type DeckCategoryTab = 'USER' | 'OFFICIAL' | 'PRESET' | 'SHARED' | 'ALL';
 
 interface CategoryItem {
   id: DeckCategoryTab;
@@ -27,7 +28,8 @@ interface CategoryItem {
 const CATEGORY_TABS: CategoryItem[] = [
   { id: 'USER', label: '보유 덱', badgeLabel: '★ 보유 덱' },
   { id: 'OFFICIAL', label: '공식', badgeLabel: '👑 공식' },
-  { id: 'PRESET', label: '프리셋', badgeLabel: '📜 프리셋' },
+  { id: 'PRESET', label: '추천', badgeLabel: '📜 추천' },
+  { id: 'SHARED', label: '공유 덱', badgeLabel: '🌐 공유' },
   { id: 'ALL', label: '전체', badgeLabel: '전체' },
 ];
 
@@ -39,8 +41,12 @@ function isOfficialPreset(preset: DeckPreset): boolean {
   return Boolean(preset.isOfficial) || preset.id.startsWith('preset-official-');
 }
 
+function isSharedPreset(preset: DeckPreset): boolean {
+  return preset.id.startsWith('shared-deck-');
+}
+
 function isGeneralPreset(preset: DeckPreset): boolean {
-  return !isUserPreset(preset) && !isOfficialPreset(preset);
+  return !isUserPreset(preset) && !isOfficialPreset(preset) && !isSharedPreset(preset);
 }
 
 const DeckColumn: React.FC<{
@@ -61,6 +67,7 @@ const DeckColumn: React.FC<{
       USER: presets.filter(isUserPreset).length,
       OFFICIAL: presets.filter(isOfficialPreset).length,
       PRESET: presets.filter(isGeneralPreset).length,
+      SHARED: presets.filter(isSharedPreset).length,
       ALL: presets.length,
     };
   }, [presets]);
@@ -76,6 +83,7 @@ const DeckColumn: React.FC<{
     if (activeCategory === 'USER') return presets.filter(isUserPreset);
     if (activeCategory === 'OFFICIAL') return presets.filter(isOfficialPreset);
     if (activeCategory === 'PRESET') return presets.filter(isGeneralPreset);
+    if (activeCategory === 'SHARED') return presets.filter(isSharedPreset);
     return presets;
   }, [presets, activeCategory]);
 
@@ -183,6 +191,7 @@ const DeckColumn: React.FC<{
             const selected = selectedId === preset.id;
             const isUser = isUserPreset(preset);
             const isOff = isOfficialPreset(preset);
+            const isShared = isSharedPreset(preset);
 
             return (
               <button
@@ -202,6 +211,8 @@ const DeckColumn: React.FC<{
                           ? 'bg-amber-500/25 text-amber-300 border border-amber-500/50'
                           : isOff
                           ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                          : isShared
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
                           : 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
                       }`}
                     >
@@ -209,7 +220,9 @@ const DeckColumn: React.FC<{
                         ? '★ 보유'
                         : isOff
                         ? '👑 공식'
-                        : '📜 프리셋'}
+                        : isShared
+                        ? '🌐 공유'
+                        : '📜 추천'}
                     </span>
                     <span className="font-black text-sm sm:text-base text-white truncate">{preset.name}</span>
                   </div>
@@ -273,13 +286,20 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
       isOfficial: false,
     }));
 
-    // 2. 프리셋 보관함 목록 (중복 제외)
-    const storedPresets = getStoredPresets();
+    // 2. 기본 제공 덱: 공식 스타터·추천 덱 (중복 제외)
+    const storedPresets = getDefaultPresets();
     const existingIds = new Set(userPresets.map((u) => u.id));
     const uniqueStored = storedPresets.filter((p) => !existingIds.has(p.id));
 
-    const combined = [...userPresets, ...uniqueStored].filter((p) => presetToCustomDeck(p).actionCards.length >= 40);
+    // 3. 커뮤니티 공유 덱 (먼저 저장된 목록으로 보여주고, 서버 목록이 오면 그 부분만 바꾼다)
+    const playable = (list: DeckPreset[]) => list.filter((p) => presetToCustomDeck(p).actionCards.length >= 40);
+    const sharedPresets = (decks: ReturnType<typeof getSharedDecks>) => playable(decks.filter((d) => d?.deckPreset).map(sharedDeckToBattlePreset));
+    const combined = [...playable([...userPresets, ...uniqueStored]), ...sharedPresets(getSharedDecks())];
     setPresets(combined);
+    let alive = true;
+    fetchGlobalSharedDecks().then((decks) => {
+      if (alive) setPresets((prev) => [...prev.filter((p) => !isSharedPreset(p)), ...sharedPresets(decks)]);
+    });
 
     const lastMy = localStorage.getItem(LAST_MY_KEY);
     const lastOpp = localStorage.getItem(LAST_OPP_KEY);
@@ -287,6 +307,9 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
     setOppId(
       lastOpp === RANDOM_ID ? RANDOM_ID : combined.find((p) => p.id === lastOpp)?.id ?? combined[1]?.id ?? combined[0]?.id ?? ''
     );
+    return () => {
+      alive = false;
+    };
   }, [isOpen]);
 
   const decksById = useMemo(() => new Map(presets.map((p) => [p.id, p])), [presets]);
@@ -364,7 +387,7 @@ export const DeckSelectModal: React.FC<DeckSelectModalProps> = ({ isOpen, mode, 
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-400 mt-0.5 hidden sm:block">
-                상단 4종 탭(보유 덱, AI추천, 공식, 프리셋)을 통해 원하는 덱을 자유롭게 선택하세요.
+                상단 탭(보유 덱, 공식, 추천, 공유 덱)에서 원하는 덱을 자유롭게 선택하세요.
               </p>
             </div>
           </div>
