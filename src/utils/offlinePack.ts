@@ -71,11 +71,11 @@ export interface OfflinePackProgress {
  */
 export async function downloadOfflinePack(
   onProgress: (p: OfflinePackProgress) => void,
-  signal?: AbortSignal
+  { signal, concurrency = CONCURRENCY, askPersist = true }: { signal?: AbortSignal; concurrency?: number; askPersist?: boolean } = {}
 ): Promise<OfflinePackProgress> {
   if (typeof caches === 'undefined') throw new Error('이 브라우저는 앱 저장소(Cache Storage)를 지원하지 않습니다.');
-  // 저장 공간이 부족할 때 브라우저가 지우지 않도록 요청 (거절돼도 계속)
-  await navigator.storage?.persist?.().catch(() => false);
+  // 저장 공간이 부족할 때 브라우저가 지우지 않도록 요청 (거절돼도 계속). 파이어폭스는 확인 창을 띄우므로 직접 누를 때만
+  if (askPersist) await navigator.storage?.persist?.().catch(() => false);
 
   const cache = await caches.open(STATIC_CACHE);
   const urls = [...listCardUrls(), ...listAllSfxRequestUrls(), ...(await listFxUrls())];
@@ -106,7 +106,7 @@ export async function downloadOfflinePack(
       onProgress({ ...progress });
     }
   };
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  await Promise.all(Array.from({ length: concurrency }, worker));
 
   if (!signal?.aborted && progress.failed === 0) {
     try {
@@ -116,4 +116,29 @@ export async function downloadOfflinePack(
     }
   }
   return progress;
+}
+
+let autoController: AbortController | null = null;
+
+/**
+ * 로비에 있는 동안 배경에서 조금씩(동시 2개) 받는다. 이미 받은 파일은 건너뛰므로 끊겨도 다음에 이어서 받는다.
+ * 데이터 절약 모드이거나 브라우저가 모바일 데이터라고 알려 주면 받지 않는다 (아이폰 등 알 수 없는 경우는 받음).
+ */
+export function startAutoOfflinePack(): void {
+  if (autoController || isOfflinePackDone() || typeof caches === 'undefined') return;
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean; type?: string } }).connection;
+  if (conn?.saveData || conn?.type === 'cellular') return;
+  const controller = new AbortController();
+  autoController = controller;
+  downloadOfflinePack(() => {}, { signal: controller.signal, concurrency: 2, askPersist: false })
+    .catch(() => {}) // 용량 부족 등은 조용히 멈춘다. 「데이터 받기」 창에서 직접 받으면 원인을 보여 준다
+    .finally(() => {
+      if (autoController === controller) autoController = null;
+    });
+}
+
+/** 전투로 들어갈 때·직접 받기를 누를 때 자동 받기를 멈춘다 */
+export function stopAutoOfflinePack(): void {
+  autoController?.abort();
+  autoController = null;
 }

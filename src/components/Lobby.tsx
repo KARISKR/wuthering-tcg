@@ -308,6 +308,26 @@ export const Lobby: React.FC<LobbyProps> = ({
     }
   };
 
+  // 게임 데이터(카드 그림·효과음·이펙트) 자동 받기: 첫 화면 로딩과 겹치지 않게 10초 뒤 시작, 로비를 떠나면(전투 등) 멈춘다
+  useEffect(() => {
+    let stop: (() => void) | null = null;
+    let left = false;
+    const timer = window.setTimeout(() => {
+      import('../utils/offlinePack')
+        .then((m) => {
+          if (left) return;
+          m.startAutoOfflinePack();
+          stop = m.stopAutoOfflinePack;
+        })
+        .catch(() => {});
+    }, 10000);
+    return () => {
+      left = true;
+      window.clearTimeout(timer);
+      stop?.();
+    };
+  }, []);
+
   // 멀티배틀 카드의 '대기 중인 방 N개'. 로비에 있을 때만 30초마다, 탭이 숨겨지면 건너뜀. 멀티 모달은 자체 폴링이 있어 그동안 멈춤
   const [waitingRoomCount, setWaitingRoomCount] = useState(0);
   useEffect(() => {

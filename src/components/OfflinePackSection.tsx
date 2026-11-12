@@ -7,6 +7,7 @@ import { CheckCircle, HardDriveDownload, X } from 'lucide-react';
 import {
   downloadOfflinePack,
   isOfflinePackDone,
+  stopAutoOfflinePack,
   OFFLINE_PACK_SIZE_MB,
   OFFLINE_PACK_TOTAL_MB,
   type OfflinePackProgress,
@@ -30,6 +31,7 @@ export const OfflinePackSection: React.FC = () => {
   }, [state]);
 
   const start = async () => {
+    stopAutoOfflinePack(); // 배경 자동 받기와 겹치지 않게 (이미 받은 파일은 건너뛴다)
     setState('running');
     setMessage('');
     try {
@@ -56,8 +58,12 @@ export const OfflinePackSection: React.FC = () => {
         <span className="ml-auto text-xs font-mono text-cyan-200">약 {Math.round(OFFLINE_PACK_TOTAL_MB)}MB</span>
       </div>
       <p className="text-[11px] text-slate-300 leading-relaxed">
-        카드 그림·효과음·캐릭터 대사·공격 이펙트를 한 번에 받아 둡니다. 받은 뒤에는 도감과 전투에서 다시 받지 않아 대사·카드가 밀리지 않습니다.
-        배경음악은 포함하지 않습니다. <span className="text-amber-300">Wi‑Fi에서 받는 것을 권장합니다.</span>
+        카드 그림·효과음·캐릭터 대사·공격 이펙트는 <span className="text-white font-bold">로비에 있는 동안 자동으로 조금씩 받아집니다.</span>{' '}
+        전투에서 대사·카드가 늦게 나오는 등 문제가 있을 때만 아래 버튼으로 한 번에 받아 주세요. 이미 받은 파일은 건너뜁니다.
+      </p>
+      <p className="text-[10px] text-slate-500 leading-relaxed">
+        배경음악은 포함하지 않습니다. 데이터 절약 모드나 모바일 데이터로 접속하면 자동으로 받지 않습니다.{' '}
+        <span className="text-amber-300/90">Wi‑Fi에서 받는 것을 권장합니다.</span>
       </p>
       <div className="grid grid-cols-3 gap-1.5 text-[10px] text-center font-mono">
         <div className="rounded-lg bg-slate-950/70 border border-slate-800 py-1.5">

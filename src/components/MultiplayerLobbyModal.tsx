@@ -147,9 +147,10 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
   // AI 추천 & 공식 프리셋 덱 목록
   const recDecks: CustomDeckConfig[] = useMemo(() => {
     try {
+      // 공식 스타터만 (추천 덱은 공유 덱 탭에 있다)
       const presets = getDefaultPresets();
       return presets
-        .filter((p) => !p.id.startsWith('user-deck-'))
+        .filter((p) => p.isOfficial)
         .map((p) => presetToCustomDeck(p));
     } catch {
       return [];
@@ -1444,7 +1445,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                         {deckTab === 'MY_DECKS'
                           ? `덱 빌더에서 구성한 마이 덱 중 출전할 덱을 선택하세요. (총 ${myDecks.length}개 보유)`
                           : deckTab === 'REC_DECKS'
-                          ? `기본 제공되는 공식 스타터·추천 덱입니다. (총 ${recDecks.length}개 제공)`
+                          ? `기본 제공되는 공식 스타터 덱입니다. (총 ${recDecks.length}개 제공)`
                           : `다른 플레이어가 공유한 덱입니다. (총 ${sharedDecks.length}개)`}
                       </p>
                     </div>
@@ -1491,7 +1492,7 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                             : 'text-slate-400 hover:text-white hover:bg-slate-900'
                         }`}
                       >
-                        <span>📜 공식 & 추천</span>
+                        <span>👑 공식</span>
                         <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
                           deckTab === 'REC_DECKS' ? 'bg-black/25 text-slate-950' : 'bg-slate-800 text-slate-300'
                         }`}>
@@ -1524,11 +1525,11 @@ export const MultiplayerLobbyModal: React.FC<MultiplayerLobbyModalProps> = ({
                   <div className="py-14 px-4 text-center text-slate-400 flex flex-col items-center justify-center gap-2.5">
                     <Layers className="w-12 h-12 text-slate-600 mb-1" />
                     <p className="font-bold text-base text-slate-300">
-                      {deckTab === 'MY_DECKS' ? '저장된 마이 덱이 없습니다.' : deckTab === 'REC_DECKS' ? '추천 덱이 없습니다.' : '공유된 덱이 없습니다.'}
+                      {deckTab === 'MY_DECKS' ? '저장된 마이 덱이 없습니다.' : deckTab === 'REC_DECKS' ? '공식 덱이 없습니다.' : '공유된 덱이 없습니다.'}
                     </p>
                     <p className="text-xs sm:text-sm text-slate-500">
                       {deckTab === 'MY_DECKS'
-                        ? '메인 화면의 [덱 빌더]에서 나만의 덱을 생성하고 저장하거나 상단의 [공식 & 추천] 탭을 이용해 보세요.'
+                        ? '메인 화면의 [덱 빌더]에서 나만의 덱을 생성하고 저장하거나 상단의 [공식]·[공유 덱] 탭을 이용해 보세요.'
                         : deckTab === 'REC_DECKS'
                         ? '기본 제공 덱을 불러오는 중입니다.'
                         : '메인 화면의 [공유 덱]에서 덱을 공유하면 여기에 나타납니다.'}
