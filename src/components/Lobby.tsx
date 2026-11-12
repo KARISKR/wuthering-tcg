@@ -4,6 +4,7 @@ import { BgmPlayer } from './BgmPlayer';
 import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 import type { CustomDeckConfig } from '../types/tcg';
 import { useVisitorStats } from '../utils/visitorStats';
+import { roomDirectoryService } from '../services/roomDirectoryService';
 
 const DeckSelectModal = lazy(() => import('./DeckSelectModal').then((m) => ({ default: m.DeckSelectModal })));
 const OfficialManualModal = lazy(() => import('./OfficialManualModal').then((m) => ({ default: m.OfficialManualModal })));
@@ -305,6 +306,25 @@ export const Lobby: React.FC<LobbyProps> = ({
     }
   };
 
+  // 멀티배틀 카드의 '대기 중인 방 N개'. 로비에 있을 때만 30초마다, 탭이 숨겨지면 건너뜀. 멀티 모달은 자체 폴링이 있어 그동안 멈춤
+  const [waitingRoomCount, setWaitingRoomCount] = useState(0);
+  useEffect(() => {
+    if (isMultiplayerModalOpen) return;
+    let alive = true;
+    const load = () => {
+      if (document.hidden) return;
+      roomDirectoryService.fetchRooms().then((rooms) => {
+        if (alive) setWaitingRoomCount(rooms.filter((r) => r.status === 'WAITING').length);
+      });
+    };
+    load();
+    const timer = setInterval(load, 30000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [isMultiplayerModalOpen]);
+
   const openMultiplayer = () => {
     setHash('#multiplayer');
     setIsMultiplayerModalOpen(true);
@@ -388,6 +408,11 @@ export const Lobby: React.FC<LobbyProps> = ({
           ONLINE · 1:1
         </span>
         <span className="relative flex flex-col gap-1.5">
+          {waitingRoomCount > 0 && (
+            <span className="self-start whitespace-nowrap rounded-full bg-[#090b11]/80 border border-amber-400/50 px-2 py-0.5 text-[11px] font-black text-amber-300">
+              대기 중인 방 {waitingRoomCount}개
+            </span>
+          )}
           <span className={`font-black text-white leading-none ${s.title}`}>멀티배틀</span>
           <span className={`text-violet-100 ${s.sub}`}>{variant === 'desktop' ? '친구와 실시간 1:1. 방을 만들거나 목록에서 입장합니다.' : '친구와 실시간 1:1'}</span>
           {variant === 'desktop' && (

@@ -34,7 +34,6 @@ import {
   Clock,
   Send,
   Crown,
-  Eye,
   BookmarkPlus,
 } from 'lucide-react';
 
@@ -70,6 +69,49 @@ const AVAILABLE_TAGS = [
   '앙코',
   'sldark',
 ];
+
+// 예전 버전이 태그를 안 고르면 자동으로 붙이던 태그. 의미가 없어 표시하지 않는다
+const HIDDEN_TAGS = new Set(['커뮤니티', '유저공유']);
+const visibleTags = (tags: string[]) => tags.filter((t) => !HIDDEN_TAGS.has(t));
+
+const CARD_BY_CODE = new Map(OFFICIAL_CARDS.map((c) => [c.code, c]));
+
+/** 액션 덱 장수·색(공격/기동/방어) 비율·많이 넣은 카드 3종 */
+function summarizeDeck(preset: DeckPreset) {
+  const sum = { total: 0, RED: 0, GREEN: 0, BLUE: 0 };
+  for (const c of preset.actionCards) {
+    sum.total += c.count;
+    const color = CARD_BY_CODE.get(c.code)?.color;
+    if (color === 'RED' || color === 'GREEN' || color === 'BLUE') sum[color] += c.count;
+  }
+  const keyCards = [...preset.actionCards]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3)
+    .map((c) => `${CARD_BY_CODE.get(c.code)?.nameKr || c.code}×${c.count}`);
+  return { ...sum, keyCards };
+}
+
+const COLOR_PARTS = [
+  { key: 'RED', label: '공격', bar: 'bg-red-500', text: 'text-red-300' },
+  { key: 'GREEN', label: '기동', bar: 'bg-emerald-500', text: 'text-emerald-300' },
+  { key: 'BLUE', label: '방어', bar: 'bg-cyan-500', text: 'text-cyan-300' },
+] as const;
+
+const ColorRatio: React.FC<{ sum: ReturnType<typeof summarizeDeck> }> = ({ sum }) => (
+  <div className="space-y-1">
+    <div className="flex h-1.5 rounded-full overflow-hidden bg-slate-800">
+      {sum.total > 0 && COLOR_PARTS.map((p) => <span key={p.key} className={p.bar} style={{ width: `${(sum[p.key] / sum.total) * 100}%` }} />)}
+    </div>
+    <div className="flex items-center gap-2.5 text-[11px] font-mono font-bold">
+      <span className="text-slate-300">액션 {sum.total}장</span>
+      {COLOR_PARTS.map((p) => (
+        <span key={p.key} className={p.text}>
+          {p.label} {sum[p.key]}
+        </span>
+      ))}
+    </div>
+  </div>
+);
 
 const TILE_CLIP = 'polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px)';
 
@@ -113,6 +155,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
   const [shareAuthorName, setShareAuthorName] = useState('방랑자');
   const [shareIsAnonymous, setShareIsAnonymous] = useState(false);
   const [shareDescription, setShareDescription] = useState('');
+  const [shareStrategy, setShareStrategy] = useState('');
   const [selectedFormTags, setSelectedFormTags] = useState<string[]>(['속공']);
   const [shareFeedback, setShareFeedback] = useState<string | null>(null);
 
@@ -164,7 +207,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
           const matchName = d.deckName.toLowerCase().includes(q);
           const matchAuthor = d.authorName.toLowerCase().includes(q);
           const matchTag = d.tags.some((t) => t.toLowerCase().includes(q));
-          const matchDesc = d.description.toLowerCase().includes(q);
+          const matchDesc = `${d.description}\n${d.strategy || ''}`.toLowerCase().includes(q);
           if (!matchName && !matchAuthor && !matchTag && !matchDesc) return false;
         }
         return true;
@@ -245,6 +288,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
           authorName: shareAuthorName,
           isAnonymous: shareIsAnonymous,
           description: shareDescription,
+          strategy: shareStrategy,
           deckConfig: activeDeck,
           tags: selectedFormTags,
         };
@@ -259,6 +303,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
           authorName: shareAuthorName,
           isAnonymous: shareIsAnonymous,
           description: shareDescription,
+          strategy: shareStrategy,
           preset: targetPreset,
           tags: selectedFormTags,
         };
@@ -280,9 +325,9 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 short:p-1 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div
-        className="relative w-full max-w-6xl xl:max-w-7xl h-[94vh] max-h-[960px] bg-[#090d1c]/95 border-2 border-amber-400/80 shadow-[0_0_50px_rgba(245,158,11,0.28)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
+        className="relative w-full max-w-[1800px] h-[96dvh] short:h-[100dvh] bg-[#090d1c]/95 border-2 border-amber-400/80 shadow-[0_0_50px_rgba(245,158,11,0.28)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
         style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
       >
         {/* 내부 인셋 라인 */}
@@ -295,7 +340,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
         <div className="absolute bottom-0 right-0 w-3.5 h-3.5 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
 
         {/* 상단 헤더 */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4.5 border-b border-amber-400/20 bg-[#0d1226]/90 shrink-0 relative z-20 gap-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-3.5 sm:px-6 py-3 sm:py-4.5 short:py-1.5 border-b border-amber-400/20 bg-[#0d1226]/90 shrink-0 relative z-20 gap-2.5">
           <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-3.5 min-w-0 w-full sm:w-auto">
             <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
               <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-amber-500/20 to-indigo-600/20 border border-amber-400/40 hidden sm:flex items-center justify-center shadow-lg shadow-amber-500/20 shrink-0">
@@ -372,9 +417,9 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
 
         {/* 탭 1: 공유 덱 둘러보기 (바뀐 덱 빌더 스타일 타일 그리드) */}
         {activeTab === 'BROWSE' && (
-          <div className="flex-1 flex flex-col min-h-0 relative z-20">
+          <div className="flex-1 flex flex-col min-h-0 relative z-20 short:overflow-y-auto custom-scrollbar">
             {/* 검색 & 필터 바 */}
-            <div className="p-4 sm:p-5 border-b border-slate-800 bg-[#0d1226]/80 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="p-4 sm:p-5 short:p-2 border-b border-slate-800 bg-[#0d1226]/80 flex flex-wrap items-center justify-between gap-3 short:gap-2 shrink-0">
               {/* 검색창 */}
               <div className="relative flex-1 min-w-[240px]">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -430,7 +475,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
             </div>
 
             {/* 마스터듀얼 / 덱 빌더 스타일 덱 타일 그리드 */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto short:flex-none short:overflow-visible p-3 sm:p-5 short:p-2 custom-scrollbar">
               {filteredDecks.length === 0 ? (
                 <div className="h-64 flex flex-col items-center justify-center text-slate-500 gap-3">
                   <Info className="w-10 h-10 stroke-1" />
@@ -446,79 +491,84 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                   </button>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:gap-6 grid-cols-1 sm:grid-cols-[repeat(auto-fill,minmax(240px,1fr))] max-w-[1600px] mx-auto">
+                <div className="grid gap-3 sm:gap-4 short:gap-2 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 max-w-[1800px] mx-auto">
                   {filteredDecks.map((deck) => {
-                    const leader = getCharInfo(deck.deckPreset.leaderCode);
-                    const leftSup = getCharInfo(deck.deckPreset.leftSupportCode);
-                    const rightSup = getCharInfo(deck.deckPreset.rightSupportCode);
-                    const art = leader?.artUrl;
-                    const actionTotal = deck.deckPreset.actionCards.reduce((acc, c) => acc + c.count, 0);
+                    const p = deck.deckPreset;
+                    const leader = getCharInfo(p.leaderCode);
+                    const sups = [getCharInfo(p.leftSupportCode), getCharInfo(p.rightSupportCode)];
+                    const sum = summarizeDeck(p);
+                    const tags = visibleTags(deck.tags);
 
                     return (
                       <div
                         key={deck.id}
                         onClick={() => setInspectingDeck(deck)}
-                        className="group relative max-sm:h-28 sm:aspect-[1/1.22] border-2 border-slate-600/80 hover:border-amber-400 bg-[#080d1b]/90 hover:bg-[#150f28] flex flex-col items-center justify-end cursor-pointer overflow-hidden transition-all duration-300 shadow-xl hover:shadow-[0_0_25px_rgba(245,158,11,0.35)]"
+                        className="group relative flex min-h-[176px] short:min-h-[150px] border-2 border-slate-700/80 hover:border-amber-400 bg-[#080d1b]/90 hover:bg-[#150f28] cursor-pointer overflow-hidden transition-all duration-200 shadow-xl hover:shadow-[0_0_25px_rgba(245,158,11,0.3)]"
                         style={{ clipPath: TILE_CLIP }}
                       >
-                        {/* 리더 카드 아트워크 (덱 케이스 대용) */}
-                        {art && (
-                          <CardArt
-                            sizes="(max-width: 640px) 112px, 300px"
-                            artUrl={art}
-                            alt=""
-                            draggable={false}
-                            className="absolute top-0 max-sm:bottom-0 left-0 max-sm:w-28 sm:inset-x-0 sm:w-full h-full sm:h-[76%] object-cover object-top opacity-85 group-hover:opacity-100 group-hover:scale-105 transition duration-300"
-                          />
-                        )}
-                        <div className="absolute inset-0 bg-gradient-to-l sm:bg-gradient-to-t from-[#04060d] via-[#04060d]/75 to-transparent pointer-events-none" />
-
-                        {/* 상단 뱃지: 추천수(좌) & 작성자(우) */}
-                        <div className="absolute top-2.5 right-2.5 left-[124px] sm:left-2.5 z-10 flex items-center justify-between pointer-events-none">
-                          <button
-                            type="button"
-                            onClick={(e) => handleLike(deck.id, e)}
-                            className={`pointer-events-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border backdrop-blur-md cursor-pointer transition ${
-                              deck.likedByMe
-                                ? 'bg-rose-500/30 text-rose-300 border-rose-500/60 shadow-sm'
-                                : 'bg-black/60 text-slate-300 border-slate-700/80 hover:bg-black/80'
-                            }`}
-                            title="추천하기"
-                          >
-                            <Heart className={`w-3 h-3 ${deck.likedByMe ? 'fill-rose-500 text-rose-500' : 'text-slate-400'}`} />
-                            <span>{deck.likes}</span>
-                          </button>
-
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/60 text-slate-300 border border-slate-700/80 backdrop-blur-md">
-                            {deck.isAnonymous ? '익명' : deck.authorName}
-                          </span>
+                        {/* 리더 아트 */}
+                        <div className="relative w-28 sm:w-32 short:w-24 shrink-0 bg-slate-900">
+                          {leader?.artUrl && (
+                            <CardArt
+                              sizes="128px"
+                              artUrl={leader.artUrl}
+                              alt=""
+                              draggable={false}
+                              className="absolute inset-0 w-full h-full object-cover object-top opacity-90 group-hover:opacity-100 transition"
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#080d1b]" />
                         </div>
 
-                        {/* 클릭 시 상세 안내 호버 힌트 */}
-                        <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                          <div className="px-3 py-1.5 rounded-xl bg-black/80 border border-amber-400 text-amber-300 text-xs font-black flex items-center gap-1.5 shadow-xl">
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>전체 덱 리스트 보기</span>
+                        <div className="flex-1 min-w-0 p-3 short:p-2 flex flex-col gap-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="text-[15px] sm:text-base font-black text-white truncate group-hover:text-amber-200 transition-colors">
+                                {deck.deckName}
+                              </div>
+                              <div className="text-[11px] text-slate-400 truncate">
+                                {deck.isAnonymous ? '익명' : deck.authorName} · {formatTimeAgo(deck.createdAt)}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => handleLike(deck.id, e)}
+                              className={`shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-black border cursor-pointer transition ${
+                                deck.likedByMe
+                                  ? 'bg-rose-500/30 text-rose-300 border-rose-500/60'
+                                  : 'bg-black/60 text-slate-300 border-slate-700/80 hover:bg-black/80'
+                              }`}
+                              title="추천하기"
+                            >
+                              <Heart className={`w-3 h-3 ${deck.likedByMe ? 'fill-rose-500 text-rose-500' : 'text-slate-400'}`} />
+                              <span>{deck.likes}</span>
+                            </button>
                           </div>
-                        </div>
 
-                        {/* 하단 덱 타이틀 플레이트 */}
-                        <div className="relative z-10 w-full pl-[124px] pr-3 sm:px-4 pb-3 sm:pb-3.5 pt-1 text-left sm:text-center">
-                          <div className="text-[15px] sm:text-base font-black text-white truncate drop-shadow group-hover:text-amber-200 transition-colors">
-                            {deck.deckName}
+                          <div className="text-xs truncate">
+                            <Crown className="inline w-3.5 h-3.5 text-amber-400 -mt-0.5 mr-1" />
+                            <span className="font-black text-amber-300">{leader?.nameKr || '리더'}</span>
+                            <span className="text-slate-500"> + </span>
+                            <span className="text-slate-200">{sups.map((c) => c?.nameKr || '?').join(' · ')}</span>
                           </div>
-                          <div className="mt-1 flex items-center justify-start sm:justify-center gap-2 text-xs font-mono font-bold text-slate-300 whitespace-nowrap">
-                            <span className="text-amber-400 truncate max-w-[120px]">
-                              {leader?.nameKr || '리더'}
-                            </span>
-                            <span className="text-slate-500">|</span>
-                            <span className="text-cyan-300">{actionTotal}장</span>
-                            {deck.tags[0] && (
-                              <>
-                                <span className="text-slate-500">|</span>
-                                <span className="text-amber-300">#{deck.tags[0]}</span>
-                              </>
+
+                          <ColorRatio sum={sum} />
+
+                          {sum.keyCards.length > 0 && (
+                            <div className="text-[11px] text-slate-400 truncate">핵심: {sum.keyCards.join(' · ')}</div>
+                          )}
+
+                          <p className="text-xs text-slate-300 line-clamp-2 short:line-clamp-1 leading-snug">{deck.description}</p>
+
+                          <div className="mt-auto flex items-center gap-1 overflow-hidden text-[10px]">
+                            {deck.strategy && (
+                              <span className="shrink-0 px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200 border border-indigo-400/40 font-bold">📖 운용법</span>
                             )}
+                            {tags.slice(0, 4).map((t) => (
+                              <span key={t} className="shrink-0 px-1.5 py-0.5 rounded bg-slate-800/80 text-amber-300/90">
+                                #{t}
+                              </span>
+                            ))}
                           </div>
                         </div>
                       </div>
@@ -534,7 +584,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
         {activeTab === 'SHARE' && (
           <form
             onSubmit={handleShareSubmit}
-            className="flex-1 overflow-y-auto p-6 space-y-5 max-w-2xl mx-auto w-full relative z-20 custom-scrollbar"
+            className="flex-1 overflow-y-auto p-4 sm:p-6 short:p-3 space-y-5 max-w-3xl mx-auto w-full relative z-20 custom-scrollbar"
           >
             {shareFeedback && (
               <div className="p-3.5 rounded-xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-200 text-xs font-bold flex items-center gap-2">
@@ -660,22 +710,38 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
             {/* 4. 덱 설명 / 운영 팁 */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-300">
-                4. 덱 소개 및 플레이 팁
+                4. 한 줄 소개 (목록에 표시)
               </label>
-              <textarea
-                rows={3}
+              <input
+                type="text"
                 required
+                maxLength={300}
                 value={shareDescription}
                 onChange={(e) => setShareDescription(e.target.value)}
-                placeholder="이 덱의 핵심 콤보, 추천 운영법, 강점 등을 다른 플레이어들에게 설명해주세요!"
-                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 leading-relaxed"
+                placeholder="예: 앙코 용융 속공. 3턴 안에 끝내는 공격 덱"
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                <span>5. 덱 운용법 (선택, 여러 줄)</span>
+                <span className="font-mono text-[10px] text-slate-500">{shareStrategy.length} / 5000</span>
+              </label>
+              <textarea
+                rows={10}
+                maxLength={5000}
+                value={shareStrategy}
+                onChange={(e) => setShareStrategy(e.target.value)}
+                placeholder={'예)\n- 첫 손패: 이런 카드는 남기고 나머지는 교체\n- 1~2턴: 서포터를 먼저 깔고 에너지를 모은다\n- 핵심 콤보: A → B 순서로 연격\n- 상대가 방어 덱이면: ...'}
+                className="w-full px-3.5 py-2.5 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 leading-relaxed resize-y"
               />
             </div>
 
             {/* 5. 태그 선택 */}
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-300">
-                5. 태그 선택 (다중 선택 가능)
+                6. 태그 선택 (다중 선택 가능)
               </label>
               <div className="flex flex-wrap gap-1.5">
                 {AVAILABLE_TAGS.map((tag) => {
@@ -720,11 +786,11 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
         {/* 전체 덱 리스트 상세 모달 (덱 타일 클릭 시 노출) */}
         {inspectingDeck && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
+            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-5 short:p-1 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
             onClick={() => setInspectingDeck(null)}
           >
             <div
-              className="relative w-full max-w-4xl max-h-[90vh] bg-[#0c1020]/98 border-2 border-amber-400/90 rounded-2xl shadow-[0_0_50px_rgba(245,158,11,0.35)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
+              className="relative w-full max-w-7xl max-h-[94dvh] short:max-h-[100dvh] bg-[#0c1020]/98 border-2 border-amber-400/90 rounded-2xl shadow-[0_0_50px_rgba(245,158,11,0.35)] flex flex-col overflow-hidden text-slate-100 backdrop-blur-2xl"
               style={{ clipPath: 'polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px)' }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -736,7 +802,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
               <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-amber-300 z-30 pointer-events-none" />
 
               {/* 상세 헤더 */}
-              <div className="px-6 py-4 border-b border-amber-400/20 bg-[#12162e]/90 flex items-center justify-between shrink-0 relative z-20">
+              <div className="px-4 sm:px-6 py-4 short:py-2 border-b border-amber-400/20 bg-[#12162e]/90 flex items-center justify-between shrink-0 relative z-20">
                 <div className="flex items-center gap-3 min-w-0">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -751,9 +817,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                         {formatTimeAgo(inspectingDeck.createdAt)}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-1 line-clamp-2">
-                      💬 {inspectingDeck.description}
-                    </p>
+                    <p className="text-xs text-slate-300 mt-1">💬 {inspectingDeck.description}</p>
                   </div>
                 </div>
 
@@ -767,7 +831,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
               </div>
 
               {/* 상세 본문 (출전 캐릭터 3인 + 캐릭터 덱 + 액션 덱 40장 리스트) */}
-              <div className="flex-1 overflow-y-auto p-5 space-y-4 relative z-20 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-3 sm:p-5 short:p-2 space-y-4 relative z-20 custom-scrollbar">
                 {/* 1. 출전 캐릭터 3인 라인업 */}
                 {(() => {
                   const l = getCharInfo(inspectingDeck.deckPreset.leaderCode);
@@ -818,6 +882,15 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                   );
                 })()}
 
+                <div className={inspectingDeck.strategy ? 'grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start' : ''}>
+                {/* 운용법: 사용자 입력이므로 텍스트로만 출력 (줄바꿈만 살림) */}
+                {inspectingDeck.strategy && (
+                  <div className="p-4 rounded-xl bg-indigo-950/30 border border-indigo-500/30">
+                    <div className="text-xs font-black text-indigo-200 mb-2">📖 덱 운용법</div>
+                    <div className="text-[13px] text-slate-200 leading-relaxed whitespace-pre-wrap break-words">{inspectingDeck.strategy}</div>
+                  </div>
+                )}
+
                 {/* 2. 전체 액션 덱 40장 그리드 */}
                 <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800">
                   <div className="flex items-center justify-between text-xs mb-3">
@@ -826,13 +899,17 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                       <span>메인 액션 덱 카드 리스트 (총 {inspectingDeck.deckPreset.actionCards.reduce((acc, c) => acc + c.count, 0)}장)</span>
                     </span>
                     <span className="font-mono text-slate-400 text-[11px]">
-                      {inspectingDeck.tags.map((t) => `#${t}`).join(' ')}
+                      {visibleTags(inspectingDeck.tags).map((t) => `#${t}`).join(' ')}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                  <div className="mb-3">
+                    <ColorRatio sum={summarizeDeck(inspectingDeck.deckPreset)} />
+                  </div>
+
+                  <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2.5 ${inspectingDeck.strategy ? '' : 'md:grid-cols-4'}`}>
                     {inspectingDeck.deckPreset.actionCards.map((item) => {
-                      const cardDef = OFFICIAL_CARDS.find((c) => c.code === item.code);
+                      const cardDef = CARD_BY_CODE.get(item.code);
                       const color = cardDef?.color || 'RED';
                       const colorBg =
                         color === 'RED'
@@ -871,6 +948,7 @@ export const CommunityDeckModal: React.FC<CommunityDeckModalProps> = ({
                       );
                     })}
                   </div>
+                </div>
                 </div>
               </div>
 

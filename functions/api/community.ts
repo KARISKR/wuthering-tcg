@@ -312,6 +312,9 @@ async function attachComments(db: D1Database, posts: any[], onlyPostId?: string)
 // ─────────────────────────────────────────────────────────────────────────────
 /** 리플레이 v2 최대 크기 (넘으면 v2만 버리고 로그 기반 v1로 저장) */
 export const MAX_REPLAY_V2_BYTES = 256 * 1024;
+// 공유 덱 1건 상한: 덱 구성(~4KB) + 운용법 5000자를 넉넉히 담는 크기. 글자 수 기준(JSON.stringify 길이)
+export const MAX_DECK_JSON_CHARS = 24_000;
+export const DECK_TEXT_LIMITS: Record<string, number> = { deckName: 60, authorName: 30, description: 300, strategy: 5000, deckCode: 2000 };
 
 export const RATE_LIMITS = {
   post: { limit: 5, windowMs: 10 * 60_000 }, // 새 글
@@ -775,17 +778,23 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       //     예전에는 클라이언트가 덱 목록 전체를 보내고 서버가 "목록에 없는 덱"을 지웠다 →
       //     오래된 목록을 가진 사람이 좋아요만 눌러도 남이 올린 덱이 사라졌다. 이제 목록에 없다고 지우지 않는다.
       const auth = readAuth(env, undefined, incoming?.auth?.adminKey);
+      // 반환값: 0 저장(또는 이미 있음), >0 재시도 대기 ms, -1 너무 큼
       const createDeck = async (d: any): Promise<number> => {
-        const id = String(d.id);
+        if (JSON.stringify(d).length > MAX_DECK_JSON_CHARS) return -1;
+        const id = String(d.id).slice(0, 80);
         if (await getItem(env.DB!, 'deck', id)) return 0; // 이미 있는 덱은 덮어쓰지 않음
         const wait = await hitRateLimit(env.DB!, 'deck', who, nowTs);
         if (wait) return wait;
         const { likedByMe: _l, ...clean } = d;
+        clean.id = id;
+        for (const [k, n] of Object.entries(DECK_TEXT_LIMITS)) if (typeof clean[k] === 'string') clean[k] = clean[k].slice(0, n);
+        if (Array.isArray(clean.tags)) clean.tags = clean.tags.filter((t: unknown) => typeof t === 'string').slice(0, 12).map((t: string) => t.slice(0, 20));
         await upsertStmt(env.DB!, 'deck', id, toTs(d.createdAt, nowTs), nowTs, { ...clean, likes: 0 }).run();
         return 0;
       };
       if (incoming?.action === 'upsertDeck' && incoming?.deck?.id) {
         const wait = await createDeck(incoming.deck);
+        if (wait < 0) return new Response(JSON.stringify({ error: 'Deck too large' }), { status: 413, headers });
         if (wait) return rateLimitedResponse(headers, wait, 'deck');
       } else if (incoming?.action === 'likeDeck' && incoming?.id) {
         const id = String(incoming.id);
@@ -801,7 +810,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
         // 예전 클라이언트의 목록 저장: 새 덱만 만든다 (덮어쓰기·삭제 없음)
         for (const d of incoming.decks.filter((x: any) => x && x.id)) {
           const wait = await createDeck(d);
-          if (wait) return rateLimitedResponse(headers, wait, 'deck');
+          if (wait > 0) return rateLimitedResponse(headers, wait, 'deck');
         }
       }
       return new Response(JSON.stringify({ ok: true, updatedAt: nowTs }), { headers });

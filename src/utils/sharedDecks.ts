@@ -159,6 +159,7 @@ export interface ShareDeckParams {
   authorName: string;
   isAnonymous: boolean;
   description: string;
+  strategy?: string;
   deckConfig?: CustomDeckConfig;
   preset?: DeckPreset;
   tags?: string[];
@@ -191,6 +192,7 @@ export function shareNewDeck(params: ShareDeckParams): SharedDeck {
     authorName: finalAuthor,
     isAnonymous: !!params.isAnonymous,
     description: params.description.trim() || '공유된 커뮤니티 덱입니다.',
+    ...(params.strategy?.trim() ? { strategy: params.strategy.trim() } : {}),
     deckCode: targetCode,
     deckPreset: {
       ...targetPreset,
@@ -200,7 +202,7 @@ export function shareNewDeck(params: ShareDeckParams): SharedDeck {
     likes: 0,
     likedByMe: false,
     createdAt: Date.now(),
-    tags: params.tags && params.tags.length > 0 ? params.tags : ['커뮤니티', '유저공유'],
+    tags: params.tags ?? [],
   };
 
   const updated = [newSharedDeck, ...currentDecks];

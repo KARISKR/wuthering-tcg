@@ -374,6 +374,7 @@ export interface SharedDeck {
   authorName: string;
   isAnonymous: boolean;
   description: string;
+  strategy?: string; // 여러 줄 덱 운용법 (텍스트로만 출력)
   deckCode: string;
   deckPreset: DeckPreset;
   likes: number;

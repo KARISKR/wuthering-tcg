@@ -156,6 +156,19 @@ describe('community API row storage', () => {
     expect(old.json.id).toBe('old');
   });
 
+  it('decks: keeps a multi-line strategy, trims long text, rejects oversized decks', async () => {
+    const strategy = '1턴: 서포터 전개\n2턴: 연격\n' + '가'.repeat(6000);
+    await call('POST', 'type=decks', { action: 'upsertDeck', deck: { id: 's1', deckName: 'n'.repeat(100), strategy, tags: ['a'.repeat(30), 1] } });
+    const deck = (await call('GET', 'type=decks')).json.decks.find((d: any) => d.id === 's1');
+    expect(deck.strategy.startsWith('1턴: 서포터 전개\n2턴')).toBe(true);
+    expect(deck.strategy.length).toBe(5000);
+    expect(deck.deckName.length).toBe(60);
+    expect(deck.tags).toEqual(['a'.repeat(20)]);
+    const big = await call('POST', 'type=decks', { action: 'upsertDeck', deck: { id: 's2', junk: 'x'.repeat(30000) } });
+    expect(big.status).toBe(413);
+    expect((await call('GET', 'type=decks')).json.decks.some((d: any) => d.id === 's2')).toBe(false);
+  });
+
   it('new deck uploads are rate limited per IP', async () => {
     for (let i = 0; i < 5; i++) {
       expect((await call('POST', 'type=decks', { action: 'upsertDeck', deck: { id: 'r' + i } })).status).toBe(200);
