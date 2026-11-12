@@ -126,7 +126,8 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const [battleStore] = useState(() =>
     createBattleStore(battleSource, {
       showTutorialOverlay: isTutorialMode,
-      isInitiativeRolling: !initialSavedSession?.lastGameState,
+      // 복구한 대전이면 주사위를 이미 굴렸는지(log-dice- 로그)로 정한다
+      isInitiativeRolling: !initialSavedSession?.lastGameState?.logs.some((l) => l.id.startsWith('log-dice-')),
     })
   );
 

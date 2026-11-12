@@ -82,6 +82,11 @@ export interface UseMultiplayerBattleOptions {
   ) => void;
 }
 
+/** 선공·후공 주사위를 이미 굴렸는지 (step.ts SET_INITIATIVE가 남기는 log-dice- 로그) */
+function hasRolledInitiative(state: GameState): boolean {
+  return state.logs.some((l) => l.id.startsWith('log-dice-'));
+}
+
 export function useMultiplayerBattle({
   gameState,
   setGameState,
@@ -143,12 +148,16 @@ export function useMultiplayerBattle({
       if (saved?.lastGameState) {
         syncedLogsRef.current = saved.lastGameState.logs;
         setGameState(saved.lastGameState);
+        // 화면 상태는 저장되지 않으므로 복구한 게임에서 다시 정한다 (주사위를 이미 굴렸으면 주사위 화면을 다시 띄우지 않음)
+        setIsInitiativeRolling(!hasRolledInitiative(saved.lastGameState));
         if (saved.timeLimitConfig) setTimeLimitConfig(saved.timeLimitConfig);
         if (saved.p0TotalTime !== undefined) setP0TotalTime(saved.p0TotalTime);
         if (saved.p1TotalTime !== undefined) setP1TotalTime(saved.p1TotalTime);
         if (saved.currentTurnTime !== undefined) setCurrentTurnTime(saved.currentTurnTime);
       }
     }
+    // setIsInitiativeRolling은 GameBoard가 렌더마다 새로 만드는 함수라 의존성에 넣으면 무한 반복된다 (마운트 때 1번만 복구)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMode, setGameState, setTimeLimitConfig, setP0TotalTime, setP1TotalTime, setCurrentTurnTime]);
 
   // 1. [멀티플레이 / Step B] PeerSource 어댑터 및 호스트 상태 브로드캐스트
@@ -253,6 +262,11 @@ export function useMultiplayerBattle({
         multiplayerService.saveSession(msg.gameState);
         setIsMultiplayerDisconnected(false);
         setDisconnectCountdown(null);
+        // 재접속 뒤에는 리더 선택·멀리건을 다시 보낸다: 방장이 새로고침했으면 게스트가 이미 보낸 선택을 잃어버려
+        // 서로 기다리며 멈췄다. 같은 선택을 다시 보내도 결과는 같다
+        setIsInitiativeRolling(!hasRolledInitiative(msg.gameState));
+        setHasSelectedMyLeader(false);
+        setHasCompletedMyMulligan(false);
         if (msg.timeLimitConfig) setTimeLimitConfig(msg.timeLimitConfig);
         if (msg.p0TotalTime !== undefined) setP0TotalTime(msg.p0TotalTime);
         if (msg.p1TotalTime !== undefined) setP1TotalTime(msg.p1TotalTime);
@@ -284,6 +298,8 @@ export function useMultiplayerBattle({
     isSpectator,
     setGameState,
     setIsInitiativeRolling,
+    setHasSelectedMyLeader,
+    setHasCompletedMyMulligan,
     setTimeLimitConfig,
     setP0TotalTime,
     setP1TotalTime,
@@ -481,7 +497,10 @@ export function useMultiplayerBattle({
     }, 4000);
 
     return () => clearInterval(retryTimer);
-  }, [gameState.gameMode, isGuest, isMultiplayerDisconnected, setIsMultiplayerDisconnected, setDisconnectCountdown]);
+    // 두 setter는 GameBoard가 렌더마다 새로 만든다. 의존성에 넣으면 끊김 카운트다운(1초마다 렌더)이 4초 타이머를
+    // 계속 새로 만들어 재접속 시도가 한 번도 일어나지 않았다 (방장이 새로고침하면 게스트가 영원히 대기)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.gameMode, isGuest, isMultiplayerDisconnected]);
 
   // 6. [멀티플레이 액션 프록시 래퍼] 게스트(P1)는 호스트에게 액션을 전송하고, 호스트/솔로/AI는 로컬 엔진 실행
   const handleDrawCards = useCallback(

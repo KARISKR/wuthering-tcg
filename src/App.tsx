@@ -40,6 +40,8 @@ export function App() {
   const [battleMode, setBattleMode] = useState<'AI' | 'SOLO_DUAL' | 'MULTIPLAYER'>('AI');
   const [multiplayerRole, setMultiplayerRole] = useState<MultiplayerRole | null>(null);
   const [savedSessionToResume, setSavedSessionToResume] = useState<MultiplayerSessionData | null>(null);
+  // 새로고침·재개로 다시 여는 대전. GameBoard가 새 게임 대신 이 상태로 시작한다 (없으면 새 게임 상태가 저장분을 덮어썼다)
+  const [resumeSession, setResumeSession] = useState<MultiplayerSessionData | null>(null);
   const [isTutorialBattle, setIsTutorialBattle] = useState(false);
   const [customDeck, setCustomDeck] = useState<CustomDeckConfig | null>(null);
   const [opponentDeck, setOpponentDeck] = useState<CustomDeckConfig | null>(null);
@@ -64,6 +66,7 @@ export function App() {
         setMultiplayerRole(session.role);
         setCustomDeck(session.myProfile.customDeck || null);
         setOpponentDeck(session.opponentProfile?.customDeck || null);
+        setResumeSession(session);
         setCurrentView('BATTLE');
         import('./services/multiplayerService').then(({ multiplayerService }) => {
           multiplayerService.attemptReconnect().catch((e) => {
@@ -157,6 +160,7 @@ export function App() {
     setOpponentDeck(oppDeck ?? null);
     setBattleMode(mode);
     setMultiplayerRole(null);
+    setResumeSession(null);
     setCurrentView('BATTLE');
   };
 
@@ -172,6 +176,7 @@ export function App() {
     setOpponentDeck(oppDeck ?? null);
     setMultiplayerRole(role);
     setBattleMode('MULTIPLAYER');
+    setResumeSession(null);
     setCurrentView('BATTLE');
   };
 
@@ -184,6 +189,7 @@ export function App() {
     setMultiplayerRole(savedSessionToResume.role);
     setCustomDeck(savedSessionToResume.myProfile.customDeck || null);
     setOpponentDeck(savedSessionToResume.opponentProfile?.customDeck || null);
+    setResumeSession(savedSessionToResume);
     setSavedSessionToResume(null);
     setCurrentView('BATTLE');
     try {
@@ -273,6 +279,7 @@ export function App() {
       });
     }
     setMultiplayerRole(null);
+    setResumeSession(null);
     if (window.location.hash.toLowerCase().includes('battle')) {
       history.pushState('', document.title, window.location.pathname + window.location.search);
     }
@@ -374,6 +381,7 @@ export function App() {
             onExitToLobby={handleExitBattle}
             initialMode={battleMode}
             multiplayerRole={multiplayerRole}
+            initialSavedSession={battleMode === 'MULTIPLAYER' ? resumeSession : null}
             isTutorialMode={false}
             customDeck={customDeck}
             opponentDeck={opponentDeck}
