@@ -1,18 +1,17 @@
 /**
  * [메뉴 최적화 2026-11] 덱 화면 공통 탭.
  *
- * "마이 덱"(덱 빌더 목록), "덱 프리셋 & 코드 보관함", "공유된 덱 리스트"가 서로 다른 메뉴로 흩어져 있어
+ * "마이 덱"(덱 빌더 목록), "공유된 덱 리스트"가 서로 다른 메뉴로 흩어져 있어
  * 어디서 무엇을 하는지 헷갈렸다. 세 화면 맨 위에 같은 탭 줄을 두어 한 곳처럼 오가게 한다.
  * 화면 자체는 그대로 두고, 탭을 누르면 각 화면을 연 쪽(로비 또는 덱 빌더)이 전환을 처리한다.
  */
 import React from 'react';
-import { Layers, BookmarkCheck, Share2 } from 'lucide-react';
+import { Layers, Share2 } from 'lucide-react';
 
-export type DeckHubTab = 'mine' | 'preset' | 'shared';
+export type DeckHubTab = 'mine' | 'shared';
 
 const TABS: { id: DeckHubTab; label: string; short: string; Icon: typeof Layers }[] = [
   { id: 'mine', label: '내 덱', short: '내 덱', Icon: Layers },
-  { id: 'preset', label: '추천 덱 · 덱 코드', short: '추천 덱', Icon: BookmarkCheck },
   { id: 'shared', label: '공유 덱', short: '공유 덱', Icon: Share2 },
 ];
 

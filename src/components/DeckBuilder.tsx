@@ -21,14 +21,12 @@ import {
   Users,
   LayoutGrid,
   List,
-  BookmarkCheck,
   Share2,
   X,
   AlertTriangle,
   AlertCircle,
   ArrowRight,
 } from 'lucide-react';
-import { DeckPresetModal } from './DeckPresetModal';
 import { DeckListScreen, MAX_USER_DECKS } from './DeckListScreen';
 import { DeckExportModal } from './DeckExportModal';
 import { CommunityDeckModal } from './CommunityDeckModal';
@@ -52,7 +50,6 @@ interface DeckBuilderProps {
 }
 
 export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStartBattleWithDeck }) => {
-  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isCommunityModalOpen, setIsCommunityModalOpen] = useState(false);
   // 마스터듀얼식 흐름: 보유 덱 리스트(LIST) → 덱 에디터(EDIT)
@@ -938,7 +935,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
           onCreate={handleCreateNewDeck}
           onImportCode={handleImportDeckFromConfig}
           onDelete={handleDeleteCurrentDeck}
-          onOpenPreset={() => setIsPresetModalOpen(true)}
           onOpenShared={() => setIsCommunityModalOpen(true)}
         />
       ) : (
@@ -984,14 +980,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
             className="hidden lg:block bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-100 focus:outline-none focus:border-amber-400 font-bold w-48 shrink-0"
             placeholder="덱 이름 입력"
           />
-          <button
-            onClick={() => setIsPresetModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/50 text-xs sm:text-sm font-bold transition cursor-pointer shadow whitespace-nowrap shrink-0"
-            title="공식·추천 덱 보기 및 덱 코드 복사/가져오기"
-          >
-            <BookmarkCheck className="w-4 h-4 text-purple-400 shrink-0" />
-            <span>추천 덱 &amp; 코드</span>
-          </button>
           <button
             onClick={() => setIsExportModalOpen(true)}
             className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs sm:text-sm font-bold transition cursor-pointer shadow whitespace-nowrap shrink-0"
@@ -2254,35 +2242,6 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       </>
       )}
 
-      {/* 추천 덱 & 덱 코드 모달 */}
-      <DeckPresetModal
-        isOpen={isPresetModalOpen}
-        onClose={() => setIsPresetModalOpen(false)}
-        onSwitchHub={(t) => {
-          setIsPresetModalOpen(false);
-          if (t === 'shared') setIsCommunityModalOpen(true);
-        }}
-        onApplyActiveDeck={(deck) => {
-          saveUserDeck(deck);
-          const list = getUserDecks();
-          setUserDecks(list);
-          setSelectedDeckId(deck.id);
-          applyDeckToEditor(deck);
-        }}
-        onSelectAndEdit={(deck) => {
-          setIsPresetModalOpen(false);
-          saveUserDeck(deck);
-          const list = getUserDecks();
-          setUserDecks(list);
-          setSelectedDeckId(deck.id);
-          applyDeckToEditor(deck);
-          setScreen('EDIT');
-        }}
-        onSelectAndBattle={(deck) => {
-          onStartBattleWithDeck(deck);
-        }}
-      />
-
       {/* 덱 내보내기 모달 (카드 이미지 시트 & 텍스트 리스트) */}
       <DeckExportModal
         isOpen={isExportModalOpen}
@@ -2294,10 +2253,7 @@ export const DeckBuilder: React.FC<DeckBuilderProps> = ({ onBackToLobby, onStart
       <CommunityDeckModal
         isOpen={isCommunityModalOpen}
         onClose={() => setIsCommunityModalOpen(false)}
-        onSwitchHub={(t) => {
-          setIsCommunityModalOpen(false);
-          if (t === 'preset') setIsPresetModalOpen(true);
-        }}
+        onSwitchHub={() => setIsCommunityModalOpen(false)}
         currentEditingDeck={currentDeckConfig}
         onSelectAndBattle={(deck) => {
           setIsCommunityModalOpen(false);

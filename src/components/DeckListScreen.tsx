@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Plus,
   Trash2,
-  BookmarkCheck,
   Layers,
   AlertTriangle,
   Download,
@@ -28,7 +27,6 @@ interface DeckListScreenProps {
   onCreate: () => void;
   onImportCode?: (deck: CustomDeckConfig) => void;
   onDelete: (deckId: string) => void;
-  onOpenPreset: () => void;
   onOpenShared: () => void;
 }
 
@@ -46,7 +44,6 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
   onCreate,
   onImportCode,
   onDelete,
-  onOpenPreset,
   onOpenShared,
 }) => {
   const canCreate = decks.length < MAX_USER_DECKS;
@@ -135,7 +132,7 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
       </header>
 
       {/* [메뉴 최적화 2026-11] 덱 화면 공통 탭 (기존 하단 '덱 프리셋 & 코드' / '공유된 덱 리스트' 버튼 대체) */}
-      <DeckHubTabs active="mine" onSwitch={(t) => (t === 'preset' ? onOpenPreset() : onOpenShared())} />
+      <DeckHubTabs active="mine" onSwitch={() => onOpenShared()} />
 
       {/* 덱 타일 그리드 (모바일 2열 · 데스크톱 minmax 250px) */}
       <main className="relative z-10 flex-1 overflow-y-auto px-3 sm:px-8 py-4 sm:py-7 custom-scrollbar">
@@ -158,21 +155,6 @@ export const DeckListScreen: React.FC<DeckListScreenProps> = ({
             </div>
             <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 whitespace-nowrap">신규 제작 · 코드 불러오기</div>
           </button>
-
-          {/* [메뉴 최적화 2026-11] 덱이 적을 때: 추천 덱으로 바로 시작 */}
-          {decks.length < 3 && (
-            <button
-              onClick={onOpenPreset}
-              className="group relative aspect-[1/1.22] border-2 border-dashed border-amber-400/50 hover:border-amber-400 bg-[#080d1b]/70 hover:bg-[#0e1428] flex flex-col items-center justify-center text-center transition-all duration-300 cursor-pointer p-3"
-              style={{ clipPath: TILE_CLIP }}
-            >
-              <div className="w-14 h-14 sm:w-20 sm:h-20 rounded-full border-2 border-amber-400/70 flex items-center justify-center bg-amber-400/10 group-hover:scale-110 transition-transform">
-                <BookmarkCheck className="w-7 h-7 sm:w-10 sm:h-10 text-amber-300" />
-              </div>
-              <div className="mt-2.5 sm:mt-4 text-sm sm:text-base font-black text-amber-300">추천 덱으로 시작</div>
-              <div className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 leading-snug">공식 스타터·추천 덱을<br />골라 바로 쓰기</div>
-            </button>
-          )}
 
           {decks.map((deck) => {
             const actionCount = deck.actionCards?.length ?? 0;

@@ -9,7 +9,6 @@ import { roomDirectoryService } from '../services/roomDirectoryService';
 const DeckSelectModal = lazy(() => import('./DeckSelectModal').then((m) => ({ default: m.DeckSelectModal })));
 const OfficialManualModal = lazy(() => import('./OfficialManualModal').then((m) => ({ default: m.OfficialManualModal })));
 const CardCatalogModal = lazy(() => import('./CardCatalogModal').then((m) => ({ default: m.CardCatalogModal })));
-const DeckPresetModal = lazy(() => import('./DeckPresetModal').then((m) => ({ default: m.DeckPresetModal })));
 const VideoGuideModal = lazy(() => import('./VideoGuideModal').then((m) => ({ default: m.VideoGuideModal })));
 const PatchNotesModal = lazy(() => import('./PatchNotesModal').then((m) => ({ default: m.PatchNotesModal })));
 const SfxGuideModal = lazy(() => import('./SfxGuideModal').then((m) => ({ default: m.SfxGuideModal })));
@@ -85,7 +84,6 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [isManualOpen, setIsManualOpen] = useState(false);
   const [isVideoOpen, setIsVideoOpen] = useState(false);
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
-  const [isPresetOpen, setIsPresetOpen] = useState(false);
   const [isPatchNotesOpen, setIsPatchNotesOpen] = useState(false);
   const [isInteractiveTutorialOpen, setIsInteractiveTutorialOpen] = useState(false);
   const [isSfxGuideOpen, setIsSfxGuideOpen] = useState(false);
@@ -261,7 +259,6 @@ export const Lobby: React.FC<LobbyProps> = ({
       setShowModeModal(hash === '#battle' || hash === '#mode');
       setIsMultiplayerModalOpen(hash === '#multiplayer' || hash.startsWith('#multiplayer?') || hash.includes('room='));
       setIsCatalogOpen(hash === '#card-gallery' || hash === '#catalog' || hash === '#gallery');
-      setIsPresetOpen(hash === '#preset' || hash === '#presets');
       setIsCommunityDeckOpen(hash === '#shared-decks' || hash === '#shared' || hash === '#community-decks');
       setIsReplayOpen(hash === '#replay' || hash === '#replays');
       setIsManualOpen(hash === '#rulebook' || hash === '#manual' || hash === '#faq');
@@ -973,37 +970,6 @@ export const Lobby: React.FC<LobbyProps> = ({
           />
         )}
 
-        {/* 덱 프리셋 & 코드 매니저 모달 */}
-        {isPresetOpen && (
-          <DeckPresetModal
-            isOpen={isPresetOpen}
-            onClose={() => {
-              clearHash();
-              setIsPresetOpen(false);
-            }}
-            onSelectAndBattle={(deck) => {
-              clearHash();
-              if (onStartBattleWithCustomDeck) {
-                onStartBattleWithCustomDeck(deck);
-              } else {
-                onStartGame('AI');
-              }
-            }}
-            onSelectAndEdit={() => {
-              clearHash();
-              onOpenDeckBuilder();
-            }}
-            onSwitchHub={(t) => {
-              if (t === 'mine') {
-                setIsPresetOpen(false);
-                onOpenDeckBuilder();
-              } else {
-                setHash('#shared-decks');
-              }
-            }}
-          />
-        )}
-
         {/* 커뮤니티 공유 덱 라운지 모달 */}
         {isCommunityDeckOpen && (
           <CommunityDeckModal
@@ -1028,8 +994,6 @@ export const Lobby: React.FC<LobbyProps> = ({
               if (t === 'mine') {
                 setIsCommunityDeckOpen(false);
                 onOpenDeckBuilder();
-              } else {
-                setHash('#preset');
               }
             }}
           />
