@@ -450,7 +450,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const renderStatsLine = (extra: string) => (
     <span className={`flex items-center gap-1.5 text-slate-400 ${extra}`} title="실시간 접속 및 방문자 수">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-      {visitor.isLoading ? '접속자 확인 중' : `접속 중 ${visitor.online.toLocaleString()}명 · 오늘 ${visitor.today.toLocaleString()}명`}
+      {visitor.isLoading ? '접속자 확인 중' : `접속 중 ${visitor.online.toLocaleString()}명 · 오늘 ${visitor.today.toLocaleString()}명 · 누적 ${visitor.total.toLocaleString()}명`}
       {visitor.isExcluded && <span className="text-amber-400/80 ml-1">(집계 제외)</span>}
     </span>
   );
