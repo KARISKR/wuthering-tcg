@@ -20,7 +20,8 @@ interface PatchNotesModalProps {
 }
 
 export const PatchNotesModal: React.FC<PatchNotesModalProps> = ({ isOpen, onClose }) => {
-  const [selectedVersion, setSelectedVersion] = useState<string>(CURRENT_GAME_VERSION);
+  const latestVersion = patchNotes[0]?.version || CURRENT_GAME_VERSION;
+  const [selectedVersion, setSelectedVersion] = useState<string>(latestVersion);
 
   // ESC 키로 닫기
   const handleKeyDown = useCallback(
@@ -105,7 +106,7 @@ export const PatchNotesModal: React.FC<PatchNotesModalProps> = ({ isOpen, onClos
                 </h2>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-400/50 flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  최신 {CURRENT_GAME_VERSION}
+                  최신 {latestVersion}
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
@@ -249,7 +250,7 @@ export const PatchNotesModal: React.FC<PatchNotesModalProps> = ({ isOpen, onClos
         <footer className="px-6 py-3 border-t border-slate-800/80 bg-slate-950/80 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="font-mono">게임 버전 {CURRENT_GAME_VERSION} 정상 작동 중</span>
+            <span className="font-mono">게임 버전 {latestVersion} 정상 작동 중</span>
           </div>
 
           <button
