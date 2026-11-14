@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PendingChoice, getElementKr } from '../types/tcg';
+import { PendingChoice, getElementKr, type ActionCard } from '../types/tcg';
 import { Sparkles, Check, CheckCircle2, ChevronRight, Eye, EyeOff } from 'lucide-react';
 import { formatEffectText } from '../utils/formatEffectText';
 
@@ -36,9 +36,37 @@ const parseChoiceTitle = (rawTitle: string) => {
 interface EffectChoiceModalProps {
   choice: PendingChoice | null | undefined;
   onResolve: (chosenCardIds: string[]) => void;
+  /** 대결 카드가 공개된 뒤 판정 전(배틀 스텝)에 뜨는 선택이면 양쪽 대결 카드. 승패를 보고 고를 수 있게 함께 보여 준다 */
+  clashCards?: { mine: ActionCard | null; opponent: ActionCard | null } | null;
 }
 
-export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, onResolve }) => {
+const COLOR_KR: Record<string, string> = { RED: '적색', GREEN: '녹색', BLUE: '청색' };
+const COLOR_CLS: Record<string, string> = {
+  RED: 'border-red-500 text-red-300',
+  GREEN: 'border-emerald-500 text-emerald-300',
+  BLUE: 'border-sky-500 text-sky-300',
+};
+
+const ClashCardChip: React.FC<{ label: string; card: ActionCard | null }> = ({ label, card }) => (
+  <div className={`flex items-center gap-2 min-w-0 flex-1 border ${card ? COLOR_CLS[card.color] || 'border-white/20' : 'border-white/15'} bg-black/40 rounded-lg p-1.5`}>
+    {card ? (
+      <img src={card.artUrl} alt={card.nameKr} className="w-9 sm:w-11 aspect-[5/7] object-cover rounded shrink-0" />
+    ) : (
+      <div className="w-9 sm:w-11 aspect-[5/7] rounded bg-slate-800 shrink-0" />
+    )}
+    <div className="min-w-0 text-left">
+      <div className="text-[10px] sm:text-xs text-slate-400 font-bold">{label}</div>
+      <div className="text-xs sm:text-sm font-black text-white truncate">{card ? card.nameKr : '카드 없음 (패스)'}</div>
+      {card && (
+        <div className="text-[10px] sm:text-xs font-bold">
+          {COLOR_KR[card.color] || card.color} · 속도 {card.speed ?? '-'} · 피해 {card.damage}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, onResolve, clashCards }) => {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFieldPeek, setIsFieldPeek] = useState(false);
@@ -263,6 +291,15 @@ export const EffectChoiceModal: React.FC<EffectChoiceModalProps> = ({ choice, on
             <span>필드 확인</span>
           </button>
         </div>
+
+        {/* 공개된 대결 카드 (판정 전 배틀 스텝 선택일 때) — 승패를 보고 고를 수 있게 */}
+        {clashCards && (
+          <div data-clash-preview className="w-full flex items-stretch gap-2 my-1">
+            <ClashCardChip label="내 대결 카드" card={clashCards.mine} />
+            <div className="self-center text-xs font-black text-slate-400 shrink-0">VS</div>
+            <ClashCardChip label="상대 대결 카드" card={clashCards.opponent} />
+          </div>
+        )}
 
         {/* ============================================================
             방랑자 Lv.0 녹색 배틀 효과 카드 장수 선택 프롬프트 (ROVER_0_DRAW_PROMPT)

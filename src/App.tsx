@@ -6,6 +6,7 @@ import { bgmManager } from './utils/bgmManager';
 import { MAINTENANCE_CONFIG } from './config/maintenanceConfig';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import type { MultiplayerRole, MultiplayerSessionData } from './types/multiplayer';
+import type { GameState } from './types/tcg';
 import { MULTIPLAYER_SESSION_STORAGE_KEY } from './types/multiplayer';
 import { Wifi, RotateCcw, X } from 'lucide-react';
 import { MobileOrientationGuard } from './components/MobileOrientationGuard';
@@ -33,15 +34,18 @@ const BattleReplayStage = lazy(() => import('./components/BattleReplayStage').th
 const BattleReplayV2Stage = lazy(() => import('./components/battle/BattleReplayV2Stage').then((m) => ({ default: m.BattleReplayV2Stage })));
 const ScriptedTutorialBattle = lazy(() => import('./components/ScriptedTutorialBattle').then((m) => ({ default: m.ScriptedTutorialBattle })));
 const CommunityBoard = lazy(() => import('./components/CommunityBoard').then((m) => ({ default: m.CommunityBoard })));
+const SandboxSetup = lazy(() => import('./components/SandboxSetup').then((m) => ({ default: m.SandboxSetup })));
 
 export function App() {
-  const [currentView, setCurrentView] = useState<'LOBBY' | 'BATTLE' | 'DECK_BUILDER' | 'REPLAY_STAGE' | 'BOARD'>('LOBBY');
+  const [currentView, setCurrentView] = useState<'LOBBY' | 'BATTLE' | 'DECK_BUILDER' | 'REPLAY_STAGE' | 'BOARD' | 'SANDBOX'>('LOBBY');
   const [previousView, setPreviousView] = useState<'LOBBY' | 'BATTLE'>('LOBBY');
   const [battleMode, setBattleMode] = useState<'AI' | 'SOLO_DUAL' | 'MULTIPLAYER'>('AI');
   const [multiplayerRole, setMultiplayerRole] = useState<MultiplayerRole | null>(null);
   const [savedSessionToResume, setSavedSessionToResume] = useState<MultiplayerSessionData | null>(null);
   // 새로고침·재개로 다시 여는 대전. GameBoard가 새 게임 대신 이 상태로 시작한다 (없으면 새 게임 상태가 저장분을 덮어썼다)
   const [resumeSession, setResumeSession] = useState<MultiplayerSessionData | null>(null);
+  // 카드 테스트 모드에서 「시작」한 장면 (GameBoard가 이 상태로 시작)
+  const [sandboxState, setSandboxState] = useState<GameState | null>(null);
   const [isTutorialBattle, setIsTutorialBattle] = useState(false);
   const [customDeck, setCustomDeck] = useState<CustomDeckConfig | null>(null);
   const [opponentDeck, setOpponentDeck] = useState<CustomDeckConfig | null>(null);
@@ -110,6 +114,10 @@ export function App() {
         setIsTutorialBattle(false);
         bgmManager.unlockTrack();
         setCurrentView('BATTLE');
+      } else if (hash === '#sandbox') {
+        // 카드 테스트 모드 (관리자 전용, 확인은 SandboxSetup에서)
+        setIsTutorialBattle(false);
+        setCurrentView('SANDBOX');
       } else if (hash === '#replay-stage') {
         setIsTutorialBattle(false);
         bgmManager.unlockTrack();
@@ -161,6 +169,7 @@ export function App() {
     setBattleMode(mode);
     setMultiplayerRole(null);
     setResumeSession(null);
+    setSandboxState(null);
     setCurrentView('BATTLE');
   };
 
@@ -177,6 +186,7 @@ export function App() {
     setMultiplayerRole(role);
     setBattleMode('MULTIPLAYER');
     setResumeSession(null);
+    setSandboxState(null);
     setCurrentView('BATTLE');
   };
 
@@ -280,6 +290,7 @@ export function App() {
     }
     setMultiplayerRole(null);
     setResumeSession(null);
+    setSandboxState(null);
     if (window.location.hash.toLowerCase().includes('battle')) {
       history.pushState('', document.title, window.location.pathname + window.location.search);
     }
@@ -382,6 +393,7 @@ export function App() {
             initialMode={battleMode}
             multiplayerRole={multiplayerRole}
             initialSavedSession={battleMode === 'MULTIPLAYER' ? resumeSession : null}
+            initialState={battleMode === 'SOLO_DUAL' ? sandboxState : null}
             isTutorialMode={false}
             customDeck={customDeck}
             opponentDeck={opponentDeck}
@@ -401,6 +413,26 @@ export function App() {
               onExit={handleExitReplay}
             />
           )
+        )}
+
+        {currentView === 'SANDBOX' && (
+          <SandboxSetup
+            onExit={() => {
+              history.pushState('', document.title, window.location.pathname + window.location.search);
+              setCurrentView('LOBBY');
+            }}
+            onStart={(state) => {
+              setIsTutorialBattle(false);
+              setCustomDeck(null);
+              setOpponentDeck(null);
+              setMultiplayerRole(null);
+              setResumeSession(null);
+              setSandboxState(state);
+              setBattleMode('SOLO_DUAL');
+              window.location.hash = getBattleHash();
+              setCurrentView('BATTLE');
+            }}
+          />
         )}
 
         {currentView === 'BOARD' && (

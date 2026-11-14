@@ -29,6 +29,7 @@ import { CinematicFinisherOverlay } from '../CinematicFinisherOverlay';
 import { GameOverModal } from '../GameOverModal';
 import { BattleReplayModal } from '../BattleReplayModal';
 import { ConcertoSelectModal } from '../ConcertoSelectModal';
+import { ComboDiscardModal } from './ComboDiscardModal';
 import { EffectChoiceModal } from '../EffectChoiceModal';
 import { EvolutionTreeModal } from '../EvolutionTreeModal';
 import { HpHistoryModal } from '../HpHistoryModal';
@@ -46,6 +47,7 @@ import { multiplayerService } from '../../services/multiplayerService';
 import {
   doesCharMatchIntroTarget,
   isIntroSkillCard,
+  isComboDiscardBonusCard,
   getIntroSkillTargetChar,
   canPlayerExecuteCombo,
 } from '../../engine/gameEngine';
@@ -162,6 +164,7 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
   const isReplayOpen = useBattleStore((s) => s.isReplayOpen);
   const concertoModalState = useBattleStore((s) => s.concertoModalState);
   const introSwapModalState = useBattleStore((s) => s.introSwapModalState);
+  const comboDiscardModalState = useBattleStore((s) => s.comboDiscardModalState);
   const isIntroSwapFieldPeek = useBattleStore((s) => s.isIntroSwapFieldPeek);
   const evolutionModalChar = useBattleStore((s) => s.evolutionModalChar);
   const isHpHistoryModalOpen = useBattleStore((s) => s.isHpHistoryModalOpen);
@@ -745,12 +748,34 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
                 spentConcertoIds: selectedConcertoIds,
                 playerIndex: pIdx,
               });
+            } else if (isComboDiscardBonusCard(targetCard) && pState.hand.length > 1) {
+              setBattleState({
+                comboDiscardModalState: { isOpen: true, targetCard, spentConcertoIds: selectedConcertoIds, playerIndex: pIdx },
+              });
             } else {
               handleComboAttack(pIdx, targetCard.id, selectedConcertoIds);
             }
           }
         }}
       />
+
+      {/* 소리의 변화·강공격 (BP01-065/067) 연격: 버릴 패 1장 선택 (버리면 데미지 +1, 안 버려도 공격 가능) */}
+      {comboDiscardModalState.isOpen && comboDiscardModalState.targetCard && (() => {
+        const { targetCard, spentConcertoIds, playerIndex: pIdx } = comboDiscardModalState;
+        const close = () =>
+          setBattleState({ comboDiscardModalState: { isOpen: false, targetCard: null, spentConcertoIds: undefined, playerIndex: 0 } });
+        return (
+          <ComboDiscardModal
+            card={targetCard}
+            candidates={gameState.players[pIdx].hand.filter((c) => c.id !== targetCard.id)}
+            onCancel={close}
+            onAttack={(discardId) => {
+              close();
+              handleComboAttack(pIdx, targetCard.id, spentConcertoIds, discardId);
+            }}
+          />
+        );
+      })()}
 
       {/* <변주 스킬> 발동 시 리더와 교체할 백(서포터) 캐릭터 선택 모달 */}
       {introSwapModalState.isOpen && introSwapModalState.targetCard && (() => {
@@ -986,6 +1011,15 @@ export const BattleOverlayHost: React.FC<BattleOverlayHostProps> = (props) => {
             : null
         }
         onResolve={(chosenCardIds) => handleResolvePendingChoice(chosenCardIds)}
+        clashCards={
+          // 대결 카드 공개 뒤 판정 전(배틀 스텝 효과·코스트 지불)에는 양쪽 카드를 함께 보여 준다
+          gameState.phase === 'CLASH_REVEAL' && !gameState.clashResult && gameState.pendingChoice
+            ? {
+                mine: gameState.players[gameState.pendingChoice.playerIndex].clashCard,
+                opponent: gameState.players[gameState.pendingChoice.playerIndex === 0 ? 1 : 0].clashCard,
+              }
+            : null
+        }
       />
 
       {/* 멀티플레이 상대방 효과 선택 중 대기 오버레이 (레벨업/연격/대결 결과/드로우 연출이 모두 끝난 뒤 표시) */}

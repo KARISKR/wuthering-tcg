@@ -281,6 +281,12 @@ export function isNormalAttackCard(card: any): boolean {
 }
 
 // <체공> (Aerial) 카드 판별 통합 헬퍼 (공식 카드 특성 매칭)
+/** 소리의 변화·강공격 (BP01-065/067): 【콤보】 패 1장을 버릴 수 있고, 버리면 데미지 +1 */
+export function isComboDiscardBonusCard(card: { code?: string } | null | undefined): boolean {
+  const code = (card?.code || '').split('_')[0];
+  return code === 'BP01-065' || code === 'BP01-067';
+}
+
 export function isAerialCard(card: any): boolean {
   if (!card) return false;
   const feat = card.feature || '';
@@ -5669,7 +5675,7 @@ export function executeComboAttack(
   }
 
   // BP01-065 / BP01-067 소리의 변화·강공격: 패 1장 버리고 데미지 +1
-  if (card.code === 'BP01-065' || card.code === 'BP01-067') {
+  if (isComboDiscardBonusCard(card)) {
     if (player.isAi && player.hand.length > 0) {
       // AI는 이번 연격에서 당장 쓸 수 없는 카드(비적색 또는 코스트 부족)가 있거나 킬각일 때만 버림
       const nonComboIdx = player.hand.findIndex(

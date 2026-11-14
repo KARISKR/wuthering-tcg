@@ -5,6 +5,7 @@ import { GameState } from '../types/tcg';
 import { BattleStore } from '../battle/store';
 import {
   isIntroSkillCard,
+  isComboDiscardBonusCard,
   findAllUpgradableCards,
   getEffectiveCardCost,
   canPlayerUseActionCard,
@@ -82,6 +83,11 @@ export function useBattleActions({
           spentConcertoIds: undefined,
           playerIndex,
         },
+      });
+    } else if (isComboDiscardBonusCard(card) && player.hand.length > 1) {
+      // 소리의 변화·강공격: 버릴 패를 고르게 한다 (예전에는 화면이 버릴 카드를 넘기지 않아 사람은 +1 효과를 못 썼다)
+      battleStore.setState({
+        comboDiscardModalState: { isOpen: true, targetCard: card, spentConcertoIds: undefined, playerIndex },
       });
     } else {
       handleComboAttack(playerIndex, card.id);

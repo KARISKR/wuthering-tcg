@@ -7,6 +7,7 @@ import {
   ActionCard,
   CustomDeckConfig,
   getElementKr,
+  type GameState,
 } from '../types/tcg';
 import type { MultiplayerRole, TimeLimitConfig, MultiplayerSessionData } from '../types/multiplayer';
 import { multiplayerService } from '../services/multiplayerService';
@@ -56,6 +57,8 @@ interface GameBoardProps {
   multiplayerRole?: MultiplayerRole | null;
   isTutorialMode?: boolean;
   initialSavedSession?: MultiplayerSessionData | null;
+  /** 카드 테스트 모드(#sandbox): 이 상태로 바로 시작한다 (멀티플레이 저장 세션과 별개) */
+  initialState?: GameState | null;
 }
 
 export const GameBoard: React.FC<GameBoardProps> = ({
@@ -69,6 +72,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   multiplayerRole: initialMultiplayerRole = null,
   isTutorialMode = false,
   initialSavedSession,
+  initialState,
 }) => {
   const {
     gameState,
@@ -109,7 +113,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     opponentDeck,
     undefined,
     undefined,
-    initialSavedSession?.lastGameState
+    initialSavedSession?.lastGameState ?? initialState
   );
 
   const isMultiplayer = gameState.gameMode === 'MULTIPLAYER';
@@ -127,7 +131,10 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     createBattleStore(battleSource, {
       showTutorialOverlay: isTutorialMode,
       // 복구한 대전이면 주사위를 이미 굴렸는지(log-dice- 로그)로 정한다
-      isInitiativeRolling: !initialSavedSession?.lastGameState?.logs.some((l) => l.id.startsWith('log-dice-')),
+      // 카드 테스트 모드는 주사위·리더 선택 없이 바로 시작
+      isInitiativeRolling: initialState
+        ? false
+        : !initialSavedSession?.lastGameState?.logs.some((l) => l.id.startsWith('log-dice-')),
     })
   );
 
@@ -138,6 +145,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
   const showTutorialOverlay = useBattleStore((s) => s.showTutorialOverlay, Object.is, battleStore);
   const concertoModalState = useBattleStore((s) => s.concertoModalState, Object.is, battleStore);
   const introSwapModalState = useBattleStore((s) => s.introSwapModalState, Object.is, battleStore);
+  const comboDiscardModalOpen = useBattleStore((s) => s.comboDiscardModalState.isOpen, Object.is, battleStore);
   const upgradeTarget = useBattleStore((s) => s.upgradeTarget, Object.is, battleStore);
   const isConfirmingEndTurn = useBattleStore((s) => s.isConfirmingEndTurn, Object.is, battleStore);
   const isConfirmingNoCardPass = useBattleStore((s) => s.isConfirmingNoCardPass, Object.is, battleStore);
@@ -307,6 +315,7 @@ export const GameBoard: React.FC<GameBoardProps> = ({
     isFxBlocking ||
     concertoModalState.isOpen ||
     introSwapModalState.isOpen ||
+    comboDiscardModalOpen ||
     upgradeTarget !== null
   );
 

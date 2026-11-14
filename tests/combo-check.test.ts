@@ -32,3 +32,33 @@ describe('combo availability matches the engine', () => {
     expect(both(setup('BP01-015', '앙코', { code: 'BP01-062', cost: 2, characterExclusive: '일반' }, 1, true))).toEqual({ ui: true, engine: true });
   });
 });
+
+// 2026-11-14 버그 제보: 소리의 변화·강공격(BP01-065/067)을 사람이 연격으로 쓰면 "패 1장 버리고 +1" 효과를 못 썼다
+// (화면이 버릴 카드를 넘기지 않았음). 엔진 쪽 규칙을 고정한다.
+describe('BP01-065 discard bonus in the combo step', () => {
+  function withDiscardCard() {
+    const s = setup('BP01-018', '방랑자(여)', { code: 'BP01-065', cost: 0, damage: 2, nameKr: '소리의 변화·강공격' }, 0);
+    const extra = { ...s.players[0].actionDeck[0], id: 't-extra' } as ActionCard;
+    s.players[0].hand.push(extra);
+    s.players[0].actionDeck = s.players[0].actionDeck.slice(1);
+    return s;
+  }
+  const oppHp = (s: GameState) => s.players[1].hp;
+
+  it('discarding a card adds +1 damage and sends the card to the trash', () => {
+    const s = withDiscardCard();
+    const before = oppHp(s);
+    const res = executeComboAttack(s, 0, 't-card', undefined, 't-extra');
+    expect(res.success).toBe(true);
+    expect(before - oppHp(res.newState)).toBe(3);
+    expect(res.newState.players[0].dropZone.some((c) => c.id === 't-extra')).toBe(true);
+  });
+
+  it('attacking without a discard keeps the base damage and the hand card', () => {
+    const s = withDiscardCard();
+    const before = oppHp(s);
+    const res = executeComboAttack(s, 0, 't-card');
+    expect(before - oppHp(res.newState)).toBe(2);
+    expect(res.newState.players[0].hand.some((c) => c.id === 't-extra')).toBe(true);
+  });
+});

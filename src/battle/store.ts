@@ -28,6 +28,14 @@ export interface IntroSwapModalState {
   playerIndex: 0 | 1;
 }
 
+/** 소리의 변화·강공격(BP01-065/067) 연격: 버릴 패 1장 선택 (버리면 데미지 +1) */
+export interface ComboDiscardModalState {
+  isOpen: boolean;
+  targetCard: ActionCard | null;
+  spentConcertoIds?: string[];
+  playerIndex: 0 | 1;
+}
+
 export interface UpgradeTargetState {
   playerIndex: 0 | 1;
   slotName: 'leader' | 'leftSupport' | 'rightSupport';
@@ -56,6 +64,7 @@ export interface BattleStoreState {
   cardListModalState: CardListModalState | null;
   concertoModalState: ConcertoModalState;
   introSwapModalState: IntroSwapModalState;
+  comboDiscardModalState: ComboDiscardModalState;
   isIntroSwapFieldPeek: boolean;
   isFinisherFinished: boolean;
   isConfirmingEndTurn: boolean;
@@ -135,6 +144,7 @@ export function createBattleStore(
     cardListModalState: null,
     concertoModalState: { isOpen: false, actionType: 'CLASH', targetCard: null, requiredCost: 0, playerIndex: 0 },
     introSwapModalState: { isOpen: false, targetCard: null, spentConcertoIds: undefined, playerIndex: 0 },
+    comboDiscardModalState: { isOpen: false, targetCard: null, spentConcertoIds: undefined, playerIndex: 0 },
     isIntroSwapFieldPeek: false,
     isFinisherFinished: false,
     isConfirmingEndTurn: false,
