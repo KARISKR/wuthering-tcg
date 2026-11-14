@@ -178,8 +178,10 @@ const SideEditor: React.FC<{ title: string; side: SandboxSideConfig; onChange: (
 };
 
 export const SandboxSetup: React.FC<{ onStart: (state: GameState) => void; onExit: () => void }> = ({ onStart, onExit }) => {
-  // 로컬 개발 서버에는 관리자 확인 API가 없어서 확인을 건너뛴다 (배포 빌드에는 들어가지 않음)
-  const [isAdmin, setIsAdmin] = useState(() => import.meta.env.DEV || isUserAdmin());
+  // 로컬 개발 서버(API 없음)와 dev 미리보기 배포(*.wuthering-tcg.pages.dev, ADMIN_KEY 없음)는 확인을 건너뛴다. 본섭만 관리자 키 필요
+  const [isAdmin, setIsAdmin] = useState(
+    () => import.meta.env.DEV || window.location.hostname.endsWith('.wuthering-tcg.pages.dev') || isUserAdmin()
+  );
   const [adminKey, setAdminKey] = useState('');
   const [config, setConfig] = useState<SandboxConfig>(loadConfig);
   const [error, setError] = useState<string | null>(null);
