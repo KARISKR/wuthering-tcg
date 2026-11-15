@@ -1673,8 +1673,34 @@ export function applyCharacterEvolutionSkills(
     const candidates = player.dropZone.filter(skill.pick) as ActionCard[];
     if (candidates.length > 0) {
       if (player.isAi) {
-        const dropIdx = player.dropZone.findIndex(skill.pick);
-        const [reclaimed] = player.dropZone.splice(dropIdx, 1);
+        let chosenCard = candidates[0];
+        const hasTp01OrCustom =
+          player.hand.some((c) => (c.code || '').startsWith('TP01-')) ||
+          player.dropZone.some((c) => (c.code || '').startsWith('TP01-')) ||
+          player.actionDeck.some((c) => (c.code || '').startsWith('TP01-')) ||
+          candidates.some((c) => ['TP01-002', 'BP01-062', 'BP01-060', 'BP01-045', 'BP01-059', 'BP01-046'].includes((c.code || '').split('_')[0]));
+        if (player.name !== 'LEGACY_AI' && candidates.length > 1 && hasTp01OrCustom) {
+          const hasBp050 =
+            player.dropZone.some((dc) => (dc.code || '').split('_')[0] === 'BP01-050') ||
+            player.hand.some((hc) => (hc.code || '').split('_')[0] === 'BP01-050');
+          const scoreDropRecover = (c: ActionCard): number => {
+            const bCode = (c.code || '').split('_')[0];
+            if (bCode === 'TP01-002') return hasBp050 ? 110 : 55;
+            if (bCode === 'BP01-062') return 105;
+            if (bCode === 'BP01-060') return 95;
+            if (bCode === 'BP01-045') return 90;
+            if (bCode === 'BP01-059') return 85;
+            if (bCode === 'BP01-061') return 80;
+            if (bCode === 'BP01-046') return 88;
+            if (bCode === 'SD01-014' || bCode === 'SD02-014') return 82;
+            if (bCode === 'SD01-019' || bCode === 'SD02-019' || bCode === 'BP01-063') return 78;
+            if (bCode === 'TP01-003') return player.hasDominance ? 75 : 50;
+            return (c.damage || 0) * 15 + (c.pursuitCount || 0) * 12 + (c.speed || 0);
+          };
+          chosenCard = [...candidates].sort((a, b) => scoreDropRecover(b) - scoreDropRecover(a))[0];
+        }
+        const dropIdx = player.dropZone.findIndex((c) => c.id === chosenCard.id);
+        const [reclaimed] = player.dropZone.splice(dropIdx !== -1 ? dropIdx : 0, 1);
         addCardsToHand(player, [reclaimed as ActionCard]);
         newState.players[playerIndex] = player;
         newState = addLog(
@@ -1753,7 +1779,24 @@ export function applyCharacterEvolutionSkills(
     const dropCards = player.dropZone.filter((c) => c.kind === 'ACTION') as ActionCard[];
     if (dropCards.length > 0) {
       if (player.isAi) {
-        const [chosen] = player.dropZone.splice(0, 1);
+        let targetDropIdx = 0;
+        if (player.name !== 'LEGACY_AI' && dropCards.length > 1) {
+          const scoreConcertoFromDrop = (c: ActionCard): number => {
+            const bCode = (c.code || '').split('_')[0];
+            // 0코스트 에코는 협주 에리어 배치 시 협주 데미지 +1 시너지가 켜지므로 최우선 배치!
+            if (isEchoCard(c) && c.cost === 0) return 100;
+            // 반대로 트래시 회수 대상(BP01-050 넝쿨의 춤, TP01-002, 파수인/앙코/일반공격 핵심 카드)은 트래시에 남겨두어야 회수 가능하므로 후순위!
+            if (bCode === 'BP01-050' || bCode === 'TP01-002') return -50;
+            if (c.characterExclusive?.includes('파수인') && bCode !== 'TP01-001') return -30;
+            if (c.characterExclusive?.includes('앙코') && c.color === 'RED') return -25;
+            if (isNormalAttackCard(c)) return -15;
+            return 10 - (c.damage || 0);
+          };
+          const bestForConcerto = [...dropCards].sort((a, b) => scoreConcertoFromDrop(b) - scoreConcertoFromDrop(a))[0];
+          const foundIdx = player.dropZone.findIndex((c) => c.id === bestForConcerto.id);
+          if (foundIdx !== -1) targetDropIdx = foundIdx;
+        }
+        const [chosen] = player.dropZone.splice(targetDropIdx, 1);
         addCardsToConcertoZone(player, [chosen as ActionCard]);
         newState.players[playerIndex] = player;
         newState = addLog(
@@ -3469,8 +3512,32 @@ export function applyTp01JudgmentEffects(
         idx
       );
     } else if (player.isAi) {
-      const { slot, current, cards } = options[0];
-      const next = findEvolutionCard(player.characterDeck, current) || cards[0];
+      const scoreUpgradeOption = (opt: (typeof options)[number], cand: CharacterCard): number => {
+        const cCode = (cand.code || '').split('_')[0];
+        let s = cand.level === 2 ? 12 : 4;
+        if (opt.slot === 'leader') s += 3;
+        if (['SD01-001', 'BP01-001', 'SD02-005', 'BP01-011', 'BP01-006', 'SD01-005'].includes(cCode)) s += 6;
+        else if (['BP01-007', 'BP01-016', 'BP01-019', 'BP01-031', 'BP01-025'].includes(cCode)) s += 4;
+        else if (['BP01-023', 'BP01-017', 'BP01-020', 'BP01-013', 'BP01-003', 'BP01-032', 'BP01-009', 'BP01-008'].includes(cCode)) s += 4;
+        return s;
+      };
+      let bestOpt = options[0];
+      let bestNext = findEvolutionCard(player.characterDeck, bestOpt.current) || bestOpt.cards[0];
+      if (player.name !== 'LEGACY_AI') {
+        let bestScore = -999;
+        for (const opt of options) {
+          for (const cand of opt.cards) {
+            const sc = scoreUpgradeOption(opt, cand);
+            if (sc > bestScore) {
+              bestScore = sc;
+              bestOpt = opt;
+              bestNext = cand;
+            }
+          }
+        }
+      }
+      const { slot, current } = bestOpt;
+      const next = bestNext;
       player.characterDeck = player.characterDeck.filter((c) => c.id !== next.id);
       const { underlyingCards: prevStack, ...cleanCurrent } = current;
       player.slots[slot] = { ...next, underlyingCards: [...(prevStack || []), cleanCurrent] };
@@ -3539,7 +3606,26 @@ export function applyTp01JudgmentEffects(
     if (candidates.length === 0) {
       newState = addLog(newState, `[연역 TP01-001 효과] 트래시 에리어에 회수할 【파수인】 카드가 없습니다.`, 'ACTION', idx);
     } else if (player.isAi || candidates.length === 1) {
-      const target = candidates[0];
+      const scoreShorekeeperRecover = (c: ActionCard): number => {
+        const bCode = (c.code || '').split('_')[0];
+        const canStillEvolveSk = (['leader', 'leftSupport', 'rightSupport'] as const).some((k) => {
+          const ch = player.slots[k];
+          return ch && ch.characterName === '파수인' && ch.level < 2 && Boolean(findEvolutionCard(player.characterDeck, ch));
+        });
+        if (bCode === 'BP01-056' && canStillEvolveSk) return 100;
+        if (bCode === 'BP01-057') return 90;
+        if (bCode === 'BP01-058') return 80;
+        if (bCode === 'BP01-053') return 70;
+        if (bCode === 'BP01-056') return 65;
+        if (bCode === 'BP01-055') return 60;
+        if (bCode === 'BP01-054') return 50;
+        return 40;
+      };
+      const sortedCandidates =
+        player.name === 'LEGACY_AI'
+          ? candidates
+          : [...candidates].sort((a, b) => scoreShorekeeperRecover(b) - scoreShorekeeperRecover(a));
+      const target = sortedCandidates[0];
       player.dropZone = player.dropZone.filter((c) => c.id !== target.id);
       addCardsToHand(player, [target]);
       triggeredEffects.push({
@@ -3898,7 +3984,21 @@ export function finishClashJudgment(state: GameState): GameState {
       const normalAttacks = winnerPlayer.dropZone.filter(isNormalAttackCard) as ActionCard[];
       if (normalAttacks.length > 0) {
         if (winnerPlayer.isAi) {
-          const reclaimed = normalAttacks[0];
+          let reclaimed = normalAttacks[0];
+          if (winnerPlayer.name !== 'LEGACY_AI' && normalAttacks.length > 1) {
+            const hasBp050 =
+              winnerPlayer.dropZone.some((dc) => (dc.code || '').split('_')[0] === 'BP01-050') ||
+              winnerPlayer.hand.some((hc) => (hc.code || '').split('_')[0] === 'BP01-050');
+            const scoreNormal = (c: ActionCard): number => {
+              const bCode = (c.code || '').split('_')[0];
+              if (bCode === 'TP01-002') return hasBp050 ? 110 : 55;
+              if (bCode === 'BP01-045') return 90;
+              if (bCode === 'BP01-059') return 85;
+              if (bCode === 'TP01-003') return winnerPlayer.hasDominance ? 75 : 50;
+              return (c.damage || 0) * 15 + (c.pursuitCount || 0) * 12 + (c.speed || 0);
+            };
+            reclaimed = [...normalAttacks].sort((a, b) => scoreNormal(b) - scoreNormal(a))[0];
+          }
           winnerPlayer.dropZone = winnerPlayer.dropZone.filter((c) => c.id !== reclaimed.id);
           addCardsToHand(winnerPlayer, [reclaimed]);
           newState = addLog(
@@ -5428,13 +5528,20 @@ export function executeComboAttack(
 
         if (eligibleRedAnke.length > 0) {
           if (player.isAi) {
-            const redAnkeIdx = player.dropZone.findIndex(
-              (c) =>
-                c.kind === 'ACTION' &&
-                (c as ActionCard).characterExclusive?.includes('앙코') &&
-                (c as ActionCard).color === 'RED' &&
-                !isIntroSkillCard(c as ActionCard)
-            );
+            let targetAnke = eligibleRedAnke[0];
+            if (player.name !== 'LEGACY_AI' && eligibleRedAnke.length > 1) {
+              const scoreAnkeRed = (c: ActionCard): number => {
+                const bCode = (c.code || '').split('_')[0];
+                if (bCode === 'BP01-062') return 105;
+                if (bCode === 'BP01-060') return 95;
+                if (bCode === 'BP01-059') return 85;
+                if (bCode === 'BP01-061') return 80;
+                if (bCode === 'TP01-003') return player.hasDominance ? 75 : 50;
+                return (c.damage || 0) * 15 + (c.speed || 0);
+              };
+              targetAnke = [...eligibleRedAnke].sort((a, b) => scoreAnkeRed(b) - scoreAnkeRed(a))[0];
+            }
+            const redAnkeIdx = player.dropZone.findIndex((c) => c.id === targetAnke.id);
             if (redAnkeIdx !== -1) {
               const [reclaimed] = player.dropZone.splice(redAnkeIdx, 1);
               addCardsToHand(player, [reclaimed as ActionCard]);
@@ -5676,7 +5783,15 @@ export function executeComboAttack(
 
   // BP01-065 / BP01-067 소리의 변화·강공격: 패 1장 버리고 데미지 +1
   if (isComboDiscardBonusCard(card)) {
-    if (player.isAi && player.hand.length > 0) {
+    if (discardForBonusDmgId) {
+      const idx = player.hand.findIndex((c) => c.id === discardForBonusDmgId);
+      if (idx !== -1) {
+        const [discarded] = player.hand.splice(idx, 1);
+        addCardsToDropZone(player, [discarded]);
+        dmg += 1;
+        newState = addLog(newState, `[${card.nameKr} 콤보 효과] [트래시 이동] [${discarded.nameKr}]을(를) 버리고 데미지가 +1 증가했습니다!`, 'ACTION', playerIndex);
+      }
+    } else if (player.isAi && player.hand.length > 0) {
       // AI는 이번 연격에서 당장 쓸 수 없는 카드(비적색 또는 코스트 부족)가 있거나 킬각일 때만 버림
       const nonComboIdx = player.hand.findIndex(
         (c) => c.color !== 'RED' || !canPlayerUseActionCard(player.slots, c, player.actionArea).canUse
@@ -5690,14 +5805,6 @@ export function executeComboAttack(
           dmg += 1;
           newState = addLog(newState, `[${card.nameKr} 콤보 효과] [트래시 이동] [${discarded.nameKr}]을(를) 버리고 데미지가 +1 증가했습니다!`, 'ACTION', playerIndex);
         }
-      }
-    } else if (discardForBonusDmgId) {
-      const idx = player.hand.findIndex((c) => c.id === discardForBonusDmgId);
-      if (idx !== -1) {
-        const [discarded] = player.hand.splice(idx, 1);
-        addCardsToDropZone(player, [discarded]);
-        dmg += 1;
-        newState = addLog(newState, `[${card.nameKr} 콤보 효과] [트래시 이동] [${discarded.nameKr}]을(를) 버리고 데미지가 +1 증가했습니다!`, 'ACTION', playerIndex);
       }
     }
   }

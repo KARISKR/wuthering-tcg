@@ -38,7 +38,7 @@ export const SMART_PARAMS = {
   upgradeMinHandAfter: 3, // 일반 레벨업 후 최소 남겨야 할 패 수 (무지성 패 소모 방지)
   costPenalty: 0.35, // 협주(코스트) 1 소모당 가치 손실
   lossCost: { RED: 3.4, GREEN: 2.3, BLUE: 1.9 } as Record<CardColor, number>,
-  noise: 0.15, // 읽히지 않도록 EV 근접 시 섞는 랜덤 폭
+  noise: 0.02, // 최선 수 선택 정밀도 강화 (SMART_ALT 레거시는 0.15 유지)
   comboMinDmgPerCost: 0.8, // 연격에서 코스트 대비 최소 효율
   concertoTarget: 2, // 기본 협주 존 목표 장수
   mulliganKeepHeavy: 1, // 멀리건 시 보유할 코스트 2+ 피니셔 수
@@ -50,6 +50,7 @@ export const SMART_PARAMS = {
 
 export const SMART_ALT_PARAMS: typeof SMART_PARAMS = {
   ...SMART_PARAMS,
+  noise: 0.15,
   lossCost: { ...SMART_PARAMS.lossCost },
 };
 
@@ -345,7 +346,7 @@ export interface BurstPlan {
   needsExtraConcerto: boolean; // 패에서 비콤보 카드 1장을 협주 충전하면 성립하는지 여부
 }
 
-export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
+export function estimateBurstPlan(state: GameState, idx: 0 | 1, isLegacy = false): BurstPlan {
   const p = state.players[idx];
   const opp = state.players[other(idx)];
 
@@ -358,6 +359,7 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
     isOtk: false,
     needsExtraConcerto: false,
   };
+  let bestPlanScore = -999;
 
   // 리더 후보: 현재 리더 + (아직 교대 안 했으면) 좌/우 서포터
   const candidateLeaderSlots: SlotKey[] = p.actionFlags.switchedLeader
@@ -427,8 +429,8 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
             curLeader = curSlots.leader;
           }
         }
-        // 오프너가 SD02-015 (만년적설)인 경우 승리 시 협주 +2 충전
-        if (openerCode === 'SD02-015') {
+        // 오프너가 SD02-015 (만년적설)인 경우 승리 시 협주 +2 충전 (스피드 0인 TP01-005는 적색/녹색에 대결 승리할 수 없으므로 오프너 폭딜 시뮬레이션에서 제외)
+        if (openerCode === 'SD02-015' || (isLegacy && openerCode === 'TP01-005')) {
           curConcerto += 2;
         }
         // 양양/산화 Lv.0 청색 배틀 협주 +1 충전
@@ -457,7 +459,10 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
           comboCount += 1; // 치샤 Lv.1 추격 1
         }
         if (opener.color === 'GREEN' && slotHasCode(curLeader, 'BP01-019')) {
-          comboCount += 3; // 방랑자(남) Lv.2 녹색 승리 시 추격 3
+          // 스피드 0인 녹색 카드(TP01-004, TP01-005)는 대결 승리를 기대하기 어려우므로 오프너 추격 보너스 제외
+          if (isLegacy || (opener.speed ?? 0) > 0) {
+            comboCount += 3; // 방랑자(남) Lv.2 녹색 승리 시 추격 3
+          }
         }
         if (opener.color === 'BLUE' && slotHasCode(curLeader, 'BP01-031')) {
           comboCount += 3; // 산화 Lv.2 청색 승리 시 추격 3
@@ -507,7 +512,8 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
             virtualActionArea,
             curConcerto,
             opp.hp - totalDmg,
-            firstNormalUsed
+            firstNormalUsed,
+            isLegacy
           );
           if (!nextCard) break;
 
@@ -580,11 +586,10 @@ export function estimateBurstPlan(state: GameState, idx: 0 | 1): BurstPlan {
           (extraConc * 1.5);
 
         const bestScoreSoFar =
-          bestPlan.totalDamage +
-          (bestPlan.isOtk ? 50 : 0) -
-          (bestPlan.needsExtraConcerto ? 1.5 : 0);
+          bestPlan.totalDamage + (bestPlan.isOtk ? 50 : 0) - (bestPlan.needsExtraConcerto ? 1.5 : 0);
 
         if (planScore > bestScoreSoFar) {
+          bestPlanScore = planScore;
           const used = new Set<string>([opener.id, ...comboSeq]);
           if (chargeReserveId) used.add(chargeReserveId);
           bestPlan = {
@@ -615,7 +620,8 @@ function pickBestNextComboCard(
   virtualActionArea: ActionCard[],
   curConcerto: number,
   remainingOppHp: number,
-  firstNormalUsed: boolean
+  firstNormalUsed: boolean,
+  isLegacy = false
 ): ActionCard | null {
   if (playableReds.length === 0) return null;
 
@@ -803,6 +809,16 @@ function pickBestNextComboCard(
       }
     }
 
+    // [규칙 3-B] TP01-002 (타오르는 넝쿨의 춤): 0코스트 일반 공격이자 배틀 페이즈 종료 시 트래시의 BP01-050(넝쿨의 춤) 회수!
+    // 트래시에 BP01-050이 있거나, 이번 연격에 BP01-050을 함께 낼 수 있다면 최우선으로 먼저 깔아 일반 공격 장수도 채우고 회수까지 확정!
+    if (!isLegacy && code === 'TP01-002') {
+      const hasBp050InTrash = p.dropZone.some((dc) => baseCodeOf(dc.code) === 'BP01-050');
+      const hasBp050InCombo = playableReds.some((rc) => baseCodeOf(rc.code) === 'BP01-050');
+      if (hasBp050InTrash || hasBp050InCombo) {
+        priority += 260;
+      }
+    }
+
     // [규칙 4] 액션 에리어 장수 조건부 【콤보】 카드(SD02-011 만물의 정화, BP01-050 넝쿨의 춤)는 조건 충족 전이면 후순위로 대기, 충족 시 최우선 폭딜!
     if (code === 'SD02-011') {
       if (virtualActionArea.length + 1 < 3 && meaningfulReds.length > 1) {
@@ -820,7 +836,7 @@ function pickBestNextComboCard(
       }
     }
 
-    // [규칙 5] 【판정】/【배틀】 전용 효과를 가진 고성능 대결 카드(1드로우 강공격/공중공격, 피어난 동백꽃 등)는
+    // [규칙 5] 【판정】/【배틀】 전용 효과를 가진 고성능 대결 카드(1드로우 강공격/공중공격, 피어난 동백꽃, 연역 등)는
     // 순수 【콤보】 카드나 일반 공격보다 후순위로 밀어 다음 턴 대결 오프너로 아낄 수 있게 함
     if (isPureClashEffectRedCard(c)) {
       priority -= 65;
@@ -846,13 +862,17 @@ export function decideAiMulligan(aiPlayer: PlayerState, level: AiLevel = DEFAULT
     return discardIds;
   }
 
+  const isLegacy = level === 'SMART_ALT';
   // SMART:
   // 1) 파티의 누구도 사용할 수 없는 데드 카드나 2코스트 이상 무거운 카드 우선 교체
-  // 2) 단, BP01-062(그늘이의 대폭주)나 핵심 1코스트 진화 카드(BP01-048, BP01-056, SD02-010, BP01-057)는 보존!
-  const keepCodes = new Set(['BP01-048', 'BP01-062', 'BP01-056', 'SD02-010', 'BP01-057', 'BP01-058']);
+  // 2) 단, BP01-062(그늘이의 대폭주)나 핵심 1코스트 진화/전개 카드(BP01-048, BP01-056, SD02-010, BP01-057, TP01-001, TP01-002)는 보존!
+  const keepCodes = new Set(
+    isLegacy
+      ? ['BP01-048', 'BP01-062', 'BP01-056', 'SD02-010', 'BP01-057', 'BP01-058']
+      : ['BP01-048', 'BP01-062', 'BP01-056', 'SD02-010', 'BP01-057', 'BP01-058', 'TP01-001', 'TP01-002']
+  );
   const candidates = aiPlayer.hand.filter((c) => {
     const code = baseCodeOf(c.code);
-    if (keepCodes.has(code)) return false;
     const usableAny = SLOT_KEYS.some((k) => {
       const ch = aiPlayer.slots[k];
       if (!ch) return false;
@@ -864,6 +884,9 @@ export function decideAiMulligan(aiPlayer: PlayerState, level: AiLevel = DEFAULT
       return canPlayerUseActionCard(slotsIfL, c).canUse;
     });
     if (!usableAny) return true;
+    // 우세가 없는 첫 턴에 스피드 0 / 데미지 0인 TP01-005(심장의 선택)는 멀리건 교체 후보로 허용
+    if (!isLegacy && code === 'TP01-005') return true;
+    if (keepCodes.has(code)) return false;
     return c.cost >= 2 || isComboTerminator(c);
   });
 
@@ -875,10 +898,32 @@ export function decideAiMulligan(aiPlayer: PlayerState, level: AiLevel = DEFAULT
   return discardIds;
 }
 
+// 캐릭터 슬롯 중 진화 가능한 캐릭터가 있는지 확인 (TP01-004 공명 촉진제 평가용)
+function hasAnyUpgradableSlot(p: PlayerState): { any: boolean; hasLv2Upgrade: boolean } {
+  let any = false;
+  let hasLv2Upgrade = false;
+  for (const k of SLOT_KEYS) {
+    const ch = p.slots[k];
+    if (!ch || ch.level >= 2) continue;
+    const evo = findEvolutionCard(p.characterDeck, ch);
+    if (evo) {
+      any = true;
+      if (evo.level === 2) hasLv2Upgrade = true;
+    }
+  }
+  return { any, hasLv2Upgrade };
+}
+
 // ----------------------------------------------------------
 // 카드/캐릭터 가치 평가 (SMART)
 // ----------------------------------------------------------
-function cardRawValue(p: PlayerState, opp: PlayerState, c: ActionCard, leader: CharacterCard | undefined): number {
+function cardRawValue(
+  p: PlayerState,
+  opp: PlayerState,
+  c: ActionCard,
+  leader: CharacterCard | undefined,
+  isLegacy = false
+): number {
   const code = baseCodeOf(c.code);
   const dmg = estimateCardDamage(p, opp, c, leader, false, []);
   let v = dmg * 1.15;
@@ -905,6 +950,40 @@ function cardRawValue(p: PlayerState, opp: PlayerState, c: ActionCard, leader: C
   if (code === 'BP01-048' || code === 'BP01-062' || code === 'BP01-056' || code === 'BP01-046') {
     v += 3.5; // 무료 캐릭터 레벨업 핵심 카드
   }
+  if (!isLegacy) {
+    // TP01-001 연역: 트래시에 핵심 파수인 카드(혼돈의 이론 BP01-056, 결말의 순환 BP01-057, 해금 BP01-058)가 있을 때 회수 가치 반영
+    if (code === 'TP01-001') {
+      const hasHighValSk = p.dropZone.some((dc) =>
+        ['BP01-056', 'BP01-057', 'BP01-058'].includes(baseCodeOf(dc.code))
+      );
+      if (hasHighValSk) v += 1.5;
+    }
+    // TP01-002 타오르는 넝쿨의 춤: 배틀 페이즈 종료 시 액션 에리어에 있으면 트래시의 넝쿨의 춤(BP01-050) 회수
+    if (code === 'TP01-002') {
+      const hasBp050InTrash = p.dropZone.some((dc) => baseCodeOf(dc.code) === 'BP01-050');
+      if (hasBp050InTrash) v += 2.6;
+    }
+    // TP01-003 그늘이와 구름이 출격·공중 공격: 【우세】 상대 스피드 11+ 카운터(스피드 20)
+    if (code === 'TP01-003' && p.hasDominance && leaderName.includes('앙코')) {
+      v += 1.8;
+    }
+    // TP01-004 공명 촉진제: 판정 승리 또는 【우세】 판정 패배 시 캐릭터 1장 무료 레벨업!
+    // ★ 스피드 0이므로 우세(hasDominance)가 없을 때는 적색/녹색 모두에게 대결 패배하며 효과가 불발됨!
+    if (code === 'TP01-004') {
+      const upInfo = hasAnyUpgradableSlot(p);
+      if (!upInfo.any) {
+        v -= 5.0; // 진화 가능한 캐릭터가 없으면 완전 불발
+      } else if (p.hasDominance) {
+        v += upInfo.hasLv2Upgrade ? 3.2 : 1.8;
+      } else {
+        v -= 2.0; // 우세가 없을 때는 스피드 0 패배 리스크가 크므로 대결 가치 하향
+      }
+    }
+    // TP01-005 심장의 선택: 코스트 1 소모 후 덱 위 2장 협주 충전(순증 +1). 스피드 0 / 데미지 0이므로 대결 가치가 낮음
+    if (code === 'TP01-005') {
+      v -= 2.5;
+    }
+  }
   v += Math.min(combo, 8) * 1.0;
   if (c.effectType === 'DRAW' || code === 'BP01-058' || code === 'BP01-047' || code === 'BP01-051' || code === 'BP01-075') {
     v += 1.8;
@@ -916,7 +995,13 @@ function cardRawValue(p: PlayerState, opp: PlayerState, c: ActionCard, leader: C
 }
 
 // 손패 한 장의 "보유 가치" (충전/버림 선택에 사용): 낮을수록 먼저 소비
-function cardKeepValue(p: PlayerState, opp: PlayerState, c: ActionCard, protectedIds?: Set<string>): number {
+function cardKeepValue(
+  p: PlayerState,
+  opp: PlayerState,
+  c: ActionCard,
+  protectedIds?: Set<string>,
+  isLegacy = false
+): number {
   if (protectedIds && protectedIds.has(c.id)) {
     return 100; // 이번 턴 OTK/핵심 콤보에 사용될 카드는 절대 버리지 않음!
   }
@@ -929,6 +1014,17 @@ function cardKeepValue(p: PlayerState, opp: PlayerState, c: ActionCard, protecte
       return ch && ch.characterName === lvTarget && ch.level < 2;
     });
     if (canStillEvolve) return 40;
+  }
+  if (!isLegacy && code === 'TP01-004') {
+    const upInfo = hasAnyUpgradableSlot(p);
+    if (!upInfo.any) return -4.0; // 진화 대상이 없으면 최우선 처분
+    if (p.hasDominance && upInfo.hasLv2Upgrade) return 38; // 우세 + Lv.2 진화 가능 시 보존
+    if (p.hasDominance) return 12;
+    return 0.5; // 우세가 없을 때는 스피드 0이므로 주력 전투 카드 대신 충전/버리기 재료로 우선 활용 가능
+  }
+  if (!isLegacy && code === 'TP01-005') {
+    // 심장의 선택(스피드 0, 데미지 0, 코스트 1 -> 협주 2 충전): 대결에서 패배를 자초하는 대신 액션 단계 협주 충전/코스트 재료로 최우선 소모!
+    return p.hasDominance && p.concertoZone.length === 1 ? 2.0 : -2.0;
   }
 
   // 협주 에코 시너지용 0코스트 프리즘 에코는 협주 충전용(chargeConcerto)으로는 최고 가치(가장 먼저 충전하고 싶음)지만,
@@ -946,12 +1042,12 @@ function cardKeepValue(p: PlayerState, opp: PlayerState, c: ActionCard, protecte
     if (canPlayerUseActionCard(slotsIfLeader, c).canUse) {
       usableByAny = true;
       const w = k === 'leader' ? 1 : 0.72;
-      best = Math.max(best, cardRawValue(p, opp, c, ch) * w);
+      best = Math.max(best, cardRawValue(p, opp, c, ch, isLegacy) * w);
     }
   }
   if (!usableByAny) return -5; // 아무도 못 쓰는 카드 (완전한 데드 카드 -> 최우선 처분)
 
-  // 【콤보】 전용 카드(유효한 <변주 스킬>, 만물의 정화, 넝쿨의 춤, 복성재우, 소리의 변화·강공격)가
+  // 【콤보】 전용 카드(유효한 <변주 스킬>, 만물의 정화, 넝쿨의 춤, 복성재우, 소리의 변화·강공격, 타오르는 넝쿨의 춤)가
   // 대결 기준 데미지가 낮다는 이유로 협주 충전/레벨업 코스트로 무지성 갈려나가는 현상 방지!
   if (isIntroSkillCard(c) && canIntroSkillTriggerBonus(p, p.slots, c)) {
     best += 4.2;
@@ -961,6 +1057,12 @@ function cardKeepValue(p: PlayerState, opp: PlayerState, c: ActionCard, protecte
     best += 3.8;
   } else if (code === 'BP01-060' && SLOT_KEYS.some((k) => p.slots[k]?.characterName === '앙코')) {
     best += 3.5;
+  } else if (
+    !isLegacy &&
+    code === 'TP01-002' &&
+    p.dropZone.some((dc) => baseCodeOf(dc.code) === 'BP01-050')
+  ) {
+    best += 3.2;
   }
 
   // 이미 동일 코드 카드가 손에 여러 장 있으면 중복분은 버리기 후보로 가치 소폭 감소
@@ -972,10 +1074,16 @@ function cardKeepValue(p: PlayerState, opp: PlayerState, c: ActionCard, protecte
   return best * afford * dupPenalty - cost * 0.2;
 }
 
-function chooseDiscards(p: PlayerState, opp: PlayerState, n: number, excludeIds: Set<string> = new Set()): ActionCard[] {
+function chooseDiscards(
+  p: PlayerState,
+  opp: PlayerState,
+  n: number,
+  excludeIds: Set<string> = new Set(),
+  isLegacy = false
+): ActionCard[] {
   return [...p.hand]
     .filter((c) => !excludeIds.has(c.id))
-    .sort((a, b) => cardKeepValue(p, opp, a, excludeIds) - cardKeepValue(p, opp, b, excludeIds))
+    .sort((a, b) => cardKeepValue(p, opp, a, excludeIds, isLegacy) - cardKeepValue(p, opp, b, excludeIds, isLegacy))
     .slice(0, n);
 }
 
@@ -983,7 +1091,8 @@ function chooseDiscards(p: PlayerState, opp: PlayerState, n: number, excludeIds:
 function chooseCardForConcertoCharge(
   p: PlayerState,
   opp: PlayerState,
-  protectedIds: Set<string> = new Set()
+  protectedIds: Set<string> = new Set(),
+  isLegacy = false
 ): ActionCard | null {
   const candidates = p.hand.filter((c) => !protectedIds.has(c.id));
   if (candidates.length === 0) return null;
@@ -992,7 +1101,7 @@ function chooseCardForConcertoCharge(
   const echoCandidate = candidates.find((c) => isEchoCard(c) && c.cost === 0);
   if (echoCandidate) return echoCandidate;
 
-  candidates.sort((a, b) => cardKeepValue(p, opp, a, protectedIds) - cardKeepValue(p, opp, b, protectedIds));
+  candidates.sort((a, b) => cardKeepValue(p, opp, a, protectedIds, isLegacy) - cardKeepValue(p, opp, b, protectedIds, isLegacy));
   return candidates[0];
 }
 
@@ -1004,7 +1113,8 @@ function evaluateUpgradeCandidate(
   opp: PlayerState,
   slotKey: SlotKey,
   upCard: CharacterCard,
-  burstPlan: BurstPlan
+  burstPlan: BurstPlan,
+  isLegacy = false
 ): number {
   const curChar = p.slots[slotKey];
   if (!curChar) return -999;
@@ -1155,9 +1265,9 @@ function evaluateUpgradeCandidate(
   }
 
   // 버려야 할 카드들의 가치 손실 차감
-  const discards = chooseDiscards(p, opp, reqDiscard, burstPlan.usedCardIds);
+  const discards = chooseDiscards(p, opp, reqDiscard, burstPlan.usedCardIds, isLegacy);
   if (discards.length < reqDiscard) return -999;
-  const discardCost = discards.reduce((sum, dc) => sum + Math.max(0.5, cardKeepValue(p, opp, dc) * 0.45), 0);
+  const discardCost = discards.reduce((sum, dc) => sum + Math.max(0.5, cardKeepValue(p, opp, dc, undefined, isLegacy) * 0.45), 0);
 
   return effectValue - discardCost;
 }
@@ -1188,21 +1298,41 @@ function opponentColorProbs(state: GameState, idx: 0 | 1, level: AiLevel): Recor
 
 const BEATS: Record<CardColor, CardColor> = { RED: 'GREEN', GREEN: 'BLUE', BLUE: 'RED' };
 
-function effectiveSpeed(p: PlayerState, c: ActionCard): number {
+function effectiveSpeed(p: PlayerState, c: ActionCard, isLegacy = false): number {
   let s = c.speed ?? 0;
   const code = baseCodeOf(c.code);
   if (slotHasCode(p.slots.leader, 'BP01-027') && c.color === 'RED') s += 0.5;
   if (code === 'BP01-059' && p.hasDominance && slotHasCharacterSkill(p.slots.leader, '앙코')) s = 10;
+  if (!isLegacy) {
+    // TP01-001 연역: 【우세】【배틀】 리더가 파수인이면 스피드 14
+    if (code === 'TP01-001' && p.hasDominance && slotHasCharacterSkill(p.slots.leader, '파수인')) {
+      s = 14;
+    }
+    // TP01-003 그늘이와 구름이 출격·공중 공격: 【우세】【배틀】 리더가 앙코이고 상대 스피드 11 이상이면 스피드 20
+    if (code === 'TP01-003' && p.hasDominance && slotHasCharacterSkill(p.slots.leader, '앙코')) {
+      s = 12;
+    }
+  }
   return s;
 }
 
-function speedWinProb(mySpeed: number, color: CardColor, iAmActive: boolean): number {
-  const oppAvg = color === 'RED' ? 8 : 7;
+function speedWinProb(mySpeed: number, color: CardColor, iAmActive: boolean, opp?: PlayerState, isLegacy = false): number {
+  if (!isLegacy && mySpeed <= 0) {
+    // 스피드 0 카드(공명 촉진제, 심장의 선택 등)는 동색 속도 대결에서 일반 카드를 이길 수 없음
+    return iAmActive ? 0.04 : 0.01;
+  }
+  let oppAvg = color === 'RED' ? 8 : 7;
+  if (!isLegacy && opp && opp.hasDominance) {
+    const oppLeader = opp.slots.leader.characterName || opp.slots.leader.nameKr;
+    if (oppLeader.includes('파수인') || oppLeader.includes('앙코')) {
+      oppAvg += 1.2; // 상대 우세 시 연역(14), 출격(10/20) 등 고속 카드 경계
+    }
+  }
   const p = 0.5 + (mySpeed - oppAvg) * 0.07 + (iAmActive ? 0.08 : -0.02);
   return Math.max(0.08, Math.min(0.92, p));
 }
 
-function effectBonus(p: PlayerState, c: ActionCard, scale: number): number {
+function effectBonus(p: PlayerState, c: ActionCard, scale: number, isLegacy = false): number {
   if (scale <= 0) return 0;
   let b = 0;
   const code = baseCodeOf(c.code);
@@ -1221,6 +1351,26 @@ function effectBonus(p: PlayerState, c: ActionCard, scale: number): number {
   ) {
     b += 1.6;
   }
+  if (!isLegacy) {
+    if (code === 'TP01-004' && hasAnyUpgradableSlot(p).any && p.hasDominance) {
+      b += 2.0;
+    }
+    if (code === 'TP01-001') {
+      const hasCoreSkInDrop = p.dropZone.some((dc) =>
+        ['BP01-056', 'BP01-057', 'BP01-058'].includes(baseCodeOf(dc.code))
+      );
+      if (hasCoreSkInDrop) b += 1.2;
+    }
+    if (
+      code === 'TP01-002' &&
+      p.dropZone.some((dc) => baseCodeOf(dc.code) === 'BP01-050')
+    ) {
+      b += 1.5;
+    }
+    if (code === 'TP01-003' && p.hasDominance && slotHasCharacterSkill(p.slots.leader, '앙코')) {
+      b += 1.2;
+    }
+  }
   return b * scale;
 }
 
@@ -1232,11 +1382,13 @@ function clashEV(
   level: AiLevel,
   burstPlan?: BurstPlan
 ): number {
+  const isLegacy = level === 'SMART_ALT';
   const P = paramsFor(level);
   const me = state.players[idx];
   const opp = state.players[other(idx)];
   const iAmActive = state.activePlayerIndex === idx;
-  let winValue = cardRawValue(me, opp, c, me.slots.leader) + effectBonus(me, c, P.effectBonusScale);
+  const code = baseCodeOf(c.code);
+  let winValue = cardRawValue(me, opp, c, me.slots.leader, isLegacy) + effectBonus(me, c, P.effectBonusScale, isLegacy);
 
   // 만약 이 카드가 이번 턴 OTK 또는 대폭딜 플랜의 오프너라면 승리 가치를 대폭 상향!
   if (burstPlan && burstPlan.clashCardId === c.id) {
@@ -1267,6 +1419,15 @@ function clashEV(
   if (isPureClashEffectRedCard(c)) {
     winValue += 2.2;
   }
+  // TP01-002(스피드 6) 및 비우세 TP01-003(스피드 5): 손패에 더 빠른 적색 비콤보 오프너(스피드 8+)가 함께 있을 때만 오프너 우선도를 소폭 낮춰 연격으로 유도
+  if (!isLegacy && (code === 'TP01-002' || (!me.hasDominance && code === 'TP01-003'))) {
+    const hasFasterRedOpener = otherPlayableInHand.some(
+      (h) => h.color === 'RED' && !isComboOnlyEffectCard(h) && !isComboTerminator(h) && (h.speed ?? 0) >= 8
+    );
+    if (hasFasterRedOpener) {
+      winValue -= 2.2;
+    }
+  }
 
   // 4) 연격 종료 디메리트가 있는 카드(BP01-074, BP01-061)는 손에 다른 적색 콤보 카드가 있을 때 대결 오프너로 내면 손해!
   if (isComboTerminator(c) && me.hand.filter((h) => h.color === 'RED' && h.id !== c.id).length > 0) {
@@ -1276,7 +1437,31 @@ function clashEV(
     }
   }
 
-  const mySpeed = effectiveSpeed(me, c);
+  // ★ TP01-004 (공명 촉진제) 및 TP01-005 (심장의 선택):
+  // 【판정】 승리 시뿐 아니라 【우세】【판정】 패배 시에도 효과가 100% 발동한다!
+  // 단, 내가 턴 플레이어이고 강력한 연격 폭딜(5데미지 이상)이 준비된 상태이거나 내 체력이 위험할 때는 우세를 내주지 않는다.
+  let dominanceLossReward = 0;
+  const hasStrongAttackNow = Boolean(iAmActive && burstPlan && (burstPlan.isOtk || burstPlan.totalDamage >= 5));
+  if (!isLegacy && me.hasDominance && !hasStrongAttackNow && me.hp >= 6) {
+    if (code === 'TP01-004') {
+      const upInfo = hasAnyUpgradableSlot(me);
+      if (upInfo.any) {
+        dominanceLossReward = upInfo.hasLv2Upgrade ? 6.2 : 4.2;
+      }
+    } else if (code === 'TP01-005' && me.concertoZone.length <= 1 && !iAmActive) {
+      dominanceLossReward = 2.2;
+    }
+  }
+  // 우세가 없을 때 스피드 0인 TP01-004/005는 적색/녹색 모두에게 100% 패배하고 효과도 불발되므로 다른 카드가 있으면 강하게 감점!
+  if (!isLegacy && !me.hasDominance && (code === 'TP01-004' || code === 'TP01-005') && otherPlayableInHand.length > 0) {
+    winValue -= 7.5;
+  }
+  // 우세가 있더라도 TP01-005(심장의 선택)는 다른 정상 대결 카드가 있으면 대결 패배를 자초하지 않도록 후순위로 배치
+  if (!isLegacy && code === 'TP01-005' && otherPlayableInHand.length > 0 && me.concertoZone.length >= 1) {
+    winValue -= 4.5;
+  }
+
+  const mySpeed = effectiveSpeed(me, c, isLegacy);
   let ev = 0;
   (['RED', 'GREEN', 'BLUE'] as CardColor[]).forEach((k) => {
     const pk = probs[k];
@@ -1287,10 +1472,10 @@ function clashEV(
     else if (c.color === 'BLUE') {
       // BLUE 미러 = 무승부
     } else {
-      pWin = speedWinProb(mySpeed, c.color, iAmActive);
+      pWin = speedWinProb(mySpeed, c.color, iAmActive, opp, isLegacy);
       pLose = 1 - pWin;
     }
-    ev += pk * (pWin * winValue - pLose * P.lossCost[k]);
+    ev += pk * (pWin * winValue + pLose * (dominanceLossReward - P.lossCost[k]));
   });
   ev -= comboCostOf(me, c) * P.costPenalty;
   if (isIntroSkillCard(c) && otherPlayableInHand.length > 0) {
@@ -1300,11 +1485,11 @@ function clashEV(
 }
 
 // 리더 후보 슬롯의 "이번 대결 가치"
-function leaderScore(p: PlayerState, opp: PlayerState, ch: CharacterCard, scale = 1): number {
+function leaderScore(p: PlayerState, opp: PlayerState, ch: CharacterCard, scale = 1, isLegacy = false): number {
   const playable = p.hand.filter((c) => canPlay(p, c, ch));
   if (playable.length === 0) return -5 + ch.level * 0.2;
   const vals = playable
-    .map((c) => cardRawValue(p, opp, c, ch) - comboCostOf(p, c) * 0.3)
+    .map((c) => cardRawValue(p, opp, c, ch, isLegacy) - comboCostOf(p, c) * 0.3)
     .sort((a, b) => b - a);
   let s = vals[0] + 0.35 * (vals[1] ?? 0) + 0.15 * playable.length;
 
@@ -1319,8 +1504,20 @@ function leaderScore(p: PlayerState, opp: PlayerState, ch: CharacterCard, scale 
   if (scale > 0) {
     let extra = 0;
     if (name === '카멜리아') extra += 1.0 + (lv >= 2 ? 1.4 : 0);
-    if (name === '앙코') extra += 0.9 + (lv >= 2 ? 1.5 : 0) + (playable.some((c) => baseCodeOf(c.code) === 'BP01-059') ? 0.8 : 0);
-    if (name === '파수인') extra += (playable.some((c) => c.color === 'GREEN') ? 1.2 : 0.3) + (lv >= 2 ? 1.3 : 0);
+    if (name === '앙코') {
+      extra +=
+        0.9 +
+        (lv >= 2 ? 1.5 : 0) +
+        (playable.some((c) => {
+          const bCode = baseCodeOf(c.code);
+          return bCode === 'BP01-059' || (!isLegacy && bCode === 'TP01-003');
+        })
+          ? 0.8
+          : 0);
+    }
+    if (name === '파수인') {
+      extra += (playable.some((c) => c.color === 'GREEN') ? 1.2 : 0.3) + (lv >= 2 ? 1.3 : 0);
+    }
     s += extra * scale;
     playable.forEach((c) => {
       const t = LEVELUP_CARD_TARGET[baseCodeOf(c.code)];
@@ -1336,13 +1533,14 @@ function leaderScore(p: PlayerState, opp: PlayerState, ch: CharacterCard, scale 
 // ★ 액션 단계 (SMART: 원턴킬 설계 + 무지성 레벨업 방지 + 전략적 턴 패스)
 // ----------------------------------------------------------
 function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameState {
+  const isLegacy = level === 'SMART_ALT';
   const P = paramsFor(level);
   let cur = state;
   let p = cur.players[idx];
   let opp = cur.players[other(idx)];
 
   // 0. 현재 패/필드 상태에서 원턴킬(OTK) 및 최대 폭딜 플랜 계산
-  let burstPlan = estimateBurstPlan(cur, idx);
+  let burstPlan = estimateBurstPlan(cur, idx, isLegacy);
 
   // 1. 협주 충전 판단 (OTK에 추가 협주 1장이 필요하거나, 고코스트 피니셔를 위해 협주가 필요할 때)
   const doSmartCharge = () => {
@@ -1361,28 +1559,32 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
       p.hand.length > 7;
     if (!wantMore) return;
 
-    const chosen = chooseCardForConcertoCharge(p, opp, burstPlan.usedCardIds);
+    const chosen = chooseCardForConcertoCharge(p, opp, burstPlan.usedCardIds, isLegacy);
     if (!chosen) return;
 
     // 충분히 가치 있는 카드는(패가 넘치거나 OTK에 협주가 꼭 필요한 경우가 아니면) 협주로 버리지 않음
-    const keepVal = cardKeepValue(p, opp, chosen, burstPlan.usedCardIds);
-    if (!burstPlan.needsExtraConcerto && !hasZeroCostEcho && keepVal > 5.0 && p.hand.length <= 6) {
+    const keepVal = cardKeepValue(p, opp, chosen, burstPlan.usedCardIds, isLegacy);
+    if (
+      !burstPlan.needsExtraConcerto &&
+      !hasZeroCostEcho &&
+      keepVal > 5.0 &&
+      p.hand.length <= 6
+    ) {
       return;
     }
 
     const res = chargeConcerto(cur, idx, chosen.id);
     if (res.success) {
       cur = res.newState;
-      burstPlan = estimateBurstPlan(cur, idx);
+      burstPlan = estimateBurstPlan(cur, idx, isLegacy);
     }
   };
 
-  doSmartCharge();
+  const doSmartUpgrade = (onlySelfReplenishing = false) => {
+    p = cur.players[idx];
+    opp = cur.players[other(idx)];
+    if (p.actionFlags.upgraded || burstPlan.isOtk) return;
 
-  // 2. 스마트 레벨업: 무지성 서포터 레벨업을 금지하고, 실질적 이득이 확실할 때만 실행!
-  p = cur.players[idx];
-  opp = cur.players[other(idx)];
-  if (!p.actionFlags.upgraded && !burstPlan.isOtk) {
     let bestSlot: SlotKey | null = null;
     let bestScore = 0.8; // 최소 임계값 이상일 때만 레벨업 실행
     let bestUpgrade: CharacterCard | null = null;
@@ -1392,8 +1594,21 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
       if (!ch || ch.level >= 2) continue;
       const up = findEvolutionCard(p.characterDeck, ch);
       if (!up) continue;
+      if (onlySelfReplenishing) {
+        const upCode = baseCodeOf(up.code);
+        const isReplenishing =
+          upCode === 'BP01-023' ||
+          upCode === 'BP01-017' ||
+          upCode === 'BP01-020' ||
+          (upCode === 'BP01-032' && p.dropZone.some((c) => c.kind === 'ACTION')) ||
+          (upCode === 'BP01-003' && p.dropZone.some(isNormalAttackCard)) ||
+          (upCode === 'BP01-013' && p.dropZone.some((c) => c.kind === 'ACTION' && c.characterExclusive?.includes('앙코'))) ||
+          (upCode === 'BP01-009' && p.dropZone.some((c) => c.kind === 'ACTION' && isIntroSkillCard(c as ActionCard))) ||
+          (upCode === 'BP01-026' && p.dropZone.some(isNormalAttackCard));
+        if (!isReplenishing) continue;
+      }
 
-      const score = evaluateUpgradeCandidate(p, opp, k, up, burstPlan);
+      const score = evaluateUpgradeCandidate(p, opp, k, up, burstPlan, isLegacy);
       if (score > bestScore) {
         bestScore = score;
         bestSlot = k;
@@ -1403,16 +1618,21 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
 
     if (bestSlot && bestUpgrade) {
       const req = bestUpgrade.level;
-      const discards = chooseDiscards(p, opp, req, burstPlan.usedCardIds).map((c) => c.id);
+      const discards = chooseDiscards(p, opp, req, burstPlan.usedCardIds, isLegacy).map((c) => c.id);
       if (discards.length === req) {
         const res = upgradeCharacter(cur, idx, bestSlot, bestUpgrade.id, discards);
         if (res.success) {
           cur = res.newState;
-          burstPlan = estimateBurstPlan(cur, idx);
+          burstPlan = estimateBurstPlan(cur, idx, isLegacy);
         }
       }
     }
-  }
+  };
+
+  doSmartCharge();
+
+  // 2. 스마트 레벨업: 무지성 서포터 레벨업을 금지하고, 실질적 이득이 확실할 때만 실행!
+  doSmartUpgrade(false);
 
   // 레벨업 효과(예: 방랑자 Lv.1 드로우, 치샤/앙코 트래시 회수)로 패가 늘어났다면 협주 충전 재검토
   doSmartCharge();
@@ -1425,12 +1645,12 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
     if (burstPlan.isOtk || burstPlan.totalDamage >= 9) {
       targetSlot = burstPlan.leaderSlot;
     } else {
-      const curScore = leaderScore(p, opp, p.slots.leader, P.charBonusScale);
+      const curScore = leaderScore(p, opp, p.slots.leader, P.charBonusScale, isLegacy);
       let bestScore = curScore;
       (['leftSupport', 'rightSupport'] as const).forEach((k) => {
         const ch = p.slots[k];
         if (!ch) return;
-        const s = leaderScore(p, opp, ch, P.charBonusScale);
+        const s = leaderScore(p, opp, ch, P.charBonusScale, isLegacy);
         if (s > bestScore + 0.35) {
           bestScore = s;
           targetSlot = k;
@@ -1441,7 +1661,7 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
       const res = switchLeader(cur, idx, targetSlot as 'leftSupport' | 'rightSupport');
       if (res.success) {
         cur = res.newState;
-        burstPlan = estimateBurstPlan(cur, idx);
+        burstPlan = estimateBurstPlan(cur, idx, isLegacy);
       }
     }
   }
@@ -1455,8 +1675,18 @@ function smartActionPhase(state: GameState, idx: 0 | 1, level: AiLevel): GameSta
   }
 
   // 원턴킬이나 강한 콤보(6데미지 이상)가 준비되었거나, 무료 레벨업/드로우(녹색) 카드가 있으면 무조건 배틀 개시!
-  const hasGreenSetup = usable.some((c) => c.color === 'GREEN');
-  const hasFreeLevelUpPlay = usable.some((c) => Boolean(LEVELUP_CARD_TARGET[baseCodeOf(c.code)]));
+  const hasGreenSetup = usable.some((c) => {
+    if (c.color !== 'GREEN') return false;
+    if (!isLegacy && !p.hasDominance && (baseCodeOf(c.code) === 'TP01-004' || baseCodeOf(c.code) === 'TP01-005')) {
+      return false;
+    }
+    return true;
+  });
+  const hasFreeLevelUpPlay = usable.some(
+    (c) =>
+      Boolean(LEVELUP_CARD_TARGET[baseCodeOf(c.code)]) ||
+      (!isLegacy && p.hasDominance && baseCodeOf(c.code) === 'TP01-004' && hasAnyUpgradableSlot(p).any)
+  );
   if (burstPlan.isOtk || burstPlan.totalDamage >= 5 || hasGreenSetup || hasFreeLevelUpPlay || opp.hp <= 5) {
     return decideClash(cur, true);
   }
@@ -1563,11 +1793,20 @@ export function selectAiClashCard(state: GameState, idx: 0 | 1 = 1, level: AiLev
   }
 
   const probs = opponentColorProbs(state, idx, level);
-  const burstPlan = state.activePlayerIndex === idx ? estimateBurstPlan(state, idx) : undefined;
+  const burstPlan = state.activePlayerIndex === idx ? estimateBurstPlan(state, idx, level === 'SMART_ALT') : undefined;
+  const hasTp01Context =
+    state.players.some(
+      (pl) =>
+        pl.hand.some((c) => c.code.startsWith('TP01-')) ||
+        pl.dropZone.some((c) => c.code.startsWith('TP01-')) ||
+        pl.concertoZone.some((c) => c.code.startsWith('TP01-')) ||
+        pl.actionDeck.some((c) => c.code.startsWith('TP01-'))
+    );
+  const noiseScale = level === 'SMART' && hasTp01Context ? SMART_PARAMS.noise : SMART_ALT_PARAMS.noise;
 
   const scored = usableCards.map((c) => ({
     c,
-    ev: clashEV(state, idx, c, probs, level, burstPlan) + (aiRandom() - 0.5) * 2 * paramsFor(level).noise,
+    ev: clashEV(state, idx, c, probs, level, burstPlan) + (aiRandom() - 0.5) * 2 * noiseScale,
   }));
   scored.sort((a, b) => b.ev - a.ev);
   return scored[0].c.id;
@@ -1577,6 +1816,7 @@ export function selectAiClashCard(state: GameState, idx: 0 | 1 = 1, level: AiLev
 // ★ 연격 단계 (1회 공격 후 반환 - 【콤보】 카드 최우선 활용 & 무지성 패 털기 방지)
 // ----------------------------------------------------------
 export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel = DEFAULT_AI_LEVEL): GameState {
+  const isLegacy = level === 'SMART_ALT';
   const currentState = { ...state };
   const ai = currentState.players[idx];
   const opp = currentState.players[other(idx)];
@@ -1610,7 +1850,8 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
       actionArea,
       ai.concertoZone.length,
       opp.hp,
-      Boolean(ai.actionFlags?.firstNormalAttackBonusUsed)
+      Boolean(ai.actionFlags?.firstNormalAttackBonusUsed),
+      isLegacy
     );
 
     if (chosen) {
@@ -1664,6 +1905,11 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
           slotHasCode(ai.slots.leader, 'BP01-025') &&
           actionArea.filter(isNormalAttackCard).length < 2 &&
           isNormalAttackCard(chosen);
+        const isTp01002RecoveryPlay =
+          !isLegacy &&
+          code === 'TP01-002' &&
+          (ai.dropZone.some((dc) => baseCodeOf(dc.code) === 'BP01-050') ||
+            redCards.some((rc) => baseCodeOf(rc.code) === 'BP01-050'));
 
         // 이 카드가 연격(COMBO_STEP)에서 고유 시너지/어드밴티지를 창출하는 진짜 【콤보】 플레이인지 판별
         const isTrueComboSynergyPlay =
@@ -1678,7 +1924,8 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
           ((code === 'BP01-065' || code === 'BP01-067') &&
             ai.hand.some((h) => h.id !== chosen!.id && (h.color !== 'RED' || !canPlay(ai, h)))) ||
           (code === 'BP01-060' && slotHasCharacterSkill(ai.slots.leader, '앙코') && dmg > 0) ||
-          (isNormalAttackCard(chosen) && (hasScalingInHand || needsNormalForChixiaLv2));
+          (isNormalAttackCard(chosen) && (hasScalingInHand || needsNormalForChixiaLv2)) ||
+          isTp01002RecoveryPlay;
 
         // 1) 0 데미지이면서 연격 시너지도 없는 카드는 절대 무지성으로 버리지 않음
         if (dmg <= 0 && !isTrueComboSynergyPlay) {
@@ -1711,11 +1958,13 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
           }
 
           // (b) 손패의 마지막 1장인데 상대 체력이 여유 있고(HP > 5) 1데미지짜리 일반 카드라면 다음 턴 대결을 위해 세이브!
+          //     (단, 기본 스피드가 6 이하로 대결 가치가 낮은 TP01-002/003 등은 아끼지 않고 연격 딜로 꽂는다)
           if (
             remainingHandAfter.length === 0 &&
             dmg <= 1 &&
             opp.hp > 5 &&
-            (chosen.speed ?? 0) >= 5
+            (chosen.speed ?? 0) >= 5 &&
+            (isLegacy || (code !== 'TP01-002' && code !== 'TP01-003'))
           ) {
             return finishComboStep(currentState, idx);
           }
@@ -1732,7 +1981,33 @@ export function runAiComboStep(state: GameState, idx: 0 | 1 = 1, level: AiLevel 
     swapSupportSlot = pickIntroSkillSwapSlot(ai, opp, ai.slots, chosen) ?? undefined;
   }
 
-  const res = executeComboAttack(currentState, idx, chosen.id, undefined, undefined, swapSupportSlot);
+  // BP01-065 / BP01-067 (소리의 변화·강공격): 패에서 가장 가치가 낮은 카드를 선별해 버리기 대상으로 지정!
+  let discardForBonusDmgId: string | undefined = undefined;
+  const chosenCode = baseCodeOf(chosen.code);
+  if (!isLegacy && level !== 'BASIC' && (chosenCode === 'BP01-065' || chosenCode === 'BP01-067')) {
+    const exclude = new Set<string>([chosen.id]);
+    const candidates = chooseDiscards(ai, opp, 1, exclude, false);
+    if (candidates.length > 0) {
+      const cand = candidates[0];
+      const keepVal = cardKeepValue(ai, opp, cand, exclude, false);
+      const baseDmgNoDiscard = estimateCardDamage(
+        ai,
+        opp,
+        chosen,
+        ai.slots.leader,
+        true,
+        actionArea,
+        Boolean(ai.actionFlags?.firstNormalAttackBonusUsed),
+        ai.slots
+      ) - 1;
+      const neededForLethal = opp.hp <= baseDmgNoDiscard + 1 && opp.hp > baseDmgNoDiscard;
+      if (neededForLethal || cand.color !== 'RED' || !canPlay(ai, cand) || keepVal <= 4.0) {
+        discardForBonusDmgId = cand.id;
+      }
+    }
+  }
+
+  const res = executeComboAttack(currentState, idx, chosen.id, undefined, discardForBonusDmgId, swapSupportSlot);
   return res.success ? res.newState : finishComboStep(currentState, idx);
 }
 
@@ -1749,7 +2024,7 @@ export function runAiDiscardOverflow(state: GameState, idx: 0 | 1 = 1, level: Ai
   if (level === 'BASIC') {
     discardIds = [...ai.hand].sort((a, b) => b.cost - a.cost).slice(0, excess).map((c) => c.id);
   } else {
-    discardIds = chooseDiscards(ai, opp, excess).map((c) => c.id);
+    discardIds = chooseDiscards(ai, opp, excess, new Set(), level === 'SMART_ALT').map((c) => c.id);
   }
   const res = discardOverflowCards(state, idx, discardIds);
   return res.success ? res.newState : state;
