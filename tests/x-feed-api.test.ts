@@ -62,10 +62,11 @@ describe('X feed API (/api/x-feed)', () => {
     } as unknown as Parameters<typeof onRequest>[0]);
 
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean; source: string; post: { handle: string; url: string } };
+    const body = (await res.json()) as { ok: boolean; source: string; post: { id: string; handle: string; url: string } };
     expect(body.ok).toBe(true);
     expect(body.source).toBe('fallback');
     expect(body.post.handle).toBe('ucp_cardgame');
-    expect(body.post.url).toBe('https://x.com/ucp_cardgame');
+    expect(body.post.id).toBe('2122873482635776453');
+    expect(body.post.url).toBe('https://x.com/ucp_cardgame/status/2122873482635776453');
   });
 });

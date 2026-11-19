@@ -37,13 +37,84 @@ const DEFAULT_HANDLE = 'ucp_cardgame';
 const CACHE_TTL_MS = 20 * 60 * 1000; // 20분 캐시 (X syndication 레이트리밋 방지)
 
 const FALLBACK_POST: XFeedPost = {
-  id: '',
+  id: '2122873482635776453',
   handle: DEFAULT_HANDLE,
   authorName: '【공식】UCP 카드 게임',
-  text: '《명조: 배틀》 공식 TCG 소식 · 신카드 프리뷰, 제품 정보 및 이벤트 공지 바로가기',
-  url: `https://x.com/${DEFAULT_HANDLE}`,
-  createdAt: '',
+  text: "【테마 대회 「카멜리아」 개최 매장 공개】\n\n『명조: 배틀』 테마 대회 「카멜리아」의 개최 매장이 결정되었습니다🎉\n11월 28일부터 순차적으로 개최됩니다✨\n\n참가 방법 등 자세한 내용은 공식 홈페이지의 '이벤트'에서 확인해 주세요👀\n\n▼공식 홈페이지\nhttps://wwcg.ucp-jp.com/kr/event",
+  url: `https://x.com/${DEFAULT_HANDLE}/status/2122873482635776453`,
+  createdAt: '2026-11-18T02:04:13.000Z',
 };
+
+/** 단건 트윗 ID로 fxtwitter / syndication tweet-result 조회 (관리자 URL 등록·갱신용) */
+export async function fetchTweetById(tweetId: string, handle = DEFAULT_HANDLE): Promise<XFeedPost | null> {
+  const cleanId = tweetId.replace(/\D/g, '');
+  if (!cleanId) return null;
+
+  try {
+    const r = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(handle)}/status/${cleanId}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (r.ok) {
+      const data = (await r.json()) as {
+        tweet?: {
+          id?: string;
+          url?: string;
+          text?: string;
+          created_at?: string;
+          author?: { name?: string; screen_name?: string };
+          media?: { photos?: Array<{ url?: string }> };
+        };
+      };
+      const tw = data?.tweet;
+      if (tw?.id && tw?.text) {
+        return {
+          id: String(tw.id),
+          handle: tw.author?.screen_name || handle,
+          authorName: tw.author?.name || FALLBACK_POST.authorName,
+          text: String(tw.text).trim(),
+          url: tw.url || `https://x.com/${handle}/status/${tw.id}`,
+          createdAt: tw.created_at ? new Date(tw.created_at).toISOString() : new Date().toISOString(),
+          ...(tw.media?.photos?.[0]?.url ? { mediaUrl: tw.media.photos[0].url } : {}),
+        };
+      }
+    }
+  } catch {
+    // fxtwitter 실패 시 tweet-result 폴백
+  }
+
+  try {
+    const r = await fetch(`https://cdn.syndication.twimg.com/tweet-result?id=${cleanId}&token=1`, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      signal: AbortSignal.timeout(4000),
+    });
+    if (r.ok) {
+      const tw = (await r.json()) as {
+        id_str?: string;
+        text?: string;
+        created_at?: string;
+        user?: { name?: string; screen_name?: string };
+        entities?: { media?: Array<{ media_url_https?: string }> };
+      };
+      if (tw?.id_str && tw?.text) {
+        const sn = tw.user?.screen_name || handle;
+        const mediaUrl = tw.entities?.media?.[0]?.media_url_https;
+        return {
+          id: String(tw.id_str),
+          handle: sn,
+          authorName: tw.user?.name || FALLBACK_POST.authorName,
+          text: String(tw.text).replace(/\s*https:\/\/t\.co\/\w+\s*$/g, '').trim(),
+          url: `https://x.com/${sn}/status/${tw.id_str}`,
+          createdAt: tw.created_at ? new Date(tw.created_at).toISOString() : new Date().toISOString(),
+          ...(mediaUrl ? { mediaUrl } : {}),
+        };
+      }
+    }
+  } catch {
+    // 무시
+  }
+  return null;
+}
 
 /** X syndication HTML에서 __NEXT_DATA__ JSON을 파싱해 최신 게시글 1건 추출 */
 export function parseLatestTweetFromSyndicationHtml(html: string, handle = DEFAULT_HANDLE): XFeedPost | null {
@@ -142,17 +213,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
     try {
       const body = (await request.json()) as Partial<XFeedPost>;
-      const post: XFeedPost = {
-        id: typeof body.id === 'string' ? body.id.trim() : '',
-        handle,
-        authorName: typeof body.authorName === 'string' && body.authorName.trim() ? body.authorName.trim() : FALLBACK_POST.authorName,
-        text: typeof body.text === 'string' && body.text.trim() ? body.text.trim().slice(0, 400) : FALLBACK_POST.text,
-        url: typeof body.url === 'string' && /^https:\/\/(x|twitter)\.com\//.test(body.url.trim())
-          ? body.url.trim()
-          : `https://x.com/${handle}`,
-        createdAt: typeof body.createdAt === 'string' && body.createdAt ? body.createdAt : new Date().toISOString(),
-        isPinned: Boolean(body.isPinned),
-      };
+      const urlMatch = typeof body.url === 'string' ? body.url.match(/\/status\/(\d+)/) : null;
+      const targetId = (typeof body.id === 'string' && body.id.trim()) || urlMatch?.[1] || '';
+      const fetched = targetId ? await fetchTweetById(targetId, handle) : null;
+      const post: XFeedPost = fetched
+        ? { ...fetched, isPinned: body.isPinned ?? true }
+        : {
+            id: targetId,
+            handle,
+            authorName: typeof body.authorName === 'string' && body.authorName.trim() ? body.authorName.trim() : FALLBACK_POST.authorName,
+            text: typeof body.text === 'string' && body.text.trim() ? body.text.trim().slice(0, 400) : FALLBACK_POST.text,
+            url: typeof body.url === 'string' && /^https:\/\/(x|twitter)\.com\//.test(body.url.trim())
+              ? body.url.trim()
+              : `https://x.com/${handle}`,
+            createdAt: typeof body.createdAt === 'string' && body.createdAt ? body.createdAt : new Date().toISOString(),
+            isPinned: Boolean(body.isPinned),
+          };
       if (env.DB) {
         await ensureXFeedTable(env.DB);
         await env.DB.prepare(
@@ -203,7 +279,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     if (resp.ok) {
       const html = await resp.text();
       const livePost = parseLatestTweetFromSyndicationHtml(html, handle);
-      if (livePost) {
+      const minId = cachedPost?.id || FALLBACK_POST.id;
+      const isNewerOrEqual =
+        livePost &&
+        (!minId || !/^\d+$/.test(livePost.id) || !/^\d+$/.test(minId) || BigInt(livePost.id) >= BigInt(minId));
+      if (livePost && isNewerOrEqual) {
         if (env.DB) {
           try {
             await ensureXFeedTable(env.DB);
@@ -234,7 +314,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     JSON.stringify({
       ok: true,
       source: 'fallback',
-      post: { ...FALLBACK_POST, handle, url: `https://x.com/${handle}` },
+      post: handle === DEFAULT_HANDLE ? FALLBACK_POST : { ...FALLBACK_POST, id: '', handle, url: `https://x.com/${handle}` },
     }),
     { status: 200, headers }
   );

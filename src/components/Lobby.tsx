@@ -62,14 +62,14 @@ interface LobbyXFeedPost {
 }
 
 const LOBBY_NOTICE_CACHE_KEY = 'wuthering_lobby_notice_cache_v1';
-const LOBBY_X_FEED_CACHE_KEY = 'wuthering_x_feed_cache_v1';
+const LOBBY_X_FEED_CACHE_KEY = 'wuthering_x_feed_cache_v2';
 const DEFAULT_X_FEED_POST: LobbyXFeedPost = {
-  id: '',
+  id: '2122873482635776453',
   handle: 'ucp_cardgame',
   authorName: '【공식】UCP 카드 게임',
-  text: '《명조: 배틀》 공식 TCG 소식 · 신카드 프리뷰, 제품 정보 및 이벤트 공지 바로가기',
-  url: 'https://x.com/ucp_cardgame',
-  createdAt: '',
+  text: "【테마 대회 「카멜리아」 개최 매장 공개】\n\n『명조: 배틀』 테마 대회 「카멜리아」의 개최 매장이 결정되었습니다🎉\n11월 28일부터 순차적으로 개최됩니다✨",
+  url: 'https://x.com/ucp_cardgame/status/2122873482635776453',
+  createdAt: '2026-11-18T02:04:13.000Z',
 };
 // [로비 개편 2026-11] 튜토리얼을 한 번 시작하거나 안내를 닫았는지
 const TUTORIAL_SEEN_KEY = 'wtcg_tutorial_seen';
