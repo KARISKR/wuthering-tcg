@@ -30,6 +30,7 @@ import {
   Download,
   HardDriveDownload,
   X,
+  ExternalLink,
 } from 'lucide-react';
 
 import { BattleReplayData } from '../utils/replayManager';
@@ -561,23 +562,62 @@ export const Lobby: React.FC<LobbyProps> = ({
           zoom: typeof window !== 'undefined' && window.innerWidth >= 1024 && layout.uiScale !== 1 ? layout.uiScale : undefined,
         }}
       >
-        {/* 히어로 로고 (가로 모바일에서는 왼쪽 열로 이동) */}
-        <div
-          onWheel={handleLogoWheel}
-          className={`short:hidden text-center flex flex-col items-center select-none ${
-            isEditingLayout ? 'ring-2 ring-amber-400/60 ring-dashed rounded-2xl p-2 cursor-ns-resize' : ''
-          }`}
-          style={{ transform: layout.logoScale !== 1 ? `scale(${layout.logoScale})` : undefined, transformOrigin: 'top center' }}
-          title={isEditingLayout ? '마우스 휠로 로고 크기 조절' : undefined}
-        >
-          <img
-            src="/images/logo-battle-trans.webp"
-            alt="명조 배틀"
-            className="h-20 sm:h-24 lg:h-[104px] 2xl:h-[120px] lg:[@media(max-height:760px)]:h-[86px] w-auto max-w-[80vw] object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]"
-          />
-          <span className="mt-1 text-[10px] sm:text-xs font-black tracking-[0.3em] text-white uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
-            FAN MADE ONLINE BATTLE SIMULATOR
-          </span>
+        {/* 히어로 로고 + 우측 공식 X 계정 카드 (가로 모바일에서는 왼쪽 열로 이동) */}
+        <div className="short:hidden w-full grid grid-cols-1 lg:grid-cols-[minmax(280px,340px)_minmax(0,1fr)_minmax(280px,340px)] items-center gap-3 lg:gap-4">
+          <div className="hidden lg:block" aria-hidden="true" />
+          <div
+            onWheel={handleLogoWheel}
+            className={`text-center flex flex-col items-center select-none ${
+              isEditingLayout ? 'ring-2 ring-amber-400/60 ring-dashed rounded-2xl p-2 cursor-ns-resize' : ''
+            }`}
+            style={{ transform: layout.logoScale !== 1 ? `scale(${layout.logoScale})` : undefined, transformOrigin: 'top center' }}
+            title={isEditingLayout ? '마우스 휠로 로고 크기 조절' : undefined}
+          >
+            <img
+              src="/images/logo-battle-trans.webp"
+              alt="명조 배틀"
+              className="h-20 sm:h-24 lg:h-[104px] 2xl:h-[120px] lg:[@media(max-height:760px)]:h-[86px] w-auto max-w-[80vw] object-contain drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]"
+            />
+            <span className="mt-1 text-[10px] sm:text-xs font-black tracking-[0.3em] text-white uppercase drop-shadow-[0_2px_10px_rgba(0,0,0,0.95)]">
+              FAN MADE ONLINE BATTLE SIMULATOR
+            </span>
+          </div>
+
+          <a
+            href="https://x.com/ucp_cardgame"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden md:flex flex-col gap-1.5 w-full max-w-[360px] lg:max-w-none mx-auto rounded-[18px] border border-white/12 hover:border-sky-400/50 bg-[#0c111d]/90 hover:bg-[#11192a]/95 backdrop-blur-xl px-4 py-3 text-left transition group select-none"
+            title="【공식】UCP 카드 게임 X 계정으로 이동"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="w-7 h-7 rounded-lg bg-white/[0.08] border border-white/15 flex items-center justify-center shrink-0 text-white group-hover:border-sky-400/40 transition">
+                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" aria-hidden="true">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                  </svg>
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[13px] font-black text-white group-hover:text-sky-200 truncate">
+                      【공식】UCP 카드 게임
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded bg-sky-400/15 text-sky-300 text-[10px] font-black shrink-0">
+                      공식 X
+                    </span>
+                  </div>
+                  <span className="block text-[11px] text-slate-400 truncate">@ucp_cardgame</span>
+                </div>
+              </div>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-300 shrink-0 transition" />
+            </div>
+            <p className="text-[12px] text-slate-200/90 leading-snug line-clamp-2">
+              《명조: 배틀》 공식 TCG 소식 · 신카드 프리뷰, 제품 정보 및 이벤트 공지 바로가기
+            </p>
+            <span className="text-[10px] font-semibold text-sky-300/80 group-hover:text-sky-300 truncate">
+              x.com/ucp_cardgame
+            </span>
+          </a>
         </div>
 
         {/* ===================== 모바일 세로 ===================== */}
