@@ -51,7 +51,26 @@ interface LobbyNoticeSummary {
   content?: string;
 }
 
+interface LobbyXFeedPost {
+  id: string;
+  handle: string;
+  authorName: string;
+  text: string;
+  url: string;
+  createdAt: string;
+  mediaUrl?: string;
+}
+
 const LOBBY_NOTICE_CACHE_KEY = 'wuthering_lobby_notice_cache_v1';
+const LOBBY_X_FEED_CACHE_KEY = 'wuthering_x_feed_cache_v1';
+const DEFAULT_X_FEED_POST: LobbyXFeedPost = {
+  id: '',
+  handle: 'ucp_cardgame',
+  authorName: '【공식】UCP 카드 게임',
+  text: '《명조: 배틀》 공식 TCG 소식 · 신카드 프리뷰, 제품 정보 및 이벤트 공지 바로가기',
+  url: 'https://x.com/ucp_cardgame',
+  createdAt: '',
+};
 // [로비 개편 2026-11] 튜토리얼을 한 번 시작하거나 안내를 닫았는지
 const TUTORIAL_SEEN_KEY = 'wtcg_tutorial_seen';
 
@@ -114,11 +133,21 @@ export const Lobby: React.FC<LobbyProps> = ({
       return false;
     }
   });
+  const [xFeedPost, setXFeedPost] = useState<LobbyXFeedPost>(() => {
+    try {
+      const raw = localStorage.getItem(LOBBY_X_FEED_CACHE_KEY);
+      if (!raw) return DEFAULT_X_FEED_POST;
+      const parsed = JSON.parse(raw);
+      return parsed?.url && parsed?.text ? parsed : DEFAULT_X_FEED_POST;
+    } catch {
+      return DEFAULT_X_FEED_POST;
+    }
+  });
 
   useEffect(() => {
     let cancelled = false;
 
-    // 초기 로딩 대역폭 경합 방지를 위해 브라우저 유휴 시점에 백그라운드로 공지사항 로드
+    // 초기 로딩 대역폭 경합 방지를 위해 브라우저 유휴 시점에 백그라운드로 공지사항 & 공식 X 최신 글 로드
     const fetchNotice = () => {
       fetch('/api/community?type=board&lobby=1', {
         headers: { Accept: 'application/json' },
@@ -130,6 +159,19 @@ export const Lobby: React.FC<LobbyProps> = ({
           setHasNewBoardPosts(Boolean(data.hasNewBoardPosts));
           try {
             localStorage.setItem(LOBBY_NOTICE_CACHE_KEY, JSON.stringify(data));
+          } catch {}
+        })
+        .catch(() => {});
+
+      fetch('/api/x-feed', { headers: { Accept: 'application/json' } })
+        .then((res) =>
+          res.ok && res.headers.get('content-type')?.includes('application/json') ? res.json() : null
+        )
+        .then((data) => {
+          if (cancelled || !data?.ok || !data?.post) return;
+          setXFeedPost(data.post);
+          try {
+            localStorage.setItem(LOBBY_X_FEED_CACHE_KEY, JSON.stringify(data.post));
           } catch {}
         })
         .catch(() => {});
@@ -584,11 +626,11 @@ export const Lobby: React.FC<LobbyProps> = ({
           </div>
 
           <a
-            href="https://x.com/ucp_cardgame"
+            href={xFeedPost.url || 'https://x.com/ucp_cardgame'}
             target="_blank"
             rel="noopener noreferrer"
             className="hidden md:flex flex-col gap-1.5 w-full max-w-[360px] lg:max-w-none mx-auto rounded-[18px] border border-white/12 hover:border-sky-400/50 bg-[#0c111d]/90 hover:bg-[#11192a]/95 backdrop-blur-xl px-4 py-3 text-left transition group select-none"
-            title="【공식】UCP 카드 게임 X 계정으로 이동"
+            title={`${xFeedPost.authorName} (@${xFeedPost.handle}) 최신 게시글 보기`}
           >
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
@@ -600,23 +642,31 @@ export const Lobby: React.FC<LobbyProps> = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[13px] font-black text-white group-hover:text-sky-200 truncate">
-                      【공식】UCP 카드 게임
+                      {xFeedPost.authorName}
                     </span>
                     <span className="px-1.5 py-0.5 rounded bg-sky-400/15 text-sky-300 text-[10px] font-black shrink-0">
-                      공식 X
+                      최신글
                     </span>
                   </div>
-                  <span className="block text-[11px] text-slate-400 truncate">@ucp_cardgame</span>
+                  <span className="block text-[11px] text-slate-400 truncate">
+                    @{xFeedPost.handle}
+                    {xFeedPost.createdAt
+                      ? ` · ${new Date(xFeedPost.createdAt).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' })}`
+                      : ''}
+                  </span>
                 </div>
               </div>
               <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-300 shrink-0 transition" />
             </div>
-            <p className="text-[12px] text-slate-200/90 leading-snug line-clamp-2">
-              《명조: 배틀》 공식 TCG 소식 · 신카드 프리뷰, 제품 정보 및 이벤트 공지 바로가기
+            <p className="text-[12px] text-slate-200/90 leading-snug line-clamp-3 whitespace-pre-wrap break-words">
+              {xFeedPost.text}
             </p>
-            <span className="text-[10px] font-semibold text-sky-300/80 group-hover:text-sky-300 truncate">
-              x.com/ucp_cardgame
-            </span>
+            <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-sky-300/80 group-hover:text-sky-300">
+              <span className="truncate">
+                {xFeedPost.id ? `x.com/${xFeedPost.handle}/status/${xFeedPost.id}` : `x.com/${xFeedPost.handle}`}
+              </span>
+              <span className="shrink-0">X에서 보기 →</span>
+            </div>
           </a>
         </div>
 
