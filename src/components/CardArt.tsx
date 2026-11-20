@@ -104,10 +104,12 @@ export const CardArt: React.FC<CardArtProps> = ({ artUrl, sizes, fallbackName, f
   return (
     <img
       key={`${stage}-${retryKey}`}
+      draggable={false}
       {...rest}
       alt={alt}
       data-no-lod="true"
-      className={className}
+      className={`${className ?? ''} select-none`}
+      style={{ WebkitTouchCallout: 'none', ...rest.style }}
       src={useLod ? encodeURI(lodUrl(artUrl, lodWidths(artUrl)[0])) : artUrl}
       srcSet={useLod ? srcSet : undefined}
       sizes={useLod ? sizes : undefined}
