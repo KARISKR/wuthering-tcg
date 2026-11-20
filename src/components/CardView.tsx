@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { formatEffectText } from '../utils/formatEffectText';
+import { useLongPress } from '../hooks/useLongPress';
 
 // [WP3] CardView 크기별 표시 너비 (sizeStyles의 w-24 / w-36 / w-48 / 최대 w-72와 일치)
 const CARD_ART_SIZES: Record<'sm' | 'md' | 'lg' | 'xl', string> = {
@@ -113,6 +114,7 @@ export const CardView: React.FC<CardViewProps> = ({
               setIsZoomed(true);
             }
           }}
+          onLongPress={showZoomModal ? () => setIsZoomed(true) : undefined}
           badge={badge}
           className={className}
         />
@@ -121,18 +123,22 @@ export const CardView: React.FC<CardViewProps> = ({
     );
   }
 
-  // 캐릭터 카드 (크게보기 제거)
+  // 캐릭터 카드 (길게 누르기로 상세 보기 지원)
   return (
-    <CharacterCardView
-      card={card}
-      size={size}
-      sizeStyles={sizeStyles}
-      isSelected={isSelected}
-      isDisabled={isDisabled}
-      onClick={onClick}
-      badge={badge}
-      className={className}
-    />
+    <>
+      <CharacterCardView
+        card={card}
+        size={size}
+        sizeStyles={sizeStyles}
+        isSelected={isSelected}
+        isDisabled={isDisabled}
+        onClick={onClick}
+        onLongPress={showZoomModal ? () => setIsZoomed(true) : undefined}
+        badge={badge}
+        className={className}
+      />
+      {isZoomed && <CardZoomModal card={card} onClose={() => setIsZoomed(false)} />}
+    </>
   );
 };
 
@@ -148,9 +154,11 @@ const ActionCardView: React.FC<{
   isPlayable?: boolean;
   onClick?: () => void;
   onZoom?: (e: React.MouseEvent) => void;
+  onLongPress?: () => void;
   badge?: string;
   className?: string;
-}> = ({ card, size, sizeStyles, isSelected, isDisabled, isPlayable, onClick, onZoom, badge, className = '' }) => {
+}> = ({ card, size, sizeStyles, isSelected, isDisabled, isPlayable, onClick, onZoom, onLongPress, badge, className = '' }) => {
+  const { longPressHandlers, consumeLongPressClick } = useLongPress(onLongPress, { disabled: !onLongPress });
   const colorConfig: Record<
     CardColor,
     { border: string; bg: string; headerBg: string; text: string; icon: React.ReactNode; label: string }
@@ -187,7 +195,11 @@ const ActionCardView: React.FC<{
 
   return (
     <div
-      onClick={!isDisabled ? onClick : undefined}
+      {...longPressHandlers}
+      onClick={(e) => {
+        if (consumeLongPressClick(e)) return;
+        if (!isDisabled) onClick?.();
+      }}
       className={`relative group ${sizeStyles} rounded-2xl border-2 ${cfg.border} bg-slate-950 shadow-xl flex items-center justify-center p-1 cursor-pointer transition-all duration-200 select-none overflow-hidden ${
         isSelected ? 'ring-4 ring-amber-400 scale-105 shadow-amber-500/50' : ''
       } ${isPlayable ? 'ring-2 ring-emerald-400/80 shadow-emerald-500/30' : ''} ${
@@ -275,9 +287,11 @@ const CharacterCardView: React.FC<{
   isSelected?: boolean;
   isDisabled?: boolean;
   onClick?: () => void;
+  onLongPress?: () => void;
   badge?: string;
   className?: string;
-}> = ({ card, size, sizeStyles, isSelected, isDisabled, onClick, badge, className = '' }) => {
+}> = ({ card, size, sizeStyles, isSelected, isDisabled, onClick, onLongPress, badge, className = '' }) => {
+  const { longPressHandlers, consumeLongPressClick } = useLongPress(onLongPress, { disabled: !onLongPress });
   const elementColors: Record<
     string,
     { border: string; bg: string; text: string; label: string }
@@ -301,7 +315,11 @@ const CharacterCardView: React.FC<{
 
   return (
     <div
-      onClick={!isDisabled ? onClick : undefined}
+      {...longPressHandlers}
+      onClick={(e) => {
+        if (consumeLongPressClick(e)) return;
+        if (!isDisabled) onClick?.();
+      }}
       className={`relative group ${sizeStyles} rounded-2xl border-2 ${elem.border} bg-slate-950 shadow-xl flex items-center justify-center p-1 cursor-pointer transition-all duration-200 select-none overflow-hidden ${
         isSelected ? 'ring-4 ring-amber-400 scale-105 shadow-amber-500/50' : ''
       } ${isDisabled ? 'opacity-40 grayscale cursor-not-allowed' : 'hover:-translate-y-1 hover:shadow-2xl'} ${className}`}
@@ -368,7 +386,7 @@ const CharacterCardView: React.FC<{
 };
 
 // 카드 전체 크게 보기 모달
-const CardZoomModal: React.FC<{ card: AnyCard; onClose: () => void }> = ({ card, onClose }) => {
+export const CardZoomModal: React.FC<{ card: AnyCard; onClose: () => void }> = ({ card, onClose }) => {
   const artUrl = (card as unknown as { artUrl?: string }).artUrl;
   const isChar = card.kind === 'CHARACTER';
 

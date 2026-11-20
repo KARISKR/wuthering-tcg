@@ -7,6 +7,7 @@ import React, { memo } from 'react';
 import { Bot, User, Heart, Flame, Zap, Clock, ChevronUp, ArrowLeftRight, Layers } from 'lucide-react';
 import type { AnyCard, CharacterCard, PlayerState } from '../../../types/tcg';
 import { CardArt } from '../../CardArt';
+import { useLongPress } from '../../../hooks/useLongPress';
 
 export type SlotKey = 'leftSupport' | 'leader' | 'rightSupport';
 
@@ -55,10 +56,17 @@ const PhoneSlot: React.FC<{
   side: 'opponent' | 'me';
   model: PhoneSlotModel;
   onPreview: (card: AnyCard) => void;
-}> = ({ card, slotKey, side, model, onPreview }) => {
+  onShowDetail: (card: AnyCard) => void;
+}> = ({ card, slotKey, side, model, onPreview, onShowDetail }) => {
   const isLeader = slotKey === 'leader';
   const accent = side === 'me' ? 'border-[#f97316]' : 'border-cyan-400';
   const stackCount = card?.underlyingCards?.length ?? 0;
+  const { longPressHandlers, consumeLongPressClick } = useLongPress(
+    () => {
+      if (card) onShowDetail(card);
+    },
+    { disabled: !card }
+  );
 
   return (
     <div
@@ -68,8 +76,12 @@ const PhoneSlot: React.FC<{
     >
       <button
         type="button"
+        {...longPressHandlers}
         onPointerEnter={() => card && onPreview(card)}
-        onClick={model.onCardClick}
+        onClick={(e) => {
+          if (consumeLongPressClick(e)) return;
+          model.onCardClick();
+        }}
         aria-label={card ? `${card.nameKr} Lv.${card.level}` : '빈 슬롯'}
         className={`relative w-full aspect-[5/7] rounded-lg overflow-hidden border-2 bg-[#0c101b] ${
           isLeader ? `${accent} shadow-[0_0_14px_rgba(249,115,22,0.35)]` : 'border-white/20'
@@ -260,6 +272,7 @@ export const PhoneFieldColumn: React.FC<PhoneFieldColumnProps> = memo(
               side={side}
               model={slots[key]}
               onPreview={onPreview}
+              onShowDetail={onShowDetail}
             />
           ))}
         </div>

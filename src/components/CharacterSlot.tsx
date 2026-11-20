@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CardArt } from './CardArt';
 import { CharacterCard } from '../types/tcg';
-import { CardView } from './CardView';
+import { CardView, CardZoomModal } from './CardView';
 import { ArrowLeftRight, ChevronUp, Crown, UserCheck, Layers } from 'lucide-react';
 import { getCharacterOpeningQuote } from '../data/characterQuotes';
+import { useLongPress } from '../hooks/useLongPress';
 
 interface CharacterSlotProps {
   card: CharacterCard | null;
@@ -37,6 +38,13 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
   isOpponent = false,
 }) => {
   const isLeader = role === 'leader';
+  const [zoomedChar, setZoomedChar] = useState<CharacterCard | null>(null);
+  const { longPressHandlers, consumeLongPressClick } = useLongPress(
+    () => {
+      if (card) setZoomedChar(card);
+    },
+    { disabled: !card }
+  );
 
   // 시인성 극대화 대형 카드 규격 + 리더 15% 확대 위계 (상하 여백 최적화)
   const cardSizeClass = isOpponent
@@ -58,9 +66,14 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
     : 'border-[#f97316]/50';
 
   return (
+    <>
     <div
+      {...longPressHandlers}
       onMouseEnter={onMouseEnter}
-      onClick={onCardClick}
+      onClick={(e) => {
+        if (consumeLongPressClick(e)) return;
+        onCardClick?.();
+      }}
       title={openingQuote ? `[${card?.nameKr} 출격 대사] "${openingQuote}"` : undefined}
       className={`relative flex flex-col items-center p-2 transition-all duration-200 cursor-pointer group/slot bg-[#0c101b]/85 backdrop-blur-md ${
         isLeader
@@ -216,6 +229,8 @@ export const CharacterSlot: React.FC<CharacterSlotProps> = ({
         </button>
       )}
     </div>
+    {zoomedChar && <CardZoomModal card={zoomedChar} onClose={() => setZoomedChar(null)} />}
+    </>
   );
 };
 

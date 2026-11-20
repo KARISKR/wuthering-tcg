@@ -6,6 +6,7 @@ import { BatteryCharging, Swords, Zap, Trash2, X, Sparkles, Flame, AlertTriangle
 import { canLeaderUseCard, canPlayerUseActionCard, getEffectiveCardCost } from '../engine/gameEngine';
 import { soundEffects } from '../utils/soundEffects';
 import { formatEffectText } from '../utils/formatEffectText';
+import { useLongPress } from '../hooks/useLongPress';
 
 interface HandViewProps {
   hand: ActionCard[];
@@ -70,6 +71,12 @@ export const HandView: React.FC<HandViewProps> = ({
   const [hoveredCardId, setHoveredCardId] = useState<string | null>(null);
   const [isHandCollapsed, setIsHandCollapsed] = useState<boolean>(false);
   const [zoomedCard, setZoomedCard] = useState<ActionCard | null>(null);
+  const longPressCardRef = useRef<ActionCard | null>(null);
+  const { longPressHandlers, consumeLongPressClick } = useLongPress(() => {
+    if (longPressCardRef.current) {
+      setZoomedCard(longPressCardRef.current);
+    }
+  });
 
   // 새로 드로우된 카드 추적 및 드로우 애니메이션 활성화 상태
   const [animatingDrawIds, setAnimatingDrawIds] = useState<Set<string>>(new Set());
@@ -334,12 +341,22 @@ export const HandView: React.FC<HandViewProps> = ({
             return (
               <div
                 key={`${card.id}-${idx}`}
+                onPointerDown={(e) => {
+                  longPressCardRef.current = card;
+                  longPressHandlers.onPointerDown(e);
+                }}
+                onPointerMove={longPressHandlers.onPointerMove}
+                onPointerUp={longPressHandlers.onPointerUp}
+                onPointerCancel={longPressHandlers.onPointerCancel}
+                onPointerLeave={longPressHandlers.onPointerLeave}
+                onContextMenu={longPressHandlers.onContextMenu}
                 onMouseEnter={() => {
                   setHoveredCardId(card.id);
                   onHover?.(card);
                 }}
                 onMouseLeave={() => setHoveredCardId(null)}
-                onClick={() => {
+                onClick={(e) => {
+                  if (consumeLongPressClick(e)) return;
                   onHover?.(card);
                   if (isOverflowPhase) {
                     onSelectOverflowCard?.(card.id);
