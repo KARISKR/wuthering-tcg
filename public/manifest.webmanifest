@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "명조: 대결 (Wuthering Waves TCG)",
+  "name": "명조 배틀 온라인 시뮬레이터 (Wuthering Waves Battle Online Simulator)",
   "short_name": "명조 배틀",
-  "description": "명조: 워더링 웨이브 2인 대전 카드 게임 (Wuthering Waves TCG)",
+  "description": "명조: 배틀 온라인 TCG 시뮬레이터 · AI 대전, 실시간 1:1 온라인 멀티플레이, 덱 빌더 (Wuthering Waves Battle Online Simulator)",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
