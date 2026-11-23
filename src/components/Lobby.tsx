@@ -63,15 +63,15 @@ interface LobbyXFeedPost {
 }
 
 const LOBBY_NOTICE_CACHE_KEY = 'wuthering_lobby_notice_cache_v1';
-const LOBBY_X_FEED_CACHE_KEY = 'wuthering_x_feed_cache_v3';
+const LOBBY_X_FEED_CACHE_KEY = 'wuthering_x_feed_cache_v4';
 const DEFAULT_X_FEED_POST: LobbyXFeedPost = {
-  id: '2122873482635776453',
+  id: '2124783550511915192',
   handle: 'ucp_cardgame',
   authorName: '【공식】UCP 카드 게임',
-  text: "【테마 대회 「카멜리아」 개최 매장 공개】\n\n『명조: 배틀』 테마 대회 「카멜리아」의 개최 매장이 결정되었습니다🎉\n11월 28일부터 순차적으로 개최됩니다✨",
-  url: 'https://x.com/ucp_cardgame/status/2122873482635776453',
-  createdAt: '2026-11-18T02:04:13.000Z',
-  mediaUrl: 'https://pbs.twimg.com/media/HXX2JKvbwAAotOR.jpg?name=small',
+  text: '『명조: 배틀』 제1탄 굿즈 상품이 곧 출시됩니다!\n\n각 상품은 온라인과 전국 취급 매장에서 판매될 예정입니다.',
+  url: 'https://x.com/ucp_cardgame/status/2124783550511915192',
+  createdAt: '2026-11-23T08:34:09.000Z',
+  mediaUrl: 'https://pbs.twimg.com/media/HXy-H65bgAATGkR.jpg?name=small',
 };
 // [로비 개편 2026-11] 튜토리얼을 한 번 시작하거나 안내를 닫았는지
 const TUTORIAL_SEEN_KEY = 'wtcg_tutorial_seen';

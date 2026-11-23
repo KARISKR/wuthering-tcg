@@ -66,7 +66,7 @@ describe('X feed API (/api/x-feed)', () => {
     expect(body.ok).toBe(true);
     expect(body.source).toBe('fallback');
     expect(body.post.handle).toBe('ucp_cardgame');
-    expect(body.post.id).toBe('2122873482635776453');
-    expect(body.post.url).toBe('https://x.com/ucp_cardgame/status/2122873482635776453');
+    expect(body.post.id).toBe('2124783550511915192');
+    expect(body.post.url).toBe('https://x.com/ucp_cardgame/status/2124783550511915192');
   });
 });
