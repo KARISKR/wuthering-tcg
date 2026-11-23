@@ -4,6 +4,7 @@ import { BgmPlayer } from './BgmPlayer';
 import { CURRENT_GAME_VERSION } from '../data/gameVersion';
 import type { CustomDeckConfig } from '../types/tcg';
 import { useVisitorStats } from '../utils/visitorStats';
+import { getAdminKey } from '../utils/feedbackManager';
 import { roomDirectoryService } from '../services/roomDirectoryService';
 
 const DeckSelectModal = lazy(() => import('./DeckSelectModal').then((m) => ({ default: m.DeckSelectModal })));
@@ -62,7 +63,7 @@ interface LobbyXFeedPost {
 }
 
 const LOBBY_NOTICE_CACHE_KEY = 'wuthering_lobby_notice_cache_v1';
-const LOBBY_X_FEED_CACHE_KEY = 'wuthering_x_feed_cache_v2';
+const LOBBY_X_FEED_CACHE_KEY = 'wuthering_x_feed_cache_v3';
 const DEFAULT_X_FEED_POST: LobbyXFeedPost = {
   id: '2122873482635776453',
   handle: 'ucp_cardgame',
@@ -70,6 +71,7 @@ const DEFAULT_X_FEED_POST: LobbyXFeedPost = {
   text: "【테마 대회 「카멜리아」 개최 매장 공개】\n\n『명조: 배틀』 테마 대회 「카멜리아」의 개최 매장이 결정되었습니다🎉\n11월 28일부터 순차적으로 개최됩니다✨",
   url: 'https://x.com/ucp_cardgame/status/2122873482635776453',
   createdAt: '2026-11-18T02:04:13.000Z',
+  mediaUrl: 'https://pbs.twimg.com/media/HXX2JKvbwAAotOR.jpg?name=small',
 };
 // [로비 개편 2026-11] 튜토리얼을 한 번 시작하거나 안내를 닫았는지
 const TUTORIAL_SEEN_KEY = 'wtcg_tutorial_seen';
@@ -658,14 +660,65 @@ export const Lobby: React.FC<LobbyProps> = ({
               </div>
               <ExternalLink className="w-3.5 h-3.5 text-slate-400 group-hover:text-sky-300 shrink-0 transition" />
             </div>
-            <p className="text-[12px] text-slate-200/90 leading-snug line-clamp-3 whitespace-pre-wrap break-words">
-              {xFeedPost.text}
-            </p>
+            <div className="flex items-start justify-between gap-2.5">
+              <p className="flex-1 min-w-0 text-[12px] text-slate-200/90 leading-snug line-clamp-3 whitespace-pre-wrap break-words">
+                {xFeedPost.text}
+              </p>
+              {xFeedPost.mediaUrl && (
+                <img
+                  src={xFeedPost.mediaUrl}
+                  alt="X 게시글 첨부 이미지"
+                  loading="lazy"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                  className="w-16 h-16 rounded-lg object-cover border border-white/15 shrink-0 bg-slate-900"
+                />
+              )}
+            </div>
             <div className="flex items-center justify-between gap-2 text-[10px] font-semibold text-sky-300/80 group-hover:text-sky-300">
               <span className="truncate">
                 {xFeedPost.id ? `x.com/${xFeedPost.handle}/status/${xFeedPost.id}` : `x.com/${xFeedPost.handle}`}
               </span>
-              <span className="shrink-0">X에서 보기 →</span>
+              <span className="flex items-center gap-2 shrink-0">
+                {getAdminKey() && (
+                  <button
+                    type="button"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const inputUrl = window.prompt('새 X 게시글 주소(URL)를 입력하세요:', xFeedPost.url);
+                      if (!inputUrl || !inputUrl.trim()) return;
+                      try {
+                        const res = await fetch('/api/x-feed', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'X-Admin-Key': getAdminKey(),
+                          },
+                          body: JSON.stringify({ url: inputUrl.trim(), isPinned: true }),
+                        });
+                        const data = await res.json();
+                        if (data?.ok && data?.post) {
+                          setXFeedPost(data.post);
+                          try {
+                            localStorage.setItem(LOBBY_X_FEED_CACHE_KEY, JSON.stringify(data.post));
+                          } catch {}
+                        } else {
+                          window.alert(data?.error || 'X 게시글 갱신에 실패했습니다.');
+                        }
+                      } catch {
+                        window.alert('네트워크 오류로 X 게시글을 갱신하지 못했습니다.');
+                      }
+                    }}
+                    className="px-1.5 py-0.5 rounded bg-amber-400/20 hover:bg-amber-400/35 text-amber-300 border border-amber-400/40 text-[10px] font-black cursor-pointer"
+                    title="관리자: 새 X 게시글 URL로 즉시 교체"
+                  >
+                    URL 변경
+                  </button>
+                )}
+                <span>X에서 보기 →</span>
+              </span>
             </div>
           </a>
         </div>
